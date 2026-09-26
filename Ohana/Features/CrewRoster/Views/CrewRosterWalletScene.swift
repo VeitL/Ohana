@@ -155,9 +155,9 @@ private struct CrewRosterWalletCard: View {
         let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
         let data: Data? = switch mediaRequest.source {
         case .pet:
-            await loader.petAvatarImageData(modelID: mediaRequest.modelID)
+            await loader.petAvatarImageData(id: mediaRequest.id)
         case .human:
-            await loader.humanAvatarImageData(modelID: mediaRequest.modelID)
+            await loader.humanAvatarImageData(id: mediaRequest.id)
         }
         guard !Task.isCancelled, let data, !data.isEmpty else { return }
         _ = await FocusWalletAvatarCache.preload(payloads: [
@@ -249,7 +249,12 @@ struct CrewRosterProfileSummarySnapshot: Equatable {
             rows.append(.init(id: "mbti", title: "MBTI", value: mbti, icon: "brain.head.profile"))
         }
         if !card.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            rows.append(.init(id: "breed", title: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: card.breed, icon: "tag.fill"))
+            rows.append(.init(
+                id: "breed",
+                title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+                value: l.resourceName(card.breed),
+                icon: "tag.fill"
+            ))
         }
         if rows.count < 4, !card.kind.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             rows.append(.init(id: "type", title: l.tr(zh: "类型", en: "Type", de: "Typ"), value: card.kind, icon: memberKindIcon))
@@ -263,15 +268,15 @@ struct CrewRosterProfileSummarySnapshot: Equatable {
             statusText: statusText?.isEmpty == false ? statusText : nil,
             statusIcon: card.statusBadgeIsWarning ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
             eyebrow: l.tr(zh: "基本信息", en: "Profile", de: "Profil"),
-            summaryText: card.personalityHint ?? secondaryIdentityText(for: card),
+            summaryText: card.personalityHint ?? secondaryIdentityText(for: card, l: l),
             metrics: metrics,
             rows: Array(rows.prefix(4))
         )
     }
 
-    private static func secondaryIdentityText(for card: FocusCard) -> String {
+    private static func secondaryIdentityText(for card: FocusCard, l: L10n) -> String {
         if !card.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return card.breed
+            return l.resourceName(card.breed)
         }
         if let days = card.daysTogetherText, !days.isEmpty {
             return days

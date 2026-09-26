@@ -97,6 +97,7 @@ enum AppPresentationPolicyProvider {
                 cornerRadius: OhanaRadius.sheetCompact
             )
         case .settings,
+             .guardianSafety,
              .streakDetail:
             AppPresentationPolicy(
                 surface: .sheetPage,
@@ -348,6 +349,8 @@ private extension AppSheetRoute {
             "humanWorkoutDashboard"
         case .humanMetrics:
             "humanMetrics"
+        case .humanConditions:
+            "humanConditions"
         case .humanReport:
             "humanReport"
         case .humanExpenseQuick:
@@ -360,6 +363,8 @@ private extension AppSheetRoute {
             "humanNoteQuick"
         case .humanNote:
             "humanNote"
+        case .guardianSafety:
+            "guardianSafety"
         case .requiredAccountSwitch:
             "requiredAccountSwitch"
         case .settings:

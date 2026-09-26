@@ -12,19 +12,19 @@ struct PetImageCropView: View {
     var silhouetteSystemName: String?
     let onCrop: (UIImage?) -> Void
 
-    private let cardMargin: CGFloat = 7
-    private let cardAspectRatio: CGFloat = 1.586
+    private let cropMargin: CGFloat = 7
+    private let reservedVerticalSpace: CGFloat = 170
     private let cornerRadius: CGFloat = 24
     private let maxScale: CGFloat = 6.0
 
     @Environment(\.colorScheme) private var colorScheme
 
     @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
-    @State private var lastOffset: CGSize = .zero
     @State private var fitDisplaySize: CGSize = .zero
     @State private var containerSize: CGSize = .zero
+    @GestureState private var gestureMagnification: CGFloat = 1
+    @GestureState private var gestureTranslation: CGSize = .zero
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
@@ -32,6 +32,8 @@ struct PetImageCropView: View {
     var body: some View {
         GeometryReader { geo in
             let (cropW, cropH) = cropSize(for: geo.size)
+            let displayedScale = resolvedScale(cropW: cropW, cropH: cropH)
+            let displayedOffset = resolvedOffset(scale: displayedScale, cropW: cropW, cropH: cropH)
             ZStack {
                 Color.arkInk
 
@@ -39,8 +41,8 @@ struct PetImageCropView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: geo.size.width, height: geo.size.height)
-                    .scaleEffect(scale, anchor: .center)
-                    .offset(offset)
+                    .scaleEffect(displayedScale, anchor: .center)
+                    .offset(displayedOffset)
                     .allowsHitTesting(false)
 
                 CardCropOverlay(cropW: cropW, cropH: cropH, cornerRadius: cornerRadius)
@@ -54,12 +56,9 @@ struct PetImageCropView: View {
                     .frame(width: cropW, height: cropH)
                     .allowsHitTesting(false)
 
-                CardCropCorners(width: cropW, height: cropH, radius: cornerRadius)
-                    .allowsHitTesting(false)
-
                 VStack {
                     Spacer()
-                    Label(l.tr(zh: "卡片取景", en: "Card crop", de: "Kartenausschnitt"), systemImage: "crop")
+                    Label(l.tr(zh: "头像取景", en: "Avatar crop", de: "Avatar zuschneiden"), systemImage: "crop")
                         .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.goCardWhite.opacity(0.5))
                         .padding(.horizontal, 10)
@@ -70,52 +69,54 @@ struct PetImageCropView: View {
                 .allowsHitTesting(false)
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .contentShape(Rectangle())
             .clipped()
-            .simultaneousGesture(cropGesture(cropW: cropW, cropH: cropH))
+            .highPriorityGesture(cropGesture(cropW: cropW, cropH: cropH))
             .onAppear {
-                configureInitialImageFit(container: geo.size, cropW: cropW, cropH: cropH)
+                configureImageFit(container: geo.size, cropW: cropW, cropH: cropH, resetsTransform: true)
             }
             .onChange(of: geo.size) { _, newValue in
-                containerSize = newValue
+                let newCropSize = cropSize(for: newValue)
+                configureImageFit(
+                    container: newValue,
+                    cropW: newCropSize.w,
+                    cropH: newCropSize.h,
+                    resetsTransform: false
+                )
             }
         }
         .safeAreaInset(edge: .bottom) {
             cropActions
         }
         .navigationBarHidden(true)
+        .interactiveDismissDisabled()
         .ignoresSafeArea(edges: .top)
     }
 
     private func cropSize(for container: CGSize) -> (w: CGFloat, h: CGFloat) {
-        let targetW = max(container.width - cardMargin * 2, 220)
-        let targetH = targetW / cardAspectRatio
-        let availableH = max(container.height - 170, 260)
-        if targetH <= availableH {
-            return (targetW, targetH)
-        }
-        return (availableH * cardAspectRatio, availableH)
+        let size = MemberAvatarImageProcessor.portraitCropSize(
+            in: container,
+            horizontalMargin: cropMargin,
+            reservedVerticalSpace: reservedVerticalSpace
+        )
+        return (size.width, size.height)
     }
 
     private func minScale(cropW: CGFloat, cropH: CGFloat) -> CGFloat {
         guard fitDisplaySize.width > 0, fitDisplaySize.height > 0 else { return 0.3 }
         let fw = cropW / fitDisplaySize.width
         let fh = cropH / fitDisplaySize.height
-        return max(min(fw, fh), 0.3)
+        return max(fw, fh)
     }
 
     private func cropGuide(cropW: CGFloat, cropH: CGFloat) -> some View {
-        HStack(spacing: 0) {
-            ZStack {
-                RoundedRectangle(cornerRadius: max(4, cornerRadius - 4), style: .continuous)
-                    .fill(Color.goCardWhite.opacity(colorScheme == .dark ? 0.1 : 0.07))
-                    .frame(width: cropW / 2, height: cropH)
-                Image(systemName: silhouetteSystemName ?? Pet.speciesSilhouetteSymbol(forSpecies: species))
-                    .font(.system(size: min(cropH * 0.52, 128), weight: .bold))
-                    .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(Color.goCardWhite.opacity(colorScheme == .dark ? 0.38 : 0.26))
-            }
-            .frame(width: cropW / 2, height: cropH)
-            Color.clear.frame(width: cropW / 2, height: cropH)
+        ZStack {
+            RoundedRectangle(cornerRadius: max(4, cornerRadius - 4), style: .continuous)
+                .fill(Color.goCardWhite.opacity(colorScheme == .dark ? 0.1 : 0.07))
+            Image(systemName: silhouetteSystemName ?? Pet.speciesSilhouetteSymbol(forSpecies: species))
+                .font(.system(size: min(cropW * 0.38, 128), weight: .bold))
+                .symbolRenderingMode(.monochrome)
+                .foregroundStyle(Color.goCardWhite.opacity(colorScheme == .dark ? 0.32 : 0.22))
         }
         .frame(width: cropW, height: cropH)
     }
@@ -123,20 +124,70 @@ struct PetImageCropView: View {
     private func cropGesture(cropW: CGFloat, cropH: CGFloat) -> some Gesture {
         SimultaneousGesture(
             MagnifyGesture()
-                .onChanged { value in
-                    let proposed = lastScale * value.magnification
-                    let minimum = minScale(cropW: cropW, cropH: cropH)
-                    scale = min(maxScale, max(minimum, proposed))
+                .updating($gestureMagnification) { value, state, _ in
+                    state = value.magnification
+                },
+            DragGesture(minimumDistance: 1, coordinateSpace: .local)
+                .updating($gestureTranslation) { value, state, _ in
+                    state = value.translation
                 }
-                .onEnded { _ in lastScale = scale },
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    offset = CGSize(
-                        width: lastOffset.width + value.translation.width,
-                        height: lastOffset.height + value.translation.height
-                    )
-                }
-                .onEnded { _ in lastOffset = offset }
+        )
+        .onEnded { value in
+            let magnification = value.first?.magnification ?? 1
+            let translation = value.second?.translation ?? .zero
+            let committedScale = MemberAvatarImageProcessor.clampedCropScale(
+                scale * magnification,
+                minimum: minScale(cropW: cropW, cropH: cropH),
+                maximum: maxScale
+            )
+            let proposedOffset = CGSize(
+                width: offset.width + translation.width,
+                height: offset.height + translation.height
+            )
+            scale = committedScale
+            offset = clampedOffset(
+                proposedOffset,
+                scale: committedScale,
+                cropW: cropW,
+                cropH: cropH
+            )
+        }
+    }
+
+    private func resolvedScale(cropW: CGFloat, cropH: CGFloat) -> CGFloat {
+        MemberAvatarImageProcessor.clampedCropScale(
+            scale * gestureMagnification,
+            minimum: minScale(cropW: cropW, cropH: cropH),
+            maximum: maxScale
+        )
+    }
+
+    private func resolvedOffset(scale: CGFloat, cropW: CGFloat, cropH: CGFloat) -> CGSize {
+        clampedOffset(
+            CGSize(
+                width: offset.width + gestureTranslation.width,
+                height: offset.height + gestureTranslation.height
+            ),
+            scale: scale,
+            cropW: cropW,
+            cropH: cropH
+        )
+    }
+
+    private func clampedOffset(
+        _ proposed: CGSize,
+        scale: CGFloat,
+        cropW: CGFloat,
+        cropH: CGFloat
+    ) -> CGSize {
+        guard fitDisplaySize.width > 0, fitDisplaySize.height > 0 else { return .zero }
+        return MemberAvatarImageProcessor.clampedCropOffset(
+            proposed,
+            displayedImageSize: CGSize(
+                width: fitDisplaySize.width * scale,
+                height: fitDisplaySize.height * scale
+            ),
+            cropSize: CGSize(width: cropW, height: cropH)
         )
     }
 
@@ -155,7 +206,7 @@ struct PetImageCropView: View {
             Button { performCrop() } label: {
                 Text(l.tr(zh: "确认裁剪", en: "Crop", de: "Zuschneiden"))
                     .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 50)
                     .background(Color.goPrimary, in: Capsule())
@@ -167,18 +218,30 @@ struct PetImageCropView: View {
         .background(Color.arkInk.opacity(0.8))
     }
 
-    private func configureInitialImageFit(container: CGSize, cropW: CGFloat, cropH: CGFloat) {
+    private func configureImageFit(
+        container: CGSize,
+        cropW: CGFloat,
+        cropH: CGFloat,
+        resetsTransform: Bool
+    ) {
         containerSize = container
         let imageSize = image.size
         guard imageSize.width > 0, imageSize.height > 0 else { return }
         let aspectFit = min(container.width / imageSize.width, container.height / imageSize.height)
         fitDisplaySize = CGSize(width: imageSize.width * aspectFit, height: imageSize.height * aspectFit)
         let minimum = minScale(cropW: cropW, cropH: cropH)
-        let fw = fitDisplaySize.width > 0 ? cropW / fitDisplaySize.width : 1.0
-        let fh = fitDisplaySize.height > 0 ? cropH / fitDisplaySize.height : 1.0
-        let initialScale = max(minimum, max(fw, fh))
-        scale = initialScale
-        lastScale = initialScale
+        if resetsTransform || scale <= 0 {
+            scale = minimum
+            offset = .zero
+            return
+        }
+
+        scale = MemberAvatarImageProcessor.clampedCropScale(
+            scale,
+            minimum: minimum,
+            maximum: maxScale
+        )
+        offset = clampedOffset(offset, scale: scale, cropW: cropW, cropH: cropH)
     }
 
     private func performCrop() {
@@ -244,33 +307,6 @@ private struct CardCropOverlay: View {
             }
             .fill(style: FillStyle(eoFill: true))
             .foregroundStyle(Color.arkInk.opacity(0.62))
-        }
-    }
-}
-
-private struct CardCropCorners: View {
-    let width: CGFloat
-    let height: CGFloat
-    let radius: CGFloat
-    private let len: CGFloat = 20
-    private let thick: CGFloat = 3
-
-    var body: some View {
-        ZStack {
-            ForEach(0 ..< 4, id: \.self) { index in
-                let xSign: CGFloat = index < 2 ? -1 : 1
-                let ySign: CGFloat = (index % 2 == 0) ? -1 : 1
-                ZStack {
-                    RoundedRectangle(cornerRadius: thick / 2)
-                        .fill(Color.goPrimary)
-                        .frame(width: len, height: thick)
-                        .offset(x: xSign * (width / 2 - len / 2), y: ySign * (height / 2))
-                    RoundedRectangle(cornerRadius: thick / 2)
-                        .fill(Color.goPrimary)
-                        .frame(width: thick, height: len)
-                        .offset(x: xSign * (width / 2), y: ySign * (height / 2 - len / 2))
-                }
-            }
         }
     }
 }

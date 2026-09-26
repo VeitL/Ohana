@@ -91,7 +91,7 @@ struct HumanPrivacyTestView: View {
                     Spacer()
                     Text(viewer?.id == target.id ? l.tr(zh: "本人视角", en: "Own view", de: "Eigene Ansicht") : l.tr(zh: "他人视角", en: "Other viewer", de: "Andere Ansicht"))
                         .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                         .background(Color.goPrimary, in: Capsule())
@@ -158,7 +158,7 @@ struct HumanPrivacyTestView: View {
             Spacer()
             Text(isLocked ? l.tr(zh: "锁定", en: "Locked", de: "Gesperrt") : l.tr(zh: "可见", en: "Visible", de: "Sichtbar"))
                 .font(OhanaFont.caption2(.black))
-                .foregroundStyle(isLocked ? Color.goYellow : Color.arkInk)
+                .foregroundStyle(isLocked ? Color.goYellow : Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(isLocked ? Color.goYellow.opacity(0.14) : Color.goPrimary, in: Capsule())
@@ -184,7 +184,7 @@ struct HumanPrivacyTestView: View {
     private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

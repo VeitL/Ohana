@@ -20,7 +20,7 @@ enum HumanPrivateField: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .weight: "体重"
+        case .weight: "身体与健康记录"
         case .workout: "运动"
         case .medication: "吃药提醒"
         case .wishlist: "椰子资产与心愿"
@@ -37,10 +37,19 @@ nonisolated enum HumanLocalPrivacyPolicy {
     static let isEnabled = false
 }
 
+nonisolated enum HumanProfileEditPolicy {
+    /// Human records are household content, not authenticated operators. The
+    /// locally selected Human only supplies task attribution and never grants
+    /// or removes profile-editing authority.
+    static func canEdit(hasPassedAway: Bool) -> Bool {
+        !hasPassedAway
+    }
+}
+
 nonisolated enum HumanProfileOptions {
     static let permissionRoles: [(key: String, title: String, description: String, icon: String)] = [
-        ("owner", "管理者", "可管理家庭资料与核心设置", "crown.fill"),
-        ("member", "成员", "可进行日常记录与照护打卡", "person.fill")
+        ("owner", "主要成员", "家庭资料中的主要成员", "crown.fill"),
+        ("member", "家庭成员", "家庭资料中的其他成员", "person.fill")
     ]
 
     static let genderOptions: [(key: String, icon: String)] = [
@@ -58,9 +67,17 @@ nonisolated enum HumanProfileOptions {
     static func localizedRoleTitle(_ raw: String, l: L10n) -> String {
         switch normalizedRole(raw) {
         case "owner":
-            l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")
+            l.tr(
+                zh: "主要成员", en: "Primary member", de: "Hauptmitglied",
+                es: "Miembro principal", pt: "Membro principal", fr: "Membre principal",
+                ja: "主なメンバー", ko: "주요 구성원", it: "Membro principale"
+            )
         default:
-            l.tr(zh: "成员", en: "Member", de: "Mitglied")
+            l.tr(
+                zh: "家庭成员", en: "Family member", de: "Familienmitglied",
+                es: "Familiar", pt: "Membro da família", fr: "Membre de la famille",
+                ja: "家族メンバー", ko: "가족 구성원", it: "Membro della famiglia"
+            )
         }
     }
 
@@ -108,13 +125,29 @@ nonisolated enum HumanProfileOptions {
     static func localizedGenderTitle(_ raw: String, l: L10n) -> String {
         switch storedGenderIdentity(raw) {
         case "female":
-            l.tr(zh: "女", en: "Female", de: "Weiblich")
+            l.tr(
+                zh: "女", en: "Female", de: "Weiblich",
+                es: "Mujer", pt: "Feminino", fr: "Femme",
+                ja: "女性", ko: "여성", it: "Donna"
+            )
         case "male":
-            l.tr(zh: "男", en: "Male", de: "Männlich")
+            l.tr(
+                zh: "男", en: "Male", de: "Männlich",
+                es: "Hombre", pt: "Masculino", fr: "Homme",
+                ja: "男性", ko: "남성", it: "Uomo"
+            )
         case "nonbinary":
-            l.tr(zh: "非二元", en: "Non-binary", de: "Nichtbinaer")
+            l.tr(
+                zh: "非二元", en: "Non-binary", de: "Nichtbinär",
+                es: "No binario", pt: "Não binário", fr: "Non binaire",
+                ja: "ノンバイナリー", ko: "논바이너리", it: "Non binario"
+            )
         case "private":
-            l.tr(zh: "不透露", en: "Prefer not to say", de: "Keine Angabe")
+            l.tr(
+                zh: "不透露", en: "Prefer not to say", de: "Keine Angabe",
+                es: "Prefiero no decirlo", pt: "Prefiro não informar", fr: "Je préfère ne pas répondre",
+                ja: "回答しない", ko: "공개하지 않음", it: "Preferisco non dirlo"
+            )
         default:
             raw.trimmingCharacters(in: .whitespacesAndNewlines)
         }
@@ -144,18 +177,18 @@ nonisolated enum HumanPermissionRole {
     static func title(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            "管理者"
+            "主要成员"
         default:
-            "成员"
+            "家庭成员"
         }
     }
 
     static func description(for raw: String) -> String {
         switch HumanProfileOptions.normalizedRole(raw) {
         case "owner":
-            "可管理家庭资料与核心设置"
+            "家庭资料中的主要成员"
         default:
-            "可进行日常记录与照护打卡"
+            "家庭资料中的其他成员"
         }
     }
 
@@ -447,11 +480,79 @@ final class Human {
     }
 
     static func westernZodiacDisplay(for date: Date, l: L10n) -> String {
-        switch l.languageCode {
-        case "de":
-            westernZodiacGerman(for: date)
-        case "en":
-            westernZodiacEnglish(for: date)
+        switch westernZodiacChinese(for: date) {
+        case "摩羯座":
+            l.tr(
+                zh: "摩羯座", en: "Capricorn", de: "Steinbock",
+                es: "Capricornio", pt: "Capricórnio", fr: "Capricorne",
+                ja: "山羊座", ko: "염소자리", it: "Capricorno"
+            )
+        case "水瓶座":
+            l.tr(
+                zh: "水瓶座", en: "Aquarius", de: "Wassermann",
+                es: "Acuario", pt: "Aquário", fr: "Verseau",
+                ja: "水瓶座", ko: "물병자리", it: "Acquario"
+            )
+        case "双鱼座":
+            l.tr(
+                zh: "双鱼座", en: "Pisces", de: "Fische",
+                es: "Piscis", pt: "Peixes", fr: "Poissons",
+                ja: "魚座", ko: "물고기자리", it: "Pesci"
+            )
+        case "白羊座":
+            l.tr(
+                zh: "白羊座", en: "Aries", de: "Widder",
+                es: "Aries", pt: "Áries", fr: "Bélier",
+                ja: "牡羊座", ko: "양자리", it: "Ariete"
+            )
+        case "金牛座":
+            l.tr(
+                zh: "金牛座", en: "Taurus", de: "Stier",
+                es: "Tauro", pt: "Touro", fr: "Taureau",
+                ja: "牡牛座", ko: "황소자리", it: "Toro"
+            )
+        case "双子座":
+            l.tr(
+                zh: "双子座", en: "Gemini", de: "Zwillinge",
+                es: "Géminis", pt: "Gêmeos", fr: "Gémeaux",
+                ja: "双子座", ko: "쌍둥이자리", it: "Gemelli"
+            )
+        case "巨蟹座":
+            l.tr(
+                zh: "巨蟹座", en: "Cancer", de: "Krebs",
+                es: "Cáncer", pt: "Câncer", fr: "Cancer",
+                ja: "蟹座", ko: "게자리", it: "Cancro"
+            )
+        case "狮子座":
+            l.tr(
+                zh: "狮子座", en: "Leo", de: "Löwe",
+                es: "Leo", pt: "Leão", fr: "Lion",
+                ja: "獅子座", ko: "사자자리", it: "Leone"
+            )
+        case "处女座":
+            l.tr(
+                zh: "处女座", en: "Virgo", de: "Jungfrau",
+                es: "Virgo", pt: "Virgem", fr: "Vierge",
+                ja: "乙女座", ko: "처녀자리", it: "Vergine"
+            )
+        case "天秤座":
+            l.tr(
+                zh: "天秤座", en: "Libra", de: "Waage",
+                es: "Libra", pt: "Libra", fr: "Balance",
+                ja: "天秤座", ko: "천칭자리", it: "Bilancia"
+            )
+        case "天蝎座":
+            l.tr(
+                zh: "天蝎座", en: "Scorpio", de: "Skorpion",
+                es: "Escorpio", pt: "Escorpião", fr: "Scorpion",
+                ja: "蠍座", ko: "전갈자리", it: "Scorpione"
+            )
+        case "射手座":
+            l.tr(
+                zh: "射手座", en: "Sagittarius", de: "Schütze",
+                es: "Sagitario", pt: "Sagitário", fr: "Sagittaire",
+                ja: "射手座", ko: "사수자리", it: "Sagittario"
+            )
         default:
             westernZodiacChinese(for: date)
         }

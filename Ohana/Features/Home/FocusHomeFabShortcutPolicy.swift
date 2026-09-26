@@ -33,7 +33,6 @@ nonisolated enum FocusHomeFabShortcutPolicy {
     static func humanShortcuts(localization l: L10n) -> [ExpandedCardFabShortcut] {
         [
             ExpandedCardFabShortcut(label: l.homeQAWeight, icon: "scalemass.fill", action: .humanQuick("humanWeight")),
-            ExpandedCardFabShortcut(label: l.expense, icon: "creditcard.fill", action: .humanQuick("humanExpense")),
             ExpandedCardFabShortcut(label: l.homeQAMeds, icon: "pill.fill", action: .humanQuick("humanMedication")),
             ExpandedCardFabShortcut(label: l.homeQASport, icon: "figure.run", action: .humanQuick("humanWorkout")),
             ExpandedCardFabShortcut(label: l.homeQANote, icon: "note.text", action: .humanQuick("humanNote")),

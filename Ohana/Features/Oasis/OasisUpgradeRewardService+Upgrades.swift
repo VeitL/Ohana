@@ -17,58 +17,60 @@ extension OasisUpgradeRewardService {
     ) throws -> Bool {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let questManager = providedQuestManager ?? QuestManager()
-        normalizeLifecycle(for: critter, context: context)
-        guard critter.lifeState != .dead else { return false }
-        let cost = starUpgradeCost(for: critter)
-        guard let balance = fragmentBalance(critterId: critter.catalogId, context: context),
-              balance.amount >= cost.fragments,
-              OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
-                  cost.coconuts,
-                  context: context,
-                  activeHumanSelection: activeHumanSelection,
-                  questManager: questManager
-              ) else {
-            return false
-        }
+        let commandKey = "star:\(critter.id.uuidString)"
+        guard beginGrowthCommand(commandKey) else { return false }
+        defer { endGrowthCommand(commandKey) }
 
-        balance.amount -= cost.fragments
-        balance.updatedAt = Date()
-        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
-            cost.coconuts,
-            emoji: "⭐️",
-            title: DomainCareRewardGeneralTitle.oasisCritterStarUpgrade,
+        return try PersistenceWriteFence.withExclusiveAccess(
             context: context,
-            activeHumanSelection: activeHumanSelection,
-            wallet: wallet,
-            questManager: questManager,
-            updatesProjection: false
-        ) else {
-            balance.amount += cost.fragments
-            balance.updatedAt = Date()
-            return false
-        }
-        do {
-            critter.starLevel += 1
-            critter.bond = min(999, critter.bond + 20)
-            critter.mood = min(100, critter.mood + 16)
-            critter.appearanceStage = min(maxCritterAppearanceStage, max(appearanceStage(forLevel: critter.level), critter.starLevel))
-            critter.lastInteractionAt = Date()
-            critter.lastStateRefreshAt = Date()
-            context.insert(actionLog(
+            unavailable: { false }
+        ) {
+            normalizeLifecycle(for: critter, context: context)
+            let availability = starUpgradeAvailability(
                 for: critter,
-                action: .starUpgrade,
-                coconutDelta: -cost.coconuts,
-                fragmentDelta: -cost.fragments,
-                xpDelta: 0
-            ))
-            try saveRewardChanges(context: context)
-            wallet.refreshQuestProjection(context: context, manager: questManager)
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context, manager: questManager)
-            throw error
+                context: context,
+                isProcessing: false,
+                activeHumanSelection: activeHumanSelection,
+                questManager: questManager,
+                ignoresCommandKey: commandKey
+            )
+            guard availability.isAvailable else { return false }
+            let plan = availability.fundingPlan
+            guard consumeCompanionFunding(
+                plan,
+                catalogId: critter.catalogId,
+                emoji: "⭐️",
+                title: DomainCareRewardGeneralTitle.oasisCritterStarUpgrade,
+                context: context,
+                activeHumanSelection: activeHumanSelection,
+                wallet: wallet,
+                questManager: questManager
+            ) else { return false }
+
+            do {
+                critter.starLevel = min(maxCritterStarLevel, critter.starLevel + 1)
+                critter.bond = min(999, critter.bond + 20)
+                critter.mood = min(100, critter.mood + 16)
+                critter.appearanceStage = min(
+                    maxCritterAppearanceStage,
+                    max(appearanceStage(forLevel: critter.level), critter.starLevel)
+                )
+                critter.lastInteractionAt = Date()
+                critter.lastStateRefreshAt = Date()
+                context.insert(fundingActionLog(
+                    for: critter,
+                    action: .starUpgrade,
+                    plan: plan
+                ))
+                try saveRewardChanges(context: context)
+                wallet.refreshQuestProjection(context: context, manager: questManager)
+                return true
+            } catch {
+                context.rollback()
+                wallet.refreshQuestProjection(context: context, manager: questManager)
+                throw error
+            }
         }
-        return true
     }
 
     @discardableResult
@@ -81,81 +83,73 @@ extension OasisUpgradeRewardService {
     ) throws -> OasisElectronicPet? {
         let wallet: CoconutWalletManaging = providedWallet ?? SwiftDataCoconutWalletManager()
         let questManager = providedQuestManager ?? QuestManager()
-        guard !ownsCritter(catalogId, context: context),
-              let entry = OasisUpgradeRewardCatalog.critter(id: catalogId) else {
-            return nil
-        }
-        guard OasisTreeManagerRegistry.current.treeLevel.rawValue >= entry.sourceLevel else {
-            return nil
-        }
-        let cost = awakeningCost(for: entry.rarity)
-        guard let balance = fragmentBalance(critterId: catalogId, context: context),
-              balance.amount >= cost.fragments,
-              OasisCritterEconomyService.canSpendCurrentHumanCoconuts(
-                  cost.coconuts,
-                  context: context,
-                  activeHumanSelection: activeHumanSelection,
-                  questManager: questManager
-              ) else {
-            return nil
-        }
+        let commandKey = "awaken:\(catalogId)"
+        guard beginGrowthCommand(commandKey) else { return nil }
+        defer { endGrowthCommand(commandKey) }
 
-        balance.amount -= cost.fragments
-        balance.updatedAt = Date()
-        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
-            cost.coconuts,
-            emoji: "🐾",
-            title: DomainCareRewardGeneralTitle.oasisCritterAwaken,
+        return try PersistenceWriteFence.withExclusiveAccess(
             context: context,
-            activeHumanSelection: activeHumanSelection,
-            wallet: wallet,
-            questManager: questManager,
-            updatesProjection: false
-        ) else {
-            balance.amount += cost.fragments
-            balance.updatedAt = Date()
-            return nil
-        }
-
-        do {
-            let hasFeatured = hasFeaturedCritter(context: context)
-            let critter = OasisElectronicPet(
-                catalogId: entry.id,
-                nameZh: entry.nameZh,
-                nameEn: entry.nameEn,
-                nameDe: entry.nameDe,
-                emoji: entry.emoji,
-                rarity: entry.rarity,
-                isFeaturedOnOasis: !hasFeatured,
-                habitatSlot: hasFeatured ? 1 : 0,
-                favoriteItemId: entry.preferredItemId,
-                personalityRaw: entry.personalityRaw,
-                sourceLevel: entry.sourceLevel
+            unavailable: { nil }
+        ) {
+            guard let entry = OasisUpgradeRewardCatalog.critter(id: catalogId) else { return nil }
+            let availability = awakenAvailability(
+                catalogId: catalogId,
+                context: context,
+                isProcessing: false,
+                activeHumanSelection: activeHumanSelection,
+                questManager: questManager,
+                ignoresCommandKey: commandKey
             )
-            context.insert(critter)
-            context.insert(OasisCritterActionLog(
-                critterId: critter.id,
-                critterCatalogId: critter.catalogId,
-                action: .fragmentAwaken,
-                coconutDelta: -cost.coconuts,
-                fragmentDelta: -cost.fragments,
-                noteZh: "用碎片唤醒伙伴",
-                noteEn: "Awakened a companion with fragments.",
-                noteDe: "Begleiter mit Fragmenten geweckt."
-            ))
-            try saveRewardChanges(context: context)
-            wallet.refreshQuestProjection(context: context, manager: questManager)
-            return critter
-        } catch {
-            context.rollback()
-            wallet.refreshQuestProjection(context: context, manager: questManager)
-            throw error
+            guard availability.isAvailable else { return nil }
+            let plan = availability.fundingPlan
+            guard consumeCompanionFunding(
+                plan,
+                catalogId: catalogId,
+                emoji: "🐾",
+                title: DomainCareRewardGeneralTitle.oasisCritterAwaken,
+                context: context,
+                activeHumanSelection: activeHumanSelection,
+                wallet: wallet,
+                questManager: questManager
+            ) else { return nil }
+
+            do {
+                let hasFeatured = hasFeaturedCritter(context: context)
+                let critter = OasisElectronicPet(
+                    catalogId: entry.id,
+                    nameZh: entry.nameZh,
+                    nameEn: entry.nameEn,
+                    nameDe: entry.nameDe,
+                    emoji: entry.emoji,
+                    rarity: entry.rarity,
+                    isFeaturedOnOasis: !hasFeatured,
+                    habitatSlot: hasFeatured ? 1 : 0,
+                    favoriteItemId: entry.preferredItemId,
+                    personalityRaw: entry.personalityRaw,
+                    sourceLevel: entry.sourceLevel
+                )
+                context.insert(critter)
+                context.insert(fundingActionLog(
+                    for: critter,
+                    action: .fragmentAwaken,
+                    plan: plan
+                ))
+                try saveRewardChanges(context: context)
+                wallet.refreshQuestProjection(context: context, manager: questManager)
+                return critter
+            } catch {
+                context.rollback()
+                wallet.refreshQuestProjection(context: context, manager: questManager)
+                throw error
+            }
         }
     }
 
     static func setFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
         normalizeLifecycle(for: critter, context: context)
-        guard critter.lifeState != .dead else { return }
+        guard critter.lifeState != .dead,
+              critter.lifeState != .critical,
+              critter.lifeState != .sleeping else { return }
         let all = allElectronicPets(context: context)
         for item in all {
             item.isFeaturedOnOasis = item.id == critter.id
@@ -171,7 +165,9 @@ extension OasisUpgradeRewardService {
 
     static func clearFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
         normalizeLifecycle(for: critter, context: context)
-        guard critter.lifeState != .dead else { return }
+        guard critter.lifeState != .dead,
+              critter.lifeState != .critical,
+              critter.lifeState != .sleeping else { return }
         critter.isFeaturedOnOasis = false
         context.insert(actionLog(for: critter, action: .feature))
         try saveRewardChanges(context: context)
@@ -197,7 +193,7 @@ extension OasisUpgradeRewardService {
             })
         guard let critter = candidates.first(where: {
             normalizeLifecycle(for: $0, context: context)
-            return $0.lifeState != .dead
+            return $0.lifeState != .dead && $0.lifeState != .critical && $0.lifeState != .sleeping
         }) else { return true }
 
         let gain = careEchoGain(for: type)
@@ -264,13 +260,268 @@ extension OasisUpgradeRewardService {
     static func awakeningCost(for rarity: OasisElectronicPetRarity) -> (fragments: Int, coconuts: Int) {
         switch rarity {
         case .common: (120, 80)
-        case .rare: (180, 120)
-        case .epic: (300, 220)
-        case .legendary: (520, 420)
+        case .rare: (160, 120)
+        case .epic: (240, 180)
+        case .legendary: (360, 300)
         }
     }
 
     static func starUpgradeCost(for critter: OasisElectronicPet) -> (fragments: Int, coconuts: Int) {
-        (critter.starLevel * 40, critter.starLevel * 80)
+        switch critter.starLevel {
+        case ...1: (40, 40)
+        case 2: (60, 80)
+        case 3: (80, 120)
+        case 4: (120, 160)
+        default: (0, 0)
+        }
+    }
+
+    static func starUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        context: ModelContext,
+        isProcessing: Bool = false,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        questManager providedQuestManager: QuestManager? = nil,
+        ignoresCommandKey: String? = nil
+    ) -> CompanionActionAvailability {
+        let questManager = providedQuestManager ?? QuestManager()
+        let cost = starUpgradeCost(for: critter)
+        let plan = companionFundingPlan(
+            catalogId: critter.catalogId,
+            requiredGrowthCurrency: cost.fragments,
+            coconutCost: cost.coconuts,
+            context: context,
+            activeHumanSelection: activeHumanSelection,
+            questManager: questManager
+        )
+        let commandKey = "star:\(critter.id.uuidString)"
+        let commandIsActive = activeGrowthCommandKeys.contains(commandKey) && commandKey != ignoresCommandKey
+        let reason: CompanionActionUnavailableReason? = if isProcessing || commandIsActive {
+            .processing
+        } else if critter.starLevel >= maxCritterStarLevel {
+            .maxStars
+        } else if critter.lifeState == .sleeping || critter.lifeState == .critical || critter.lifeState == .dead {
+            .sleeping
+        } else if OasisCritterEconomyService.currentHuman(
+            context: context,
+            activeHumanSelection: activeHumanSelection
+        ) == nil {
+            .noActiveHuman
+        } else if plan.missingGrowthCurrency > 0 {
+            .insufficientGrowthCurrency
+        } else if plan.missingCoconuts > 0 {
+            .insufficientCoconuts
+        } else {
+            nil
+        }
+        return CompanionActionAvailability(
+            action: .starUpgrade,
+            isAvailable: reason == nil,
+            reason: reason,
+            fundingPlan: plan
+        )
+    }
+
+    static func awakenAvailability(
+        catalogId: String,
+        context: ModelContext,
+        isProcessing: Bool = false,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        questManager providedQuestManager: QuestManager? = nil,
+        ignoresCommandKey: String? = nil
+    ) -> CompanionActionAvailability {
+        let questManager = providedQuestManager ?? QuestManager()
+        guard let entry = OasisUpgradeRewardCatalog.critter(id: catalogId) else {
+            let plan = CompanionFundingPlan.make(
+                requiredGrowthCurrency: 0,
+                coconutCost: 0,
+                specificFragmentBalance: 0,
+                stardustBalance: stardustBalance(context: context),
+                coconutBalance: OasisCritterEconomyService.currentHumanBalance(
+                    context: context,
+                    activeHumanSelection: activeHumanSelection,
+                    questManager: questManager
+                )
+            )
+            return CompanionActionAvailability(
+                action: .awaken,
+                isAvailable: false,
+                reason: .unknownCompanion,
+                fundingPlan: plan
+            )
+        }
+        let cost = awakeningFundingCost(for: entry)
+        let plan = companionFundingPlan(
+            catalogId: catalogId,
+            requiredGrowthCurrency: cost.fragments,
+            coconutCost: cost.coconuts,
+            context: context,
+            activeHumanSelection: activeHumanSelection,
+            questManager: questManager
+        )
+        let commandKey = "awaken:\(catalogId)"
+        let commandIsActive = activeGrowthCommandKeys.contains(commandKey) && commandKey != ignoresCommandKey
+        let reason: CompanionActionUnavailableReason? = if isProcessing || commandIsActive {
+            .processing
+        } else if ownsCritter(catalogId, context: context) {
+            .alreadyOwned
+        } else if OasisTreeManagerRegistry.current.treeLevel.rawValue < entry.sourceLevel {
+            .treeLevelLocked
+        } else if OasisCritterEconomyService.currentHuman(
+            context: context,
+            activeHumanSelection: activeHumanSelection
+        ) == nil {
+            .noActiveHuman
+        } else if plan.missingGrowthCurrency > 0 {
+            .insufficientGrowthCurrency
+        } else if plan.missingCoconuts > 0 {
+            .insufficientCoconuts
+        } else {
+            nil
+        }
+        return CompanionActionAvailability(
+            action: .awaken,
+            isAvailable: reason == nil,
+            reason: reason,
+            fundingPlan: plan
+        )
+    }
+
+    static func companionSnapshot(
+        for critter: OasisElectronicPet,
+        context: ModelContext,
+        isProcessing: Bool = false,
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        questManager providedQuestManager: QuestManager? = nil
+    ) -> OasisCompanionSnapshot {
+        let questManager = providedQuestManager ?? QuestManager()
+        let availability = starUpgradeAvailability(
+            for: critter,
+            context: context,
+            isProcessing: isProcessing,
+            activeHumanSelection: activeHumanSelection,
+            questManager: questManager
+        )
+        return OasisCompanionSnapshot(
+            id: critter.id,
+            catalogID: critter.catalogId,
+            level: min(maxCritterLevel, max(1, critter.level)),
+            starLevel: min(maxCritterStarLevel, max(1, critter.starLevel)),
+            appearanceStage: min(maxCritterAppearanceStage, max(1, critter.appearanceStage)),
+            bond: max(0, critter.bond),
+            lifeState: lifecycleSnapshot(for: critter).state,
+            specificFragments: availability.fundingPlan.specificFragmentBalance,
+            stardust: availability.fundingPlan.stardustBalance,
+            starAvailability: availability
+        )
+    }
+
+    private static func awakeningFundingCost(
+        for entry: OasisElectronicPetCatalogEntry
+    ) -> (fragments: Int, coconuts: Int) {
+        if entry.id == OasisUpgradeRewardCatalog.firstCritterId {
+            return (0, 0)
+        }
+        return awakeningCost(for: entry.rarity)
+    }
+
+    private static func companionFundingPlan(
+        catalogId: String,
+        requiredGrowthCurrency: Int,
+        coconutCost: Int,
+        context: ModelContext,
+        activeHumanSelection: ActiveHumanSelecting,
+        questManager: QuestManager
+    ) -> CompanionFundingPlan {
+        CompanionFundingPlan.make(
+            requiredGrowthCurrency: requiredGrowthCurrency,
+            coconutCost: coconutCost,
+            specificFragmentBalance: fragmentBalance(
+                critterId: catalogId,
+                context: context
+            )?.amount ?? 0,
+            stardustBalance: stardustBalance(context: context),
+            coconutBalance: OasisCritterEconomyService.currentHumanBalance(
+                context: context,
+                activeHumanSelection: activeHumanSelection,
+                questManager: questManager
+            )
+        )
+    }
+
+    private static func consumeCompanionFunding(
+        _ plan: CompanionFundingPlan,
+        catalogId: String,
+        emoji: String,
+        title: String,
+        context: ModelContext,
+        activeHumanSelection: ActiveHumanSelecting,
+        wallet: CoconutWalletManaging,
+        questManager: QuestManager
+    ) -> Bool {
+        guard plan.isFullyFunded else { return false }
+        let now = Date()
+        if plan.specificFragmentsUsed > 0 {
+            guard let balance = fragmentBalance(critterId: catalogId, context: context),
+                  balance.amount >= plan.specificFragmentsUsed else { return false }
+            balance.amount -= plan.specificFragmentsUsed
+            balance.updatedAt = now
+        }
+        if plan.stardustUsed > 0 {
+            guard let balance = fragmentBalance(
+                critterId: OasisCompanionCurrency.stardustCatalogID,
+                context: context
+            ), balance.amount >= plan.stardustUsed else {
+                context.rollback()
+                return false
+            }
+            balance.amount -= plan.stardustUsed
+            balance.updatedAt = now
+        }
+        guard OasisCritterEconomyService.spendCurrentHumanCoconuts(
+            plan.coconutCost,
+            emoji: emoji,
+            title: title,
+            context: context,
+            activeHumanSelection: activeHumanSelection,
+            wallet: wallet,
+            questManager: questManager,
+            updatesProjection: false
+        ) else {
+            context.rollback()
+            wallet.refreshQuestProjection(context: context, manager: questManager)
+            return false
+        }
+        return true
+    }
+
+    private static func fundingActionLog(
+        for critter: OasisElectronicPet,
+        action: OasisCritterAction,
+        plan: CompanionFundingPlan
+    ) -> OasisCritterActionLog {
+        let actionZh = action == .starUpgrade ? "伙伴升星" : "唤醒伙伴"
+        let actionEn = action == .starUpgrade ? "Companion star upgrade" : "Companion awakening"
+        let actionDe = action == .starUpgrade ? "Begleiter-Sternupgrade" : "Begleiter-Erweckung"
+        let fundingZh = "\(plan.specificFragmentsUsed)◇ + \(plan.stardustUsed)✦ + \(plan.coconutCost)🥥"
+        return OasisCritterActionLog(
+            critterId: critter.id,
+            critterCatalogId: critter.catalogId,
+            action: action,
+            coconutDelta: -plan.coconutCost,
+            fragmentDelta: -(plan.specificFragmentsUsed + plan.stardustUsed),
+            sourceLevel: critter.sourceLevel,
+            noteZh: "\(actionZh)：\(fundingZh)",
+            noteEn: "\(actionEn): \(fundingZh)",
+            noteDe: "\(actionDe): \(fundingZh)"
+        )
+    }
+
+    private static func beginGrowthCommand(_ key: String) -> Bool {
+        activeGrowthCommandKeys.insert(key).inserted
+    }
+
+    private static func endGrowthCommand(_ key: String) {
+        activeGrowthCommandKeys.remove(key)
     }
 }

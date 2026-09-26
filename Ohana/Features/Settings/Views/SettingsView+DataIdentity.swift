@@ -11,23 +11,33 @@ extension SettingsView {
     @ViewBuilder
     var settingsDataSections: some View {
         if !isRouteDataLoaded {
+            if routeLoadErrorMessage != nil {
+                routeDataErrorSection
+            }
             deviceIdentityPlaceholderSection
             petManagementPlaceholderSection
         } else {
             if selectableSettingsHumans.count > 1 {
-                if areDataSectionsMounted {
-                    deviceIdentitySection(selectableSettingsHumans)
-                } else {
-                    deviceIdentityPlaceholderSection
-                }
+                deviceIdentitySection(selectableSettingsHumans)
             }
             if let homePets, !homePets.isEmpty {
-                if areDataSectionsMounted {
-                    petManagementEntrySection(homePets)
-                } else {
-                    petManagementPlaceholderSection
-                }
+                petManagementEntrySection(homePets)
             }
+        }
+    }
+
+    private var routeDataErrorSection: some View {
+        Section {
+            Button {
+                onRetryRouteData?()
+            } label: {
+                SettingsNavigationLabel(
+                    icon: "arrow.clockwise.circle.fill",
+                    title: l.tr(zh: "重新载入成员数据", en: "Reload member data", de: "Mitgliederdaten neu laden"),
+                    subtitle: l.tr(zh: "其他设置仍可正常使用", en: "Other settings remain available", de: "Andere Einstellungen bleiben verfügbar")
+                )
+            }
+            .accessibilityIdentifier("settings-route-data-retry")
         }
     }
 
@@ -161,6 +171,7 @@ extension SettingsView {
                         ))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
+                        .accessibilityIdentifier("settings-human-identity-selected-summary")
                     }
                 }
             }
@@ -198,10 +209,6 @@ extension SettingsView {
             }
             .buttonStyle(ScaleButtonStyle())
         }
-    }
-
-    var currentBackgroundStyle: AppBackgroundStyle {
-        AppBackgroundStyle(rawValue: appBackgroundStyle) ?? .goIsland
     }
 
     func quickSwitch(to human: SettingsHumanSnapshot) {

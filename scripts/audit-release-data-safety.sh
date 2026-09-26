@@ -59,6 +59,7 @@ data_backup_files=(
 shared_container="Ohana/Models/SharedModelContainer.swift"
 local_backup_exclusion="Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift"
 human_note_attachments="Ohana/Features/HumanNotes/HumanNoteAttachmentStore.swift"
+system_surface_contracts="Ohana/SystemSurfaces/SystemSurfaceContracts.swift"
 human_note_commands="Ohana/Features/HumanNotes/HumanNoteCommands.swift"
 member_deletion_commands="Ohana/Features/Members/MemberDeletionCommands.swift"
 human_note_attachment_tests="OhanaTests/HumanNoteAttachmentLifecycleTests.swift"
@@ -66,7 +67,7 @@ data_backup_atomic_tests="OhanaTests/DataBackupAtomicRestoreTests.swift"
 v90_migration_fixture="OhanaTests/Fixtures/ArkSchemaV90/default.store"
 v90_migration_manifest="OhanaTests/Fixtures/ArkSchemaV90/manifest.json"
 settings_backup="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
-settings_chrome="Ohana/Features/Settings/Views/SettingsView+Chrome.swift"
+settings_reset="Ohana/Features/Settings/Views/SettingsView+Backup.swift"
 
 failures=()
 
@@ -134,10 +135,25 @@ reject_backup_pattern() {
   fi
 }
 
+require_ordered_patterns() {
+  local file="$1"
+  local first="$2"
+  local second="$3"
+  local message="$4"
+  local first_line second_line
+  first_line="$(rg -n -m 1 --pcre2 "$first" "$file" | cut -d: -f1 || true)"
+  second_line="$(rg -n -m 1 --pcre2 "$second" "$file" | cut -d: -f1 || true)"
+  if [[ -z "$first_line" || -z "$second_line" || "$first_line" -ge "$second_line" ]]; then
+    failures+=("$message")
+  fi
+}
+
 # Every persisted SwiftData model must either have a backup DTO contract or a
 # deliberate exemption. This prevents new @Model types from silently falling out
 # of user-owned export/restore coverage.
 backup_contract_entries=(
+  "AchievementRewardReceipt|struct AchievementRewardReceiptBackup"
+  "AchievementUnlock|struct AchievementUnlockBackup"
   "CareLedgerEvent|struct CareLedgerEventBackup"
   "CloudSyncRecordState|EXEMPT:local CloudKit sync metadata, rebuilt by sync runtime"
   "CoconutAccount|struct CoconutAccountBackup"
@@ -146,10 +162,18 @@ backup_contract_entries=(
   "EconomyBudgetUsageEvent|EXEMPT:derived daily budget guardrail state, not user-authored history"
   "Event|struct EventBackup"
   "FamilyCollaborationTask|struct FamilyCollaborationTaskBackup"
+  "FamilyTaskActivity|EXEMPT:free-form family-task activity is excluded from restricted external backup"
+  "FamilyTaskPlan|EXEMPT:free-form recurring family-task plans are excluded from restricted external backup"
+  "GuardianIncidentProjection|EXEMPT:authenticated Family guardian service projection, never restored from backup"
+  "GuardianRelationshipProjection|EXEMPT:authenticated Family guardian service projection, never restored from backup"
+  "GuardianSafetyPolicyProjection|EXEMPT:authenticated Family guardian service projection, never restored from backup"
+  "GuardianSafetySyncOutbox|EXEMPT:device-local network recovery queue, unsafe to resurrect from backup"
   "HeatCycleLog|struct HeatCycleLogBackup"
   "Household|struct HouseholdBackup"
   "Human|struct HumanBackup"
+  "HumanHealthCondition|EXEMPT:Human condition details are excluded from externally shareable backups"
   "HumanHealthMetricLog|struct HumanHealthMetricLogBackup"
+  "HumanHealthObservation|EXEMPT:Human health observations are excluded from externally shareable backups"
   "HumanHealthReport|struct HumanHealthReportBackup"
   "HumanNoteRecord|struct HumanNoteRecordBackup"
   "HumanMedication|struct HumanMedicationBackup"
@@ -175,10 +199,15 @@ backup_contract_entries=(
   "PetWeightLog|struct PetWeightLogBackup"
   "Plant|struct PlantBackup"
   "PlantCareLog|struct PlantCareLogBackup"
+  "PresenceCheckIn|struct PresenceCheckInBackup"
+  "PresenceParticipationPeriod|struct PresenceParticipationPeriodBackup"
+  "PresenceRewardReceipt|struct PresenceRewardReceiptBackup"
   "RecycleBinBatch|EXEMPT:short-lived recycle-bin grouping metadata, not durable user content"
   "Reminder|struct ReminderBackup"
+  "SafetyContact|EXEMPT:device-local phone-number data, intentionally excluded from every backup destination"
   "SharedCareSession|struct SharedCareSessionBackup"
   "SharedCareUndoReceipt|EXEMPT:local short-lived crash-recovery coordination state, not user-authored history"
+  "ShopPurchaseAttempt|EXEMPT:local shop fulfillment recovery state, not user-authored history"
   "ShopPurchaseRecord|struct ShopPurchaseRecordBackup"
   "SymptomLog|struct SymptomLogBackup"
   "WaterLog|struct WaterLogBackup"
@@ -218,11 +247,21 @@ for entry in "${backup_contract_entries[@]}"; do
     "SwiftData model $model should have a matching backup DTO, or a documented exemption if intentionally excluded."
 done
 
-require_pattern "$shared_container" 'Schema\(ArkSchemaV91\.models\)' \
-  "SharedModelContainer should open the current ArkSchemaV91 model set."
+latest_schema_version="$(
+  rg -o '^enum ArkSchemaV[0-9]+: VersionedSchema' "$shared_container" |
+    rg -o '[0-9]+' |
+    sort -n |
+    tail -n 1 || true
+)"
+if [[ -z "$latest_schema_version" ]]; then
+  failures+=("SharedModelContainer should declare at least one versioned ArkSchema.")
+else
+  require_pattern "$shared_container" "Schema\\(ArkSchemaV${latest_schema_version}\\.models\\)" \
+    "SharedModelContainer should open the latest declared ArkSchemaV${latest_schema_version} model set."
+fi
 
 require_pattern "$local_backup_exclusion" 'values\.isExcludedFromBackup = true' \
-  "Local persistence must set URLResourceValues.isExcludedFromBackup before storing private data."
+  "Local persistence must apply URLResourceValues.isExcludedFromBackup at protected path creation or open."
 
 require_pattern "$local_backup_exclusion" 'forKeys: \[\.isExcludedFromBackupKey\]' \
   "Local backup exclusion must be read back and verified after it is applied."
@@ -235,6 +274,25 @@ require_pattern "$human_note_attachments" 'LocalBackupExclusionPolicy\.excludeFr
 
 require_pattern "$human_note_attachments" 'LocalBackupExclusionPolicy\.excludeFromDeviceBackup\(url\)' \
   "Human Note attachment files must be excluded after atomic writes."
+
+if ! scripts/audit-system-surface-contract.sh "$system_surface_contracts"; then
+  failures+=("The bounded App Group snapshot must protect and verify its container before writing and its final file after every atomic replacement.")
+fi
+
+if ! scripts/audit-system-surface-reset-fence.sh; then
+  failures+=("The App Reset runtime must fence delayed Widget refreshes, recover after failed persistent deletion, and keep executable regression proof.")
+fi
+
+require_pattern "$app_reset" 'sanitizeForAppReset\(' \
+  "Delete-all Reset must use the observable Widget snapshot sanitization boundary."
+
+require_ordered_patterns "$app_reset" 'try systemSurfaceSnapshotSanitizer\(\)' \
+  'try deletePersistentModels\(' \
+  "Delete-all Reset must sanitize the private Widget projection before deleting the primary store."
+
+require_section_pattern "OhanaWidgets/TodayCareWidget.swift" 'case \.personal:' \
+  'case \.upgradeRequired:' '\.privacySensitive\(\)' \
+  "The Today Care Widget must redact the entire Personal branch on privacy-sensitive system surfaces."
 
 require_pattern "$human_note_commands" 'let attachmentCleanup = cleanDeletedAttachments\(' \
   "Human Note deletion must run attachment cleanup only after its SwiftData commit succeeds."
@@ -269,6 +327,18 @@ require_pattern "$human_note_attachment_tests" 'appResetStoreDeletionFailureLeav
 
 require_pattern "OhanaTests/LocalBackupExclusionPolicyTests.swift" 'marksDirectoriesAndFilesAsExcludedFromDeviceBackup' \
   "Release data safety must test directory and file backup-exclusion resource values."
+
+require_pattern "OhanaTests/SystemSurfaceTests.swift" 'snapshotStoreRoundTripsVersionedValueDataAndReappliesBackupExclusion' \
+  "Release data safety must test backup exclusion on bounded App Group snapshot rewrites."
+
+require_pattern "OhanaTests/SystemSurfaceTests.swift" 'includedValues\.isExcludedFromBackup = false' \
+  "The snapshot rewrite test must clear the prior marker before proving exclusion is reapplied."
+
+require_pattern "OhanaTests/SystemSurfaceTests.swift" 'snapshotResetSanitizationRequiresWriteOrRemovalToSucceed' \
+  "Release data safety must prove Widget Reset sanitization rejects a double failure."
+
+require_pattern "OhanaTests/AppResetServiceTests.swift" 'testResetStopsBeforePersistentDeletionWhenSystemSurfaceSanitizationFails' \
+  "Release data safety must prove a failed Widget sanitization aborts Reset before primary deletion."
 
 require_pattern "$app_reset" 'deletePersistentData: \{ \$0\.deleteAllData\(\) \}' \
   "Delete-all reset must use the full-store deletion boundary so every current and future persisted model is removed."
@@ -306,7 +376,7 @@ require_pattern "$app_runtime_adapters" 'await automaticBackups\.removeManagedAu
 require_pattern "$app_services" 'automaticBackups: automaticBackups' \
   "AppServices must inject one AutomaticBackupService instance into both lifecycle backup and Reset ownership."
 
-require_pattern "$settings_chrome" 'try await appServices\.appReset\.reset\(context: modelContext\)' \
+require_pattern "$settings_reset" 'try await appServices\.appReset\.reset\(context: modelContext\)' \
   "Settings Delete-All must await the coordinated asynchronous Reset result."
 
 require_pattern "OhanaTests/AutomaticBackupServiceTests.swift" 'resetDuringNonCooperativeExportFencesOldGenerationAndAllowsANewBackup' \
@@ -326,11 +396,11 @@ while IFS= read -r localized_strings; do
     "Localized resources must not retain the obsolete claim that backups include all Human health records."
 done < <(find Ohana -name Localizable.strings -type f -print)
 
-require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 31' \
-  "OhanaBackup.schemaVersion should be 31 after adding Human action attribution."
+require_pattern "$data_backup_dtos" 'var schemaVersion: Int = 34' \
+  "OhanaBackup.schemaVersion should be 34 after adding structured expense payer contributions."
 
-require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 31' \
-  "Restore preflight should accept supported backup schema versions through 31."
+require_pattern "$data_backup_preflight" 'backup\.schemaVersion >= 1, backup\.schemaVersion <= 34' \
+  "Restore preflight should accept supported backup schema versions through 34."
 
 require_pattern "$data_backup_dtos" 'struct BackupMediaPackageInfo' \
   "OhanaBackup should describe the out-of-line backup media package."
@@ -464,7 +534,7 @@ require_pattern "$data_backup_dtos" 'var humanHealthMetricLogs: \[HumanHealthMet
 require_backup_pattern 'FetchDescriptor<HumanHealthMetricLog>' \
   "DataBackupManager should fetch HumanHealthMetricLog during backup/import."
 
-require_backup_pattern 'humanHealthMetricLogs: humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
+require_backup_pattern 'humanHealthMetricLogs: source\.humanHealthMetricLogs\.map\(encodeHumanHealthMetricLog\)' \
   "buildBackup should encode human health metric logs."
 
 require_backup_pattern 'insertHumanHealthMetricLogIfNeeded' \
@@ -497,7 +567,7 @@ require_pattern "$data_backup_dtos" 'var coconutAccounts: \[CoconutAccountBackup
 require_pattern "$data_backup_dtos" 'var coconutLedgerEntries: \[CoconutLedgerEntryBackup\]\?' \
   "OhanaBackup should include V58 CoconutLedgerEntry backups."
 
-require_backup_pattern 'coconutAccounts: coconutAccounts\.map\(encodeCoconutAccount\)' \
+require_backup_pattern 'coconutAccounts: source\.coconutAccounts\.map\(encodeCoconutAccount\)' \
   "buildBackup should export V58 CoconutAccount rows."
 
 require_backup_pattern 'let backupCoconutLedgerEntries = scope\.excludesHumanHealthData' \
@@ -515,7 +585,7 @@ require_backup_pattern 'economyBudgetUsageEvents: backupEconomyBudgetUsageEvents
 require_backup_pattern 'let backupFamilyTasks = scope\.excludesHumanHealthData' \
   "Restricted exports must explicitly scope free-text family tasks."
 
-require_backup_pattern 'let coconutLogProjection = backupCoconutLedgerEntries' \
+require_backup_pattern 'source\.shopPurchaseRecords, source\.coconutAccounts, backupCoconutLedgerEntries, source\.plants' \
   "Legacy wallet-log projection must use the same restricted wallet scope."
 
 require_backup_pattern 'insertCoconutAccountIfNeeded' \

@@ -40,6 +40,10 @@ extension PetBasicInfoDetailView {
     }
 
     func saveChanges() {
+        guard canSavePetDraft else { return }
+        isSaving = true
+        saveErrorMessage = nil
+
         let input = PetProfileCommandInput(
             name: eName,
             avatarImageData: eAvatarImageData,
@@ -82,11 +86,20 @@ extension PetBasicInfoDetailView {
                 note: "petBasicInfo.profile"
             )
             guard result.didPersist else {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                isSaving = false
+                saveErrorMessage = l.tr(
+                    zh: "修改没有保存，请稍后重试。",
+                    en: "Changes were not saved. Please try again.",
+                    de: "Änderungen wurden nicht gespeichert. Bitte erneut versuchen."
+                )
+                OhanaFeedback.error()
                 return
             }
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation { isEditing = false }
+            isSaving = false
+            presentedSheet = nil
+            OhanaFeedback.success()
+            presentSavedFeedback()
+            onSave?()
         }
     }
 }

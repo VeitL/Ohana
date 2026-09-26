@@ -662,6 +662,7 @@ nonisolated enum CloudSyncRecordSerializer {
             "sharedSessionId": .string(log.sharedSessionId),
             "executorId": optionalString(log.executorId),
             "recordedByHumanId": optionalString(log.recordedByHumanId),
+            "payerContributionsJSON": .string(log.payerContributionsJSON),
             "petId": optionalString(log.pet.map { CloudSyncRecordState.normalizedRecordId($0.id) })
         ]
     }
@@ -845,6 +846,9 @@ nonisolated enum CloudSyncRecordSerializer {
             "instantCoconutDelta": .int(log.instantCoconutDelta),
             "costCoconuts": .int(log.costCoconuts),
             "dailySequence": .int(log.dailySequence),
+            "oddsVersion": .int(log.oddsVersion ?? 1),
+            "guaranteeKindRaw": .string(log.guaranteeKindRaw ?? ""),
+            "stardustDelta": .int(log.stardustDelta ?? 0),
             "drawDate": .date(log.drawDate),
             "createdAt": .date(log.createdAt)
         ]

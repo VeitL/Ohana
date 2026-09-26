@@ -76,7 +76,7 @@ extension PlantDetailContentView {
         case .leafCleaning:
             openPlantCareFeatureDetail(for: .leafCleaning)
         case .profile:
-            showingEditSheet = true
+            showingBasicInfo = true
         case .photos:
             if galleryPhotoItems.isEmpty {
                 openCareLogSheet(.photo)
@@ -264,10 +264,12 @@ extension PlantDetailContentView {
         guard !selections.isEmpty else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let executorId = executorID?.uuidString
+        let operationID = UUID()
         await OhanaFrameScheduler.waitAfterNextFrame()
         let result = commandExecutor.recordPlantBatchQuickCare(
             selections: selections,
-            executorId: executorId
+            executorId: executorId,
+            operationID: operationID
         )
         return handleBatchQuickCareResult(result, selections: selections)
     }
@@ -506,6 +508,11 @@ extension PlantDetailContentView {
                 plant,
                 note: "plant.detail.restore"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

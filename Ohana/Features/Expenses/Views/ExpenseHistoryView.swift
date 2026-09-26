@@ -139,7 +139,8 @@ struct ExpenseHistoryContentView: View {
                         showingExpensePopup = true
                     }
                 },
-                onRemove: onRemove
+                onRemove: onRemove,
+                onDataChanged: onDataChanged
             )
 
             if showingExpensePopup {
@@ -342,7 +343,17 @@ struct ExpenseHistoryContentView: View {
                             expenseRow(log: log)
                         }
                         if sortedLogs.isEmpty {
-                            Text(l.tr(zh: "还没有花费记录\n点击右上角 + 在这里记录", en: "No expenses yet\nTap + to record one here", de: "Noch keine Ausgaben\nTippe auf + zum Erfassen"))
+                            Text(l.tr(
+                                zh: "还没有花费记录\n点击 + 记录",
+                                en: "No expenses yet\nTap + to add one",
+                                de: "Noch keine Ausgaben\nTippe zum Erfassen auf +",
+                                es: "Aún no hay gastos\nToca + para añadir uno",
+                                pt: "Ainda não há despesas\nToque em + para adicionar",
+                                fr: "Aucune dépense\nTouchez + pour en ajouter",
+                                ja: "支出記録はまだありません\n＋をタップして追加",
+                                ko: "지출 기록이 아직 없어요\n+를 탭해 추가하세요",
+                                it: "Nessuna spesa\nTocca + per aggiungerne una"
+                            ))
                                 .font(OhanaFont.adaptive(size: 14, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                                 .multilineTextAlignment(.center)
@@ -361,16 +372,13 @@ struct ExpenseHistoryContentView: View {
             HStack(spacing: 12) {
                 Image(systemName: "creditcard.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "快速记账", en: "Quick Expense", de: "Schnelle Ausgabe"))
                         .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "金额、日期和备注都在本页完成", en: "Amount, date, and notes stay on this page.", de: "Betrag, Datum und Notizen bleiben auf dieser Seite."))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Button {
@@ -435,7 +443,7 @@ struct ExpenseHistoryContentView: View {
                     Text(l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag sichern"))
                 }
                 .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(canSaveInlineExpense ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
                 .background(canSaveInlineExpense ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -461,7 +469,7 @@ struct ExpenseHistoryContentView: View {
                             Text(l.expenseCategoryTitle(cat))
                                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         }
-                        .foregroundStyle(newCategory == cat ? Color.arkInk : Color.ohanaPrimaryText.opacity(0.72))
+                        .foregroundStyle(newCategory == cat ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText.opacity(0.72))
                         .padding(.horizontal, 13)
                         .padding(.vertical, 9)
                         .background(newCategory == cat ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -526,10 +534,10 @@ struct ExpenseHistoryContentView: View {
         let cat = ExpenseCategory(rawValue: log.category) ?? .other
         let isReimbursement = log.amount < 0
         let accentColor: Color = isReimbursement ? Color(hex: "4ECDC4") : Color.goYellow
-        let payer = payer(for: log)
+        let payerSummary = payerSummary(for: log)
         let recorder = recorder(for: log)
         let payerLabel = isReimbursement ? l.tr(zh: "到账", en: "Received", de: "Eingang") : l.tr(zh: "支付者", en: "Payer", de: "Gezahlt von")
-        let payerName = payer?.name ?? (isReimbursement ? l.tr(zh: "保险", en: "Insurance", de: "Versicherung") : l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet"))
+        let payerName = payerSummary ?? (isReimbursement ? l.tr(zh: "保险", en: "Insurance", de: "Versicherung") : l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet"))
         let visibleNote = SharedCareMetadata.visibleNote(log.note)
 
         return HStack(spacing: 14) {
@@ -580,7 +588,7 @@ struct ExpenseHistoryContentView: View {
                             .lineLimit(1)
                     }
                 }
-                .foregroundStyle(accentColor.opacity(payer == nil && !isReimbursement ? 0.65 : 1))
+                .foregroundStyle(accentColor.opacity(payerSummary == nil && !isReimbursement ? 0.65 : 1))
             }
 
             Spacer()
@@ -639,14 +647,26 @@ struct ExpenseHistoryContentView: View {
         return allSharedCareSessions.first { $0.id.uuidString == id }
     }
 
-    private func payer(for log: PetExpenseLog) -> Human? {
-        guard let executorId = log.executorId else { return nil }
-        return allHumans.first { $0.id.uuidString == executorId }
+    private func payerSummary(for log: PetExpenseLog) -> String? {
+        let contributions = log.payerContributions
+        guard !contributions.isEmpty else { return nil }
+        let includesMultiplePayers = contributions.count > 1
+        return contributions.map { contribution in
+            let name = contribution.humanID.flatMap { humanID in
+                allHumans.first { $0.id == humanID }?.name
+            } ?? l.tr(
+                zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet",
+                es: "Sin asignar", pt: "Não atribuído", fr: "Non attribué",
+                ja: "未指定", ko: "미지정", it: "Non assegnato"
+            )
+            guard includesMultiplePayers else { return name }
+            return "\(name) \(AppCurrency.format(contribution.amount, fractionDigits: 2))"
+        }.joined(separator: " · ")
     }
 
     private func recorder(for log: PetExpenseLog) -> Human? {
         guard let recordedByHumanId = log.recordedByHumanId,
-              recordedByHumanId != log.executorId else { return nil }
+              !log.payerIDs.contains(recordedByHumanId) else { return nil }
         return allHumans.first { $0.id.uuidString == recordedByHumanId }
     }
 

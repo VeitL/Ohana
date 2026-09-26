@@ -44,6 +44,7 @@ struct CalendarRouteContainer: View {
             onPresentCoconutLog: onPresentCoconutLog,
             onCompleteEvent: onCompleteEvent,
             events: routeData.events,
+            familyTaskProjectionEvents: routeData.familyTaskProjectionEvents,
             pets: routeData.pets,
             humans: routeData.humans,
             plants: routeData.plants,
@@ -174,6 +175,7 @@ nonisolated struct CalendarPreparedSnapshotLoadInput: Sendable {
 
 private nonisolated struct CalendarRouteData {
     var events: [Event] = []
+    var familyTaskProjectionEvents: [Event] = []
     var pets: [Pet] = []
     var humans: [Human] = []
     var plants: [Plant] = []
@@ -188,6 +190,7 @@ private nonisolated struct CalendarRouteData {
     @MainActor
     init(reference: CalendarRouteDataReference, context: ModelContext) {
         events = Self.rehydrate(reference.events, as: Event.self, context: context)
+        familyTaskProjectionEvents = reference.familyTaskOccurrences.map { $0.makeReadOnlyEvent() }
         pets = Self.rehydrate(reference.pets, as: Pet.self, context: context)
         humans = Self.rehydrate(reference.humans, as: Human.self, context: context)
         plants = Self.rehydrate(reference.plants, as: Plant.self, context: context)
@@ -210,6 +213,7 @@ private nonisolated struct CalendarRouteData {
 
 private nonisolated struct CalendarRouteDataReference: Sendable {
     var events: [PersistentIdentifier] = []
+    var familyTaskOccurrences: [CalendarFamilyTaskOccurrenceProjection] = []
     var pets: [PersistentIdentifier] = []
     var humans: [PersistentIdentifier] = []
     var plants: [PersistentIdentifier] = []
@@ -235,6 +239,7 @@ private actor CalendarRouteDataActor {
             )
             : []
         let events = fetchVisibleEvents()
+        let familyTaskOccurrences = fetchFamilyTaskOccurrences(existingEvents: events)
         let pets = fetch(
             FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]),
             name: "Pet"
@@ -268,6 +273,7 @@ private actor CalendarRouteDataActor {
         try Task.checkCancellation()
         return CalendarRouteDataReference(
             events: events.map(\.persistentModelID),
+            familyTaskOccurrences: familyTaskOccurrences,
             pets: pets.map(\.persistentModelID),
             humans: humans.map(\.persistentModelID),
             plants: plants.map(\.persistentModelID),
@@ -313,6 +319,82 @@ private actor CalendarRouteDataActor {
             uniqueEvents[event.id] = event
         }
         return uniqueEvents.values.sorted { $0.startDate > $1.startDate }
+    }
+
+    private func fetchFamilyTaskOccurrences(
+        existingEvents: [Event],
+        now: Date = Date()
+    ) -> [CalendarFamilyTaskOccurrenceProjection] {
+        let activeStatus = FamilyTaskPlanStatus.active.rawValue
+        var planDescriptor = FetchDescriptor<FamilyTaskPlan>(
+            predicate: #Predicate<FamilyTaskPlan> { $0.statusRaw == activeStatus },
+            sortBy: [SortDescriptor(\.createdAt), SortDescriptor(\.id)]
+        )
+        planDescriptor.fetchLimit = CalendarFamilyTaskProjectionBuilder.activePlanFetchLimit
+        let plans = fetch(planDescriptor, name: "FamilyTaskPlan.active")
+        guard !plans.isEmpty else { return [] }
+
+        var taskDescriptor = FetchDescriptor<FamilyCollaborationTask>(
+            predicate: #Predicate<FamilyCollaborationTask> { task in
+                task.planId != nil && task.occurrenceKey != nil
+            },
+            sortBy: [SortDescriptor(\.nominalAt, order: .reverse), SortDescriptor(\.id)]
+        )
+        taskDescriptor.fetchLimit = CalendarFamilyTaskProjectionBuilder.existingOccurrenceFetchLimit
+        let activePlanIDs = Set(plans.map(\.id.uuidString))
+        let taskKeys = fetch(taskDescriptor, name: "FamilyCollaborationTask.planOccurrenceKeys")
+            .filter { task in
+                guard let planID = task.planId else { return false }
+                return activePlanIDs.contains(planID)
+            }
+            .compactMap(\.occurrenceKey)
+        let eventKeys = existingEvents.compactMap(\.familyTaskOccurrenceKey)
+        let existingKeys = Set(taskKeys).union(eventKeys)
+
+        return CalendarFamilyTaskProjectionBuilder.occurrences(
+            plans: plans.map(familyTaskPlanProjection),
+            existingOccurrenceKeys: existingKeys,
+            now: now
+        )
+    }
+
+    private func familyTaskPlanProjection(
+        _ plan: FamilyTaskPlan
+    ) -> CalendarFamilyTaskPlanProjection {
+        let relatedEntityType: String
+        let relatedEntityID: String
+        switch plan.subjectKind {
+        case .household:
+            relatedEntityType = ""
+            relatedEntityID = ""
+        case .human:
+            relatedEntityType = EntityKind.human.rawValue
+            relatedEntityID = plan.subjectId ?? ""
+        case .pet:
+            relatedEntityType = EntityKind.pet.rawValue
+            relatedEntityID = plan.subjectId ?? ""
+        case .plant:
+            relatedEntityType = EntityKind.plant.rawValue
+            relatedEntityID = plan.subjectId ?? ""
+        }
+        return CalendarFamilyTaskPlanProjection(
+            id: plan.id,
+            title: plan.title,
+            isAllDay: plan.isAllDay,
+            eventTypeRaw: plan.eventTypeRaw,
+            relatedEntityType: relatedEntityType,
+            relatedEntityID: relatedEntityID,
+            assignedToID: plan.assignedToId,
+            taskCareKindRaw: plan.taskCareKindRaw,
+            recurrenceRule: plan.recurrenceRule,
+            anchorAt: plan.anchorAt,
+            startsAt: plan.startsAt,
+            endsAt: plan.endsAt,
+            timeZone: plan.timeZone,
+            scheduleVersion: plan.scheduleVersion,
+            materializedThroughAt: plan.materializedThroughAt,
+            createdAt: plan.createdAt
+        )
     }
 
     private func fetch<T: PersistentModel>(

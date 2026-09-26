@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct PetRetentionHubView: View {
     let pet: Pet
@@ -14,6 +15,7 @@ struct PetRetentionHubView: View {
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var careLedgerEvents: [CareLedgerEvent]
@@ -21,6 +23,7 @@ struct PetRetentionHubView: View {
     @State private var ledgerLoadTask: Task<Void, Never>?
     @State private var isRenderingPDF = false
     @State private var pdfShare: PetArchivePDFShare?
+    @State private var showingPersonalPlan = false
 
     init(
         pet: Pet,
@@ -132,6 +135,10 @@ struct PetRetentionHubView: View {
             }
         }
         .petMemorialTone(isActive: pet.hasPassedAway)
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
+        }
         .onAppear { scheduleCareLedgerLoad() }
         .onDisappear {
             ledgerLoadTask?.cancel()
@@ -270,7 +277,7 @@ struct PetRetentionHubView: View {
             HStack(spacing: 12) {
                 Image(systemName: archiveSnapshot.nextStep.icon)
                     .font(OhanaFont.adaptive(size: 18, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
@@ -304,7 +311,9 @@ struct PetRetentionHubView: View {
                 icon: "person.text.rectangle.fill",
                 accent: Color(hex: "6B82C4"),
                 title: l.tr(zh: "身份资料", en: "Profile", de: "Profil"),
-                value: pet.breed.isEmpty ? pet.species : pet.breed,
+                value: pet.breed.isEmpty
+                    ? Pet.localizedSpeciesName(pet.species, l: l)
+                    : l.resourceName(pet.breed),
                 subtitle: l.tr(zh: "名字、品种、生日、到家日", en: "Name, breed, birthday, home day", de: "Name, Rasse, Geburtstag, Einzug"),
                 destination: PetBasicInfoDetailView(pet: pet)
             )
@@ -368,6 +377,12 @@ struct PetRetentionHubView: View {
                     if isRenderingPDF {
                         ProgressView()
                             .tint(Color.goPrimary)
+                    } else if !appServices.commerce.allows(.vetSummaryPDF) {
+                        Image(systemName: "lock.fill").accessibilityLabel(
+                            l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Ohana Personal erforderlich")
+                        )
+                            .font(OhanaFont.adaptive(size: 12, weight: .black))
+                            .foregroundStyle(Color.goPrimary)
                     } else {
                         Image(systemName: "chevron.right").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 12, weight: .black))
@@ -524,6 +539,11 @@ struct PetRetentionHubView: View {
 
     private func renderPDF() {
         guard !isRenderingPDF else { return }
+        guard appServices.commerce.allows(.vetSummaryPDF) else {
+            showingPersonalPlan = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
         isRenderingPDF = true
         Task {
             let url = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)

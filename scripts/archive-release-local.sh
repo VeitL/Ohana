@@ -6,6 +6,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # shellcheck source=scripts/lib/local-build-environment.sh
 source "${REPO_ROOT}/scripts/lib/local-build-environment.sh"
+# shellcheck source=scripts/lib/xcode-storage-lifecycle.sh
+source "${REPO_ROOT}/scripts/lib/xcode-storage-lifecycle.sh"
 
 cd "${REPO_ROOT}"
 
@@ -16,8 +18,9 @@ Usage:
   scripts/archive-release-local.sh --verify /path/to/Ohana.xcarchive
 
 Creates and verifies a signed Release WMO Archive outside the repository. It
-can also verify an existing Archive without rebuilding. It does not export or
-upload the archive.
+can also verify an existing Archive without rebuilding. Source and archived
+executables must not contain shipping UI-test or developer mutation surfaces.
+It does not export or upload the archive.
 USAGE
 }
 
@@ -45,7 +48,6 @@ fi
 STAMP="$(date +%Y-%m-%d-%H%M%S)"
 DEFAULT_ARCHIVE_PATH="${ARCHIVE_ROOT}/${STAMP}/Ohana-${COMMIT}${DIRTY_SUFFIX}.xcarchive"
 ARCHIVE_PATH="${OHANA_ARCHIVE_PATH:-${DEFAULT_ARCHIVE_PATH}}"
-LOCK_DIR="${REPO_ROOT}/.build/locks/lane-release.lock"
 
 absolute_path() {
   python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "$1"
@@ -80,18 +82,13 @@ else
     exit 2
   fi
 
+  "${REPO_ROOT}/scripts/audit-release-test-surface.sh" --all
   ohana_require_build_disk_space
 
-  mkdir -p "${DERIVED_DATA_PATH}" "$(dirname "${ARCHIVE_PATH}")" "$(dirname "${LOCK_DIR}")"
-  if ! mkdir "${LOCK_DIR}" 2>/dev/null; then
-    echo "Another signed Archive is already running for this worktree." >&2
-    echo "Lock: ${LOCK_DIR}" >&2
-    exit 75
-  fi
-  printf '%s\n' "$$" > "${LOCK_DIR}/pid"
+  ohana_acquire_xcode_project_lock "archive:release"
+  mkdir -p "${DERIVED_DATA_PATH}" "$(dirname "${ARCHIVE_PATH}")"
   cleanup() {
-    rm -f "${LOCK_DIR}/pid"
-    rmdir "${LOCK_DIR}" 2>/dev/null || true
+    ohana_release_xcode_project_lock
   }
   trap cleanup EXIT
 
@@ -125,8 +122,9 @@ if [[ ! -d "${APP_PATH}" ]]; then
 fi
 
 codesign --verify --deep --strict --verbose=2 "${APP_PATH}"
+"${REPO_ROOT}/scripts/audit-release-test-surface.sh" --app "${APP_PATH}"
 
-if xattr -lr "${APP_PATH}" 2>/dev/null | grep -Eq 'com\.apple\.(FinderInfo|ResourceFork)'; then
+if xattr -lr "${APP_PATH}" 2>/dev/null | grep -Eq 'com\.apple\.(FinderInfo|ResourceFork|quarantine)'; then
   echo "Signing-risk extended attributes remain in the archived app." >&2
   exit 1
 fi

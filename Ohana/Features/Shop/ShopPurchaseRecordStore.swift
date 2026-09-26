@@ -85,26 +85,6 @@ enum ShopPurchaseRecordStore {
         return inserted
     }
 
-    @discardableResult
-    static func deleteOwnershipRecord(
-        itemID: String,
-        transactionKey: String?,
-        context: ModelContext,
-        deletedAt: Date = Date()
-    ) throws -> Bool {
-        guard let transactionKey else { return false }
-        let descriptor = FetchDescriptor<ShopPurchaseRecord>(
-            predicate: #Predicate<ShopPurchaseRecord> { record in
-                record.transactionKey == transactionKey
-            }
-        )
-        let records = try context.fetch(descriptor)
-        guard let record = records.first else { return false }
-        CloudSyncMutationRecorder.markDeleted(record, context: context, deletedAt: deletedAt)
-        context.delete(record)
-        return true
-    }
-
     private nonisolated static func shouldPersistOwnership(for item: ShopItem) -> Bool {
         !item.isConsumable && item.id != AppIconCatalog.defaultItemId
     }

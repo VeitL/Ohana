@@ -56,6 +56,7 @@ struct QuickPottyDetailSheet: View {
     @State var isCommittingPottyLog = false
     @State var selectedActionHumanID: UUID?
     @State var requiresActionHumanSelection = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
@@ -87,11 +88,17 @@ struct QuickPottyDetailSheet: View {
     var scoopTint: Color { isDark ? Color.goPrimary : Color(hex: CareType.litter.accentColorHex) }
     var litterTint: Color { Color(hex: "D4A574") }
     var chromeTint: Color { isDark ? Color.goPrimary : themeColor }
+    var chromeActionForeground: Color {
+        isDark
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText)
+    }
     var pottyCommandExecutor: QuickPottyCommandExecutor {
         QuickPottyCommandExecutor(
             context: modelContext,
             careEvents: appServices.careEvents,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -252,10 +259,14 @@ struct QuickPottyDetailSheet: View {
                                 Button(l.cancel) {
                                     closeActivePottySheet()
                                 }
+                                .accessibilityIdentifier("quick-potty-sheet-cancel-action")
                             }
                         }
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
+            }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
             }
             .alert(l.tr(zh: "今天已经完成了", en: "Already done today", de: "Heute schon erledigt"), isPresented: $showSingleUseNotice) {
                 Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {}
@@ -307,6 +318,11 @@ struct QuickPottyDetailSheet: View {
             inlineSheetDragOffset = 0
             if nestedInlineSheet == nil, activeSheet?.usesInlineOverlay != true {
                 inlineSheetVisible = false
+            }
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+            if !isEntitled, overviewRange == .days90 {
+                overviewRange = .days30
             }
         }
         .onDisappear {
@@ -560,7 +576,7 @@ struct QuickPottyDetailSheet: View {
                 Text(focus.title(l))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
-            .foregroundStyle(selected ? Color.arkInk : tint)
+            .foregroundStyle(selected ? actionForeground(for: focus) : tint)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 8)
             .background(selected ? tint : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -594,6 +610,16 @@ struct QuickPottyDetailSheet: View {
         case .litter:
             litterTint
         }
+    }
+
+    func actionForeground(for focus: PottyFocus) -> Color {
+        let hex = switch focus {
+        case .potty: "A66A3F"
+        case .scoop: isDark ? nil : CareType.litter.accentColorHex
+        case .litter: "D4A574"
+        }
+        return hex.flatMap { OhanaResolvedPrimaryAccent(customHex: $0)?.actionTextColor }
+            ?? Color.ohanaPrimaryActionText
     }
 
     var coreCards: some View {
@@ -766,7 +792,7 @@ struct QuickPottyDetailSheet: View {
     var toastView: some View {
         Text(saveToastMessage)
             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(chromeActionForeground)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())

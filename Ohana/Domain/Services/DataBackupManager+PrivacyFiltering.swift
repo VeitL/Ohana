@@ -6,6 +6,20 @@
 //
 
 nonisolated extension DataBackupManager {
+    static func isHumanHealthAchievement(scopeKindRaw: String, achievementID: String) -> Bool {
+        guard scopeKindRaw == AchievementScopeKind.human.rawValue else { return false }
+        guard let definition = AchievementDefinitionCatalog.definition(id: achievementID) else {
+            // Unknown Human-scoped facts fail closed in an external package.
+            return true
+        }
+        switch definition.category {
+        case .health, .movement:
+            return true
+        case .care, .memory, .profile, .economy, .companion, .gacha, .island:
+            return false
+        }
+    }
+
     static func isHumanHealthEvent(_ event: Event) -> Bool {
         let role = DomainEntityLinkRegistry.role(for: event)
         switch role {

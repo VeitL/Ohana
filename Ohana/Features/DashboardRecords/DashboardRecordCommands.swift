@@ -354,6 +354,7 @@ struct DashboardRecordCommandExecutor {
         note expenseNote: String,
         executorId: String?,
         recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution] = [],
         source: CareLedgerSource = .detail,
         receiptTitle: String? = nil,
         receiptCategory: DocumentCategory? = nil,
@@ -370,6 +371,7 @@ struct DashboardRecordCommandExecutor {
             context: context,
             executorId: executorId,
             recordedByHumanId: recordedByHumanId,
+            payerContributions: payerContributions,
             source: source,
             receiptTitle: receiptTitle,
             receiptCategory: receiptCategory,
@@ -392,6 +394,7 @@ struct DashboardRecordCommandExecutor {
         note expenseNote: String,
         executorId: String?,
         recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution] = [],
         source: CareLedgerSource = .detail,
         command: DomainCommand,
         revisionNote: String
@@ -406,6 +409,7 @@ struct DashboardRecordCommandExecutor {
             context: context,
             executorId: executorId,
             recordedByHumanId: recordedByHumanId,
+            payerContributions: payerContributions,
             source: source,
             careEvents: careEvents
         )
@@ -444,6 +448,25 @@ struct DashboardRecordCommandExecutor {
                 noopNote: "\(revisionNote).factOnly"
             )
         )
+        return result
+    }
+
+    @discardableResult
+    func updatePetExpense(
+        _ log: PetExpenseLog,
+        pet: Pet,
+        input: PetExpenseUpdateInput,
+        note: String
+    ) throws -> PetExpenseUpdateCommandResult {
+        let result = try ExpenseCommandService.updatePetExpense(
+            log,
+            pet: pet,
+            input: input,
+            context: context
+        )
+        if result.didChange {
+            revisions.publishExpenseUpdate(result, note: note)
+        }
         return result
     }
 

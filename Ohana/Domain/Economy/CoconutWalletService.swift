@@ -58,6 +58,36 @@ nonisolated enum CoconutWalletPersistence {
     }
 }
 
+extension CoconutWalletService {
+    @MainActor
+    static func restoreCachedHumanBalances(_ balances: [UUID: Int], context: ModelContext) {
+        guard !balances.isEmpty else { return }
+        let humans = (try? context.fetch(FetchDescriptor<Human>())) ?? []
+        for human in humans {
+            if let balance = balances[human.id] {
+                human.coconutBalance = balance
+            }
+        }
+    }
+
+    /// Restores in-memory wallet projections after an uncommitted transaction
+    /// is rolled back. Persisted balances still roll back through ModelContext;
+    /// this keeps the current render pass from observing transient values.
+    @MainActor
+    static func restoreUncommittedBalances(
+        humans: [(model: Human, balance: Int)],
+        accounts: [(model: CoconutAccount, balance: Int, updatedAt: Date)]
+    ) {
+        for snapshot in humans {
+            snapshot.model.coconutBalance = snapshot.balance
+        }
+        for snapshot in accounts {
+            snapshot.model.balance = snapshot.balance
+            snapshot.model.updatedAt = snapshot.updatedAt
+        }
+    }
+}
+
 struct CoconutWalletReconciliationSummary: Equatable {
     let correctedAccountCount: Int
     let createdAccountCount: Int

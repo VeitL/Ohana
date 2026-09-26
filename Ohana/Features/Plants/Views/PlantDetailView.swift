@@ -25,11 +25,16 @@ struct PlantDetailContentView: View {
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var showingEditSheet = false
+    @State var showingBasicInfo = false
     @State var showingAllFeaturesHub = false
     @State var showingPlantDetailExtras = false
     @State var showingDeleteConfirm = false
     @State var showingPhotoGallery = false
     @State var careLogDraftType: PlantCareType?
+    @State var careHistoryRoute: PlantCareHistoryRoute?
+    @State var growthDiaryShareItem: PlantGrowthDiaryShareItem?
+    @State var growthDiaryExportTask: Task<Void, Never>?
+    @State var isPreparingGrowthDiaryExport = false
     @State var careFeatureDraft: PlantDetailCareFeatureDraft?
     @State var quickCareConfirmDraft: PlantQuickCareConfirmDraft?
     @State var quickCareExecutorID: UUID?
@@ -48,6 +53,7 @@ struct PlantDetailContentView: View {
     @State var failedDetailQuickCareTypes: Set<PlantCareType> = []
     @State var showingArchiveConfirm = false
     @State var showingRestoreConfirm = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var isDeletePending = false
     @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
@@ -289,9 +295,6 @@ struct PlantDetailContentView: View {
     }
     var galleryPhotoItems: [PlantDetailPhotoItem] {
         renderData?.galleryPhotoItems ?? []
-    }
-    var growthDiaryMarkdown: String {
-        renderData?.growthDiaryMarkdown ?? ""
     }
     var growthDiaryDateRangeText: String {
         guard let first = logSummary?.firstLogDate else {
@@ -785,7 +788,6 @@ struct PlantDetailContentView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    #if DEBUG
                     Button {
                         showingDeleteConfirm = true
                     } label: {
@@ -795,7 +797,6 @@ struct PlantDetailContentView: View {
                     }
                     .accessibilityLabel(l.tr(zh: "删除植物", en: "Delete plant", de: "Pflanze löschen"))
                     .accessibilityIdentifier("plant-detail-delete-action")
-                    #endif
 
                     if !plant.isArchived, let onCreateCareTask {
                         Menu {
@@ -849,7 +850,20 @@ struct PlantDetailContentView: View {
             )
         }
         .sheet(isPresented: $showingEditSheet) {
-            EditPlantSheet(plant: plant)
+            EditPlantSheet(plant: plant, scope: .fullCare)
+        }
+        .sheet(isPresented: $showingBasicInfo) {
+            NavigationStack {
+                PlantBasicInfoDetailView(
+                    plant: plant,
+                    onClose: { showingBasicInfo = false },
+                    onChanged: { schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0) }
+                )
+            }
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .sheet(isPresented: $showingPhotoGallery) {
             PlantPhotoGallerySheet(
@@ -866,6 +880,14 @@ struct PlantDetailContentView: View {
                 currentHealthStatus: plant.healthStatus,
                 onSave: savePlantCareLog
             )
+        }
+        .sheet(item: $careHistoryRoute) { route in
+            PlantCareHistoryEditSheet(route: route) { _ in
+                schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
+            }
+        }
+        .sheet(item: $growthDiaryShareItem) { item in
+            PlantGrowthDiaryShareSheet(markdown: item.markdown)
         }
         .sheet(item: $careFeatureDraft) { draft in
             PlantCareFeatureDetailView(
@@ -940,6 +962,7 @@ struct PlantDetailContentView: View {
         .onDisappear {
             renderDataRefreshTask?.cancel()
             mediaAttachmentIndexRepairTask?.cancel()
+            growthDiaryExportTask?.cancel()
             quickCareToastClearTask?.cancel()
             deleteUndoTask?.cancel()
             pendingBatchCareRewardTask?.cancel()

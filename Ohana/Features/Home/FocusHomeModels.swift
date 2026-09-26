@@ -396,7 +396,7 @@ extension FocusCard {
         let themeHex = switch state {
         case .healthy:
             "9EF06A"
-        case .dead:
+        case .dead, .sleeping:
             "7C828D"
         case .needsCare, .atRisk, .sick, .critical:
             "FF4757"

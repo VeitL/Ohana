@@ -230,16 +230,20 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!OasisHomeTabContentPolicy.shouldRunActiveWork(for: lifecycle))
     }
 
-    @Test func frozenOasisShopEntryUsesGlobalShopRouteWithoutMountingLiveTree() throws {
+    @Test func frozenOasisEntriesUseSharedRoutesWithoutMountingLiveTree() throws {
         let frozenStage = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
         let host = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
         let homeUtilities = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
-        #expect(frozenStage.contains("interactiveFeatures: [.shop]"))
+        #expect(frozenStage.contains("interactiveFeatures: Set(OasisBentoFeature.allCases)"))
         #expect(frozenStage.contains("onOpenShop(snapshot.shopInitialCategory)"))
         #expect(host.contains("VerticalSolidHomeOasisFrozenTreeStage("))
         #expect(host.contains("onOpenShop: onOpenShop"))
+        #expect(host.contains("onOpenFullOasis: onOpenFullOasis"))
         #expect(homeUtilities.contains("routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)"))
+        #expect(homeUtilities.contains("onOpenFullOasis: onPresentOasisReward"))
+        #expect(frozenStage.contains(".accessibilityIdentifier(\"oasis-open-reward-action\")"))
+        #expect(frozenStage.contains("每日确认 +6，首次状态 +2 养分"))
         #expect(!OasisHomeTabContentPolicy.shouldRenderTreeContent(
             for: VerticalHomeTabMountPolicy.lifecycle(
                 for: .oasis,
@@ -257,7 +261,8 @@ struct VerticalHomeTabMountPolicyTests {
             level: 4,
             progressToNextLevel: .nan,
             totalEnergy: -20,
-            nextLevelThreshold: -100
+            nextLevelThreshold: -100,
+            coconutBalance: -3
         )
 
         #expect(low.level == 0)
@@ -268,6 +273,8 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(invalid.progressToNextLevel == 0)
         #expect(invalid.totalEnergy == 0)
         #expect(invalid.nextLevelThreshold == 0)
+        #expect(invalid.coconutBalance == 0)
+        #expect(low.coconutBalance == nil)
         #expect(invalid.shopInitialCategory == .effect)
 
         let shopDecor = OasisTreeRenderSnapshot(
@@ -298,15 +305,70 @@ struct VerticalHomeTabMountPolicyTests {
         }
     }
 
-    @Test func tabOutgoingCleanupWaitsForFullMotionSpringTail() {
+    @Test func tabOutgoingCleanupDoesNotLeaveADeferredUnmountHitch() {
         #expect(
             VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(for: .full)
-                >= UInt64(700)
+                <= UInt64(220)
         )
         #expect(
             VerticalHomeTabTransitionPolicy.outgoingCleanupDelayMilliseconds(for: .static)
                 == VerticalHomeTabTransitionPolicy.reducedMotionOutgoingCleanupDelayMilliseconds
         )
+    }
+
+    @Test func sharedInteractionMotionStaysShortWithoutFlatteningRewardMotion() throws {
+        let motionSource = try source("Ohana/Shared/Design/GoMotion.swift")
+        let expectedCommonTokens = [
+            "static let page: Animation = .smooth(duration: 0.24, extraBounce: 0)",
+            "static let hero: Animation = .smooth(duration: 0.28, extraBounce: 0)",
+            "static let fab: Animation = .smooth(duration: 0.20, extraBounce: 0)",
+            "static let feedback: Animation = .smooth(duration: 0.16, extraBounce: 0)",
+            "static let tap: Animation = .smooth(duration: 0.12, extraBounce: 0)",
+            "static let selection: Animation = .smooth(duration: 0.18, extraBounce: 0)",
+            "static let stateChange: Animation = .smooth(duration: 0.20, extraBounce: 0)",
+            "static let sheet: Animation = .smooth(duration: 0.24, extraBounce: 0)"
+        ]
+
+        for token in expectedCommonTokens {
+            #expect(motionSource.contains(token))
+        }
+        #expect(motionSource.contains("static let quick: Animation = .easeOut(duration: 0.16)"))
+        #expect(motionSource.contains("static let reduced: Animation = .easeOut(duration: 0.10)"))
+        #expect(motionSource.contains("static let zenCardGlassDissolve: Animation = .timingCurve"))
+        #expect(motionSource.contains("static let rewardPop: Animation = .interactiveSpring"))
+    }
+
+    @Test func sharedFrequentFeedbackUsesGovernedReduceMotionAwareTokens() throws {
+        let buttonSource = try source("Ohana/Shared/Components/LiquidGlassButton.swift")
+        let toastSource = try source("Ohana/Shared/Components/IslandToastView.swift")
+
+        #expect(buttonSource.contains("reduceMotion ? GoMotion.reduced : GoMotion.tap"))
+        #expect(buttonSource.contains("isPressed && !reduceMotion ? 0.97 : 1"))
+        #expect(!buttonSource.contains(".spring(response:"))
+        #expect(toastSource.contains("reduceMotion ? GoMotion.reduced : GoMotion.stateChange"))
+        #expect(toastSource.contains("isShowing || reduceMotion ? 0 : 10"))
+        #expect(!toastSource.contains(".spring(response:"))
+    }
+
+    @Test func frequentContentSelectionDoesNotAnimateWholeScreenWithSprings() throws {
+        let todayFocusSource = try source("Ohana/Features/TodayFocus/Views/TodayFocusCard+Deck.swift")
+        let retentionSource = try source("Ohana/Features/DashboardRecords/Views/IslandRetentionDashboard.swift")
+        let bountySource = try source("Ohana/Features/FamilyTasks/Views/BountyBoardView.swift")
+        let ledgerSource = try source("Ohana/Features/CareLedger/Views/CareLedgerAnalysisView.swift")
+
+        #expect(todayFocusSource.contains("return GoMotion.selection"))
+        #expect(!todayFocusSource.contains("return .interactiveSpring(response: 0.42"))
+
+        #expect(retentionSource.contains("@Environment(\\.accessibilityReduceMotion) private var reduceMotion"))
+        #expect(retentionSource.contains("withAnimation(GoMotion.stateChange)"))
+        #expect(!retentionSource.contains(".onChange(of: selectedPetId) { _, _ in animateGrowth() }"))
+        #expect(!retentionSource.contains("withAnimation(.spring(response: 0.7"))
+
+        #expect(bountySource.contains("Button {\n            selectedTab = idx"))
+        #expect(!bountySource.contains("withAnimation(.spring(response: 0.3, dampingFraction: 0.7)"))
+
+        #expect(ledgerSource.contains("screenModel.selectedKind = kind"))
+        #expect(!ledgerSource.contains("withAnimation(.spring(response: 0.25, dampingFraction: 0.9)"))
     }
 
     @Test func embeddedQuickActionsMountWhenPreloadedForHeroTail() {
@@ -552,15 +614,16 @@ struct VerticalHomeTabMountPolicyTests {
         let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 4)
 
         #expect(!metrics.showsSelectedLabel)
-        #expect(metrics.barHeight >= 64)
+        #expect(metrics.barHeight == 58)
         #expect(metrics.tabSpacing <= 2)
+        #expect(metrics.actionGap >= 8)
     }
 
     @Test func bottomNavigationRemainsIconOnlyForFiveTabs() {
         let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 5)
 
         #expect(!metrics.showsSelectedLabel)
-        #expect(metrics.barHeight >= 64)
+        #expect(metrics.barHeight == 58)
         #expect(metrics.tabSpacing == 0)
     }
 
@@ -579,24 +642,32 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(threeTabWidth > fiveTabWidth)
     }
 
-    @Test func nativeToolbarUsesContextualPrimaryActions() throws {
+    @Test func splitIslandOwnsPageContextActionsWithoutRemovingModuleMenus() throws {
         let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
         let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+        let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeComponents.swift")
         let oasisHostSource = try source("Ohana/Features/Oasis/Views/OasisHomeTabHost.swift")
 
-        #expect(routingSource.contains("openFunctionMenu(destination: HomeToolbarPrimaryActionPolicy.homeDestination("))
-        #expect(routingSource.contains("HomeToolbarPrimaryActionPolicy.homeIcon("))
-        #expect(routingSource.contains("case .calendar:\n            \"plus\""))
-        #expect(routingSource.contains("case .plants:\n            \"ellipsis.circle\""))
-        #expect(toolbarSource.contains("if selectedTab == .home"))
-        #expect(toolbarSource.contains("} else if selectedTab != .oasis {"))
-        #expect(componentsSource.contains(".accessibilityIdentifier(\"oasis-inject-energy-action\")"))
-        #expect(componentsSource.contains(".buttonStyle(.borderedProminent)"))
+        #expect(routingSource.contains("guard let destination = HomeToolbarPrimaryActionPolicy.homeDestination("))
+        #expect(routingSource.contains("HomeToolbarPrimaryActionPolicy.homeIcon"))
+        #expect(routingSource.contains("openCalendarAddEvent(plants: embeddedCalendarPlants)"))
+        #expect(routingSource.contains("injectEmbeddedOasisEnergy()"))
+        #expect(bottomBarSource.contains("case .home, .plants:\n            .quickRecord"))
+        #expect(bottomBarSource.contains("case .calendar:\n            .addEvent"))
+        #expect(bottomBarSource.contains("case .oasis:\n            .injectEnergy"))
+        #expect(toolbarSource.contains("if selectedTab == .home, showsHomePrimaryAction"))
+        #expect(toolbarSource.contains("} else if selectedTab == .plants {"))
+        #expect(!toolbarSource.contains("} else if selectedTab != .home, selectedTab != .oasis {"))
+        #expect(bottomBarSource.contains("if contextAction == .injectEnergy"))
+        #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-primary-action\")"))
         #expect(oasisHostSource.contains("onInjectEnergy: onInjectEnergy"))
+        #expect(oasisHostSource.contains("showsInjectEnergyButton: false"))
+        #expect(oasisHostSource.contains(".accessibilityIdentifier(\"oasis-screen\")"))
+        #expect(!componentsSource.contains(".accessibilityIdentifier(\"oasis-screen\")"))
     }
 
-    @Test func nativeTabPagesUseTheFullHeightAboveTopChrome() {
+    @Test func splitIslandPagesReserveBottomChrome() {
         let containerHeight: CGFloat = 844
         let topChromeHeight: CGFloat = 46
         let bottomChromeHeight: CGFloat = 104
@@ -606,19 +677,25 @@ struct VerticalHomeTabMountPolicyTests {
             containerHeight: containerHeight,
             topChromeHeight: topChromeHeight,
             bottomChromeHeight: bottomChromeHeight
-        ) == 798)
+        ) == 694)
         #expect(VerticalSolidHomePageContentHeightPolicy.height(
             selectedTab: .plants,
             containerHeight: containerHeight,
             topChromeHeight: topChromeHeight,
             bottomChromeHeight: bottomChromeHeight
-        ) == 798)
+        ) == 694)
         #expect(VerticalSolidHomePageContentHeightPolicy.height(
             selectedTab: .calendar,
             containerHeight: containerHeight,
             topChromeHeight: topChromeHeight,
             bottomChromeHeight: bottomChromeHeight
-        ) == 798)
+        ) == 694)
+        #expect(VerticalSolidHomePageContentHeightPolicy.height(
+            selectedTab: .home,
+            containerHeight: 360,
+            topChromeHeight: topChromeHeight,
+            bottomChromeHeight: bottomChromeHeight
+        ) == 210)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.bottomContentInset <= 32)
         #expect(VerticalSolidHomePlantWalletScrollPolicy.topContentInset == 0)
         #expect(
@@ -639,9 +716,10 @@ struct VerticalHomeTabMountPolicyTests {
         )
     }
 
-    @Test func rootNavigationUsesNativeTabViewAndSystemScrollMinimization() throws {
+    @Test func rootContentTabViewUsesSplitIslandNavigation() throws {
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePageDeck.swift")
         let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
+        let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
         let backgroundSource = try source("Ohana/Shared/Design/ArkBackgroundView.swift")
         let staticBackgroundSource = backgroundSource
             .components(separatedBy: "struct OhanaStaticAppBackground")
@@ -655,10 +733,18 @@ struct VerticalHomeTabMountPolicyTests {
         let homeUtilitiesSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Utilities.swift")
 
         #expect(componentsSource.contains("TabView(selection: selection)"))
-        #expect(componentsSource.contains(".tabItem"))
-        #expect(componentsSource.contains(".tabBarMinimizeBehavior(.onScrollDown)"))
+        #expect(componentsSource.contains("static let selectionAnimation: Animation = GoMotion.selection"))
+        #expect(componentsSource.contains("Tab(value: tab)"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-content-tab-\\(tab.rawValue)\")"))
+        #expect(!componentsSource.contains(".id(visibleTabs)"))
+        #expect(!componentsSource.contains(".tabItem"))
+        #expect(!componentsSource.contains(".tabBarMinimizeBehavior"))
+        #expect(componentsSource.contains(".toolbarVisibility(.hidden, for: .tabBar)"))
+        #expect(
+            componentsSource.components(separatedBy: ".toolbarVisibility(.hidden, for: .tabBar)").count >= 3
+        )
         #expect(componentsSource.contains(".badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)"))
-        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-native-tab-view\")"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-content-tab-view\")"))
         #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains("viewportAlignedPageBackground(for: tab)"))
         #expect(componentsSource.contains("if lifecycle(for: tab).isVisible"))
@@ -672,9 +758,11 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!taskCenterViewSource.contains(".background(Color.ohanaCardSurfaceElevated.opacity(0.96))"))
         #expect(nativeToolbarSource.contains("if selectedTab == .plants"))
         #expect(nativeToolbarSource.contains("if selectedTab == .home"))
-        #expect(nativeToolbarSource.contains("} else if selectedTab != .oasis {"))
+        #expect(!nativeToolbarSource.contains("} else if selectedTab != .home, selectedTab != .oasis {"))
         #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-primary-action\")"))
         #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-crew-roster-action\")"))
+        #expect(nativeToolbarSource.contains("Text(activeHumanInitial)"))
+        #expect(nativeToolbarSource.contains("current user \\(activeHumanDisplayName)"))
         #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-add-plant-action\")"))
         #expect(nativeToolbarSource.contains(".accessibilityIdentifier(\"home-plant-data-action\")"))
         let crewActionPosition = nativeToolbarSource.range(of: ".accessibilityIdentifier(\"home-crew-roster-action\")")
@@ -689,20 +777,30 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(homeUtilitiesSource.contains("onInjectEnergy: injectEmbeddedOasisEnergy"))
         #expect(homeSource.contains(".toolbarBackground(.hidden, for: .navigationBar)"))
         #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
-        #expect(!homeSource.contains("VerticalSolidHomeBottomBar("))
+        #expect(homeSource.contains("VerticalSolidHomeBottomBar("))
+        #expect(homeSource.contains("let safeBottom = proxy.safeAreaInsets.bottom"))
+        #expect(!homeSource.contains("safeAreaController.resolvedBottom(in: proxy)"))
+        #expect(bottomBarSource.contains("GlassEffectContainer(spacing: 10)"))
+        #expect(bottomBarSource.contains("HomeBottomNavigationTabButton("))
+        #expect(bottomBarSource.contains("properties: .position"))
+        #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
+        #expect(bottomBarSource.contains("attentionCount: tab == .calendar ? taskCenterBadge.attentionCount : 0"))
+        #expect(bottomBarSource.contains(".accessibilityValue(accessibilityPosition)"))
+        #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-bottom-navigation\")"))
         #expect(!homeSource.contains("calendarBottomChromeHidden"))
         #expect(!routingSource.contains("VerticalSolidHomeBottomChromeScrollPolicy"))
         #expect(!plantSource.contains("updateBottomChromeVisibility"))
+        #expect(componentsSource.contains("case .plants:\n                plants(lifecycle)"))
     }
 
-    @Test func taskCenterAddAndEmbeddedCalendarCompletionUseUnifiedEntryPoints() throws {
+    @Test func rootActionAddsAnEventWhileTaskCenterKeepsItsUnifiedEntryPoint() throws {
         let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
         let taskCenterSource = try source("Ohana/Features/Tasks/TaskCenterRouteContainer.swift")
         let calendarRouteSource = try source("Ohana/Features/Calendar/CalendarRouteContainer.swift")
         let calendarViewSource = try source("Ohana/Features/Calendar/Views/CalendarView.swift")
         let calendarListSource = try source("Ohana/Features/Calendar/Views/CalendarView+List.swift")
 
-        #expect(routingSource.contains("case .calendar:\n            calendarAddEventTrigger += 1"))
+        #expect(routingSource.contains("case .calendar:\n            openCalendarAddEvent(plants: embeddedCalendarPlants)"))
         #expect(taskCenterSource.contains("onAdd: requestAdd"))
         #expect(taskCenterSource.contains(".onChange(of: addEventTrigger) { _, _ in\n            requestAdd()"))
         #expect(taskCenterSource.contains("onCompleteEvent: completeEvent"))
@@ -746,7 +844,10 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test func plantBatchCareSheetUsesRouteSnapshotInsteadOfBodyAggregation() throws {
-        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift"
+        ].map { try source($0) }.joined(separator: "\n")
         let sheetSource = try source("Ohana/Features/Plants/Views/PlantBatchCareSheet.swift")
         let snapshotSource = try source("Ohana/Features/Plants/PlantBatchCareRouteSnapshot.swift")
 
@@ -767,7 +868,10 @@ struct VerticalHomeTabMountPolicyTests {
 
     @Test func plantBatchCareSheetKeepsExceptionActionsInFlow() throws {
         let sheetSource = try source("Ohana/Features/Plants/Views/PlantBatchCareSheet.swift")
-        let dashboardSource = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift"
+        ].map { try source($0) }.joined(separator: "\n")
 
         #expect(sheetSource.contains("PlantBatchCareActionRevealRow"))
         #expect(sheetSource.contains("@State private var resolvedTaskIDs"))
@@ -1199,11 +1303,14 @@ struct VerticalHomeTabMountPolicyTests {
     }
 
     @Test func plantDashboardWalletLegacyToggleUsesHeroStateMachine() throws {
-        let source = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift")
+        let dashboardSource = try [
+            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift"
+        ].map { try source($0) }.joined(separator: "\n")
 
-        #expect(source.contains("expandPlantWalletCard(snapshot)"))
-        #expect(source.contains("collapsePlantWalletCard()"))
-        #expect(!source.contains("withAnimation(GoMotion.page) {\n            expandedPlantCardID"))
+        #expect(dashboardSource.contains("expandPlantWalletCard(snapshot)"))
+        #expect(dashboardSource.contains("collapsePlantWalletCard()"))
+        #expect(!dashboardSource.contains("withAnimation(GoMotion.page) {\n            expandedPlantCardID"))
     }
 
     @Test func plantDashboardWalletUsesSceneLocalInactiveFreezeWithoutExternalState() throws {
@@ -1228,7 +1335,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!VerticalSolidHomePlantRoomRailPolicy.shouldShow(plantCount: 8, selectedCardId: nil, heroDirection: 1))
     }
 
-    @Test func homePlantPageOwnsViewSwitcherAndListMode() throws {
+    @Test func homePlantPageOwnsExpandAllGroupedGridMode() throws {
         let plantPage = try source("Ohana/Features/Home/Views/VerticalSolidHomePlantsPage.swift")
         let models = try source("Ohana/Features/Home/VerticalSolidHomeModels.swift")
         let builder = try source("Ohana/Features/Home/VerticalSolidHomeSnapshotBuilder.swift")
@@ -1236,12 +1343,18 @@ struct VerticalHomeTabMountPolicyTests {
 
         #expect(plantPage.contains("VerticalSolidHomePlantViewStyle"))
         #expect(plantPage.contains("@State private var selectedViewStyle"))
-        #expect(plantPage.contains("home-plants-view-switcher-rail"))
+        #expect(plantPage.contains("selectedViewStyle == .roomStacks"))
+        #expect(plantPage.contains("home-plants-expand-all"))
+        #expect(plantPage.contains("home-plants-collapse-all"))
         #expect(plantPage.contains("home-plants-view-deck"))
-        #expect(plantPage.contains("home-plants-view-list"))
-        #expect(plantPage.contains("home-plants-room-list-view"))
-        #expect(plantPage.contains("selectedViewStyle == .deck &&"))
-        #expect(plantPage.contains("viewSwitcherCenterY(roomRailCenterY: roomRailCenterY)"))
+        #expect(plantPage.contains("home-plants-all-expanded-view"))
+        #expect(plantPage.contains("home-plants-all-expanded-room-"))
+        #expect(plantPage.contains("home-plants-all-expanded-card-"))
+        #expect(plantPage.contains("LazyVGrid("))
+        #expect(plantPage.contains("ForEach(roomGroups)"))
+        #expect(!plantPage.contains("roomGroups.prefix("))
+        #expect(!plantPage.contains("home-plants-view-list"))
+        #expect(!plantPage.contains("home-plants-view-switcher-rail"))
         #expect(plantPage.contains("collapsedLayoutMode: .scrollExtended"))
         #expect(plantPage.contains("expandedVerticalPlacement: .viewportTop("))
         #expect(plantPage.contains("deckScrollOffsetTracker.offsetY"))
@@ -1267,7 +1380,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(builder.contains("overdueCareTypes: overdueCareTypes"))
         #expect(builder.contains("dueCareCount: todayDueCareCount"))
         #expect(builder.contains("overdueCareCount: overdueCareCount"))
-        #expect(uiTestSource.contains("testHomePlantViewSwitcherRailSwitchesToListMode"))
+        #expect(uiTestSource.contains("testHomePlantExpandAllGroupsCompactCardsByRoom"))
     }
 
     @Test func homeQuickActionsExposeMinimumHitAreas() {
@@ -1300,16 +1413,23 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
     }
 
-    @Test func unresolvedHomeSnapshotDoesNotPresentEmptyDataAsRealZero() throws {
+    @Test func unresolvedHomeSnapshotUsesDelayedNonverbalLoadingInsteadOfRealZero() throws {
         let homeSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView.swift")
         let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
+        let loadingOverlaySource = homeSource.components(
+            separatedBy: "private struct HomeReadModelLoadingOverlay"
+        ).last ?? ""
 
         #expect(toolbarSource.contains("let coconutBalance: Int?"))
         #expect(toolbarSource.contains("Loading coconut balance"))
         #expect(toolbarSource.contains(".disabled(coconutBalance == nil)"))
         #expect(homeSource.contains("controller.snapshot.isReady ? headerCoconutBalance : nil"))
+        #expect(homeSource.contains("readModelLoadingPresentationDelayMilliseconds: UInt64 = 500"))
+        #expect(homeSource.contains("if showsHomeReadModelLoadingOverlay"))
         #expect(homeSource.contains("HomeReadModelLoadingOverlay(localization: l)"))
         #expect(homeSource.contains("home-read-model-loading"))
+        #expect(!loadingOverlaySource.contains("Text(localization.tr("))
+        #expect(loadingOverlaySource.contains(".accessibilityLabel(localization.tr("))
     }
 
     @Test func petFeatureCollectionRoutesToAggregateCards() throws {
@@ -1340,8 +1460,13 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!collectionSource.contains("parentPath.append(.petFood"))
         #expect(!collectionSource.contains("parentPath.append(.petHealth"))
         #expect(!collectionSource.contains("FetchDescriptor<"))
-        #expect(sharedCheckInSource.contains("FeatureHubSummaryPanel("))
-        #expect(sharedCheckInSource.contains("pet-shared-check-in-summary-panel"))
+        #expect(sharedCheckInSource.contains("private var pageHeader: some View"))
+        #expect(sharedCheckInSource.contains("LazyVGrid(columns: columns"))
+        #expect(sharedCheckInSource.contains("FeatureSummaryChartCard(data: tileData(for: action))"))
+        #expect(sharedCheckInSource.contains("pet-shared-check-in-card-\\(action.id)"))
+        #expect(sharedCheckInSource.contains("pet-shared-check-in-view"))
+        #expect(!sharedCheckInSource.contains("FeatureHubSummaryPanel("))
+        #expect(!sharedCheckInSource.contains("pet-shared-check-in-summary-panel"))
         #expect(sheetSource.contains(".petFeatureCollection,"))
         #expect(sheetSource.contains(".petSharedCheckIn,"))
         #expect(sheetSource.contains("Alle Funktionen"))
@@ -1362,14 +1487,12 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(routeDataSource.contains("PlantFeatureCollectionSummary.load("))
         #expect(routeDataSource.contains("var calendarPlanEnabledCount"))
         #expect(routeDataSource.contains("var systemReminderEnabledCount"))
-        #expect(collectionSource.contains("commandCenterPanel"))
-        #expect(collectionSource.contains("plant-feature-collection-command-center"))
+        #expect(!collectionSource.contains("commandCenterPanel"))
         #expect(collectionSource.contains("FeatureHubSectionActionView(section: plantActionSection)"))
         #expect(collectionSource.contains("id: \"plant-care-actions\""))
         #expect(collectionSource.contains("destination: FMDest.plantsBatchCare"))
         #expect(collectionSource.contains("destination: FMDest.plantsBatchQuickRecord"))
         #expect(collectionSource.contains("plant-feature-collection-stat-section"))
-        #expect(collectionSource.contains("summary.systemReminderEnabledCount"))
         #expect(collectionSource.contains("summary.maintenanceDueCount"))
         #expect(collectionSource.contains("summary.healthDueCount"))
         #expect(collectionSource.contains("summary.growthLogCount"))
@@ -1404,15 +1527,20 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!functionRootSource.contains(".householdHub, .plants"))
     }
 
-    @Test func nativeTabsUseLocalizedTitlesAndAccessibilityLabels() throws {
+    @Test func splitIslandTabsUseLocalizedTitlesAndAccessibilityLabels() throws {
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePageDeck.swift")
+        let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
 
         #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains(".accessibilityLabel(tabAccessibilityLabel(for: tab))"))
-        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
+        #expect(componentsSource.contains(".accessibilityIdentifier(\"home-content-tab-\\(tab.rawValue)\")"))
+        #expect(bottomBarSource.contains("return tab.title(localization)"))
+        #expect(bottomBarSource.contains(".accessibilityLabel(accessibilityLabel)"))
+        #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
+        #expect(bottomBarSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))
     }
 
-    @Test func oasisTabIsHiddenUntilStarterGiftUnlocksTree() {
+    @Test func oasisTabUnlocksWhenStarterGiftTransactionCommits() {
         let suiteName = "VerticalHomeTabMountPolicyTests.oasisTabIsHiddenUntilStarterGiftUnlocksTree.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             Issue.record("Expected isolated defaults suite")
@@ -1432,9 +1560,11 @@ struct VerticalHomeTabMountPolicyTests {
         defaults.set(true, forKey: StarterGiftStorageKey.claimed)
         defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(false, forKey: StarterGiftStorageKey.oasisTabPromptPending)
-        #expect(!AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
-        #expect(!AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
+        #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
+        #expect(AppFeatureRouteGuard.visibleHomeTabs(starterGiftDefaults: defaults).contains(.oasis))
 
+        // The ceremony is presentation-only and cannot revoke an already
+        // committed household unlock.
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         #expect(AppFeatureRouteGuard.allowsHomeTab(.oasis, starterGiftDefaults: defaults))
@@ -1547,6 +1677,8 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(calendarSource.contains("preparedCalendarSnapshot.events(for: selectedDate)"))
         #expect(calendarSource.contains("monthKey: CalendarSnapshotBuilder.preparedSnapshotWindowKey"))
         #expect(headerSource.contains("preparedCalendarSnapshot.events(for: day)"))
+        #expect(!headerSource.contains("requestAddEventPresentation()"))
+        #expect(!headerSource.contains("calendar-add-event-action"))
         #expect(monthSource.contains("!preparedCalendarSnapshot.events(for: date).isEmpty"))
         #expect(!supportSource.contains("var selectedDay: Date"))
         #expect(routeSource.contains("actor CalendarPreparedSnapshotActor"))

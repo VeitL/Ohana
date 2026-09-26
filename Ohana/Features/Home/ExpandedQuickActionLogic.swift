@@ -625,7 +625,8 @@ enum ExpandedQuickActionLogic {
         isLocked: Bool,
         todayMedicationLogs: [HumanMedicationLog],
         expenses: [HomeExpensePreviewEntry] = [],
-        calendar cal: Calendar = .current
+        calendar cal: Calendar = .current,
+        now: Date = Date()
     ) -> Bool {
         guard !isLocked else { return false }
         switch item.actionType {
@@ -641,7 +642,7 @@ enum ExpandedQuickActionLogic {
                     $0.status == .taken
             }
         case "humanExpense":
-            return latestHumanExpenseDate(for: human, in: expenses).map { cal.isDateInToday($0) } ?? false
+            return latestHumanExpenseDate(for: human, in: expenses).map { cal.isDate($0, inSameDayAs: now) } ?? false
         default:
             return false
         }
@@ -654,7 +655,8 @@ enum ExpandedQuickActionLogic {
         activeMedications: [HumanMedication],
         todayMedicationLogs: [HumanMedicationLog],
         expenses: [HomeExpensePreviewEntry] = [],
-        calendar cal: Calendar = .current
+        calendar cal: Calendar = .current,
+        now: Date = Date()
     ) -> String? {
         guard !isLocked else { return nil }
         switch item.actionType {
@@ -696,7 +698,7 @@ enum ExpandedQuickActionLogic {
             let myExpenses = expenses.filter { $0.actorId == human.id.uuidString }
             if let latest = myExpenses.max(by: { $0.date < $1.date }) {
                 let totalThisMonth = myExpenses
-                    .filter { cal.isDate($0.date, equalTo: Date(), toGranularity: .month) }
+                    .filter { cal.isDate($0.date, equalTo: now, toGranularity: .month) }
                     .reduce(0.0) { $0 + $1.amount }
                 if totalThisMonth > 0 {
                     return "本月 \(AppCurrency.format(totalThisMonth, fractionDigits: 0))"

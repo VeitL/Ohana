@@ -26,6 +26,7 @@ struct HygieneTodoSheet: View {
     @State private var endDate: Date
     @State private var repeatDays: Int
     @State private var customNote: String
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     init(
         pet: Pet,
@@ -76,6 +77,9 @@ struct HygieneTodoSheet: View {
                         .foregroundStyle(accent)
                 }
             }
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
         }
     }
 
@@ -191,13 +195,25 @@ struct HygieneTodoSheet: View {
             repeatDays: repeatDays,
             customNote: customNote
         )
-        PetHygieneCommandExecutor(context: modelContext, services: appServices).createPlan(
-            pet: pet,
-            type: type,
-            input: input,
-            note: "PetHygieneDetailView.HygieneTodoSheet"
-        )
-        onSaved()
-        dismiss()
+        do {
+            _ = try PetHygieneCommandExecutor(
+                context: modelContext,
+                services: appServices
+            ).createPlanEnforcingPersonalAccess(
+                pet: pet,
+                type: type,
+                input: input,
+                note: "PetHygieneDetailView.HygieneTodoSheet"
+            )
+            onSaved()
+            dismiss()
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        } catch {
+            appServices.domainRevisions.publishFailure(
+                command: .petHygienePlan(petID: pet.id, type: type.rawValue),
+                error: error
+            )
+        }
     }
 }

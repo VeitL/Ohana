@@ -139,19 +139,19 @@ for file in "${files[@]}"; do
   case "$file" in
     *.swift)
       swift_files+=("$file")
-      [[ "$file" == Ohana/* ]] && app_swift_files+=("$file")
+      [[ "$file" == Ohana/* || "$file" == OhanaWidgets/* ]] && app_swift_files+=("$file")
       case "$file" in
-        Ohana/*/Views/*|Ohana/Features/*/Views/*|Ohana/Shared/Components/*|Ohana/Shared/Design/*|Ohana/Features/Settings/DesignLab/*)
+        Ohana/*/Views/*|Ohana/Features/*/Views/*|Ohana/Shared/Components/*|Ohana/Shared/Design/*|Ohana/Features/Settings/DesignLab/*|OhanaWidgets/*)
           ui_swift_files+=("$file")
           ;;
       esac
       case "$file" in
-        Ohana/Models/*|Ohana/App/*|Ohana/Domain/*|Ohana/Shared/Components/*|Ohana/Shared/Design/*|*Service.swift|*Manager.swift|*Command*.swift|*Executor*.swift|*Route*.swift)
+        Ohana/Models/*|Ohana/App/*|Ohana/Domain/*|Ohana/SystemSurfaces/*|OhanaWidgets/*|Ohana/Shared/Components/*|Ohana/Shared/Design/*|*Service.swift|*Manager.swift|*Command*.swift|*Executor*.swift|*Route*.swift)
           build_reasons+=("$file")
           ;;
       esac
       case "$file" in
-        Ohana/Models/*|*Service.swift|*Command*.swift|*Executor*.swift|OhanaTests/*|OhanaUITests/*)
+        Ohana/Models/*|Ohana/SystemSurfaces/*|OhanaWidgets/*|*Service.swift|*Command*.swift|*Executor*.swift|OhanaTests/*|OhanaUITests/*)
           test_reasons+=("$file")
           ;;
       esac
@@ -172,7 +172,7 @@ for file in "${files[@]}"; do
   esac
 
   case "$file" in
-    Ohana/Models/*|Ohana/Domain/Services/*|Ohana/App/AppResetService.swift|Ohana/App/AppRuntimeAdapters.swift|Ohana/App/AppServices.swift|Ohana/App/StartupMaintenanceCoordinator.swift|Ohana/Shared/Media/*|Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift|Ohana/Features/HumanNotes/*|Ohana/Features/Members/MemberDeletionCommands.swift|Ohana/Features/Settings/Views/SettingsView+Backup.swift|Ohana/Features/Settings/Views/SettingsView+Chrome.swift|Ohana/Features/Documents/*|Ohana/Features/Expenses/ExpenseReceiptSupport.swift|OhanaTests/*Backup*.swift|OhanaTests/*Restore*.swift|OhanaTests/*Deletion*.swift|OhanaTests/*Privacy*.swift|OhanaTests/*Migration*.swift|OhanaTests/*Recovery*.swift|OhanaTests/*Attachment*.swift|OhanaTests/AppResetServiceTests.swift|OhanaTests/AutomaticBackupServiceTests.swift|OhanaTests/LocalBackupExclusionPolicyTests.swift|OhanaTests/SharedModelContainerRecoveryTests.swift|Ohana/*.lproj/Localizable.strings|docs/governance/manifests/swiftdata-save-failure-baseline.json|scripts/audit-release-data-safety.sh|scripts/audit-swiftdata-save-failures.sh)
+    Ohana/Models/*|Ohana/Domain/Services/*|Ohana/App/AppResetService.swift|Ohana/App/AppRuntimeAdapters.swift|Ohana/App/AppServices.swift|Ohana/App/StartupMaintenanceCoordinator.swift|Ohana/Shared/Media/*|Ohana/Shared/Utilities/LocalBackupExclusionPolicy.swift|Ohana/SystemSurfaces/*|OhanaWidgets/*|Ohana/Features/HumanNotes/*|Ohana/Features/Members/MemberDeletionCommands.swift|Ohana/Features/Settings/Views/SettingsView+Backup.swift|Ohana/Features/Settings/Views/SettingsView+Chrome.swift|Ohana/Features/Documents/*|Ohana/Features/Expenses/ExpenseReceiptSupport.swift|OhanaTests/*Backup*.swift|OhanaTests/*Restore*.swift|OhanaTests/*Deletion*.swift|OhanaTests/*Privacy*.swift|OhanaTests/*Migration*.swift|OhanaTests/*Recovery*.swift|OhanaTests/*Attachment*.swift|OhanaTests/AppResetServiceTests.swift|OhanaTests/AutomaticBackupServiceTests.swift|OhanaTests/LocalBackupExclusionPolicyTests.swift|OhanaTests/SharedModelContainerRecoveryTests.swift|OhanaTests/SystemSurfaceTests.swift|Ohana/*.lproj/Localizable.strings|docs/governance/manifests/swiftdata-save-failure-baseline.json|scripts/audit-system-surface-contract.sh|scripts/audit-system-surface-reset-fence.sh|scripts/audit-release-data-safety.sh|scripts/audit-swiftdata-save-failures.sh)
       release_data_safety_reasons+=("$file")
       ;;
   esac

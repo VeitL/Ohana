@@ -58,17 +58,18 @@ struct CoHealthDashboardContentView: View {
         snapshot.petWeightDelta(for: associatedPets)
     }
 
-    // 趣味总结文案
     private var summaryText: String {
         let petName = associatedPets.first?.name ?? l.tr(zh: "毛孩子", en: "your pets", de: "deine Tiere")
         let km = String(format: "%.1f", thisMonthWalkKm)
         if let delta = petWeightDelta {
-            let amount = String(format: "%.1f", abs(delta))
-            return delta < 0
-                ? l.tr(zh: "本月你带 \(petName) 走了 \(km)km，\(petName)瘦了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month. \(petName) is down \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen. \(petName) hat \(amount) kg abgenommen 🎉")
-                : l.tr(zh: "本月你带 \(petName) 走了 \(km)km，\(petName)胖了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month. \(petName) is up \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen. \(petName) hat \(amount) kg zugenommen 🎉")
+            let change = String(format: "%+.1f", delta)
+            return l.tr(
+                zh: "本月同行 \(km) km · \(petName) 体重 \(change) kg",
+                en: "\(km) km together this month · \(petName) weight \(change) kg",
+                de: "Diesen Monat \(km) km zusammen · \(petName) Gewicht \(change) kg"
+            )
         }
-        return l.tr(zh: "本月你带 \(petName) 走了 \(km)km，继续加油！💪", en: "You walked \(km) km with \(petName) this month. Keep going! 💪", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen. Weiter so! 💪")
+        return l.tr(zh: "本月同行 \(km) km", en: "\(km) km together this month", de: "Diesen Monat \(km) km zusammen")
     }
 
     private func playWeightChartReveal() {
@@ -97,7 +98,7 @@ struct CoHealthDashboardContentView: View {
                 Text(l.tr(zh: "人宠共健仅本人可见", en: "Co-health is private", de: "Gemeinsame Gesundheit ist privat"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "切换到本人账户后可查看体重与运动趋势", en: "Switch to this account to view weight and workout trends.", de: "Wechsle zu diesem Konto, um Gewicht und Trainingstrends zu sehen."))
+                Text(l.tr(zh: "请切换至本人档案", en: "Switch to this profile", de: "Zu diesem Profil wechseln"))
                     .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
@@ -202,7 +203,7 @@ struct CoHealthDashboardContentView: View {
                 .textCase(.uppercase)
 
             if !hasData {
-                Text(l.tr(zh: "体重记录 2 条以上后可查看趋势对比", en: "Add at least 2 weight records to compare trends.", de: "Füge mindestens 2 Gewichtseinträge hinzu, um Trends zu vergleichen."))
+                Text(l.tr(zh: "至少需要 2 条体重记录", en: "At least 2 weight logs required", de: "Mindestens 2 Gewichtseinträge nötig"))
                     .font(OhanaFont.adaptive(size: 12, weight: .medium))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
                     .frame(maxWidth: .infinity, alignment: .center)

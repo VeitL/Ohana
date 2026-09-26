@@ -11,7 +11,13 @@ import UniformTypeIdentifiers
 
 extension AddExpenseSheetContent {
     func saveExpense() {
-        guard canSave, let amount = parsedAmount, amount > 0 else { return }
+        guard canSave,
+              let amount = parsedAmount,
+              amount > 0,
+              let payerContributions = payerContributionsForSave
+        else {
+            return
+        }
         isSaving = true
         inputFocused = false
         GoKeyboard.dismiss()
@@ -45,6 +51,7 @@ extension AddExpenseSheetContent {
                         note: cleanNote,
                         executorId: payerId,
                         recordedByHumanId: recorderId,
+                        payerContributions: payerContributions,
                         source: .detail,
                         command: command,
                         revisionNote: "dashboard.expense.sharedEntry"
@@ -65,6 +72,7 @@ extension AddExpenseSheetContent {
                         note: cleanNote,
                         executorId: payerId,
                         recordedByHumanId: recorderId,
+                        payerContributions: payerContributions,
                         source: .detail,
                         receiptTitle: savedReceiptTitle,
                         receiptCategory: savedReceiptCategory,

@@ -25,6 +25,14 @@ extension DomainCommand {
         command("expenses", "entry", ["entityID": entityID.uuidString, "entityKind": entityKind])
     }
 
+    static func expenseUpdate(entityID: UUID, entityKind: String, recordID: UUID) -> DomainCommand {
+        command("expenses", "update", [
+            "entityID": entityID.uuidString,
+            "entityKind": entityKind,
+            "recordID": recordID.uuidString
+        ])
+    }
+
     static func expenseDelete(entityID: UUID, entityKind: String, recordID: UUID) -> DomainCommand {
         command("expenses", "delete", [
             "entityID": entityID.uuidString,
@@ -89,6 +97,14 @@ extension DomainCommand {
         command("humanHealth", "metric", ["humanID": humanID.uuidString, "metricKey": metricKey])
     }
 
+    static func humanHealthMetricUpdate(humanID: UUID, metricKey: String, logID: UUID) -> DomainCommand {
+        command("humanHealth", "metricUpdate", [
+            "humanID": humanID.uuidString,
+            "metricKey": metricKey,
+            "logID": logID.uuidString
+        ])
+    }
+
     static func humanHealthMetricDelete(humanID: UUID, metricKey: String, logID: UUID) -> DomainCommand {
         command("humanHealth", "metricDelete", [
             "humanID": humanID.uuidString,
@@ -101,6 +117,36 @@ extension DomainCommand {
         command("humanHealth", "report", [
             "humanID": humanID.uuidString,
             "reportID": reportID?.uuidString ?? "new",
+            "action": action
+        ])
+    }
+
+    static func humanLabReportImport(humanID: UUID, reportID: UUID, metricCount: Int) -> DomainCommand {
+        command("humanHealth", "labReportImport", [
+            "humanID": humanID.uuidString,
+            "reportID": reportID.uuidString,
+            "metricCount": String(metricCount)
+        ])
+    }
+
+    static func humanHealthCondition(humanID: UUID, conditionID: UUID, action: String) -> DomainCommand {
+        command("humanHealth", "condition", [
+            "humanID": humanID.uuidString,
+            "conditionID": conditionID.uuidString,
+            "action": action
+        ])
+    }
+
+    static func humanHealthObservation(
+        humanID: UUID,
+        conditionID: UUID,
+        observationID: UUID,
+        action: String
+    ) -> DomainCommand {
+        command("humanHealth", "observation", [
+            "humanID": humanID.uuidString,
+            "conditionID": conditionID.uuidString,
+            "observationID": observationID.uuidString,
             "action": action
         ])
     }

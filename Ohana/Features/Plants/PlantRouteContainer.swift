@@ -8,25 +8,51 @@
 import SwiftData
 import SwiftUI
 
+enum AppPlantRouteDestination: Hashable {
+    case detail
+    case basicInfo
+}
+
 struct AppPlantRouteContainer: View {
     @Query private var plants: [Plant]
+    let destination: AppPlantRouteDestination
     let onCreateCareTask: ((TaskCreationPreset) -> Void)?
+    let onDismiss: () -> Void
+    let onChanged: () -> Void
 
     init(
         id: UUID,
-        onCreateCareTask: ((TaskCreationPreset) -> Void)? = nil
+        destination: AppPlantRouteDestination = .detail,
+        onCreateCareTask: ((TaskCreationPreset) -> Void)? = nil,
+        onDismiss: @escaping () -> Void = {},
+        onChanged: @escaping () -> Void = {}
     ) {
         _plants = Query(filter: #Predicate<Plant> { plant in
             plant.id == id
         })
+        self.destination = destination
         self.onCreateCareTask = onCreateCareTask
+        self.onDismiss = onDismiss
+        self.onChanged = onChanged
     }
 
     var body: some View {
         if let plant = plants.first {
-            PlantDetailView(plant: plant, onCreateCareTask: onCreateCareTask)
+            switch destination {
+            case .detail:
+                PlantDetailView(plant: plant, onCreateCareTask: onCreateCareTask)
+            case .basicInfo:
+                NavigationStack {
+                    PlantBasicInfoDetailView(
+                        plant: plant,
+                        onClose: onDismiss,
+                        onChanged: onChanged
+                    )
+                }
+            }
         } else {
             PlantRouteMissingEntityView(kind: "plant")
+                .onAppear(perform: onDismiss)
         }
     }
 }

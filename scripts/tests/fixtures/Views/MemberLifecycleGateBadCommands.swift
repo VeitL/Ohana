@@ -107,6 +107,79 @@ enum MemberLifecycleGateBadCommandService {
         DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context)
     }
 
+    static func deleteRenamedScheduleValueBypass(
+        obsoleteSchedule: Event,
+        context: ModelContext
+    ) {
+        context.delete(obsoleteSchedule)
+    }
+
+    static func scheduleDeleteResultCommentBypass(
+        event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) {
+        let orphanedDeletion = DomainScheduleWriter.deleteEvent(
+            event,
+            mutation: mutation,
+            context: context
+        )
+        // DomainScheduleEffectsDispatcher.dispatch(delete: orphanedDeletion)
+        // return orphanedDeletion.notificationIdsToCancel
+        _ = orphanedDeletion.didDelete
+    }
+
+    static func scheduleDeleteResultStringBypass(
+        event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) {
+        let stringOnlyDeletion = DomainScheduleWriter.deleteEvent(
+            event,
+            mutation: mutation,
+            context: context
+        )
+        let fakeSink = "DomainScheduleEffectsDispatcher.dispatch(delete: stringOnlyDeletion)"
+        _ = fakeSink
+        _ = stringOnlyDeletion.didDelete
+    }
+
+    static func scheduleDeleteResultWrongBindingBypass(
+        firstEvent: Event,
+        secondEvent: Event,
+        firstMutation: AuthorizedDomainScheduleMutation,
+        secondMutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) {
+        let abandonedDeletion = DomainScheduleWriter.deleteEvent(
+            firstEvent,
+            mutation: firstMutation,
+            context: context
+        )
+        let handledDeletion = DomainScheduleWriter.deleteEvent(
+            secondEvent,
+            mutation: secondMutation,
+            context: context
+        )
+        DomainScheduleEffectsDispatcher.dispatch(delete: handledDeletion)
+        _ = abandonedDeletion.didDelete
+    }
+
+    static func scheduleDeleteResultUnrelatedIDsBypass(
+        event: Event,
+        mutation: AuthorizedDomainScheduleMutation,
+        context: ModelContext
+    ) {
+        let discardedDeletion = DomainScheduleWriter.deleteEvent(
+            event,
+            mutation: mutation,
+            context: context
+        )
+        let notificationIdsToCancel: [String] = []
+        _ = notificationIdsToCancel
+        _ = discardedDeletion.didDelete
+    }
+
     static func completeReminderBypass(reminder: Reminder) {
         reminder.statusEnum = .completed
         reminder.completedAt = Date()

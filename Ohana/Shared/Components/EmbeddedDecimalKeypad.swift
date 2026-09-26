@@ -17,10 +17,12 @@ struct EmbeddedDecimalKeypad: View {
     var showsSubmitButton: Bool = true
     var onSubmit: (() -> Void)?
 
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
     private let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "decimal", "0", "delete"]
 
     private var gridSpacing: CGFloat { isMini ? 5 : 7 }
-    private var keyHeight: CGFloat { isMini ? 30 : 40 }
+    private var keyHeight: CGFloat { 44 }
     private var keyCornerRadius: CGFloat { isMini ? 10 : 14 }
     private var horizontalPadding: CGFloat { isMini ? 0 : 20 }
 
@@ -43,6 +45,8 @@ struct EmbeddedDecimalKeypad: View {
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(!isEnabled || (key == "decimal" && maxFractionDigits == 0))
                     .opacity((key == "decimal" && maxFractionDigits == 0) ? 0.28 : 1)
+                    .accessibilityLabel(keyAccessibilityLabel(key))
+                    .accessibilityHint(key == "delete" ? deleteAccessibilityHint : "")
                     .accessibilityIdentifier("embedded-decimal-keypad-key-\(key)")
                     .simultaneousGesture(
                         LongPressGesture(minimumDuration: 0.35).onEnded { _ in
@@ -66,7 +70,7 @@ struct EmbeddedDecimalKeypad: View {
                     }
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity)
-                    .frame(height: isMini ? 30 : 34)
+                    .frame(height: 44)
                     .background(Color.ohanaCardSurfaceElevated, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -100,6 +104,35 @@ struct EmbeddedDecimalKeypad: View {
             return Color.ohanaCardSurfaceElevated
         }
         return Color.ohanaCardSurfaceElevated
+    }
+
+    private func keyAccessibilityLabel(_ key: String) -> String {
+        let l = L10n(appLanguage)
+        return switch key {
+        case "delete":
+            l.tr(
+                zh: "删除", en: "Delete", de: "Löschen",
+                es: "Borrar", pt: "Apagar", fr: "Effacer",
+                ja: "削除", ko: "삭제", it: "Elimina"
+            )
+        case "decimal":
+            l.tr(
+                zh: "小数点", en: "Decimal separator", de: "Dezimaltrennzeichen",
+                es: "Separador decimal", pt: "Separador decimal", fr: "Séparateur décimal",
+                ja: "小数点", ko: "소수점", it: "Separatore decimale"
+            )
+        default:
+            key
+        }
+    }
+
+    private var deleteAccessibilityHint: String {
+        L10n(appLanguage).tr(
+            zh: "长按清空", en: "Touch and hold to clear", de: "Zum Leeren gedrückt halten",
+            es: "Mantén pulsado para borrar todo", pt: "Mantenha premido para limpar",
+            fr: "Maintenez pour tout effacer", ja: "長押しですべて消去",
+            ko: "길게 눌러 모두 지우기", it: "Tieni premuto per cancellare tutto"
+        )
     }
 
     private func press(_ key: String) {

@@ -287,7 +287,8 @@ nonisolated extension DataBackupManager {
                             petId: l.pet?.id.uuidString,
                             executorId: l.executorId,
                             recordedByHumanId: l.recordedByHumanId,
-                            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId)
+                            sharedSessionId: l.sharedSessionId.isEmpty ? nil : l.sharedSessionId,
+                            payerContributionsJSON: l.payerContributionsJSON.isEmpty ? nil : l.payerContributionsJSON)
     }
 
     func encodeHealthLog(_ l: PetHealthLog) -> PetHealthLogBackup {
@@ -504,6 +505,12 @@ nonisolated extension DataBackupManager {
             notes: l.notes,
             humanId: l.human?.id.uuidString,
             recordedByHumanId: l.recordedByHumanId,
+            sourceReportID: l.sourceReportID?.uuidString,
+            sourceLabel: l.sourceLabel,
+            referenceLow: l.referenceLow,
+            referenceHigh: l.referenceHigh,
+            referenceRangeText: l.referenceRangeText,
+            reportedFlagRaw: l.reportedFlagRaw,
             createdAt: d(l.createdAt)
         )
     }
@@ -521,6 +528,7 @@ nonisolated extension DataBackupManager {
             summary: report.summary,
             notes: report.notes,
             recordedByHumanId: report.recordedByHumanId,
+            captureSourceRaw: report.captureSourceRaw,
             colorHex: report.colorHex,
             createdAt: d(report.createdAt)
         )
@@ -838,8 +846,44 @@ nonisolated extension DataBackupManager {
             instantCoconutDelta: log.instantCoconutDelta,
             costCoconuts: log.costCoconuts,
             dailySequence: log.dailySequence,
+            oddsVersion: log.oddsVersion,
+            guaranteeKindRaw: log.guaranteeKindRaw,
+            stardustDelta: log.stardustDelta,
             drawDate: d(log.drawDate),
             createdAt: d(log.createdAt)
+        )
+    }
+
+    func encodeAchievementUnlock(_ unlock: AchievementUnlock) -> AchievementUnlockBackup {
+        AchievementUnlockBackup(
+            id: unlock.id.uuidString,
+            achievementKey: unlock.achievementKey,
+            achievementID: unlock.achievementID,
+            scopeKindRaw: unlock.scopeKindRaw,
+            scopeIDRaw: unlock.scopeIDRaw,
+            unlockedAt: d(unlock.unlockedAt),
+            isLegacyImport: unlock.isLegacyImport,
+            createdAt: d(unlock.createdAt)
+        )
+    }
+
+    func encodeAchievementRewardReceipt(
+        _ receipt: AchievementRewardReceipt
+    ) -> AchievementRewardReceiptBackup {
+        AchievementRewardReceiptBackup(
+            id: receipt.id.uuidString,
+            receiptKey: receipt.receiptKey,
+            achievementKey: receipt.achievementKey,
+            achievementID: receipt.achievementID,
+            scopeKindRaw: receipt.scopeKindRaw,
+            scopeIDRaw: receipt.scopeIDRaw,
+            recipientHumanIDRaw: receipt.recipientHumanIDRaw,
+            claimedAt: d(receipt.claimedAt),
+            awardedCoconutAmount: receipt.awardedCoconutAmount,
+            awardedStardustAmount: receipt.awardedStardustAmount,
+            walletTransactionKey: receipt.walletTransactionKey,
+            isLegacyImport: receipt.isLegacyImport,
+            createdAt: d(receipt.createdAt)
         )
     }
 

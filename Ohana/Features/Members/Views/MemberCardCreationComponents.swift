@@ -104,7 +104,6 @@ struct MemberCreationStepIndicator: View {
     let currentStep: MemberCreationStep
     let kind: MemberCreationKind
     let l: L10n
-    let foreground: Color
     let secondaryForeground: Color
     let inactiveFill: Color
 
@@ -114,13 +113,8 @@ struct MemberCreationStepIndicator: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(currentStep.title(kind: kind, l: l))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(foreground)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Spacer()
+            HStack {
+                Spacer(minLength: 0)
                 Text("\(currentIndex + 1) / \(steps.count)")
                     .font(OhanaFont.caption(.black))
                     .foregroundStyle(secondaryForeground)
@@ -138,6 +132,9 @@ struct MemberCreationStepIndicator: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(height: 42, alignment: .bottom)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(currentStep.title(kind: kind, l: l))
+        .accessibilityValue("\(currentIndex + 1) / \(steps.count)")
     }
 }
 
@@ -218,6 +215,42 @@ struct MemberCompactDateRow: View {
     }
 }
 
+nonisolated enum MemberMBTISelectionPolicy {
+    private static let allowedValues: [Set<String>] = [
+        ["I", "E"],
+        ["S", "N"],
+        ["T", "F"],
+        ["J", "P"]
+    ]
+
+    static func components(from rawValue: String) -> [String] {
+        let characters = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .uppercased()
+            .map(String.init)
+        guard characters.count == allowedValues.count,
+              zip(characters, allowedValues).allSatisfy({ $0.1.contains($0.0) })
+        else {
+            return Array(repeating: "", count: allowedValues.count)
+        }
+        return characters
+    }
+
+    static func value(
+        energy: String,
+        information: String,
+        decision: String,
+        lifestyle: String
+    ) -> String {
+        let selections = [energy, information, decision, lifestyle]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).uppercased() }
+        guard zip(selections, allowedValues).allSatisfy({ $0.1.contains($0.0) }) else {
+            return ""
+        }
+        return selections.joined()
+    }
+}
+
 struct MemberCompactMBTIBar: View {
     @Binding var energy: String
     @Binding var information: String
@@ -233,8 +266,12 @@ struct MemberCompactMBTIBar: View {
         [energy, information, decision, lifestyle].map { $0.isEmpty ? "-" : $0 }.joined()
     }
 
+    private var hasSelection: Bool {
+        [energy, information, decision, lifestyle].contains { !$0.isEmpty }
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("MBTI")
                     .font(OhanaFont.caption(.black))
@@ -244,36 +281,106 @@ struct MemberCompactMBTIBar: View {
                     .font(OhanaFont.callout(.black))
                     .monospaced()
                     .foregroundStyle(result.contains("-") ? foreground.opacity(0.58) : foreground)
+                if hasSelection {
+                    Button {
+                        clearSelection()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold))
+                            .foregroundStyle(foreground.opacity(0.58))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(l.tr(zh: "清空 MBTI", en: "Clear MBTI", de: "MBTI leeren"))
+                }
             }
-            HStack(spacing: 7) {
-                dimensionMenu(title: "I/E", first: "I", second: "E", selection: $energy)
-                dimensionMenu(title: "S/N", first: "S", second: "N", selection: $information)
-                dimensionMenu(title: "T/F", first: "T", second: "F", selection: $decision)
-                dimensionMenu(title: "J/P", first: "J", second: "P", selection: $lifestyle)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 2),
+                alignment: .leading,
+                spacing: 8
+            ) {
+                dimensionButtons(key: "energy", title: "I / E", first: "I", second: "E", selection: $energy)
+                dimensionButtons(key: "information", title: "S / N", first: "S", second: "N", selection: $information)
+                dimensionButtons(key: "decision", title: "T / F", first: "T", second: "F", selection: $decision)
+                dimensionButtons(key: "lifestyle", title: "J / P", first: "J", second: "P", selection: $lifestyle)
             }
         }
     }
 
-    private func dimensionMenu(title: String, first: String, second: String, selection: Binding<String>) -> some View {
-        Menu {
-            Button(first) { select(first, selection: selection) }
-            Button(second) { select(second, selection: selection) }
-            Button(l.tr(zh: "清空", en: "Clear", de: "Leeren"), role: .destructive) { select("", selection: selection) }
-        } label: {
-            Text(selection.wrappedValue.isEmpty ? title : selection.wrappedValue)
-                .font(OhanaFont.caption(.black))
+    private func dimensionButtons(
+        key: String,
+        title: String,
+        first: String,
+        second: String,
+        selection: Binding<String>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(OhanaFont.caption2(.bold))
                 .monospaced()
-                .foregroundStyle(selection.wrappedValue.isEmpty ? foreground.opacity(0.72) : Color.arkInk)
-                .frame(maxWidth: .infinity)
-                .frame(height: 38)
-                .background(selection.wrappedValue.isEmpty ? Color.ohanaControlFill : Color.goPrimary, in: Capsule())
+                .foregroundStyle(foreground.opacity(0.62))
+
+            HStack(spacing: 4) {
+                dimensionButton(first, key: key, title: title, selection: selection)
+                dimensionButton(second, key: key, title: title, selection: selection)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func dimensionButton(
+        _ value: String,
+        key: String,
+        title: String,
+        selection: Binding<String>
+    ) -> some View {
+        let isSelected = selection.wrappedValue == value
+        return Button {
+            select(value, selection: selection)
+        } label: {
+            Text(value)
+                .font(OhanaFont.callout(.black))
+                .monospaced()
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : foreground.opacity(0.82))
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .background(
+                    isSelected ? Color.goPrimary : foreground.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous)
+                        .strokeBorder(
+                            isSelected ? Color.goPrimary.opacity(0.88) : foreground.opacity(0.12),
+                            lineWidth: 1
+                        )
+                }
+                .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityLabel("MBTI \(title): \(value)")
+        .accessibilityValue(isSelected
+            ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+            : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt"))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("member-mbti-\(key)-\(value.lowercased())")
     }
 
     private func select(_ value: String, selection: Binding<String>) {
         withAnimation(GoMotion.selection) {
             selection.wrappedValue = value
+        }
+        onSelectionChanged()
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    private func clearSelection() {
+        withAnimation(GoMotion.selection) {
+            energy = ""
+            information = ""
+            decision = ""
+            lifestyle = ""
         }
         onSelectionChanged()
         UISelectionFeedbackGenerator().selectionChanged()
@@ -289,7 +396,7 @@ struct MemberCompactCityPicker: View {
 
     private var l: L10n { L10n(appLanguage) }
     private var cities: [String] {
-        country.isEmpty ? [] : PetBreedDatabase.cities(for: country)
+        country.isEmpty ? [] : PetBreedDatabase.sortedCities(for: country, l: l)
     }
 
     var body: some View {
@@ -354,7 +461,7 @@ struct MemberCompactCityPicker: View {
     }
 
     private func localizedCity(_ value: String) -> String {
-        value == "其他" ? l.tr(zh: "其他", en: "Other", de: "Andere") : value
+        PetBreedDatabase.localizedRegionName(value, l: l)
     }
 }
 
@@ -372,18 +479,12 @@ struct MemberCreationJoinHandoffModifier: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        let rawProgress = clampedProgress
         let p = easedProgress
-        let scale = reduceMotion ? mix(1, 0.82, p) : mix(1, HomeJoinHandoffMotion.scale, p)
-        let y = reduceMotion ? mix(0, 10, p) : mix(0, HomeJoinHandoffMotion.y, p)
-        let rotation = reduceMotion ? Double(0) : Double(mix(0, HomeJoinHandoffMotion.rotation, p))
-        let flipArc = sin(Double(rawProgress) * .pi)
-        let flip = reduceMotion ? Double(0) : Double(HomeJoinHandoffMotion.flip) * flipArc
-        let opacity = reduceMotion ? Double(mix(1, 0.68, p)) : Double(mix(1, HomeJoinHandoffMotion.opacity, p))
+        let scale = reduceMotion ? 1 : mix(1, HomeJoinHandoffMotion.scale, p)
+        let y = reduceMotion ? 0 : mix(0, HomeJoinHandoffMotion.y, p)
+        let opacity = Double(mix(1, HomeJoinHandoffMotion.opacity, p))
 
         content
-            .rotationEffect(.degrees(rotation))
-            .rotation3DEffect(.degrees(flip), axis: (x: 0.04, y: 1, z: 0), perspective: 0.88)
             .scaleEffect(scale, anchor: .center)
             .offset(y: y)
             .opacity(opacity)

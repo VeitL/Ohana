@@ -83,10 +83,16 @@ SwiftData schema migration, persistence writes, privacy, deletion/memorial mode,
 Required:
 
 - Build.
-- Targeted unit tests with in-memory SwiftData.
+- Targeted in-memory Unit/Integration proof for the affected invariant.
+- A temporary on-disk old-store or durability fixture when migration,
+  relaunch, atomicity, or filesystem persistence is part of the risk.
 - Runtime audit.
-- Manual simulator flow.
-- Recovery path.
+- A disposable Simulator journey for destructive, empty-state, permission
+  setup, restore, or other state-mutating acceptance.
+- One guarded normal-UI Dogfood journey when the stabilized change can affect
+  persisted facts or accumulated existing-user behavior; never use Dogfood for
+  destructive/reset/empty-state flows.
+- Failure, recovery/retry, and repeat/idempotency proof.
 - Privacy review.
 - Performance note if launch, route transition, scrolling, or tap path changes.
 - Feature flag, kill switch, or graceful fallback where feasible.
@@ -102,7 +108,11 @@ Required:
 | App Intents/system surfaces | Build, route-handoff test, entity/action summary, privacy/deleted/memorial/missing-data checks | That all Shortcuts/Siri/Spotlight surfaces work from an app-only test |
 | Performance/smoothness | Code-first smell review; one focused Instruments/ETTrace capture when runtime evidence is needed | "Feels fast" or conclusions from mixed/unsymbolicated traces |
 | Leak/memory growth | Same-flow before/after memgraph, app-owned leaked type counts, ownership path or retaining edge | Leak fixed because total memory is smaller |
-| Persistence/schema | In-memory migration/compatibility tests, recovery path, backup/export impact, targeted simulator test when user-visible | Data safety from a build-only pass |
+| Persistence/schema | In-memory invariant/compatibility tests; temporary on-disk old-store fixtures for affected migration or durability paths; recovery and backup/export impact; targeted simulator test when user-visible | Durability or existing-store safety from an in-memory or build-only pass |
+| Simulator/system simulation | Exact runtime and OS, deterministic setup, driven journey, and final UI/log evidence | Physical-device delivery, permission prompts, energy, biometrics, camera, iCloud, or background execution |
+| Signed release Archive | Final Archive inspection for signing, entitlements, embedded manifests/frameworks, and an Archive-generated Xcode Privacy Report | Runtime behavior on a device or App Store processing success |
+| Physical device | Named hardware/OS and the relevant normal-product journey from the release artifact | Coverage of untested hardware, OS versions, accounts, regions, or external distribution |
+| External platform | Platform receipt from the actual boundary, such as CI, App Store Connect processing, TestFlight installation, or review metadata | Evidence for any external boundary that was not actually exercised |
 
 ## Efficient Test Lanes
 
@@ -116,11 +126,11 @@ full UI suite as a default response to a local code edit.
 | Release static gate | `scripts/release-hardening-check.sh --static-only` | Fixture self-tests and the complete strict static audit set without CoreSimulator. |
 | Release unit gate | `scripts/release-hardening-check.sh` | Full static release gate plus the complete unit suite; use `--with-ui` only for RC full UI regression. |
 | Fast optimized Release build | `scripts/build-release-fast.sh` | Repeated optimized compiler/artifact checks. It keeps `-O`, uses incremental compilation, and does not prove runtime behavior, signing, or App Store readiness. |
-| Targeted unit/integration | `scripts/test-simulator.sh -only-testing:OhanaTests/<RelevantTests>` | One service, command, read model, persistence boundary, or regression test changed. |
+| Targeted unit/integration | `scripts/xcode-test.sh --only-testing OhanaTests/<RelevantTests>` | One service, command, read model, persistence boundary, or regression test changed. |
 | Full unit suite | `scripts/test-unit.sh` or `scripts/module-exit-gate.sh --unit` | Broad module handoff or phase boundary; it does not pull in the UI target. |
 | Release UI smoke | `scripts/test-ui-release-smoke.sh smoke` | First-release onboarding and first-pet path changed. |
 | Domain UI shard | `scripts/test-ui-shard.sh <shard>` | One user-facing domain changed; use `--list` to see the available shards. |
-| Full UI regression | `scripts/test-ui-nightly.sh` | Nightly, release candidate, or an explicitly requested whole-app UI pass. It builds once, then runs sequential shards with one xcresult per shard. |
+| Full UI regression | `scripts/test-ui-nightly.sh` | Nightly, release candidate, or an explicitly requested whole-app UI pass. Each shard runs the governed normal build-then-test lifecycle sequentially against the fixed incremental cache; the campaign fails at a shard boundary, deletes passing results, and retains only the bounded failure set. |
 | Signed WMO Archive | `scripts/archive-release-local.sh` | RC/signing/device-matrix gates only. It keeps whole-module optimization, writes outside the File Provider-managed repository, verifies code signing/xattrs, and does not upload. |
 | Real-device acceptance | `docs/release-true-device-test-plan.md` | Permissions, HealthKit, background delivery, location, energy, iCloud, biometrics, camera, keyboard, and device-only behavior. |
 
@@ -143,9 +153,12 @@ the changed audits after `dev-check-changed.sh`. The complete UI suite remains
 `scripts/test-ui-nightly.sh`, or `scripts/release-hardening-check.sh --with-ui`
 for an explicit RC lane.
 
-UI shards intentionally run sequentially with parallel testing disabled. The UI
-tests launch, reset, seed, and sometimes preserve state in the same simulator;
-parallel runners would compete for the app process and persistence container.
+UI shards intentionally run sequentially with parallel testing disabled. Each
+shard owns one normal governed build-then-test lifecycle; the fixed cache keeps
+those builds incremental without sharing a stale build-for-testing artifact
+across shard boundaries. The UI tests launch, reset, seed, and sometimes
+preserve state in the same simulator, so parallel runners would compete for the
+app process and persistence container.
 `scripts/audit-ui-test-shards.sh` requires every source UI test to appear in
 exactly one shard so a newly added test cannot silently disappear from the full
 regression lane.
@@ -172,7 +185,10 @@ Affected data:
 Affected permissions:
 Affected background work:
 Validation commands:
-Simulator/device:
+Simulator/system simulation:
+Signed Archive:
+Physical device:
+External platform:
 Screenshots/recording:
 Trace/memgraph artifacts:
 Known limitations:

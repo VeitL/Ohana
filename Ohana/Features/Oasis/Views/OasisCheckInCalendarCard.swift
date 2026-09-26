@@ -177,20 +177,33 @@ struct OasisCheckInCalendarCard: View {
             Spacer()
 
             if makeupPackCount > 0 {
-                Text(localization.tr(zh: "点击灰色日期补签", en: "Tap a gray date to make up", de: "Graues Datum zum Nachtragen tippen"))
+                Text(localization.tr(
+                    zh: "旧库存已保留 · 当前连击不支持补签",
+                    en: "Legacy stock preserved · makeup is unavailable",
+                    de: "Altbestand bleibt · Nachtragen ist nicht verfügbar",
+                    es: "Stock anterior conservado · no se admite recuperar días",
+                    pt: "Estoque antigo preservado · reposição indisponível",
+                    fr: "Ancien stock conservé · rattrapage indisponible",
+                    ja: "旧在庫は保持済み・現在は振替不可",
+                    ko: "기존 재고 보존됨 · 현재 소급 체크인 불가",
+                    it: "Scorte precedenti conservate · recupero non disponibile"
+                ))
                     .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.goPrimary.opacity(0.6))
+                    .foregroundStyle(Color.ohanaSecondaryText)
             } else {
-                if let makeupShopLockedLevel {
-                    lockedMakeupShopLabel(level: makeupShopLockedLevel)
-                } else {
-                    Button(action: onOpenMakeupShop) {
-                        Text(localization.tr(zh: "去商店购买", en: "Buy in shop", de: "Im Shop kaufen"))
-                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.goYellow.opacity(0.8))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
+                Text(localization.tr(
+                    zh: "当前版本不再出售",
+                    en: "No longer sold in this version",
+                    de: "In dieser Version nicht mehr erhältlich",
+                    es: "Ya no se vende en esta versión",
+                    pt: "Não é mais vendido nesta versão",
+                    fr: "N’est plus vendu dans cette version",
+                    ja: "現在のバージョンでは販売終了",
+                    ko: "현재 버전에서 판매 종료",
+                    it: "Non più in vendita in questa versione"
+                ))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
     }
@@ -345,7 +358,8 @@ struct OasisCheckInCalendarCard: View {
     }
 
     private func isMakeupEligible(_ cell: CalendarCell) -> Bool {
-        !cell.isChecked && !cell.isToday && !cell.isFuture && makeupPackCount > 0
+        // The supported Presence model has no historical makeup command.
+        false
     }
 
     private func calendarDayCellContent(_ cell: CalendarCell) -> some View {

@@ -17,7 +17,6 @@ struct SettingsPetManagementSheet: View {
     @State private var petToReset: SettingsPetSnapshot? = nil
 
     private var primaryText: Color { Color.ohanaPrimaryText }
-    private var secondaryText: Color { Color.ohanaSecondaryText }
     private var tertiaryText: Color { Color.ohanaTertiaryText }
     private var dividerLine: Color { Color.ohanaDivider }
     private var l: L10n { L10n(appLanguage) }
@@ -75,14 +74,9 @@ struct SettingsPetManagementSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "宠物管理", en: "Pet Management", de: "Tierverwaltung"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(primaryText)
-                Text(l.tr(zh: "重置记录或删除成员", en: "Reset records or delete members", de: "Einträge zurücksetzen oder Mitglieder löschen"))
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(secondaryText)
-            }
+            Text(l.tr(zh: "宠物管理", en: "Pet Management", de: "Tierverwaltung"))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(primaryText)
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
@@ -97,17 +91,6 @@ struct SettingsPetManagementSheet: View {
 
     private var petList: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                RoundedRectangle(cornerRadius: OhanaRadius.hairline, style: .continuous)
-                    .fill(Color.goPrimary)
-                    .frame(width: 3, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                Text(l.tr(zh: "成员", en: "Members", de: "Mitglieder"))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(tertiaryText)
-                    .tracking(1.2)
-            }
-            .padding(.leading, 2)
-
             VStack(spacing: 0) {
                 ForEach(Array(pets.enumerated()), id: \.element.id) { index, pet in
                     if index > 0 {

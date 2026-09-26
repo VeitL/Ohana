@@ -225,7 +225,8 @@ nonisolated struct DomainInsuranceClaimValues {
     let approvedAt: Date?
 }
 
-nonisolated struct DomainHumanHealthReportValues {
+nonisolated struct DomainHumanHealthReportValues: Equatable, Sendable {
+    let id: UUID
     let reportType: HealthReportType
     let conclusion: ReportConclusion
     let hospitalName: String
@@ -235,6 +236,33 @@ nonisolated struct DomainHumanHealthReportValues {
     let summary: String
     let notes: String
     let recordedByHumanId: String?
+    let captureSource: HumanHealthReportCaptureSource
+
+    init(
+        id: UUID = UUID(),
+        reportType: HealthReportType,
+        conclusion: ReportConclusion,
+        hospitalName: String,
+        doctorName: String,
+        reportDate: Date,
+        nextCheckDate: Date?,
+        summary: String,
+        notes: String,
+        recordedByHumanId: String?,
+        captureSource: HumanHealthReportCaptureSource = .manual
+    ) {
+        self.id = id
+        self.reportType = reportType
+        self.conclusion = conclusion
+        self.hospitalName = hospitalName
+        self.doctorName = doctorName
+        self.reportDate = reportDate
+        self.nextCheckDate = nextCheckDate
+        self.summary = summary
+        self.notes = notes
+        self.recordedByHumanId = recordedByHumanId
+        self.captureSource = captureSource
+    }
 }
 
 nonisolated struct DomainHumanMedicationPlanValues {
@@ -620,21 +648,35 @@ nonisolated enum DomainMemberFactWriter {
     static func createHumanHealthMetricLog(
         plan: AuthorizedDomainMemberFactWrite,
         human: Human,
+        id: UUID = UUID(),
         metricKey: String,
         unitCode: String,
         value: Double,
         notes: String,
         recordedByHumanId: String?,
+        sourceReportID: UUID? = nil,
+        sourceLabel: String = "",
+        referenceLow: Double? = nil,
+        referenceHigh: Double? = nil,
+        referenceRangeText: String = "",
+        reportedFlag: HumanHealthMetricReportedFlag = .unknown,
         context: ModelContext
     ) -> HumanHealthMetricLog {
         plan.consume()
         let log = HumanHealthMetricLog(
+            id: id,
             metricKey: metricKey,
             unitCode: unitCode,
             value: value,
             date: plan.occurredAt,
             notes: notes,
             recordedByHumanId: recordedByHumanId,
+            sourceReportID: sourceReportID,
+            sourceLabel: sourceLabel,
+            referenceLow: referenceLow,
+            referenceHigh: referenceHigh,
+            referenceRangeText: referenceRangeText,
+            reportedFlag: reportedFlag,
             human: human
         )
         context.insert(log)
@@ -652,6 +694,7 @@ nonisolated enum DomainMemberFactWriter {
     ) -> HumanHealthReport {
         plan.consume()
         let report = HumanHealthReport(
+            id: values.id,
             humanId: human.id.uuidString,
             reportType: values.reportType,
             conclusion: values.conclusion,
@@ -661,7 +704,8 @@ nonisolated enum DomainMemberFactWriter {
             nextCheckDate: values.nextCheckDate,
             summary: values.summary,
             notes: values.notes,
-            recordedByHumanId: values.recordedByHumanId
+            recordedByHumanId: values.recordedByHumanId,
+            captureSource: values.captureSource
         )
         context.insert(report)
         CloudSyncMutationRecorder.markModified(report, context: context, modifiedAt: plan.modifiedAt)
@@ -867,7 +911,7 @@ nonisolated enum DomainMemberFactWriter {
             medicationId: medicationIdString,
             scheduledTime: scheduledTime,
             calendar: calendar
-        ) ?? fetchMatchingHumanMedicationLog(
+        ) ?? HumanMedicationLogStore.fetchMatchingLog(
             humanId: humanId,
             medicationId: medicationIdString,
             scheduledTime: scheduledTime,
@@ -953,6 +997,10 @@ nonisolated enum DomainMemberFactWriter {
         relatedPetId: String? = nil,
         relatedEventId: String? = nil,
         relatedReminderId: String? = nil,
+        planId: String? = nil,
+        occurrenceKey: String? = nil,
+        nominalAt: Date? = nil,
+        scheduleVersion: Int = 0,
         createdById: String,
         createdByName: String,
         assignedToId: String? = nil,
@@ -975,6 +1023,10 @@ nonisolated enum DomainMemberFactWriter {
             relatedPetId: relatedPetId,
             relatedEventId: relatedEventId,
             relatedReminderId: relatedReminderId,
+            planId: planId,
+            occurrenceKey: occurrenceKey,
+            nominalAt: nominalAt,
+            scheduleVersion: scheduleVersion,
             createdById: createdById,
             createdByName: createdByName,
             assignedToId: assignedToId,
@@ -1020,39 +1072,6 @@ nonisolated enum DomainMemberFactWriter {
         )
         context.delete(task)
     }
-
-    @MainActor
-    private static func fetchMatchingHumanMedicationLog(
-        humanId: String,
-        medicationId: String,
-        scheduledTime: Date,
-        context: ModelContext,
-        calendar: Calendar
-    ) -> HumanMedicationLog? {
-        var descriptor = FetchDescriptor<HumanMedicationLog>(
-            predicate: #Predicate<HumanMedicationLog> { log in
-                log.humanId == humanId && log.medicationId == medicationId
-            }
-        )
-        descriptor.fetchLimit = 128
-        let logs: [HumanMedicationLog]
-        do {
-            logs = try context.fetch(descriptor)
-        } catch {
-            OhanaLog.warning(
-                "[DomainMemberFactWriter] failed to fetch human medication log for humanId=\(humanId) medicationId=\(medicationId): \(error.localizedDescription)",
-                category: "Care"
-            )
-            logs = []
-        }
-        return HumanMedicationLogStore.matchingLog(
-            in: logs,
-            humanId: humanId,
-            medicationId: medicationId,
-            scheduledTime: scheduledTime,
-            calendar: calendar
-        )
-    }
 }
 
 @MainActor
@@ -1079,7 +1098,7 @@ enum DomainMemberFactEffectsDispatcher {
     }
 }
 
-private nonisolated extension AuthorizedDomainMemberFactWrite {
+nonisolated extension AuthorizedDomainMemberFactWrite {
     func consume() {
         _ = token
         mutationPlan.consumeAuthorization()

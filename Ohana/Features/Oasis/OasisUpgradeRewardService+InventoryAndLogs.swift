@@ -7,6 +7,21 @@ import Foundation
 import SwiftData
 
 extension OasisUpgradeRewardService {
+    static func stardustBalance(context: ModelContext) -> Int {
+        fragmentBalance(
+            critterId: OasisCompanionCurrency.stardustCatalogID,
+            context: context
+        )?.amount ?? 0
+    }
+
+    static func addStardust(amount: Int, context: ModelContext) {
+        addFragments(
+            critterId: OasisCompanionCurrency.stardustCatalogID,
+            amount: amount,
+            context: context
+        )
+    }
+
     static func ownsCritter(_ catalogId: String, context: ModelContext) -> Bool {
         activeCritter(catalogId: catalogId, context: context) != nil
     }
@@ -215,40 +230,15 @@ extension OasisUpgradeRewardService {
     }
 
     static func deadInteractionOutcome(for critter: OasisElectronicPet, action: OasisCritterAction) -> OasisCritterInteractionOutcome {
-        let reason = critter.deathReasonRaw
-        let reasonZh: String
-        let reasonEn: String
-        let reasonDe: String
-        switch OasisCritterDeathReason(rawValue: reason) {
-        case .hungry:
-            reasonZh = "太久没有吃东西"
-            reasonEn = "too long without food"
-            reasonDe = "zu lange ohne Futter"
-        case .sick:
-            reasonZh = "久病没有恢复"
-            reasonEn = "illness that was not healed"
-            reasonDe = "Krankheit ohne Erholung"
-        case .bored:
-            reasonZh = "太久没有陪伴"
-            reasonEn = "too long without company"
-            reasonDe = "zu lange ohne Gesellschaft"
-        case .oldAge:
-            reasonZh = "自然老去"
-            reasonEn = "old age"
-            reasonDe = "Alter"
-        case .none:
-            reasonZh = "生命已经结束"
-            reasonEn = "life has ended"
-            reasonDe = "das Leben ist zu Ende"
-        }
+        _ = critter
         return OasisCritterInteractionOutcome(
             success: false,
             action: action,
             completedDailyWish: false,
             wish: nil,
-            messageZh: "它正在纪念册里安静休息，因为\(reasonZh)。可以用一键照顾把它带回来。",
-            messageEn: "It is resting in the memorial album because of \(reasonEn). One-tap care can bring it back.",
-            messageDe: "Es ruht im Erinnerungsalbum wegen \(reasonDe). Ein-Klick-Pflege kann es zurückholen.",
+            messageZh: "伙伴正在安心休眠，免费唤醒后即可继续互动。",
+            messageEn: "Your companion is safely sleeping. Wake it for free to keep interacting.",
+            messageDe: "Dein Begleiter schläft sicher. Wecke ihn kostenlos auf.",
             rewardXP: 0,
             rewardBond: 0,
             rewardFragments: 0,

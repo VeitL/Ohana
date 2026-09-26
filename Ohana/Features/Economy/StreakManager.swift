@@ -36,8 +36,7 @@ enum StreakManager {
                 // 昨天有记录，今天还没有 → 暂不处理，等今天打卡
             } else {
                 // 超过1天没打卡 → 检查 Streak 保护盾
-                let shieldKey = "shop_streakShieldExpiry"
-                let shieldExpiry = UserDefaults.standard.object(forKey: shieldKey) as? Date
+                let shieldExpiry = ShopInventoryStateStore.snapshot().streakShieldExpiry
                 let shieldActive = shieldExpiry.map { Date() < $0 } ?? false
 
                 if checkedInToday {
@@ -68,7 +67,7 @@ enum StreakManager {
             return
         }
         if shouldConsumeShield {
-            UserDefaults.standard.removeObject(forKey: "shop_streakShieldExpiry")
+            ShopInventoryStateStore.clearStreakShield()
         }
     }
 

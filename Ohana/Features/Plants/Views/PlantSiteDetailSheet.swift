@@ -162,7 +162,7 @@ struct PlantSiteDetailSheet: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
             .background(Color.goPrimary, in: Capsule())
@@ -201,7 +201,7 @@ struct PlantSiteDetailSheet: View {
             } label: {
                 Image(systemName: "checkmark") // a11y: allow decorative completion glyph; accessibility label names action.
                     .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)

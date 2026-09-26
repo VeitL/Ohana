@@ -51,13 +51,14 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
-    @Test func petCreationRequiresNameSpeciesAndBreedWhileOtherProfileFieldsRemainOptional() throws {
+    @Test func petCreationRequiresNameSpeciesBreedAndGenderWhileCoatRemainsOptional() throws {
         resetGlobalState()
         let container = try makeContainer()
         var draft = MemberCreationDraft(kind: .pet)
         draft.name = "Momo"
         draft.species = "dog"
         draft.breed = "柴犬"
+        draft.petGender = "boy"
 
         let pet = try #require(saveMember(
             draft: draft,
@@ -70,8 +71,83 @@ struct MemberCreationServiceTests {
         #expect(pet.name == "Momo")
         #expect(pet.species == "dog")
         #expect(pet.breed == "柴犬")
-        #expect(pet.gender == "unknown")
+        #expect(pet.gender == "boy")
         #expect(pet.coatColor.isEmpty)
+    }
+
+    @Test func petCreationWithoutExplicitDatesDoesNotCreateCalendarPlans() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        _ = try saveMember(
+            draft: petDraft(name: "Momo", source: .placeholder),
+            existingPets: [],
+            existingHumans: [],
+            context: context,
+            countryCode: "CN"
+        )
+
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<FamilyTaskPlan>()).isEmpty)
+    }
+
+    @Test func petProfileEditDoesNotMaterializeCareOrCalendarPlans() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        try context.save()
+
+        let result = MemberProfileCommandService.updatePet(
+            pet,
+            input: PetProfileCommandInput(
+                name: "Momo",
+                avatarImageData: nil,
+                species: "cat",
+                breed: "Domestic Shorthair",
+                gender: "girl",
+                isNeutered: true,
+                birthday: Date(timeIntervalSince1970: 1_600_000_000),
+                homeDate: Date(timeIntervalSince1970: 1_700_000_000),
+                themeHex: pet.safeThemeColorHex,
+                notes: ""
+            ),
+            context: context
+        )
+
+        #expect(result.didPersist)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<FamilyTaskPlan>()).isEmpty)
+    }
+
+    @Test func petCreationRejectsMissingGender() throws {
+        resetGlobalState()
+        let container = try makeContainer()
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.name = "Momo"
+        draft.species = "dog"
+        draft.breed = "柴犬"
+
+        do {
+            _ = try saveMember(
+                draft: draft,
+                existingPets: [],
+                existingHumans: [],
+                context: container.mainContext,
+                countryCode: "CN"
+            )
+            Issue.record("Expected missing Pet gender to be rejected")
+        } catch let error as MemberCreationService.ServiceError {
+            guard case .incompletePetProfile = error else {
+                Issue.record("Expected incomplete Pet profile error")
+                return
+            }
+        }
+        #expect(try container.mainContext.fetch(FetchDescriptor<Pet>()).isEmpty)
     }
 
     @Test func petCreationStillRejectsMissingSpecies() throws {
@@ -128,6 +204,7 @@ struct MemberCreationServiceTests {
         custom.customSpecies = "Capybara"
         custom.isCustomBreed = true
         custom.customBreed = "Short-haired"
+        custom.petGender = "girl"
 
         let pet = try #require(saveMember(
             draft: custom,
@@ -757,7 +834,7 @@ struct MemberCreationServiceTests {
         let birthdayEvent = try #require(events.first { $0.eventType == EventType.birthday.rawValue })
         let anniversaryEvent = try #require(events.first { $0.eventType == EventType.anniversary.rawValue })
 
-        #expect(events.count >= 2)
+        #expect(events.count == 2)
         #expect(birthdayEvent.relatedEntityId == pet.id.uuidString)
         #expect(birthdayEvent.recurrenceDays == 365)
         #expect(reminders.count == 1)
@@ -897,7 +974,7 @@ struct MemberCreationServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -923,6 +1000,7 @@ struct MemberCreationServiceTests {
     private func resetGlobalState() {
         [
             "inventory_avatar2d_extra_count",
+            ShopInventoryDefaultsKeys.durableStateV2,
             "avatar2d_free_human_used",
             "avatar2d_free_pet_used",
             "currentActiveHumanId",

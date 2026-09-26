@@ -10,8 +10,6 @@ import SwiftUI
 extension AddPlantView {
     var plantConfirmationStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            plantMiniHeader
-
             PlantCreationSection(
                 title: l.tr(zh: "确认信息", en: "Review", de: "Prüfen"),
                 icon: "checkmark.seal.fill"

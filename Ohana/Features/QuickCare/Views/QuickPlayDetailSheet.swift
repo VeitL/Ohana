@@ -61,6 +61,7 @@ struct QuickPlayDetailSheet: View {
     @State private var chartProgress: Double = 0
     @State private var selectedActionHumanID: UUID?
     @State private var requiresActionHumanSelection = false
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     private var l: L10n { L10n(appLanguage) }
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -72,7 +73,8 @@ struct QuickPlayDetailSheet: View {
         QuickPlayCommandExecutor(
             context: modelContext,
             careEvents: appServices.careEvents,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -237,6 +239,9 @@ struct QuickPlayDetailSheet: View {
                 }
                 .presentationDetents([.medium, .large])
                 .presentationContentInteraction(.scrolls)
+            }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
             }
         }
         .accessibilityIdentifier("quick-play-detail-sheet")
@@ -497,7 +502,7 @@ struct QuickPlayDetailSheet: View {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(playTint)
-            Text(l.tr(zh: "第一次逗玩后会出现在这里", en: "Your first play session appears here", de: "Das erste Spiel erscheint hier"))
+            Text(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge"))
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
@@ -643,9 +648,6 @@ struct QuickPlayDetailSheet: View {
                     Text(playPlanEvent == nil ? l.tr(zh: "添加陪玩计划", en: "Add play plan", de: "Spielplan hinzufügen") : l.tr(zh: "陪玩计划", en: "Play plan", de: "Spielplan"))
                         .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "轻提醒，不制造压力。", en: "A light reminder, no pressure.", de: "Sanfte Erinnerung, kein Druck."))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .padding(.top, 26)
@@ -740,6 +742,11 @@ struct QuickPlayDetailSheet: View {
             .padding(.top, 12)
             .transition(.move(edge: .top).combined(with: .opacity))
     }
+}
+
+// MARK: - Actions and Formatting
+
+private extension QuickPlayDetailSheet {
 
     private func commitPlay() {
         guard !isCommittingPlay else { return }
@@ -800,18 +807,28 @@ struct QuickPlayDetailSheet: View {
         playPlanSaveTask?.cancel()
         closePlayPlanEditor()
         playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
-            let event = CarePlanCalendarSync.syncPlayPlan(
-                pet: pet,
-                context: modelContext,
-                intervalDays: playPlanIntervalDays,
-                enabled: true,
-                anchor: playPlanAnchorDate
-            )
-            showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
-            if let event {
-                Task { @MainActor in
-                    await appServices.reminderScheduling.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
+            do {
+                let event = try playCommandExecutor.syncPlayPlan(
+                    pet: pet,
+                    intervalDays: playPlanIntervalDays,
+                    enabled: true,
+                    anchor: playPlanAnchorDate
+                )
+                showToast(l.tr(zh: "计划已保存", en: "Plan saved", de: "Plan gespeichert"))
+                if let event {
+                    Task { @MainActor in
+                        await appServices.reminderScheduling.scheduleManyIfNeeded(reminders: event.reminders, context: modelContext, source: .detail)
+                    }
                 }
+            } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            } catch {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "playPlan"),
+                    error: error
+                )
+                showToast(l.tr(zh: "保存失败，请重试", en: "Save failed. Please try again.", de: "Speichern fehlgeschlagen. Bitte erneut versuchen."))
             }
             isSavingPlayPlan = false
             playPlanSaveTask = nil
@@ -827,14 +844,20 @@ struct QuickPlayDetailSheet: View {
         playPlanSaveTask?.cancel()
         closePlayPlanEditor()
         playPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: playPlanSaveDelayMilliseconds) {
-            CarePlanCalendarSync.syncPlayPlan(
-                pet: pet,
-                context: modelContext,
-                intervalDays: 0,
-                enabled: false,
-                anchor: playPlanAnchorDate
-            )
-            showToast(l.tr(zh: "计划已关闭", en: "Plan off", de: "Plan aus"))
+            do {
+                _ = try playCommandExecutor.syncPlayPlan(
+                    pet: pet,
+                    intervalDays: 0,
+                    enabled: false,
+                    anchor: playPlanAnchorDate
+                )
+                showToast(l.tr(zh: "计划已关闭", en: "Plan off", de: "Plan aus"))
+            } catch {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "playPlan.delete"),
+                    error: error
+                )
+            }
             isSavingPlayPlan = false
             playPlanSaveTask = nil
         }

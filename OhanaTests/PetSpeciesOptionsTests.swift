@@ -93,17 +93,92 @@ struct PetSpeciesOptionsTests {
         #expect(Pet().species == "dog")
     }
 
+    @Test func memberCreationShowsSpeciesAsVisibleNativeButtons() throws {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let steps = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift"),
+            encoding: .utf8
+        )
+        let controls = try String(
+            contentsOf: rootURL.appending(path: "Ohana/Features/Members/Views/MemberCardCreationContentView+Controls.swift"),
+            encoding: .utf8
+        )
+
+        #expect(steps.contains("LazyVGrid(columns: petSpeciesGridColumns"))
+        #expect(steps.contains("petSpeciesButton(species)"))
+        #expect(!steps.contains("member-pet-species-picker"))
+        #expect(controls.contains("member-pet-species-option-"))
+        #expect(controls.contains(".buttonStyle(.borderedProminent)"))
+        #expect(controls.contains(".buttonStyle(.bordered)"))
+        #expect(controls.contains("isSelected ? cardSelectedForeground : cardForeground"))
+        #expect(controls.contains("guard currentKey != nextKey else { return }"))
+        #expect(steps.contains("selected, 3 maximum"))
+    }
+
     @Test func automaticPetThemeIsStableAndExplicitSelectionOverridesIt() {
         var draft = MemberCreationDraft(kind: .pet)
         draft.name = "Momo"
         draft.species = "cat"
         draft.breed = "布偶猫"
 
-        let automatic = draft.normalizedThemeHex
-        #expect(automatic == draft.normalizedThemeHex)
+        let automaticWithoutCoat = draft.normalizedThemeHex
+        #expect(automaticWithoutCoat == draft.normalizedThemeHex)
+
+        draft.coatColor = "海豹双色"
+        #expect(draft.normalizedThemeHex == "4A2A10")
 
         draft.themeColorHex = "833471"
         draft.hasExplicitThemeColor = true
         #expect(draft.normalizedThemeHex == "833471")
+
+        draft.coatColor = "蓝双色"
+        #expect(draft.normalizedThemeHex == "833471")
+
+        draft.hasExplicitThemeColor = false
+        #expect(draft.normalizedThemeHex == "7A9AAF")
+    }
+
+    @Test func petCreationStepsPlaceRequiredGenderBeforeOptionalThemeAndAvatar() {
+        #expect(MemberCreationStep.steps(for: .pet) == [
+            .petName,
+            .petIdentity,
+            .petAppearance,
+            .petPersonality,
+            .avatar
+        ])
+    }
+
+    @Test func petAvatarPreviewIsScopedToTheFifthStep() throws {
+        let rootURL = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let layout = try String(
+            contentsOf: rootURL.appending(
+                path: "Ohana/Features/Members/Views/MemberCardCreationContentView+Layout.swift"
+            ),
+            encoding: .utf8
+        )
+        let surface = try String(
+            contentsOf: rootURL.appending(
+                path: "Ohana/Features/Members/Views/MemberCardCreationMediaComponents.swift"
+            ),
+            encoding: .utf8
+        )
+        let mediaAndSave = try String(
+            contentsOf: rootURL.appending(
+                path: "Ohana/Features/Members/Views/MemberCardCreationContentView+MediaAndSave.swift"
+            ),
+            encoding: .utf8
+        )
+
+        #expect(layout.contains("kind != .pet || currentStep == .avatar"))
+        #expect(layout.contains("currentStep == .avatar"))
+        #expect(layout.contains(".avatarFocus"))
+        #expect(surface.contains("else if showsAvatar, let image = snapshot.avatarImage"))
+        #expect(surface.contains("member-pet-avatar-preview"))
+        #expect(surface.contains("layoutMode == .avatarFocus ? 4 : 0"))
+        #expect(mediaAndSave.contains("guard currentStep == .avatar, !didConfigureAvatarStep"))
     }
 }

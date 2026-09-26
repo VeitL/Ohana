@@ -584,18 +584,6 @@ nonisolated enum IslandQuestEngine {
         let hasAnyMember = !activePets.isEmpty || !humans.isEmpty
         let hasSeenStarterCeremony = UserDefaults.standard.bool(forKey: StarterGiftStorageKey.ceremonySeen)
 
-        if activePets.isEmpty {
-            quests.append(IslandQuest(
-                id: oasisPetWizardQuestId,
-                emoji: "🐾",
-                title: localized(zh: "添加第一只宠物", en: "Add your first pet"),
-                subtitle: localized(zh: "添加伙伴后记录初始体重，领取新人礼包 · +50🥥", en: "Add a companion, log starting weight, and claim the starter gift · +50🥥"),
-                isCompleted: false,
-                targetPetId: nil,
-                targetPlantId: nil
-            ))
-        }
-
         guard hasSeenStarterCeremony else { return quests }
 
         if !questProgress.isFirstMealRecorded, !activePets.isEmpty {

@@ -8,6 +8,15 @@
 import SwiftData
 import SwiftUI
 
+nonisolated enum PetDetailModelReadability {
+    static func isReadable(_ pet: Pet) -> Bool {
+        guard !pet.isDeleted else { return false }
+        // A saved deletion detaches the model before retained views and queries
+        // necessarily refresh. Unsaved preview/editor drafts remain readable.
+        return pet.modelContext != nil || pet.persistentModelID.storeIdentifier == nil
+    }
+}
+
 enum AppPetDetailSheetDestination: Hashable {
     case allFeatures
     case basicInfo
@@ -54,6 +63,7 @@ struct AppPetDetailSheetRouteContainer: View {
     let destination: AppPetDetailSheetDestination
     let onMissing: () -> Void
     let onDismiss: () -> Void
+    let showsFoodCloseButton: Bool
     let onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)?
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
@@ -62,6 +72,7 @@ struct AppPetDetailSheetRouteContainer: View {
         destination: AppPetDetailSheetDestination,
         onMissing: @escaping () -> Void,
         onDismiss: @escaping () -> Void = {},
+        showsFoodCloseButton: Bool = false,
         onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)? = nil,
         onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     ) {
@@ -71,12 +82,13 @@ struct AppPetDetailSheetRouteContainer: View {
         self.destination = destination
         self.onMissing = onMissing
         self.onDismiss = onDismiss
+        self.showsFoodCloseButton = showsFoodCloseButton
         self.onOpenFeatureDestination = onOpenFeatureDestination
         self.onPresentCoconutLog = onPresentCoconutLog
     }
 
     var body: some View {
-        if let pet = pets.first {
+        if let pet = pets.first, PetDetailModelReadability.isReadable(pet) {
             petDestination(for: pet)
         } else {
             PetRouteMissingEntityView(kind: "pet")
@@ -109,9 +121,15 @@ struct AppPetDetailSheetRouteContainer: View {
                     allFeaturesActivitySummaryTask = nil
                 }
             case .basicInfo:
-                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+                NavigationStack { PetBasicInfoDetailView(pet: pet, onClose: onDismiss) }
             case .food:
-                NavigationStack { PetFoodManagementView(pet: pet) }
+                NavigationStack {
+                    PetFoodManagementView(
+                        pet: pet,
+                        onClose: onDismiss,
+                        showsCloseButton: showsFoodCloseButton
+                    )
+                }
             case .weightQuick:
                 GenericWeightEntrySheet(
                     target: .pet(pet),
@@ -153,7 +171,8 @@ struct AppPetDetailSheetRouteContainer: View {
                     PetHealthDetailView(
                         pet: pet,
                         isModal: true,
-                        initialSection: initialSection
+                        initialSection: initialSection,
+                        onFullDismiss: onDismiss
                     )
                 }
             case .medication:
@@ -161,7 +180,11 @@ struct AppPetDetailSheetRouteContainer: View {
             case .momentHistory:
                 PetMomentsHubRouteContainer(pet: pet)
             case .documents:
-                DocumentsListView(pet: pet, showsCloseButton: true)
+                DocumentsListView(
+                    pet: pet,
+                    showsCloseButton: true,
+                    onClose: onDismiss
+                )
             case .achievements:
                 NavigationStack {
                     AchievementWallView(

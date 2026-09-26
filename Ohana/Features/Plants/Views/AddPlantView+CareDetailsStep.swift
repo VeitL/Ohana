@@ -10,8 +10,6 @@ import SwiftUI
 extension AddPlantView {
     var plantCareDetailsStep: some View {
         VStack(alignment: .leading, spacing: 14) {
-            plantMiniHeader
-
             PlantCreationInfoRow(
                 icon: "drop.fill",
                 title: l.tr(zh: "Water", en: "Water", de: "Wasser"),
@@ -172,38 +170,5 @@ extension AddPlantView {
         .overlay(alignment: .topLeading) {
             PlantCreationAccessibilityMarker(identifier: "add-plant-step-care-details")
         }
-    }
-
-    var plantMiniHeader: some View {
-        HStack(spacing: 12) {
-            PlantCreationAvatarPreview(
-                image: selectedAvatarSource == .customImage ? decodedAvatarImage : nil,
-                catalog: selectedCatalog,
-                size: 58
-            )
-            VStack(alignment: .leading, spacing: 4) {
-                Text(resolvedPlantName)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
-                Text(plantMiniHeaderSubtitle)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(12)
-        .background(Color.ohanaControlFill.opacity(0.50), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-        .transition(.move(edge: .top).combined(with: .opacity))
-        .accessibilityIdentifier("add-plant-mini-profile")
-    }
-
-    var plantMiniHeaderSubtitle: String {
-        let room = trimmedRoomName.isEmpty ? l.tr(zh: "未设置房间", en: "No room", de: "Kein Raum") : trimmedRoomName
-        let spot = trimmedLocation.isEmpty ? "" : " · \(trimmedLocation)"
-        return "\(profilePreviewSpecies) · \(room)\(spot)"
     }
 }

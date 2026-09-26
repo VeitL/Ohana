@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 @MainActor
@@ -32,9 +33,13 @@ protocol CoconutWalletManaging {
     func balance(for human: Human, context: ModelContext) -> Int
     func balance(for pet: Pet, context: ModelContext) -> Int
     func legacySystemBalance(context: ModelContext, fallback: Int) -> Int
-    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext)
+    #if DEBUG
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext)
+    #endif
     func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?)
     func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws
+    func stageLegacyBootstrapIfNeeded(context: ModelContext) throws
+    func restoreCachedHumanBalances(_ balances: [UUID: Int], context: ModelContext)
 }
 
 extension CoconutWalletManaging {
@@ -81,10 +86,25 @@ extension CoconutWalletManaging {
     func bootstrapIfNeeded(context: ModelContext) throws {
         try bootstrapIfNeeded(context: context, projectionManager: nil)
     }
+
+    /// Test doubles and non-SwiftData wallets have no legacy projection to
+    /// stage. The production wallet overrides this so a command can include
+    /// compatibility opening entries in its own transaction.
+    func stageLegacyBootstrapIfNeeded(context _: ModelContext) throws {}
+
+    func restoreCachedHumanBalances(_ balances: [UUID: Int], context: ModelContext) {
+        CoconutWalletService.restoreCachedHumanBalances(balances, context: context)
+    }
 }
 
 @MainActor
 final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
+    private let legacyDefaults: UserDefaults
+
+    init(legacyDefaults: UserDefaults = .standard) {
+        self.legacyDefaults = legacyDefaults
+    }
+
     func apply(
         deltas: [CoconutWalletDelta],
         context: ModelContext,
@@ -151,14 +171,16 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
         CoconutWalletService.legacySystemBalance(context: context, fallback: fallback)
     }
 
-    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
-        CoconutWalletService.setDeveloperOverrideBalance(
-            amount: amount,
-            for: human,
-            displayName: displayName,
-            context: context
-        )
-    }
+    #if DEBUG
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
+            CoconutWalletService.setDeveloperOverrideBalance(
+                amount: amount,
+                for: human,
+                displayName: displayName,
+                context: context
+            )
+        }
+    #endif
 
     func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
         CoconutWalletService.refreshQuestProjection(context: context, manager: manager)
@@ -167,7 +189,18 @@ final class SwiftDataCoconutWalletManager: CoconutWalletManaging {
     func bootstrapIfNeeded(context: ModelContext, projectionManager: CoconutProjectionManaging?) throws {
         try CoconutEconomyBootstrapService.bootstrapIfNeeded(
             context: context,
+            defaults: legacyDefaults,
             projectionManager: projectionManager
+        )
+    }
+
+    func stageLegacyBootstrapIfNeeded(context: ModelContext) throws {
+        try CoconutEconomyBootstrapService.bootstrapIfNeeded(
+            context: context,
+            defaults: legacyDefaults,
+            projectionManager: nil,
+            saveChanges: false,
+            updatesProjection: false
         )
     }
 }

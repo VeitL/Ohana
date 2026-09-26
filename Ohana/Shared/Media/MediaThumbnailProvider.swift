@@ -55,6 +55,16 @@ enum MediaThumbnailProvider {
     private static var accessTicks: [MediaThumbnailKey: UInt64] = [:]
     private static var nextAccessTick: UInt64 = 0
     private static var evictionGeneration = 0
+    #if DEBUG
+        private static var workloadPolicyForTesting: AppWorkloadPolicy?
+    #endif
+
+    private static var workloadPolicy: AppWorkloadPolicy {
+        #if DEBUG
+            if let workloadPolicyForTesting { return workloadPolicyForTesting }
+        #endif
+        return .shared
+    }
 
     nonisolated static func signature(for data: Data) -> String {
         MediaPayloadSignature.signature(for: data)
@@ -98,7 +108,7 @@ enum MediaThumbnailProvider {
         }
 
         let generation = evictionGeneration
-        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+        let budget = workloadPolicy.backgroundWorkBudget(
             operation: "media_thumbnail_decode",
             requestedItemCount: 1
         )
@@ -208,7 +218,7 @@ enum MediaThumbnailProvider {
     /// thumbnail. Low Power / app power-saving mode deliberately retains a
     /// smaller working set and lets off-screen tiles rebuild lazily.
     private static func trimToCapacity() {
-        let budget = AppWorkloadPolicy.shared.backgroundWorkBudget(
+        let budget = workloadPolicy.backgroundWorkBudget(
             operation: "media_thumbnail_cache",
             requestedItemCount: 48
         )
@@ -249,6 +259,10 @@ enum MediaThumbnailProvider {
     }
 
     #if DEBUG
+        static func setWorkloadPolicyForTesting(_ policy: AppWorkloadPolicy?) {
+            workloadPolicyForTesting = policy
+        }
+
         static func resetForTesting() {
             images.removeAll(keepingCapacity: false)
             transparencyFlags.removeAll(keepingCapacity: false)
@@ -262,6 +276,7 @@ enum MediaThumbnailProvider {
             inFlight.removeAll(keepingCapacity: false)
             transparencyInFlight.removeAll(keepingCapacity: false)
             evictionGeneration &+= 1
+            workloadPolicyForTesting = nil
         }
     #endif
 }

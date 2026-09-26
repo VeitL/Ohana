@@ -40,6 +40,7 @@ struct AddEventContentView: View {
     @State var rewardCoconuts = 0
     @State private var showsTypePicker = false
     @State var isSaving = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State private var didSave = false
     @State private var keyboardHeight: CGFloat = 0
     @StateObject var commandQueue = DeferredDomainCommandQueue()
@@ -151,7 +152,14 @@ struct AddEventContentView: View {
         _recurrenceDays = State(initialValue: initial.recurrenceDays)
         _recurrenceEndDate = State(initialValue: initial.recurrenceEndDate)
         _reminderLeadOption = State(initialValue: initial.reminderLeadOption)
-        _hasReminder = State(initialValue: initial.hasReminder)
+        #if DEBUG
+            let hasReminder = ProcessInfo.processInfo.environment[
+                "OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"
+            ] == "1" ? false : initial.hasReminder
+        #else
+            let hasReminder = initial.hasReminder
+        #endif
+        _hasReminder = State(initialValue: hasReminder)
         _assigneeId = State(initialValue: initial.assigneeId)
     }
 
@@ -299,25 +307,16 @@ extension AddEventContentView {
                         }
                         .accessibilityIdentifier("add-event-locked-care-subject")
                     } else {
-                        Picker(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"), selection: relatedEntitySelection) {
-                            Label(l.tr(zh: "无", en: "None", de: "Keine"), systemImage: "circle.slash")
-                                .tag("")
-                            ForEach(activePlants) { plant in
-                                Label(plant.name, systemImage: "leaf.fill")
-                                    .tag("\(EntityKind.plant.rawValue)|\(plant.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-plant-\(plant.name)")
-                            }
-                            ForEach(activePets) { pet in
-                                Label(pet.name, systemImage: "pawprint.fill")
-                                    .tag("\(EntityKind.pet.rawValue)|\(pet.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-pet-\(pet.name)")
-                            }
-                            ForEach(activeHumans) { human in
-                                Label(human.name, systemImage: "person.fill")
-                                    .tag("\(EntityKind.human.rawValue)|\(human.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-human-\(human.name)")
-                            }
+                        LabeledContent(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen")) {
+                            Label(selectedRelatedEntityTitle, systemImage: selectedRelatedEntityIcon)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"))
+                        .accessibilityIdentifier("add-event-related-entity-picker")
+                        .accessibilityValue(selectedRelatedEntityTitle)
+
+                        relatedEntityOptions
                     }
                 }
 
@@ -375,12 +374,15 @@ extension AddEventContentView {
                         isOn: $hasReminder
                     )
                         .tint(Color.goPrimary)
+                        .accessibilityIdentifier("add-event-reminder-toggle")
                     if hasReminder {
                         Picker(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"), selection: $reminderLeadOption) {
                             ForEach(allowedReminderLeadOptions) { option in
                                 Text(option.title(l)).tag(option)
                             }
                         }
+                        .accessibilityIdentifier("add-event-reminder-lead-picker")
+                        .accessibilityValue(reminderLeadOption.title(l))
                     }
                 }
 
@@ -424,6 +426,7 @@ extension AddEventContentView {
                     }
                 }
             }
+            .accessibilityIdentifier("add-event-form")
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(editorTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -438,27 +441,30 @@ extension AddEventContentView {
                         saveEvent()
                     }
                     .disabled(!canSave)
-                    .accessibilityIdentifier("add-event-save-action")
+                    .accessibilityIdentifier("add-event-navigation-save-action")
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                        titleFocused = false
+                        GoKeyboard.dismiss()
+                    }
+                    .accessibilityIdentifier("add-event-keyboard-dismiss-action")
+                    if canSave {
+                        Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
+                            saveEvent()
+                        }
+                        .fontWeight(.bold)
+                        .accessibilityIdentifier("add-event-keyboard-save-action")
+                    }
                 }
             }
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
         .interactiveDismissDisabled(isSaving)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                    titleFocused = false
-                    GoKeyboard.dismiss()
-                }
-                if canSave {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
-                        saveEvent()
-                    }
-                    .fontWeight(.bold)
-                    .accessibilityIdentifier("add-event-save-action")
-                }
-            }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .onChange(of: startDate) { _, newValue in
             keepDependentDatesAfter(newValue)
@@ -494,17 +500,100 @@ extension AddEventContentView {
         }
     }
 
-    private var relatedEntitySelection: Binding<String> {
-        Binding(
-            get: {
-                guard !relatedEntityType.isEmpty, !relatedEntityId.isEmpty else { return "" }
-                return "\(relatedEntityType)|\(relatedEntityId)"
-            },
-            set: { value in
-                let parts = value.split(separator: "|", maxSplits: 1).map(String.init)
-                relatedEntityType = parts.first ?? ""
-                relatedEntityId = parts.count == 2 ? parts[1] : ""
+    private var selectedRelatedEntityTitle: String {
+        if relatedEntityType == EntityKind.plant.rawValue,
+           let plant = activePlants.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return plant.name
+        }
+        if relatedEntityType == EntityKind.pet.rawValue,
+           let pet = activePets.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return pet.name
+        }
+        if relatedEntityType == EntityKind.human.rawValue,
+           let human = activeHumans.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return human.name
+        }
+        return l.tr(zh: "无", en: "None", de: "Keine")
+    }
+
+    private var selectedRelatedEntityIcon: String {
+        switch relatedEntityType {
+        case EntityKind.plant.rawValue: "leaf.fill"
+        case EntityKind.pet.rawValue: "pawprint.fill"
+        case EntityKind.human.rawValue: "person.fill"
+        default: "circle.slash"
+        }
+    }
+
+    @ViewBuilder
+    private var relatedEntityOptions: some View {
+        relatedEntitySelectionButton(
+            title: l.tr(zh: "无", en: "None", de: "Keine"),
+            icon: "circle.slash",
+            identifier: "add-event-related-none",
+            type: "",
+            id: ""
+        )
+
+        ForEach(activePlants) { plant in
+            relatedEntitySelectionButton(
+                title: plant.name,
+                icon: "leaf.fill",
+                identifier: "add-event-related-plant-\(plant.name)",
+                type: EntityKind.plant.rawValue,
+                id: plant.id.uuidString
+            )
+        }
+
+        ForEach(activePets) { pet in
+            relatedEntitySelectionButton(
+                title: pet.name,
+                icon: "pawprint.fill",
+                identifier: "add-event-related-pet-\(pet.name)",
+                type: EntityKind.pet.rawValue,
+                id: pet.id.uuidString
+            )
+        }
+
+        ForEach(activeHumans) { human in
+            relatedEntitySelectionButton(
+                title: human.name,
+                icon: "person.fill",
+                identifier: "add-event-related-human-\(human.name)",
+                type: EntityKind.human.rawValue,
+                id: human.id.uuidString
+            )
+        }
+    }
+
+    private func relatedEntitySelectionButton(
+        title: String,
+        icon: String,
+        identifier: String,
+        type: String,
+        id: String
+    ) -> some View {
+        Button {
+            relatedEntityType = type
+            relatedEntityId = id
+        } label: {
+            HStack {
+                Label(title, systemImage: icon)
+                Spacer()
+                if relatedEntityType == type, relatedEntityId == id {
+                    Image(systemName: "checkmark") // a11y: allow decorative selection mark; the Button exposes the selected trait
+                        .foregroundStyle(Color.goPrimary)
+                        .accessibilityHidden(true)
+                }
             }
+            .contentShape(Rectangle())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(
+            relatedEntityType == type && relatedEntityId == id ? .isSelected : []
         )
     }
 
@@ -664,6 +753,7 @@ extension AddEventContentView {
                 }
 
                 ForEach(activePlants) { plant in
+                    let themeHex = plantChipHex(for: plant)
                     relatedPersonChip(
                         title: plant.name,
                         imageSignature: plant.avatarThumbnailSignature,
@@ -671,7 +761,8 @@ extension AddEventContentView {
                             plant.hasAvatarImageAttachment ? plant.avatarImageData : nil
                         },
                         fallback: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
-                        tint: plantChipTint(for: plant),
+                        tint: Color(hex: themeHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: themeHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-plant-\(plant.name)",
                         isSelected: relatedEntityType == EntityKind.plant.rawValue && relatedEntityId == plant.id.uuidString
                     ) {
@@ -689,6 +780,7 @@ extension AddEventContentView {
                         },
                         fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                         tint: Color(hex: pet.safeThemeColorHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-pet-\(pet.name)",
                         isSelected: relatedEntityType == EntityKind.pet.rawValue && relatedEntityId == pet.id.uuidString
                     ) {
@@ -706,6 +798,7 @@ extension AddEventContentView {
                         },
                         fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                         tint: Color(hex: human.safeThemeColorHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: human.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-human-\(human.name)",
                         isSelected: relatedEntityType == EntityKind.human.rawValue && relatedEntityId == human.id.uuidString
                     ) {
@@ -762,7 +855,7 @@ extension AddEventContentView {
                     } label: {
                         Text(option.title(l))
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -800,6 +893,7 @@ extension AddEventContentView {
                             },
                             fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                             tint: Color(hex: human.safeThemeColorHex),
+                            selectedForeground: OhanaResolvedPrimaryAccent(customHex: human.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                             identifier: "add-event-assignee-human-\(human.name)",
                             isSelected: assigneeId == human.id.uuidString
                         ) {
@@ -830,7 +924,7 @@ extension AddEventContentView {
                     Text(didSave ? savedActionTitle : primaryActionTitle)
                 }
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
+                .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -996,7 +1090,7 @@ extension AddEventContentView {
         } label: {
             Text(option.title(l))
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -1033,7 +1127,7 @@ extension AddEventContentView {
                     .lineLimit(1)
             }
             .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 12)
             .padding(.trailing, 14)
@@ -1049,6 +1143,7 @@ extension AddEventContentView {
         imageDataProvider: @escaping @MainActor () -> Data?,
         fallback: String,
         tint: Color,
+        selectedForeground: Color,
         identifier: String,
         isSelected: Bool,
         action: @escaping () -> Void
@@ -1073,7 +1168,7 @@ extension AddEventContentView {
                     .minimumScaleFactor(0.72)
             }
             .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? selectedForeground : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 8)
             .padding(.trailing, 13)
@@ -1090,9 +1185,9 @@ extension AddEventContentView {
             : L10n.current.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt")
     }
 
-    private func plantChipTint(for plant: Plant) -> Color {
+    private func plantChipHex(for plant: Plant) -> String {
         let trimmed = plant.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Color(hex: trimmed.isEmpty ? "2ED3B7" : trimmed)
+        return trimmed.isEmpty ? "2ED3B7" : trimmed
     }
 
     private func eventTypeTitle(_ type: EventType) -> String {

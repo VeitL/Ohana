@@ -106,7 +106,7 @@ struct PlantBatchQuickRecordLayoutTests {
             rootURL: rootURL
         )
         let dashboardSource = try source(
-            "Ohana/Features/Plants/Views/PlantDashboardView.swift",
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift",
             rootURL: rootURL
         )
         let detailActionsSource = try source(
@@ -123,10 +123,11 @@ struct PlantBatchQuickRecordLayoutTests {
     }
 
     @Test func fertilizingRowsShowLastDatePlannedCadenceAndLocalizedDueState() throws {
-        let source = try source(
+        let rootURL = repositoryRootURL()
+        let source = try [
             "Ohana/Features/Plants/Views/PlantCareFeatureDetailView.swift",
-            rootURL: repositoryRootURL()
-        )
+            "Ohana/Features/Plants/Views/PlantCareFeatureDetailView+Support.swift"
+        ].map { try self.source($0, rootURL: rootURL) }.joined(separator: "\n")
 
         #expect(source.contains("func fertilizingCadenceText(for plant: Plant) -> String"))
         #expect(source.contains("lastDate: plant.lastFertilizedDate"))

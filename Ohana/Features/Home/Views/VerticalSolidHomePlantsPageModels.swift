@@ -11,8 +11,10 @@ import SwiftUI
 
 enum VerticalSolidHomePlantWalletScrollPolicy {
     static let maxCardsPerSection = Int.max
-    static let sectionSpacing: CGFloat = 18
+    static let sectionSpacing: CGFloat = 10
     static let minimumSceneHeight: CGFloat = 360
+    static let selectedRoomHeaderHeight: CGFloat = 54
+    static let selectedRoomHeaderSpacing: CGFloat = 10
     static let topContentInset: CGFloat = 0
     static let bottomContentInset: CGFloat = 28
     static let roomRailVisibleBottomInset: CGFloat = 72
@@ -26,6 +28,19 @@ enum VerticalSolidHomePlantWalletScrollPolicy {
         bottomChromeHeight: CGFloat
     ) -> CGFloat {
         max(minimumSceneHeight, containerHeight - bottomChromeHeight)
+    }
+
+    static func selectedRoomCardViewportHeight(
+        containerHeight: CGFloat,
+        bottomChromeHeight: CGFloat
+    ) -> CGFloat {
+        max(
+            minimumSceneHeight,
+            cardViewportHeight(
+                containerHeight: containerHeight,
+                bottomChromeHeight: bottomChromeHeight
+            ) - selectedRoomHeaderHeight - selectedRoomHeaderSpacing
+        )
     }
 
     static func roomRailCenterY(
@@ -91,6 +106,110 @@ enum VerticalSolidHomePlantWalletScrollPolicy {
     }
 }
 
+struct VerticalSolidHomePlantRoomStackTransform: Equatable {
+    let xOffset: CGFloat
+    let yOffset: CGFloat
+    let rotationDegrees: Double
+    let scale: CGFloat
+}
+
+nonisolated enum VerticalSolidHomePlantRoomStackLayout {
+    static let maxVisibleCards = 5
+    static let overviewColumnCount = 2
+    static let overviewSpacing: CGFloat = 10
+    static let overviewHorizontalPadding: CGFloat = 16
+    static let overviewTopInset: CGFloat = 72
+    static let overviewBottomInset: CGFloat = 24
+    static let verticalOverflowAllowance: CGFloat = 26
+
+    static func gridCellWidth(containerWidth: CGFloat) -> CGFloat {
+        let totalSpacing = overviewSpacing * CGFloat(overviewColumnCount - 1)
+        let availableWidth = max(
+            0,
+            containerWidth - overviewHorizontalPadding * 2 - totalSpacing
+        )
+        return availableWidth / CGFloat(overviewColumnCount)
+    }
+
+    static func cardWidth(containerWidth: CGFloat) -> CGFloat {
+        min(max(containerWidth - 38, 104), 132)
+    }
+
+    static func stackHeight(containerWidth: CGFloat) -> CGFloat {
+        cardWidth(containerWidth: containerWidth)
+            * FocusHomeVerticalSolidCollapsedLayoutPolicy.cardAspectRatio
+            + verticalOverflowAllowance
+    }
+
+    static func fourStackGridHeight(containerWidth: CGFloat) -> CGFloat {
+        stackHeight(containerWidth: gridCellWidth(containerWidth: containerWidth)) * 2
+            + overviewSpacing
+    }
+
+    static func transform(position: Int) -> VerticalSolidHomePlantRoomStackTransform {
+        let transforms = [
+            VerticalSolidHomePlantRoomStackTransform(
+                xOffset: 0,
+                yOffset: 4,
+                rotationDegrees: 0,
+                scale: 1
+            ),
+            VerticalSolidHomePlantRoomStackTransform(
+                xOffset: -13,
+                yOffset: 6,
+                rotationDegrees: -9.2,
+                scale: 0.985
+            ),
+            VerticalSolidHomePlantRoomStackTransform(
+                xOffset: 13,
+                yOffset: 5,
+                rotationDegrees: 9.0,
+                scale: 0.975
+            ),
+            VerticalSolidHomePlantRoomStackTransform(
+                xOffset: -6,
+                yOffset: -8,
+                rotationDegrees: -4.8,
+                scale: 0.965
+            ),
+            VerticalSolidHomePlantRoomStackTransform(
+                xOffset: 7,
+                yOffset: -9,
+                rotationDegrees: 5.6,
+                scale: 0.955
+            )
+        ]
+        return transforms[min(max(position, 0), transforms.count - 1)]
+    }
+}
+
+nonisolated enum VerticalSolidHomePlantExpandedGridLayout {
+    static let horizontalPadding: CGFloat = 12
+    static let columnSpacing: CGFloat = 6
+    static let rowSpacing: CGFloat = 8
+    static let roomSpacing: CGFloat = 18
+    static let topInset: CGFloat = 72
+    static let bottomInset: CGFloat = 32
+    static let minimumReadableRenderWidth: CGFloat = 154
+
+    static func columnCount(containerWidth: CGFloat) -> Int {
+        if containerWidth < 350 { return 3 }
+        if containerWidth >= 700 { return 7 }
+        if containerWidth >= 560 { return 6 }
+        if containerWidth >= 430 { return 5 }
+        return 4
+    }
+
+    static func cardWidth(containerWidth: CGFloat) -> CGFloat {
+        let count = columnCount(containerWidth: containerWidth)
+        let totalSpacing = columnSpacing * CGFloat(count - 1)
+        return max(
+            0,
+            (containerWidth - horizontalPadding * 2 - totalSpacing) / CGFloat(count)
+        )
+    }
+}
+
 nonisolated enum VerticalSolidHomePlantRoomRailPolicy {
     static func shouldShow(plantCount: Int, selectedCardId: UUID?, heroDirection: Int) -> Bool {
         plantCount > 0 && selectedCardId == nil && heroDirection == 0
@@ -119,6 +238,13 @@ struct VerticalSolidHomePlantRoomSummary: Identifiable, Equatable {
     let dueCount: Int
 }
 
+struct VerticalSolidHomePlantRoomGroup: Identifiable {
+    let summary: VerticalSolidHomePlantRoomSummary
+    let plants: [VerticalSolidHomePlantSnapshot]
+
+    var id: String { summary.id }
+}
+
 struct VerticalSolidHomePlantAvatarPreloadRequest: Sendable {
     let id: UUID
     let modelID: PersistentIdentifier
@@ -126,29 +252,29 @@ struct VerticalSolidHomePlantAvatarPreloadRequest: Sendable {
 }
 
 enum VerticalSolidHomePlantViewStyle: String, CaseIterable, Identifiable {
-    case deck
-    case list
+    case roomStacks = "room-stacks"
+    case allExpanded = "all-expanded"
 
     var id: String { rawValue }
 
-    func title(_ l: L10n) -> String {
+    func toggleTitle(_ l: L10n) -> String {
         switch self {
-        case .deck: l.tr(zh: "卡牌堆", en: "Card stack", de: "Kartenstapel")
-        case .list: l.tr(zh: "列表", en: "List", de: "Liste")
+        case .roomStacks: l.tr(zh: "全部展开", en: "Expand all", de: "Alle öffnen")
+        case .allExpanded: l.tr(zh: "收起", en: "Collapse", de: "Schließen")
         }
     }
 
-    func shortTitle(_ l: L10n) -> String {
+    var toggleIcon: String {
         switch self {
-        case .deck: l.tr(zh: "卡", en: "Cards", de: "Karten")
-        case .list: l.tr(zh: "列", en: "List", de: "Liste")
+        case .roomStacks: "square.grid.3x3.square"
+        case .allExpanded: "square.stack.3d.up.fill"
         }
     }
 
-    var icon: String {
+    var toggled: Self {
         switch self {
-        case .deck: "square.stack.3d.up.fill"
-        case .list: "list.bullet"
+        case .roomStacks: .allExpanded
+        case .allExpanded: .roomStacks
         }
     }
 }

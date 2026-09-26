@@ -29,9 +29,9 @@ nonisolated enum OasisCritterPresentationRules {
     static func awakeningCost(for rarity: OasisElectronicPetRarity) -> (fragments: Int, coconuts: Int) {
         switch rarity {
         case .common: (120, 80)
-        case .rare: (180, 120)
-        case .epic: (300, 220)
-        case .legendary: (520, 420)
+        case .rare: (160, 120)
+        case .epic: (240, 180)
+        case .legendary: (360, 300)
         }
     }
 }
@@ -70,6 +70,26 @@ protocol OasisRewardManaging {
     func lifecycleSnapshot(for critter: OasisElectronicPet, context: ModelContext) -> OasisCritterLifecycleSnapshot
     func displayDailyWish(for critter: OasisElectronicPet, snapshot: OasisCritterLifecycleSnapshot) -> OasisCritterDailyWish
     func starUpgradeCost(for critter: OasisElectronicPet) -> (fragments: Int, coconuts: Int)
+    func stardustBalance(context: ModelContext) -> Int
+    func starUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        context: ModelContext,
+        isProcessing: Bool
+    ) -> CompanionActionAvailability
+    func levelUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        isProcessing: Bool
+    ) -> CompanionActionAvailability
+    func awakenAvailability(
+        catalogId: String,
+        context: ModelContext,
+        isProcessing: Bool
+    ) -> CompanionActionAvailability
+    func companionSnapshot(
+        for critter: OasisElectronicPet,
+        context: ModelContext,
+        isProcessing: Bool
+    ) -> OasisCompanionSnapshot
     func interactionCost(for critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) -> Int
     func xpProgress(for critter: OasisElectronicPet) -> Int
     func isDailyWishCompleted(
@@ -221,6 +241,62 @@ final class StaticOasisRewardManager: OasisRewardManaging {
         OasisUpgradeRewardService.starUpgradeCost(for: critter)
     }
 
+    func stardustBalance(context: ModelContext) -> Int {
+        OasisUpgradeRewardService.stardustBalance(context: context)
+    }
+
+    func starUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        context: ModelContext,
+        isProcessing: Bool
+    ) -> CompanionActionAvailability {
+        OasisUpgradeRewardService.starUpgradeAvailability(
+            for: critter,
+            context: context,
+            isProcessing: isProcessing,
+            activeHumanSelection: activeHumanSelection,
+            questManager: questManager
+        )
+    }
+
+    func levelUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        isProcessing: Bool
+    ) -> CompanionActionAvailability {
+        OasisUpgradeRewardService.levelUpgradeAvailability(
+            for: critter,
+            isProcessing: isProcessing
+        )
+    }
+
+    func awakenAvailability(
+        catalogId: String,
+        context: ModelContext,
+        isProcessing: Bool
+    ) -> CompanionActionAvailability {
+        OasisUpgradeRewardService.awakenAvailability(
+            catalogId: catalogId,
+            context: context,
+            isProcessing: isProcessing,
+            activeHumanSelection: activeHumanSelection,
+            questManager: questManager
+        )
+    }
+
+    func companionSnapshot(
+        for critter: OasisElectronicPet,
+        context: ModelContext,
+        isProcessing: Bool
+    ) -> OasisCompanionSnapshot {
+        OasisUpgradeRewardService.companionSnapshot(
+            for: critter,
+            context: context,
+            isProcessing: isProcessing,
+            activeHumanSelection: activeHumanSelection,
+            questManager: questManager
+        )
+    }
+
     func interactionCost(for critter: OasisElectronicPet, action: OasisCritterAction, context: ModelContext) -> Int {
         OasisUpgradeRewardService.interactionCost(for: critter, action: action, context: context)
     }
@@ -262,13 +338,17 @@ final class StaticOasisRewardManager: OasisRewardManaging {
     }
 
     func open(_ coconut: OasisUpgradeCoconut, context: ModelContext) throws -> OasisOpenedUpgradeReward {
-        try OasisUpgradeRewardService.open(
+        let result = try OasisUpgradeRewardService.open(
             coconut,
             context: context,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
             questManager: questManager
         )
+        if result.kind == .electronicPet {
+            publishCompanionMutation(action: "treeAwaken", affectedEntityIDs: [])
+        }
+        return result
     }
 
     func interactWithOutcome(
@@ -276,7 +356,7 @@ final class StaticOasisRewardManager: OasisRewardManaging {
         action: OasisCritterAction,
         context: ModelContext
     ) throws -> OasisCritterInteractionOutcome {
-        try OasisUpgradeRewardService.interactWithOutcome(
+        let outcome = try OasisUpgradeRewardService.interactWithOutcome(
             with: critter,
             action: action,
             context: context,
@@ -284,20 +364,32 @@ final class StaticOasisRewardManager: OasisRewardManaging {
             wallet: wallet,
             questManager: questManager
         )
+        if outcome.success {
+            publishCompanionMutation(action: outcome.action.rawValue, affectedEntityIDs: [critter.id])
+        }
+        return outcome
     }
 
     func rescueIfNeeded(for critter: OasisElectronicPet, context: ModelContext) throws -> OasisCritterInteractionOutcome {
-        try OasisUpgradeRewardService.rescueIfNeeded(for: critter, context: context)
+        let outcome = try OasisUpgradeRewardService.rescueIfNeeded(for: critter, context: context)
+        if outcome.success {
+            publishCompanionMutation(action: "rescue", affectedEntityIDs: [critter.id])
+        }
+        return outcome
     }
 
     func upgradeStar(for critter: OasisElectronicPet, context: ModelContext) throws -> Bool {
-        try OasisUpgradeRewardService.upgradeStar(
+        let didUpgrade = try OasisUpgradeRewardService.upgradeStar(
             for: critter,
             context: context,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
             questManager: questManager
         )
+        if didUpgrade {
+            publishCompanionMutation(action: "starUpgrade", affectedEntityIDs: [critter.id])
+        }
+        return didUpgrade
     }
 
     func upgradeLevel(for critter: OasisElectronicPet, context: ModelContext) throws -> Bool {
@@ -305,13 +397,17 @@ final class StaticOasisRewardManager: OasisRewardManaging {
     }
 
     func awakenWithFragments(catalogId: String, context: ModelContext) throws -> OasisElectronicPet? {
-        try OasisUpgradeRewardService.awakenWithFragments(
+        let critter = try OasisUpgradeRewardService.awakenWithFragments(
             catalogId: catalogId,
             context: context,
             activeHumanSelection: activeHumanSelection,
             wallet: wallet,
             questManager: questManager
         )
+        if let critter {
+            publishCompanionMutation(action: "awaken", affectedEntityIDs: [critter.id])
+        }
+        return critter
     }
 
     func setFeatured(_ critter: OasisElectronicPet, context: ModelContext) throws {
@@ -327,7 +423,7 @@ final class StaticOasisRewardManager: OasisRewardManaging {
     }
 
     func rewardFeaturedCritterFromCare(type: QuestManager.OhanaActionType, context: ModelContext) {
-        OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: type, context: context)
+        _ = OasisUpgradeRewardService.rewardFeaturedCritterFromCare(type: type, context: context)
     }
 
     func rewardFeaturedCritterFromCare(
@@ -347,6 +443,17 @@ final class StaticOasisRewardManager: OasisRewardManaging {
             from: startLevel,
             through: endLevel,
             context: context
+        )
+    }
+
+    private func publishCompanionMutation(action: String, affectedEntityIDs: Set<UUID>) {
+        questManager.revisions.publish(
+            DomainMutationResult(
+                command: .command("oasisCompanion", action),
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: true,
+                note: "oasis.companion.\(action)"
+            )
         )
     }
 }

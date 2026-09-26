@@ -1,7 +1,7 @@
 # Ohana
 
 Ohana is a local-first iOS care app for pets, people, and plants. The first
-release is a single-device Solo experience built with SwiftUI, SwiftData, Swift
+release is a single-device Free / Personal experience built with SwiftUI, SwiftData, Swift
 Charts, HealthKit, Core Location, UserNotifications, and optional restricted
 iCloud Drive backup. The current product has no Ohana account, developer-hosted
 backend, or login requirement.
@@ -26,11 +26,21 @@ as current status sources. Their role and precedence are listed in
   the first Pet immediately or defer it to Task Center.
 - Home holds family and member cards. Task Center is the single list/calendar
   surface for Event, Reminder, local FamilyTask, and small system-journey items.
-- The first active Pet makes the one-time island starter gift claimable. Oasis
-  stays hidden until the user explicitly claims that gift; later starter-plan
-  rewards are separate, optional, and member-owned.
-- The first release remains local-only Solo. Local Human profiles are content
-  records, not authenticated accounts or remote collaborators.
+- Creating the first living Human makes the one-time island starter gift
+  claimable. Oasis stays hidden until the user explicitly claims that gift;
+  creating a Pet is an optional, zero-reward suggestion, while later
+  starter-plan rewards remain separate, optional, and member-owned.
+- The first release remains local-only. Free supports 1 active Pet, 2 active
+  Humans, 5 active Plants, and 3 ordinary active logical plans without locking
+  care records, existing history, manual export, critical-health reminders, or
+  memorials. Personal unlocks unlimited active profiles/plans and approved
+  advanced local tools through monthly, yearly, or Lifetime purchase. Local
+  Human profiles remain content records, not authenticated accounts or remote
+  collaborators.
+- Human health in 1.0 includes local conditions, observations, manual metrics,
+  reports, medication, and workouts. Manual health records remain available in
+  Free; Personal adds on-device lab-report scanning. Source pages and raw OCR
+  stay volatile, and only user-reviewed structured results are persisted.
 
 ## Local Commands
 
@@ -41,18 +51,35 @@ scripts/module-exit-gate.sh --test OhanaTests/RelevantTests
 scripts/release-hardening-check.sh --static-only
 scripts/build-debug-fast.sh
 scripts/build-release-fast.sh
-scripts/test-simulator.sh
+scripts/xcode-test.sh
+scripts/xcode-storage-audit.sh
 scripts/run-dogfood-simulator.sh --status
+scripts/run-dogfood-simulator.sh --require-ready
+scripts/run-dogfood-simulator.sh --seal-user
+scripts/run-dogfood-simulator.sh --require-longitudinal
+scripts/run-dogfood-simulator.sh --require-day30
+scripts/record-dogfood-checkin.sh --list
 scripts/archive-release-local.sh
 ```
 
 Automated Unit, Integration, and UI validation uses only the disposable
-`iPhone 17 Tests` simulator and `.build/DerivedData/tests`. Persistent manual
-journeys use the pinned `iPhone 17` Dogfood simulator through
-`scripts/run-dogfood-simulator.sh`; that lane overlays builds and preserves the
-installed app and data. `build-release-fast.sh` uses a generic iOS Simulator
-destination, keeps `-O`, and reuses `.build/DerivedData/release` for optimized
-compiler checks.
+`iPhone 17 Tests` simulator. `scripts/xcode-test.sh` defaults to a narrow smoke
+suite and serializes all worktrees against one hashed cache outside the source
+tree. It defaults under `~/Library/Developer/Xcode/OhanaLocalBuild`; an ignored
+`.build/xcode-cache-parent` can pin one mounted external location without
+silently falling back to the system disk. Successful xcresults are deleted and
+only three failures are retained for up to seven days. Persistent manual
+journeys use the pinned `iPhone 17 Dogfood` synthetic user through
+`scripts/run-dogfood-simulator.sh`; that lane overlays Release builds, rejects
+test/reset/seed arguments, and preserves the logical durable data even when
+CoreSimulator remounts the container path. Its
+persona, readiness baseline, and daily/weekly/monthly rules are in
+[`docs/dogfood-testing.md`](docs/dogfood-testing.md). `build-release-fast.sh`
+uses a generic iOS Simulator destination, keeps `-O`, and reuses
+the shared `release` lane outside the source tree for optimized compiler checks.
+For stabilized changes that affect persisted facts or stateful existing-user
+behavior, Dogfood is the default second-stage acceptance environment after the
+narrowest relevant test passes; irrelevant or unsafe skips must be stated.
 `archive-release-local.sh` is the slower signed WMO lane for RC/signing gates;
 it writes outside the File Provider-managed repository and never uploads.
 `dev-check-changed.sh` is read-only unless `--fix-format` and explicit targets
@@ -69,6 +96,7 @@ require an explicit user request.
 - `OhanaUITests/`: XCTest UI coverage.
 - `Resources/`: packaged non-catalog resources.
 - `docs/`: current policy, status, specifications, planning, evidence, and archives.
+- `DesignExports/`: organized design sources and generated reference exports; not runtime product truth.
 - `scripts/`: local and CI validation helpers.
 - `ui规范.selection.json`: machine-readable UI token source of truth.
 

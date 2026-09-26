@@ -289,7 +289,7 @@ struct WalkDetailView: View {
                 if walk.coconutsEarned > 0 {
                     Text("+\(walk.coconutsEarned)🥥")
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .background(Color.goPrimary, in: Capsule())

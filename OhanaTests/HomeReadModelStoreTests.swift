@@ -216,6 +216,62 @@ struct HomeReadModelStoreTests {
         #expect(store.payload.signature.contains(event.id.uuidString))
     }
 
+    @Test func historicalHumanExpenseDoesNotRestoreRetiredHomeQuickAction() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let store = HomeReadModelStore()
+        let subject = Human(name: "Subject")
+        let recorder = Human(name: "Recorder")
+        let expense = CareLedgerEvent(
+            occurredAt: Date(),
+            actorKind: .human,
+            actorId: recorder.id.uuidString,
+            subjectKind: .human,
+            subjectId: subject.id.uuidString,
+            eventKind: .expense,
+            actionType: ExpenseCategory.other.rawValue,
+            amountValue: 20,
+            amountUnit: "currency",
+            source: .quickAction
+        )
+        context.insert(subject)
+        context.insert(recorder)
+        context.insert(expense)
+        try context.save()
+
+        let legacyAction = QuickActionItem(
+            label: "花费",
+            icon: "creditcard.fill",
+            colorHex: "FF9F43",
+            actionType: "humanExpense",
+            entityId: subject.id,
+            entityKind: .human
+        )
+        let legacyActionsRaw = try #require(
+            String(data: JSONEncoder().encode([legacyAction]), encoding: .utf8)
+        )
+
+        await store.refreshImmediately(
+            context: context,
+            activeHumanIdRaw: subject.id.uuidString,
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            quickActionItemsRaw: legacyActionsRaw,
+            language: "zh",
+            externalRevision: HomeRevision(),
+            force: true
+        )
+
+        let actions = store.payload.interaction.expandedActions(for: subject.id)
+
+        #expect(!actions.currentItems.contains { $0.actionType == "humanExpense" })
+        #expect(!actions.visibleItems.contains { $0.actionType == "humanExpense" })
+        #expect(!actions.candidateItems.contains { $0.actionType == "humanExpense" })
+        #expect(actions.statesByActionType["humanExpense"] == nil)
+        #expect(store.payload.signature.contains(expense.id.uuidString))
+    }
+
     @Test func orphanPetWeightFactRemainsVisibleBeforeLedgerBackfillRuns() async throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -349,6 +405,185 @@ struct HomeReadModelStoreTests {
         #expect(actorPayload.interaction.petsByID[pet.id]?.id == pet.id)
         #expect(actorPayload.interaction.humansByID[human.id]?.id == human.id)
         #expect(actorPayload.snapshot.todayFocus.refreshedQuests.map(\.id) == mainSnapshot.todayFocus.refreshedQuests.map(\.id))
+    }
+
+    @Test func actorPlantFetchExcludesArchivedRowsBeforeApplyingItsLimit() async throws {
+        let hadExistingPlantData = PlantUnlockPolicy.hasExistingPlantData()
+        defer {
+            if hadExistingPlantData {
+                PlantUnlockPolicy.noteExistingPlantData()
+            } else {
+                PlantUnlockPolicy.clearExistingPlantData()
+            }
+        }
+
+        let container = try makeContainer()
+        let now = Date(timeIntervalSince1970: 1_786_291_200)
+        let activePlant = Plant(name: "Active Fern")
+        activePlant.createdAt = now.addingTimeInterval(-100 * 86400)
+        container.mainContext.insert(activePlant)
+        for index in 0 ..< 60 {
+            let archivedPlant = Plant(name: "Archived \(index)")
+            archivedPlant.createdAt = now.addingTimeInterval(Double(index) * 60)
+            archivedPlant.archivedAt = now
+            container.mainContext.insert(archivedPlant)
+        }
+        try container.mainContext.save()
+
+        let actor = HomeReadModelActor(modelContainer: container)
+        let payload = try #require(await actor.refreshPayload(
+            input: HomeReadModelActorInput(
+                activeHumanIdRaw: "",
+                hiddenPetIDsRaw: "",
+                homeCardOrderRaw: "",
+                showDummyCards: false,
+                petBondVaultRevision: 0,
+                equippedTitleRaw: "",
+                quickActionItemsRaw: "",
+                language: AppLanguage.code,
+                loadPlants: true
+            ),
+            previousSignature: "",
+            currentRevision: HomeRevision(),
+            externalRevision: HomeRevision(),
+            force: true
+        ))
+
+        #expect(payload.snapshot.plants.map(\.id) == [activePlant.id])
+        #expect(payload.snapshot.plants.allSatisfy { !$0.isArchived })
+        #expect(!payload.snapshot.hasMorePlants)
+
+        for index in 0 ..< 60 {
+            let recentPlant = Plant(name: "Recent active \(index)")
+            recentPlant.createdAt = now.addingTimeInterval(Double(index) * 60)
+            container.mainContext.insert(recentPlant)
+        }
+        try container.mainContext.save()
+
+        let overflow = try #require(await actor.refreshPayload(
+            input: HomeReadModelActorInput(
+                activeHumanIdRaw: "",
+                hiddenPetIDsRaw: "",
+                homeCardOrderRaw: "",
+                showDummyCards: false,
+                petBondVaultRevision: 0,
+                equippedTitleRaw: "",
+                quickActionItemsRaw: "",
+                language: AppLanguage.code,
+                loadPlants: true
+            ),
+            previousSignature: payload.signature,
+            currentRevision: HomeRevision(),
+            externalRevision: HomeRevision(),
+            force: false
+        ))
+        #expect(overflow.snapshot.plants.count == 60)
+        #expect(!overflow.snapshot.plants.contains { $0.id == activePlant.id })
+        #expect(overflow.snapshot.hasMorePlants)
+        #expect(overflow.signature != payload.signature)
+    }
+
+    @Test func actorKeepsSelectedOlderHumanOutsideRecentPreview() async throws {
+        let container = try makeContainer()
+        let oldest = Human(name: "Selected older member")
+        oldest.createdAt = Date().addingTimeInterval(-100 * 86400)
+        oldest.coconutBalance = 7
+        container.mainContext.insert(oldest)
+        let hiddenOlder = Human(name: "Older member outside preview")
+        hiddenOlder.createdAt = Date().addingTimeInterval(-200 * 86400)
+        hiddenOlder.coconutBalance = 23
+        container.mainContext.insert(hiddenOlder)
+        for index in 0 ..< 40 {
+            let human = Human(name: "Recent \(index)")
+            human.createdAt = Date().addingTimeInterval(Double(index) * 60)
+            human.coconutBalance = 1
+            container.mainContext.insert(human)
+        }
+        try container.mainContext.save()
+
+        let actor = HomeReadModelActor(modelContainer: container)
+        let payload = try #require(await actor.refreshPayload(
+            input: HomeReadModelActorInput(
+                activeHumanIdRaw: oldest.id.uuidString,
+                hiddenPetIDsRaw: "",
+                homeCardOrderRaw: "",
+                showDummyCards: false,
+                petBondVaultRevision: 0,
+                equippedTitleRaw: "",
+                quickActionItemsRaw: "",
+                language: AppLanguage.code,
+                loadPlants: false
+            ),
+            previousSignature: "",
+            currentRevision: HomeRevision(),
+            externalRevision: HomeRevision(),
+            force: true
+        ))
+
+        #expect(payload.snapshot.activeName == oldest.name)
+        #expect(payload.interaction.activeHuman?.id == oldest.id)
+        #expect(payload.snapshot.coconutText == "70")
+        #expect(payload.snapshot.hasMoreMembers)
+    }
+
+    @Test func actorPetPreviewFiltersMemorialRowsAndSignalsOverflow() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let olderLivingPet = Pet(name: "Older living pet", species: "Cat")
+        olderLivingPet.createdAt = now.addingTimeInterval(-200 * 86400)
+        olderLivingPet.coconutBalance = 5
+        context.insert(olderLivingPet)
+        for index in 0 ..< 80 {
+            let memorial = Pet(name: "Memorial \(index)", species: "Cat")
+            memorial.createdAt = now.addingTimeInterval(Double(index) * 60)
+            memorial.passedAwayDate = now
+            memorial.coconutBalance = 17
+            context.insert(memorial)
+        }
+        try context.save()
+
+        let actor = HomeReadModelActor(modelContainer: container)
+        let input = HomeReadModelActorInput(
+            activeHumanIdRaw: "",
+            hiddenPetIDsRaw: "",
+            homeCardOrderRaw: "",
+            showDummyCards: false,
+            petBondVaultRevision: 0,
+            equippedTitleRaw: "",
+            quickActionItemsRaw: "",
+            language: AppLanguage.code,
+            loadPlants: false
+        )
+        let first = try #require(await actor.refreshPayload(
+            input: input,
+            previousSignature: "",
+            currentRevision: HomeRevision(),
+            externalRevision: HomeRevision(),
+            force: true
+        ))
+        #expect(first.snapshot.cards.map(\.id) == [olderLivingPet.id])
+        #expect(first.snapshot.coconutText == "5")
+        #expect(!first.snapshot.hasMoreMembers)
+
+        for index in 0 ..< 80 {
+            let livingPet = Pet(name: "Recent living \(index)", species: "Cat")
+            livingPet.createdAt = now.addingTimeInterval(Double(index) * 60)
+            context.insert(livingPet)
+        }
+        try context.save()
+
+        let overflow = try #require(await actor.refreshPayload(
+            input: input,
+            previousSignature: first.signature,
+            currentRevision: HomeRevision(),
+            externalRevision: HomeRevision(),
+            force: false
+        ))
+        #expect(overflow.snapshot.cards.count == 80)
+        #expect(!overflow.snapshot.cards.contains { $0.id == olderLivingPet.id })
+        #expect(overflow.snapshot.hasMoreMembers)
+        #expect(overflow.signature != first.signature)
     }
 
     @Test func storeSourceDoesNotReintroduceMainContextCompatibilityFetch() throws {

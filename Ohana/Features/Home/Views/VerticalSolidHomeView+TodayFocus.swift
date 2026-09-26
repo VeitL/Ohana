@@ -144,15 +144,44 @@ extension VerticalSolidHomeView {
            !quest.targetPlantIds.isEmpty {
             let plantIDs = quest.targetPlantIds
             let primaryID = plantIDs[0]
+            let operationID = UUID()
+            let selections = plantIDs.map {
+                PlantBatchCareSelection(
+                    plantID: $0,
+                    careType: plantCareType,
+                    taskID: quest.id
+                )
+            }
             performWithActionHuman(actionTitle: plantCareType.displayName(l: l)) { executorID in
                 enqueueHomeCommand(.todayFocus(entityID: primaryID, action: "plantBatch.\(plantCareType.rawValue)")) {
-                    let recordedIDs = commandExecutor.recordPlantCare(
-                        plantCareType,
-                        plantIDs: plantIDs,
-                        executorId: executorID
+                    // The confirmation sheet can remain open longer than the undo
+                    // window. Anchor the token to the actual command submission,
+                    // not the original tap that opened the confirmation.
+                    let submittedAt = Date()
+                    let result = commandExecutor.completePlantBatchCare(
+                        selections: selections,
+                        executorId: executorID,
+                        now: submittedAt,
+                        operationID: operationID
                     )
-                    guard let firstRecordedID = recordedIDs.first else { return }
-                    applyTodayFocusMutationFeedback(entityId: firstRecordedID)
+                    guard result.didPersist else {
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        return
+                    }
+                    guard result.didWrite else {
+                        // A same-operation replay is an expected idempotent no-op. Only
+                        // surface an error when preflight rejected changed targets.
+                        guard !result.skipped.isEmpty else { return }
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                        appServices.islandToasts.show(l.tr(
+                            zh: "植物状态已变化，整批未写入。",
+                            en: "Plant status changed, so nothing was written.",
+                            de: "Der Pflanzenstatus wurde geändert. Es wurde nichts gespeichert."
+                        ))
+                        return
+                    }
+                    guard let firstCompletedID = result.items.first?.plantID else { return }
+                    applyTodayFocusMutationFeedback(entityId: firstCompletedID)
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
                 }
             }
@@ -430,12 +459,6 @@ extension VerticalSolidHomeView {
         default:
             return nil
         }
-    }
-
-    func todayFocusSnapshotDate() -> Date {
-        let dayToken = controller.snapshot.todayFocus.dayToken
-        guard dayToken > 0 else { return Date() }
-        return Date(timeIntervalSince1970: TimeInterval(dayToken))
     }
 
     func openTodayFocusPlant(_ plant: VerticalSolidHomePlantSnapshot) {

@@ -1,0 +1,350 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Minimal-data Ohana Family guardian service
+
+Parameters:
+  StageName:
+    Type: String
+    Default: prod
+  AppleServiceID:
+    Type: String
+    NoEcho: true
+  AppleTeamID:
+    Type: String
+    NoEcho: true
+  AppleKeyID:
+    Type: String
+    NoEcho: true
+  ApplePrivateKey:
+    Type: String
+    NoEcho: true
+    Description: Resolve this value from Secrets Manager when deploying.
+  AppleBundleID:
+    Type: String
+    Default: com.guanchen.li.Ohana
+  AppleAppID:
+    Type: String
+    Description: Numeric App Apple ID required for production JWS verification.
+  AppleRootCertificatesSecretArn:
+    Type: String
+  FamilyProductID:
+    Type: String
+    Default: com.guanchen.li.Ohana.family.yearly
+  PublicInviteBaseURL:
+    Type: String
+    AllowedPattern: '^https://.+'
+  AppStoreURL:
+    Type: String
+    AllowedPattern: '^https://.+'
+  APNSPlatformApplicationArn:
+    Type: String
+  APNSSandboxPlatformApplicationArn:
+    Type: String
+  AppleNotificationAudienceToken:
+    Type: String
+    NoEcho: true
+    Description: Random path token configured in App Store Connect.
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [arm64]
+    Timeout: 20
+    MemorySize: 256
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref GuardianTable
+        PUSH_QUEUE_URL: !Ref PushQueue
+        PUBLIC_INVITE_BASE_URL: !Ref PublicInviteBaseURL
+        APP_STORE_URL: !Ref AppStoreURL
+        APPLE_BUNDLE_ID: !Ref AppleBundleID
+        APPLE_TEAM_ID: !Ref AppleTeamID
+        APPLE_APP_ID: !Ref AppleAppID
+        APPLE_ROOT_CERTIFICATES_SECRET_ARN: !Ref AppleRootCertificatesSecretArn
+        FAMILY_PRODUCT_ID: !Ref FamilyProductID
+        APNS_PLATFORM_APPLICATION_ARN: !Ref APNSPlatformApplicationArn
+        APNS_SANDBOX_PLATFORM_APPLICATION_ARN: !Ref APNSSandboxPlatformApplicationArn
+        APPLE_NOTIFICATION_AUDIENCE_TOKEN: !Ref AppleNotificationAudienceToken
+
+Resources:
+  GuardianUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub ohana-guardian-${StageName}
+      DeletionProtection: ACTIVE
+      MfaConfiguration: 'OFF'
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+
+  AppleIdentityProvider:
+    Type: AWS::Cognito::UserPoolIdentityProvider
+    Properties:
+      ProviderName: SignInWithApple
+      ProviderType: SignInWithApple
+      UserPoolId: !Ref GuardianUserPool
+      ProviderDetails:
+        client_id: !Ref AppleServiceID
+        team_id: !Ref AppleTeamID
+        key_id: !Ref AppleKeyID
+        private_key: !Ref ApplePrivateKey
+
+  GuardianUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: AppleIdentityProvider
+    Properties:
+      ClientName: !Sub ohana-ios-${StageName}
+      UserPoolId: !Ref GuardianUserPool
+      GenerateSecret: false
+      SupportedIdentityProviders: [SignInWithApple]
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid]
+      CallbackURLs: [ohana://auth/family]
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+
+  GuardianUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: !Sub ohana-guardian-${AWS::AccountId}-${StageName}
+      UserPoolId: !Ref GuardianUserPool
+
+  GuardianTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: expires_at_epoch
+        Enabled: true
+
+  PushDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  PushQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 120
+      MessageRetentionPeriod: 345600
+      SqsManagedSseEnabled: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt PushDeadLetterQueue.Arn
+        maxReceiveCount: 5
+
+  SchedulerDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600
+      SqsManagedSseEnabled: true
+
+  GuardianHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+      Auth:
+        DefaultAuthorizer: CognitoJWT
+        Authorizers:
+          CognitoJWT:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              audience: [!Ref GuardianUserPoolClient]
+              issuer: !Sub https://cognito-idp.${AWS::Region}.amazonaws.com/${GuardianUserPool}
+
+  GuardianApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: api.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GuardianTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt PushQueue.QueueName
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:CreatePlatformEndpoint
+                - sns:GetEndpointAttributes
+                - sns:SetEndpointAttributes
+                - sns:DeleteEndpoint
+              Resource:
+                - !Ref APNSPlatformApplicationArn
+                - !Ref APNSSandboxPlatformApplicationArn
+                - !Sub '${APNSPlatformApplicationArn}/*'
+                - !Sub '${APNSSandboxPlatformApplicationArn}/*'
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Ref AppleRootCertificatesSecretArn
+      Events:
+        Dashboard:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/dashboard, Method: GET }
+        Invitations:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/invitations, Method: POST }
+        AcceptInvitation:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/invitations/accept, Method: POST }
+        Policy:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/policy, Method: PUT }
+        Signals:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/signals/batch, Method: POST }
+        Devices:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/devices, Method: PUT }
+        DeleteDevice:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/devices/current, Method: DELETE }
+        Entitlement:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/entitlement, Method: PUT }
+        Relationship:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: "/v1/guardian/relationships/{id}", Method: DELETE }
+        Acknowledge:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: "/v1/guardian/incidents/{id}/acknowledge", Method: POST }
+        Opened:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: "/v1/guardian/incidents/{id}/opened", Method: POST }
+        DeleteAccount:
+          Type: HttpApi
+          Properties: { ApiId: !Ref GuardianHttpApi, Path: /v1/guardian/account, Method: DELETE }
+        InviteLanding:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GuardianHttpApi
+            Path: /g/{code}
+            Method: GET
+            Auth: { Authorizer: NONE }
+        Association:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GuardianHttpApi
+            Path: /.well-known/apple-app-site-association
+            Method: GET
+            Auth: { Authorizer: NONE }
+        AppStoreNotifications:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref GuardianHttpApi
+            Path: /v1/app-store/notifications/{token}
+            Method: POST
+            Auth: { Authorizer: NONE }
+
+  GuardianEvaluatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: evaluator.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GuardianTable
+        - SQSSendMessagePolicy:
+            QueueName: !GetAtt PushQueue.QueueName
+
+  PushWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: push_worker.handler
+      ReservedConcurrentExecutions: 10
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref GuardianTable
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sns:Publish
+                - sns:GetEndpointAttributes
+                - sns:SetEndpointAttributes
+              Resource: '*'
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt PushQueue.Arn
+            BatchSize: 5
+            FunctionResponseTypes: [ReportBatchItemFailures]
+
+  SchedulerInvokeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: scheduler.amazonaws.com }
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: invoke-guardian-evaluator
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt GuardianEvaluatorFunction.Arn
+              - Effect: Allow
+                Action: sqs:SendMessage
+                Resource: !GetAtt SchedulerDeadLetterQueue.Arn
+
+  GuardianEvaluationSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Description: Evaluate due Ohana guard days without assuming device execution.
+      FlexibleTimeWindow: { Mode: 'OFF' }
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Target:
+        Arn: !GetAtt GuardianEvaluatorFunction.Arn
+        RoleArn: !GetAtt SchedulerInvokeRole.Arn
+        Input: '{"kind":"evaluate"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 3600
+          MaximumRetryAttempts: 3
+        DeadLetterConfig:
+          Arn: !GetAtt SchedulerDeadLetterQueue.Arn
+
+Outputs:
+  APIBaseURL:
+    Value: !Sub https://${GuardianHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/${StageName}/
+  CognitoAuthorizationURL:
+    Value: !Sub https://${GuardianUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/authorize
+  CognitoTokenURL:
+    Value: !Sub https://${GuardianUserPoolDomain}.auth.${AWS::Region}.amazoncognito.com/oauth2/token
+  CognitoClientID:
+    Value: !Ref GuardianUserPoolClient

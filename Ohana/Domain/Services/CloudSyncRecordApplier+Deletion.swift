@@ -41,7 +41,7 @@ extension CloudSyncRecordApplier {
             }
         case String(describing: Human.self):
             if let model = try fetchHuman(id: localRecordUUID, context: context) {
-                PhysicalDeletionService.deleteHuman(
+                try PhysicalDeletionService.deleteHumanFailClosed(
                     model,
                     context: context,
                     deletedAt: deletedAt,

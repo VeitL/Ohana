@@ -3,70 +3,74 @@
 Status: Draft for App Store review notes, in-app rationale copy, and
 `Info.plist` usage-description review.
 
-Last updated: 2026-07-12
+Last updated: 2026-08-02
 
 ## Current Permission Inventory
 
 | Surface | Current source | Trigger | Rationale |
 | --- | --- | --- | --- |
-| Camera | `NSCameraUsageDescription`, `AVCaptureDevice.requestAccess(for: .video)` | User taps camera for avatar or receipt capture | Take a photo the user explicitly requested and attach it to a member, pet, Moment, or receipt. |
-| Photo Library | `NSPhotoLibraryUsageDescription`, `PhotosPicker` | User chooses an avatar or attachment image | Import only the user-selected image(s). Current PhotosPicker paths do not scan the full library. |
+| Camera | `NSCameraUsageDescription`, `AVCaptureDevice.requestAccess(for: .video)`, `VNDocumentCameraViewController` | User taps camera for an avatar, receipt, or Personal lab-report scan | Capture only the image or report pages the user explicitly requested. Lab pages are recognized on device and remain volatile. |
+| Photo Library | `NSPhotoLibraryUsageDescription`, `PhotosPicker` | User chooses an avatar, attachment, or Personal lab-report image | Import only the user-selected image(s). Current PhotosPicker paths do not scan the full library; lab pages are recognized on device and remain volatile. |
 | Location When In Use | `NSLocationWhenInUseUsageDescription`, `LocationManager.requestWhenInUseAuthorization()` | User starts a walk or asks for a one-shot location | Record a walk route or attach the current place to a user-created Moment. |
 | Location Always | `NSLocationAlwaysAndWhenInUseUsageDescription`, `requestAlwaysAuthorization()` | User upgrades while walk background tracking is needed | Continue recording the current walk route when Ohana is backgrounded or the screen is locked. |
-| Notifications | `UNUserNotificationCenter.requestAuthorization` | User creates reminder/care/medication notification flows | Deliver local reminders and allow notification actions such as Done, Skip, or Tomorrow. |
+| Notifications | `UNUserNotificationCenter.requestAuthorization` | User enables a local reminder | Deliver on-device reminders and their actions. Ohana 1.0 does not send remote guardian notifications. |
 | Face ID / Biometrics | `NSFaceIDUsageDescription`, `LAContext.evaluatePolicy` | User enables or uses member-gate biometrics | Let the device verify the current user as a shortcut to a local member PIN. Ohana receives only success/failure. |
 | Apple Health / HealthKit | `NSHealthShareUsageDescription`, `HKHealthStore.requestAuthorization` | User taps the Apple Health setup action in Human Workout | Read steps, walking/running distance, active energy, exercise and stand time, Activity Summary goals, and workouts for the selected Human's read-only local summary. |
 | iCloud Drive backup | iCloud ubiquity entitlement and `ICloudDriveAutomaticBackupFileStore` | Automatic backup is enabled or user taps Back Up Now | Save a backup file to the user's own iCloud Drive container. Developer does not receive it. |
-| Remote notifications / CloudKit | Not declared by the Solo capability profile; dormant CloudKit code remains | Not reachable in the Solo release | Future-only. Adding APNs, `remote-notification`, CloudKit sharing, or remote sync requires an explicit capability change, policy update, and release validation. |
+| Sign in with Apple / remote notifications | Absent from the source entitlement and background modes | Not reachable | Source cleanup is complete. The Developer Portal, distribution profile and final signed Archive must confirm these capabilities were not reintroduced. |
+| CloudKit sharing | No CloudKit service entitlement; `onlineCollaboration` gate remains false | Not reachable | Future-only and not part of Ohana 1.0. |
 
 ## Recommended System Purpose Strings
 
-The current `Info.plist` default language is Chinese. English and German have
-reviewed localized `InfoPlist.strings`; Spanish, Portuguese, French, Japanese,
-Korean, and Italian currently carry explicit English fallback files so a
-registered app language never falls through to an unrelated Chinese system
-prompt. There is no separate `zh-Hans.lproj/InfoPlist.strings`; the default
-Chinese strings remain the Simplified Chinese source.
+The current `Info.plist` default language is Chinese. All nine registered app
+languages now provide localized protected-resource prompts. There is no
+separate `zh-Hans.lproj/InfoPlist.strings`; the default Chinese strings remain
+the Simplified Chinese source. Final RC device prompts and professional
+language review remain release evidence.
 
 ### Camera
 
 Current Chinese:
 
-> 用于在你主动拍照时创建成员或宠物头像、时刻照片或收据附件。
+> 用于在你主动拍照时创建头像、记录时刻、添加收据，或识别健康检查报告。健康报告文字仅在本机处理。
 
 Recommended Chinese:
 
-> 用于在你主动拍照时创建成员或宠物头像、时刻照片或收据附件。
+> 用于在你主动拍照时创建头像、记录时刻、添加收据，或识别健康检查报告。健康报告文字仅在本机处理。
 
 Recommended English:
 
-> Used when you choose to take a member or pet avatar, Moment photo, or receipt attachment.
+> Used when you choose to capture an avatar, Moment, receipt, or health report. Health report text is processed only on this device.
 
 Review rationale:
 
 - Requested only after the user taps a camera action.
 - No continuous camera access after capture.
+- Personal lab-report pages are recognized on device; raw pages and OCR text
+  are not persisted after the review flow ends.
 - Captured images stay local unless the user exports/backups/shares them.
 
 ### Photo Library
 
 Current Chinese:
 
-> 用于导入你选择的头像、时刻图片或收据附件；Ohana 只处理你选中的项目。
+> 用于导入你选择的头像、时刻图片、收据或健康检查报告；Ohana 只处理你选中的项目，健康报告文字仅在本机识别。
 
 Recommended Chinese:
 
-> 用于导入你选择的头像、时刻图片或收据附件；Ohana 只处理你选中的项目。
+> 用于导入你选择的头像、时刻图片、收据或健康检查报告；Ohana 只处理你选中的项目，健康报告文字仅在本机识别。
 
 Recommended English:
 
-> Used to import avatars, Moment images, or receipt attachments that you select.
+> Used to import avatars, Moments, receipts, or health reports that you select. Health report text is recognized only on this device.
 
 Review rationale:
 
 - Current code uses PhotosPicker for selected image import.
 - Ohana should not scan the full library, read unrelated images, or upload photo
   metadata to the developer.
+- Personal lab-report images and raw recognized text remain volatile; only
+  user-reviewed structured values are saved locally.
 
 ### Location While Using the App
 
@@ -147,10 +151,9 @@ English:
 
 Review rationale:
 
-- Notifications are for local reminders and user-enabled care flows.
+- Notifications are for local reminders and user-invoked reminder actions.
 - Medication notification privacy can hide detailed pet medication content.
-- No marketing push should be sent unless a future policy explicitly adds it and
-  obtains appropriate consent.
+- No remote guardian or marketing push is sent in Ohana 1.0.
 
 ### Apple Health / HealthKit
 
@@ -204,15 +207,15 @@ Review rationale:
 
 Suggested short review note for the current release:
 
-> Ohana is local-first and does not send user data to the developer. Camera,
+> Ohana is local-first. Free and Personal do not require an Ohana account or send
+> care data to the developer. Camera,
 > photo, location, local notification, Face ID, Apple Health read access, and iCloud
 > Drive backup features are user initiated. Apple Health access is read-only and
 > used to show the selected Human's local workout summary and history. Location
 > Always is used only during an active walk to continue recording the route in the
-> background. Family CloudKit collaboration code is gated off in the current
-> release by `OnlineFeatureGate.allows(.onlineCollaboration) == false`. The Solo
-> target does not declare APNs, the `remote-notification` background mode, or a
-> CloudKit service entitlement or Sign in with Apple capability.
+> background. Ohana 1.0 does not offer an Ohana account, Family guardian,
+> remote guardian notifications, CloudKit collaboration, or remote care-data
+> synchronization. No demo account is required.
 
 ## Must Not Claim Yet
 
@@ -221,26 +224,29 @@ Do not claim the following until implemented and revalidated:
 - Production CloudKit family sync. The code exists, but the current gate is
   false, the Solo capability profile does not declare the required capabilities,
   and real-device CloudKit validation is still deferred.
-- Developer-hosted accounts, account sync, or uploads of health, care, route,
-  note, photo, document, PIN, or economy-ledger data.
+- Any Ohana account, Family guardian, remote guardian notifications, or uploads of
+  health, care, route, note, photo, document, PIN, or economy-ledger data.
 - Analytics, advertising, tracking, support upload, or third-party crash-report
   collection.
 
 ## Release Checklist
 
 - `Ohana/Info.plist` purpose strings match this document.
-- `Ohana/en.lproj/InfoPlist.strings` and `Ohana/de.lproj/InfoPlist.strings`
-  match the final approved wording.
-- The other registered language directories contain an explicit safe English
-  fallback until reviewed native-language permission copy is approved; do not
-  silently delete those files.
+- All nine registered language directories contain explicit localized permission
+  wording that matches the current feature triggers and local-first data flow.
+- Final native-language professional review and signed-device inspection of each
+  system permission alert remain release gates; repository localization coverage
+  alone does not close them.
 - If a `zh-Hans.lproj/InfoPlist.strings` file is added later, keep it in sync
   with the default Chinese `Info.plist` wording.
 - `docs/privacy-policy.md` is published at the Settings privacy-policy URL
   before App Store submission.
-- App Store Connect privacy answers are updated if an account backend, CloudKit
-  sync, analytics, tracking, support upload, or any third-party SDK data
-  collection is enabled.
+- The final Archive contains no unused Sign in with Apple, APNs,
+  `remote-notification`, CloudKit or Associated Domains capability.
+- The final Xcode Privacy Report and dependency review support the intended App
+  Store Connect **Data Not Collected** answer; any Family, CloudKit, analytics,
+  support upload or third-party SDK collection requires another update before it
+  is enabled.
 
 ## Sources Used For This Draft
 

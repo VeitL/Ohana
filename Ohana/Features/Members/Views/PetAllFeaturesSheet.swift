@@ -463,14 +463,6 @@ struct PetAllFeaturesSheet: View {
                     PetMemorialBanner(pet: pet)
                 }
 
-                FeatureHubSummaryPanel(
-                    title: l.tr(zh: "宠物摘要", en: "Pet Summary", de: "Tierübersicht"),
-                    statusText: petSummaryStatusText,
-                    statusTint: petSummaryStatusTint,
-                    metrics: petMetrics
-                )
-                .accessibilityIdentifier("pet-all-features-summary-panel")
-
                 ForEach(visiblePetSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
                         open(destination)
@@ -745,32 +737,6 @@ struct PetAllFeaturesSheet: View {
         )
     }
 
-    private var petMetrics: [FeatureHubMetric] {
-        [
-            FeatureHubMetric(id: "today", title: l.tr(zh: "今日照护", en: "Today", de: "Heute"), value: "\(todayCareCount)"),
-            FeatureHubMetric(id: "records", title: l.tr(zh: "记录", en: "Logs", de: "Einträge"), value: "\(timelineCount)"),
-            FeatureHubMetric(id: "archive", title: l.tr(zh: "档案", en: "Archive", de: "Archiv"), value: "\(archiveScore)/5"),
-            FeatureHubMetric(id: "bond", title: l.tr(zh: "成长椰子", en: "Bond", de: "Bindung"), value: "🥥 \(pet.coconutBalance)")
-        ]
-    }
-
-    private var petSummaryStatusText: String {
-        if pet.hasPassedAway {
-            return l.tr(zh: "纪念模式", en: "Memorial", de: "Gedenken")
-        }
-        if todayCareCount > 0 {
-            return l.tr(zh: "\(todayCareCount) 项今日记录", en: "\(todayCareCount) logs today", de: "\(todayCareCount) Einträge heute")
-        }
-        return l.tr(zh: "今日稳定", en: "Steady today", de: "Heute stabil")
-    }
-
-    private var petSummaryStatusTint: Color {
-        if pet.hasPassedAway {
-            return Color.ohanaSecondaryText
-        }
-        return todayCareCount > 0 ? Color.goYellow : Color.goTeal
-    }
-
     private var petSubtitle: String {
         let summary = pet.localizedSpeciesBreedSummary(l: l)
         if !summary.isEmpty { return summary }
@@ -939,12 +905,6 @@ struct PetAllFeaturesSheet: View {
     private var timelineCount: Int {
         activitySummary.photoCount + activitySummary.milestoneCount + activitySummary.healthCount + activitySummary.weightCount
     }
-
-    private var todayCareCount: Int {
-        activitySummary.todayCareCount
-    }
-
-    private var archiveScore: Int { archiveSnapshot.score }
 }
 
 enum ArchiveMemoryNextStepKind: Equatable {

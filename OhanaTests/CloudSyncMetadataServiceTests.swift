@@ -335,7 +335,7 @@ struct CloudSyncMetadataServiceTests {
 
     @MainActor
     @Test func entityRegistryCoversCurrentSwiftDataSchema() {
-        let schemaNames = Set(ArkSchemaV91.models.map { String(describing: $0) })
+        let schemaNames = Set(ArkSchemaV99.models.map { String(describing: $0) })
             .subtracting(CloudSyncEntityRegistry.localOnlySchemaEntityNames)
         let descriptorNames = Set(CloudSyncEntityRegistry.descriptors.map(\.entityName))
 
@@ -345,7 +345,29 @@ struct CloudSyncMetadataServiceTests {
     }
 
     @MainActor
-    @Test func soloProjectConfigurationKeepsOnlyICloudDocumentsCapability() throws {
+    @Test func humanConditionTrackingHasMetadataPoliciesWithoutEnteringUploadPipeline() {
+        let condition = CloudSyncEntityRegistry.descriptor(for: HumanHealthCondition.self)
+        let observation = CloudSyncEntityRegistry.descriptor(for: HumanHealthObservation.self)
+
+        #expect(condition?.role == .mutableRecord)
+        #expect(condition?.defaultConflictPolicy == .lastWriterWins)
+        #expect(observation?.role == .appendOnlyFact)
+        #expect(observation?.defaultConflictPolicy == .appendOnly)
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: HumanHealthCondition.self)))
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: HumanHealthObservation.self)))
+    }
+
+    @MainActor
+    @Test func labMetricProvenanceIsMutableLocallyWithoutEnteringUploadPipeline() {
+        let metric = CloudSyncEntityRegistry.descriptor(for: HumanHealthMetricLog.self)
+
+        #expect(metric?.role == .mutableRecord)
+        #expect(metric?.defaultConflictPolicy == .lastWriterWins)
+        #expect(!CloudSyncEntityRegistry.supportsUploadPipeline(for: String(describing: HumanHealthMetricLog.self)))
+    }
+
+    @MainActor
+    @Test func soloProjectKeepsOnlyShippingCapabilities() throws {
         let rootURL = repositoryRootURL()
         let entitlements = try propertyListDictionary(
             rootURL.appendingPathComponent("Ohana/Ohana.entitlements")
@@ -360,12 +382,18 @@ struct CloudSyncMetadataServiceTests {
 
         let containers = try #require(entitlements["com.apple.developer.icloud-container-identifiers"] as? [String])
         let services = try #require(entitlements["com.apple.developer.icloud-services"] as? [String])
+        let appGroups = try #require(entitlements["com.apple.security.application-groups"] as? [String])
         let backgroundModes = try #require(infoPlist["UIBackgroundModes"] as? [String])
 
         #expect(containers.contains(CloudSyncEngineRuntime.containerIdentifier))
         #expect(services == ["CloudDocuments"])
+        #expect(appGroups == ["group.com.guanchen.li.Ohana"])
+        #expect(entitlements["com.apple.developer.healthkit"] as? Bool == true)
         #expect(entitlements["aps-environment"] == nil)
-        #expect(!backgroundModes.contains("remote-notification"))
+        #expect(entitlements["com.apple.developer.applesignin"] == nil)
+        #expect(entitlements["com.apple.developer.associated-domains"] == nil)
+        #expect(Set(backgroundModes) == ["fetch", "location"])
+        #expect(!infoPlist.keys.contains { $0.hasPrefix("OHANAGuardian") })
         #expect(infoPlist["CKSharingSupported"] == nil)
         #expect(!project.contains("INFOPLIST_KEY_CKSharingSupported = YES;"))
         #expect(project.contains("SWIFT_ACTIVE_COMPILATION_CONDITIONS = \"OHANA_SOLO_CAPABILITIES $(inherited)\";"))
@@ -727,7 +755,8 @@ struct CloudSyncMetadataServiceTests {
         let householdId = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
         let pet = Pet(name: "Momo")
         pet.id = uuid("33333333-3333-4333-8333-333333333333")
-        let executorId = normalized(uuid("44444444-4444-4444-8444-444444444444"))
+        let executorUUID = uuid("44444444-4444-4444-8444-444444444444")
+        let executorId = normalized(executorUUID)
 
         let pottyLog = PetPottyLog(
             date: Date(timeIntervalSinceReferenceDate: 80),
@@ -785,12 +814,20 @@ struct CloudSyncMetadataServiceTests {
         #expect(walkPayload.fields["behaviorNotes"]?.stringValue == "calm walk")
         #expect(walkPayload.fields["routeLocationsData"] == .assetData(Data([1, 2, 3])))
 
+        let expenseContributionsJSON = ExpensePayerContributionPolicy.encode([
+            ExpensePayerContribution(humanID: executorUUID, minorUnits: 1080),
+            ExpensePayerContribution(
+                humanID: uuid("77777777-7777-4777-8777-777777777777"),
+                minorUnits: 720
+            )
+        ])
         let expenseLog = PetExpenseLog(
             amount: 18,
             category: .food,
             pet: pet,
             executorId: executorId,
-            recordedByHumanId: coExecutorId
+            recordedByHumanId: coExecutorId,
+            payerContributionsJSON: expenseContributionsJSON
         )
         let expenseState = try CloudSyncMetadataService.markModified(
             entityName: String(describing: PetExpenseLog.self),
@@ -801,6 +838,7 @@ struct CloudSyncMetadataServiceTests {
         let expensePayload = try CloudSyncRecordSerializer.payload(for: expenseLog, state: expenseState)
         #expect(expensePayload.fields["executorId"]?.stringValue == executorId)
         #expect(expensePayload.fields["recordedByHumanId"]?.stringValue == coExecutorId)
+        #expect(expensePayload.fields["payerContributionsJSON"]?.stringValue == expenseContributionsJSON)
 
         let symptom = SymptomLog(
             category: .skin,
@@ -833,6 +871,142 @@ struct CloudSyncMetadataServiceTests {
         )
         let heatPayload = try CloudSyncRecordSerializer.payload(for: heatCycle, state: heatState)
         #expect(heatPayload.fields["recordedByHumanId"]?.stringValue == coExecutorId)
+    }
+
+    @MainActor
+    @Test func recordApplierPreservesRemoteExpensePayerContributions() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdID = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petID = uuid("11111111-1111-4111-8111-111111111111")
+        let expenseID = uuid("22222222-2222-4222-8222-222222222222")
+        let primaryPayerID = uuid("33333333-3333-4333-8333-333333333333")
+        let coPayerID = uuid("44444444-4444-4444-8444-444444444444")
+        let contributions = [
+            ExpensePayerContribution(humanID: primaryPayerID, minorUnits: 6000),
+            ExpensePayerContribution(humanID: coPayerID, minorUnits: 4000)
+        ]
+        let contributionsJSON = ExpensePayerContributionPolicy.encode(contributions)
+        let pet = Pet(name: "Momo")
+        pet.id = petID
+        context.insert(pet)
+        try context.save()
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetExpenseLog.self),
+            recordType: String(describing: PetExpenseLog.self),
+            localRecordId: expenseID,
+            householdId: householdID,
+            fields: [
+                "date": .date(Date(timeIntervalSinceReferenceDate: 140)),
+                "amount": .double(100),
+                "category": .string(ExpenseCategory.medical.rawValue),
+                "note": .string("Remote clinic bill"),
+                "petId": .string(normalized(petID)),
+                "executorId": .string(normalized(primaryPayerID)),
+                "recordedByHumanId": .string(normalized(coPayerID)),
+                "sharedSessionId": .string(""),
+                "payerContributionsJSON": .string(contributionsJSON)
+            ]
+        ).makeCKRecord()
+
+        let result = try CloudSyncRecordApplier.apply(record, context: context)
+        let expense = try #require(try fetchPetExpenseLog(id: expenseID, context: context))
+
+        #expect(result == .inserted(entityName: "PetExpenseLog", localRecordId: normalized(expenseID)))
+        #expect(expense.payerContributionsJSON == contributionsJSON)
+        #expect(expense.payerContributions == contributions)
+        #expect(expense.executorId == normalized(primaryPayerID))
+        #expect(expense.recordedByHumanId == normalized(coPayerID))
+        #expect(expense.amountPaid(by: primaryPayerID.uuidString) == 60)
+        #expect(expense.amountPaid(by: coPayerID.uuidString) == 40)
+    }
+
+    @MainActor
+    @Test func recordApplierRejectsMalformedExpensePayerSnapshotWithoutWritingFact() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdID = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petID = uuid("11111111-1111-4111-8111-111111111111")
+        let expenseID = uuid("22222222-2222-4222-8222-222222222222")
+        let pet = Pet(name: "Momo")
+        pet.id = petID
+        context.insert(pet)
+        try context.save()
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetExpenseLog.self),
+            recordType: String(describing: PetExpenseLog.self),
+            localRecordId: expenseID,
+            householdId: householdID,
+            fields: [
+                "date": .date(Date(timeIntervalSinceReferenceDate: 141)),
+                "amount": .double(100),
+                "category": .string(ExpenseCategory.medical.rawValue),
+                "note": .string("Corrupt split"),
+                "petId": .string(normalized(petID)),
+                "payerContributionsJSON": .string("{not-json")
+            ]
+        ).makeCKRecord()
+
+        #expect(throws: ExpensePayerContributionError.invalidAllocation) {
+            _ = try CloudSyncRecordApplier.apply(record, context: context)
+        }
+        #expect(try context.fetch(FetchDescriptor<PetExpenseLog>()).isEmpty)
+    }
+
+    @MainActor
+    @Test func recordApplierDoesNotReviveTombstonedExpensePayer() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let householdID = uuid("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        let petID = uuid("11111111-1111-4111-8111-111111111111")
+        let expenseID = uuid("22222222-2222-4222-8222-222222222222")
+        let deletedPayerID = uuid("33333333-3333-4333-8333-333333333333")
+        let survivingPayerID = uuid("44444444-4444-4444-8444-444444444444")
+        let contributionsJSON = ExpensePayerContributionPolicy.encode([
+            ExpensePayerContribution(humanID: deletedPayerID, minorUnits: 6000),
+            ExpensePayerContribution(humanID: survivingPayerID, minorUnits: 4000)
+        ])
+        let pet = Pet(name: "Momo")
+        pet.id = petID
+        let deletedHumanState = CloudSyncRecordState(
+            entityName: String(describing: Human.self),
+            localRecordId: deletedPayerID,
+            householdId: householdID,
+            isDeleted: true,
+            hasPendingLocalChanges: false
+        )
+        context.insert(pet)
+        context.insert(deletedHumanState)
+        try context.save()
+
+        let record = try makeRecordPayload(
+            entityName: String(describing: PetExpenseLog.self),
+            recordType: String(describing: PetExpenseLog.self),
+            localRecordId: expenseID,
+            householdId: householdID,
+            fields: [
+                "date": .date(Date(timeIntervalSinceReferenceDate: 142)),
+                "amount": .double(100),
+                "category": .string(ExpenseCategory.medical.rawValue),
+                "note": .string("Older remote bill"),
+                "petId": .string(normalized(petID)),
+                "executorId": .string(normalized(deletedPayerID)),
+                "recordedByHumanId": .string(normalized(deletedPayerID)),
+                "payerContributionsJSON": .string(contributionsJSON)
+            ]
+        ).makeCKRecord()
+
+        _ = try CloudSyncRecordApplier.apply(record, context: context)
+        let expense = try #require(try fetchPetExpenseLog(id: expenseID, context: context))
+
+        #expect(expense.executorId == normalized(survivingPayerID))
+        #expect(expense.recordedByHumanId == nil)
+        #expect(expense.amountPaid(by: deletedPayerID.uuidString) == 0)
+        #expect(expense.amountPaid(by: survivingPayerID.uuidString) == 40)
+        #expect(expense.payerContributions.contains { $0.humanID == nil && $0.minorUnits == 6000 })
+        #expect(!expense.payerContributionsJSON.lowercased().contains(normalized(deletedPayerID)))
     }
 
     @MainActor

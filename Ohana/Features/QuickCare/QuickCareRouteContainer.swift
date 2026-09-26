@@ -107,6 +107,7 @@ struct QuickFeedDetailRouteContainer: View {
                     showsCloseButton: showsCloseButton,
                     opensManualSheetOnAppear: opensManualSheetOnAppear,
                     allEvents: routeData.allEvents,
+                    eventRevision: routeData.eventRevision,
                     allHumans: routeData.allHumans,
                     allPets: routeData.allPets,
                     feedingLedgerEntries: routeData.feedingLedgerEntries,
@@ -271,6 +272,7 @@ private struct QuickPlayRouteData {
 private struct QuickFeedRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
+    var eventRevision = QuickFeedRouteRevision(events: [])
     var allHumans: [Human] = []
     var allPets: [Pet] = []
     var feedingLedgerEntries: [QuickFeedLedgerEntry] = []
@@ -312,6 +314,7 @@ private struct QuickFeedRouteData {
         return QuickFeedRouteData(
             pet: pet,
             allEvents: allEvents,
+            eventRevision: QuickFeedRouteRevision(events: allEvents),
             allHumans: fetch(
                 FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,

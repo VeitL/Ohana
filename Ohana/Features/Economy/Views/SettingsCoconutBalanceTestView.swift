@@ -8,6 +8,7 @@
 import SwiftData
 import SwiftUI
 
+#if DEBUG
 struct CoconutBalanceTestContentView: View {
     let humans: [Human]
     let walletAccounts: [CoconutAccount]
@@ -177,6 +178,7 @@ struct CoconutBalanceTestContentView: View {
                 unit: "🥥",
                 maxFractionDigits: 0,
                 accent: Color.goYellow,
+                accentForeground: Color.arkInk,
                 step: 50,
                 valueFont: .system(size: 44, weight: .black, design: .rounded),
                 unitFont: .system(size: 28, weight: .black),
@@ -357,3 +359,4 @@ struct CoconutBalanceTestContentView: View {
             ?? human.coconutBalance
     }
 }
+#endif

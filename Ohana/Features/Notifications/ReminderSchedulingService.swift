@@ -21,13 +21,19 @@ enum ReminderSchedulingService {
         operation: String = "schedule",
         saveLedger: Bool = true,
         careLedger providedCareLedger: CareLedgerRecording? = nil,
-        policyDecision providedPolicyDecision: NotificationDeliveryDecision? = nil
+        policyDecision providedPolicyDecision: NotificationDeliveryDecision? = nil,
+        lifecycleSnapshot providedLifecycleSnapshot: MemberLifecycleActiveScheduleSnapshot? = nil
     ) async -> ReminderNotificationScheduleResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         if reminder.event == nil {
             let result = ReminderNotificationScheduleResult.missingEvent
             recordScheduleResult(result, reminder: reminder, source: source, operation: operation, context: context, save: saveLedger, careLedger: careLedger)
             return result
+        }
+        let lifecycleSnapshot = providedLifecycleSnapshot ?? MemberLifecycleActiveScheduleSnapshot(context: context)
+        guard lifecycleSnapshot.includes(reminder) else {
+            cancelNotification(for: reminder)
+            return .skippedInactiveMember
         }
         if reminder.scheduledAt <= Date() {
             let result = ReminderNotificationScheduleResult.skippedPastDue
@@ -259,7 +265,15 @@ enum ReminderSchedulingService {
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) async {
         let careLedger = providedCareLedger ?? CareLedgerService()
-        let remindersToKeep = deduplicate(reminders: reminders, context: context, careLedger: careLedger)
+        let lifecycleSnapshot = MemberLifecycleActiveScheduleSnapshot(context: context)
+        let activeReminders = reminders.filter { reminder in
+            guard lifecycleSnapshot.includes(reminder) else {
+                cancelNotification(for: reminder)
+                return false
+            }
+            return true
+        }
+        let remindersToKeep = deduplicate(reminders: activeReminders, context: context, careLedger: careLedger)
         guard !remindersToKeep.isEmpty else { return }
 
         let policyDecisions = NotificationDeliveryPolicy.plan(reminders: remindersToKeep)
@@ -322,7 +336,8 @@ enum ReminderSchedulingService {
                         classification: classification,
                         scheduledAt: reminder.scheduledAt,
                         mergedInto: summary.anchorReminderID
-                    )
+                    ),
+                    lifecycleSnapshot: lifecycleSnapshot
                 )
                 continue
             }
@@ -334,7 +349,8 @@ enum ReminderSchedulingService {
                 operation: operation,
                 saveLedger: false,
                 careLedger: careLedger,
-                policyDecision: policyDecisions[reminder.id]
+                policyDecision: policyDecisions[reminder.id],
+                lifecycleSnapshot: lifecycleSnapshot
             )
             if result.didRegisterNotification {
                 knownNotificationIds.insert(reminder.notificationId)
@@ -486,6 +502,12 @@ enum ReminderSchedulingService {
         return "\(eventId):\(minute)"
     }
 
+    private static func cancelNotification(for reminder: Reminder) {
+        let notificationID = reminder.notificationId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !notificationID.isEmpty else { return }
+        OhanaNotifications.current.cancel(notificationId: notificationID)
+    }
+
     private static func ledgerActionType(for result: ReminderNotificationScheduleResult, operation: String) -> String {
         guard operation == "refill" else { return result.ledgerActionType }
         switch result {
@@ -493,6 +515,7 @@ enum ReminderSchedulingService {
         case .deferred: return "refillDeferred"
         case .skippedDuplicate: return "refillSkippedExisting"
         case .skippedPastDue: return "refillSkippedPastDue"
+        case .skippedInactiveMember: return "refillSkippedInactiveMember"
         case .missingEvent: return "refillMissingEvent"
         case .skippedBudget: return "refillSkippedBudget"
         case .skippedMerged: return "refillMerged"

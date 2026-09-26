@@ -35,8 +35,20 @@ if ! scripts/tests/run-validation-routing-tests.sh; then
   fail "scripts/tests/run-validation-routing-tests.sh: validation lane regression"
 fi
 
+if ! scripts/tests/run-release-test-surface-fixture-tests.sh; then
+  fail "scripts/tests/run-release-test-surface-fixture-tests.sh: Release test-surface regression"
+fi
+
 if ! scripts/tests/run-local-build-environment-tests.sh; then
   fail "scripts/tests/run-local-build-environment-tests.sh: local build isolation regression"
+fi
+
+if ! scripts/tests/run-dogfood-user-status-tests.sh; then
+  fail "scripts/tests/run-dogfood-user-status-tests.sh: Dogfood user readiness regression"
+fi
+
+if ! scripts/tests/run-dogfood-simulator-tests.sh; then
+  fail "scripts/tests/run-dogfood-simulator-tests.sh: Dogfood Simulator safety regression"
 fi
 
 run_audit() {
@@ -101,6 +113,7 @@ assert_scope_floor() {
 }
 
 fixtures="scripts/tests/fixtures/Views"
+system_surface_fixtures="scripts/tests/fixtures/SystemSurfaces"
 agent_skill_fixtures="scripts/tests/fixtures/AgentSkills"
 architecture_fixture_path="Ohana/Domain/__ArchitectureBoundaryFixture.swift"
 architecture_model_fixture_path="Ohana/Models/__ArchitectureModelBoundaryFixture.swift"
@@ -110,9 +123,13 @@ governance_manifest_path="docs/governance/manifests/feature-ownership.json"
 governance_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-feature-ownership.XXXXXX")"
 release_device_manifest_path="docs/governance/manifests/release-device-matrix.json"
 release_device_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-release-device-matrix.XXXXXX")"
+dogfood_manifest_path="docs/governance/manifests/dogfood-user-profile.json"
+dogfood_manifest_backup="$(mktemp "${TMPDIR:-/tmp}/ohana-dogfood-profile.XXXXXX")"
 ui_shard_manifest_fixture=""
+ui_selector_entrypoint_fixture=""
 cp "$governance_manifest_path" "$governance_manifest_backup"
 cp "$release_device_manifest_path" "$release_device_manifest_backup"
+cp "$dogfood_manifest_path" "$dogfood_manifest_backup"
 
 cleanup_architecture_fixture() {
   rm -f "$architecture_fixture_path"
@@ -131,8 +148,15 @@ cleanup_governance_fixture() {
     cp "$release_device_manifest_backup" "$release_device_manifest_path"
     rm -f "$release_device_manifest_backup"
   fi
+  if [[ -f "$dogfood_manifest_backup" ]]; then
+    cp "$dogfood_manifest_backup" "$dogfood_manifest_path"
+    rm -f "$dogfood_manifest_backup"
+  fi
   if [[ -n "$ui_shard_manifest_fixture" ]]; then
     rm -f "$ui_shard_manifest_fixture"
+  fi
+  if [[ -n "$ui_selector_entrypoint_fixture" ]]; then
+    rm -f "$ui_selector_entrypoint_fixture"
   fi
 }
 
@@ -160,6 +184,23 @@ else
 fi
 rm -f "$ui_shard_manifest_fixture"
 ui_shard_manifest_fixture=""
+
+ui_selector_entrypoint_fixture="$(mktemp "${TMPDIR:-/tmp}/ohana-ui-selector-entrypoint-bad.XXXXXX")"
+printf "%s\n" "--only-testing 'OhanaUITests/OhanaUITests/testRemovedReleaseSmokeSelector'" \
+  > "$ui_selector_entrypoint_fixture"
+set +e
+output="$(OHANA_UI_TEST_SELECTOR_ENTRYPOINTS="$ui_selector_entrypoint_fixture" scripts/audit-ui-test-shards.sh 2>&1)"
+status=$?
+set -e
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-ui-test-shards.sh stale-entrypoint fixture: expected exit 1, got $status"
+elif ! grep -qF "entrypoint selectors not found in source" <<<"$output"; then
+  fail "scripts/audit-ui-test-shards.sh stale-entrypoint fixture: selector guard no longer fires"
+else
+  echo "ok  scripts/audit-ui-test-shards.sh catches a stale release entrypoint selector"
+fi
+rm -f "$ui_selector_entrypoint_fixture"
+ui_selector_entrypoint_fixture=""
 
 assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   background system-text-color hardcoded-white-black material shadow \
@@ -206,7 +247,7 @@ run_audit scripts/audit-architecture-boundaries.sh "$architecture_fixture_path"
 if [[ "$status" -ne 1 ]]; then
   fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: expected strict exit 1, got $status"
 else
-  for rule in domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-live-default-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency domain-platform-ui-framework-dependency; do
+  for rule in human-deletion-fail-open-entrypoint domain-feature-command-dependency domain-feature-reward-type-dependency domain-feature-implementation-dependency domain-feature-live-default-dependency domain-feature-taxonomy-literal domain-presentation-framework-dependency domain-platform-ui-framework-dependency; do
     if ! grep -qF "[$rule]" <<<"$output"; then
       fail "scripts/audit-architecture-boundaries.sh ArchitectureBoundariesBad.swift: rule [$rule] no longer fires"
     fi
@@ -293,6 +334,20 @@ else
       fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: rule [$rule] no longer fires"
     fi
   done
+  schedule_delete_result_warning_count="$(grep -cF "func scheduleDeleteResult" <<<"$output" || true)"
+  if [[ "$schedule_delete_result_warning_count" -ne 4 ]]; then
+    fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: expected 4 independently bound schedule-delete result warnings, got $schedule_delete_result_warning_count"
+  fi
+  for function_name in \
+    scheduleDeleteResultCommentBypass \
+    scheduleDeleteResultStringBypass \
+    scheduleDeleteResultWrongBindingBypass \
+    scheduleDeleteResultUnrelatedIDsBypass \
+    deleteRenamedScheduleValueBypass; do
+    if ! grep -qF "func $function_name" <<<"$output"; then
+      fail "scripts/audit-member-lifecycle-gate.sh --all MemberLifecycleGateBadCommands.swift: missing exact schedule-delete warning for $function_name"
+    fi
+  done
   echo "ok  scripts/audit-member-lifecycle-gate.sh --all catches member lifecycle fixture rules"
 fi
 assert_good scripts/audit-member-lifecycle-gate.sh "$fixtures/MemberLifecycleGateGoodCommands.swift"
@@ -309,11 +364,59 @@ assert_bad scripts/audit-swiftdata-save-failures.sh "$fixtures/SaveFailureBounda
   swiftdata-silent-save-discard swiftdata-ambiguous-safe-save
 assert_good scripts/audit-swiftdata-save-failures.sh "$fixtures/SaveFailureBoundaryGood.swift"
 
+assert_bad scripts/audit-system-surface-contract.sh \
+  "$system_surface_fixtures/SystemSurfaceBackupExclusionBad.swift" \
+  system-surface-atomic-write \
+  system-surface-backup-exclusion-set \
+  system-surface-backup-exclusion-order \
+  system-surface-backup-exclusion-readback \
+  system-surface-backup-exclusion-verification
+assert_good scripts/audit-system-surface-contract.sh \
+  "$system_surface_fixtures/SystemSurfaceBackupExclusionGood.swift"
+
+assert_bad scripts/audit-system-surface-reset-fence.sh \
+  "$system_surface_fixtures/SystemSurfaceResetFenceBad.swift" \
+  reset-fence-schedule-pause \
+  reset-fence-prepare-pause \
+  reset-fence-prepare-generation \
+  reset-fence-prepare-cancel \
+  reset-fence-post-await \
+  reset-fence-prewrite \
+  reset-fence-finish-generation \
+  reset-fence-runtime-order \
+  reset-fence-runtime-defer \
+  reset-fence-failure-recovery \
+  reset-fence-success-boundary \
+  reset-fence-live-wiring \
+  reset-fence-deterministic-test \
+  reset-fence-failure-test
+assert_good scripts/audit-system-surface-reset-fence.sh \
+  "$system_surface_fixtures/SystemSurfaceResetFenceGood.swift"
+
 run_audit scripts/audit-governance-manifests.sh
 if [[ "$status" -ne 0 ]]; then
   fail "scripts/audit-governance-manifests.sh: expected current manifests to pass, got $status: $output"
 else
   echo "ok  scripts/audit-governance-manifests.sh passes current manifests"
+fi
+
+python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("docs/governance/manifests/dogfood-user-profile.json")
+data = json.loads(path.read_text(encoding="utf-8"))
+data["milestones"]["day7"]["minMoments"] = 0
+path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+PY
+run_audit scripts/audit-governance-manifests.sh
+cp "$dogfood_manifest_backup" "$dogfood_manifest_path"
+if [[ "$status" -ne 1 ]]; then
+  fail "scripts/audit-governance-manifests.sh Dogfood milestone fixture: expected strict exit 1, got $status"
+elif ! grep -qF "dogfood day7 must define positive integer minMoments" <<<"$output"; then
+  fail "scripts/audit-governance-manifests.sh Dogfood milestone fixture: positive-threshold guard no longer fires"
+else
+  echo "ok  scripts/audit-governance-manifests.sh catches invalid Dogfood milestones"
 fi
 
 cp "$fixtures/SaveFailureBoundaryBad.swift" "$save_failure_fixture_path"

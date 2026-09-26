@@ -12,7 +12,8 @@ struct FeatureHubAdaptiveLayoutTests {
         #expect(source.contains("GridItem(.adaptive(minimum: 156)"))
         #expect(source.contains("struct FeatureHubSummaryPanel"))
         #expect(source.contains("FeatureHubMetricStrip(metrics: metrics)"))
-        #expect(source.contains("Text(section.subtitle)"))
+        #expect(!source.contains("Text(section.subtitle)"))
+        #expect(source.contains(".accessibilityLabel(\"\\(section.title). \\(section.subtitle)\")"))
         #expect(source.contains("feature-hub-section-\\(section.id)"))
         #expect(source.contains("@Environment(\\.dynamicTypeSize) private var dynamicTypeSize"))
         #expect(source.contains(".lineLimit(2)"))
@@ -23,7 +24,7 @@ struct FeatureHubAdaptiveLayoutTests {
         #expect(!source.contains("Text(data.title)\n                        .font(OhanaFont.callout(.black))\n                        .foregroundStyle(Color.ohanaPrimaryText)\n                        .lineLimit(1)"))
     }
 
-    @Test func petAndPlantFeatureCollectionHeadersFallbackForLongStatusText() throws {
+    @Test func petAndPlantFeatureCollectionsUseAdaptiveHeadersAndCardGrids() throws {
         let petSource = try source(
             "Ohana/Features/FunctionMenu/Views/PetFeatureCollectionView.swift",
             rootURL: repositoryRootURL()
@@ -33,18 +34,26 @@ struct FeatureHubAdaptiveLayoutTests {
             rootURL: repositoryRootURL()
         )
 
-        #expect(petSource.contains("FeatureHubSummaryPanel("))
-        #expect(petSource.contains("summaryPanelStatusText"))
-        #expect(try sharedSourceContainsViewThatFits())
+        #expect(!petSource.contains("FeatureHubSummaryPanel("))
+        #expect(!petSource.contains("summaryPanelStatusText"))
+        #expect(petSource.contains("@Environment(\\.dynamicTypeSize) private var dynamicTypeSize"))
+        #expect(petSource.contains("dynamicTypeSize.isAccessibilitySize"))
+        #expect(petSource.contains("private var pageHeader: some View"))
+        #expect(petSource.contains("LazyVGrid(columns: columns"))
+        #expect(petSource.contains("PetFeatureCollectionCard("))
         #expect(petSource.contains(".fixedSize(horizontal: false, vertical: true)"))
 
-        #expect(plantSource.contains("commandCenterTitle"))
-        #expect(plantSource.contains("commandCenterStatus"))
-        #expect(plantSource.contains("commandCenterPillColumns"))
-        #expect(plantSource.contains("GridItem(.adaptive(minimum: 112)"))
-        #expect(plantSource.contains("ViewThatFits(in: .horizontal)"))
+        #expect(!plantSource.contains("commandCenterTitle"))
+        #expect(!plantSource.contains("commandCenterStatus"))
+        #expect(!plantSource.contains("commandCenterMetricColumns"))
+        #expect(!plantSource.contains("commandCenterPillColumns"))
+        #expect(plantSource.contains("@Environment(\\.dynamicTypeSize) private var dynamicTypeSize"))
+        #expect(plantSource.contains("dynamicTypeSize.isAccessibilitySize"))
+        #expect(plantSource.contains("private var pageHeader: some View"))
+        #expect(plantSource.contains("FeatureHubSectionActionView(section: plantActionSection)"))
+        #expect(plantSource.contains("LazyVGrid(columns: columns"))
+        #expect(plantSource.contains("PlantFeatureCollectionCard("))
         #expect(plantSource.contains(".fixedSize(horizontal: false, vertical: true)"))
-        #expect(!plantSource.contains("HStack(spacing: 8) {\n                commandCenterMiniPill("))
     }
 
     @Test func allFeatureHintsAndBannersAllowLongLocalizedCopy() throws {
@@ -65,10 +74,16 @@ struct FeatureHubAdaptiveLayoutTests {
             rootURL: repositoryRootURL()
         )
 
-        #expect(humanSource.contains("FeatureHubSummaryPanel("))
-        #expect(humanSource.contains("human-all-features-summary-panel"))
-        #expect(petSource.contains("FeatureHubSummaryPanel("))
-        #expect(petSource.contains("pet-all-features-summary-panel"))
+        #expect(humanSource.contains("FeatureHubScaffold"))
+        #expect(humanSource.contains("FeatureHubHeader("))
+        #expect(humanSource.contains("FeatureHubSectionActionView(section: section)"))
+        #expect(!humanSource.contains("FeatureHubSummaryPanel("))
+        #expect(!humanSource.contains("human-all-features-summary-panel"))
+        #expect(petSource.contains("FeatureHubScaffold"))
+        #expect(petSource.contains("FeatureHubHeader("))
+        #expect(petSource.contains("FeatureHubSectionActionView(section: section)"))
+        #expect(!petSource.contains("FeatureHubSummaryPanel("))
+        #expect(!petSource.contains("pet-all-features-summary-panel"))
         #expect(humanSource.contains("private struct HumanOwnerPrivacyHint"))
         #expect(humanSource.contains("HStack(alignment: .top, spacing: 10)"))
         #expect(humanSource.contains("private struct HumanMemorialBanner"))

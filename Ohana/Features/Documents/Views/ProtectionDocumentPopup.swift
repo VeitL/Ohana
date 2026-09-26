@@ -32,12 +32,15 @@ struct ProtectionDocumentContentPopup: View {
     @State private var selectedPayerId: String?
     @State private var photoItem: PhotosPickerItem?
     @State private var showingFileImporter = false
+    @State private var fileImportTask: Task<Void, Never>?
     @State private var showingCamera = false
     @State private var attachmentData: Data?
     @State private var attachmentFilename = ""
     @State private var attachmentIsImage = false
     @State private var hasNewAttachment = false
     @State private var isSaving = false
+    @State private var importErrorMessage: String?
+    @State private var showImportErrorAlert = false
 
     private var isEdit: Bool { existing != nil }
     private var canSave: Bool { !isSaving && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -73,9 +76,10 @@ struct ProtectionDocumentContentPopup: View {
                 Section {
                     Picker(l.tr(zh: "证件类型", en: "Document type", de: "Dokumenttyp"), selection: $category) {
                         ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { option in
-                            Text("\(option.emoji) \(option.rawValue)").tag(option)
+                            Text("\(option.emoji) \(option.localizedLabel(l))").tag(option)
                         }
                     }
+                    .accessibilityIdentifier("protection-document-category-picker")
 
                     if !formSpec.quickTitles.isEmpty {
                         Menu(l.tr(zh: "快速标题", en: "Quick title", de: "Schnelltitel")) {
@@ -86,9 +90,12 @@ struct ProtectionDocumentContentPopup: View {
                     }
 
                     TextField(formSpec.titlePlaceholder, text: $title)
+                        .accessibilityIdentifier("protection-document-title-input")
                     TextField(formSpec.authorityPlaceholder, text: $issuingAuthority)
+                        .accessibilityIdentifier("protection-document-authority-input")
                     TextField(formSpec.notesPlaceholder, text: $notes, axis: .vertical)
                         .lineLimit(2 ... 4)
+                        .accessibilityIdentifier("protection-document-notes-input")
                 } header: {
                     Text(formSpec.sectionTitle)
                 }
@@ -156,13 +163,16 @@ struct ProtectionDocumentContentPopup: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel, action: close)
+                        .accessibilityIdentifier("protection-document-cancel-action")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Sichern"), action: save)
                         .disabled(!canSave)
+                        .accessibilityIdentifier("protection-document-save-action")
                 }
             }
         }
+        .accessibilityIdentifier("protection-document-editor")
         .onAppear {
             selectedPayerId = currentPayerId
             if !isEdit {
@@ -195,24 +205,32 @@ struct ProtectionDocumentContentPopup: View {
         }
         .fileImporter(isPresented: $showingFileImporter, allowedContentTypes: [UTType.pdf, UTType.image, UTType.data]) { result in
             guard case let .success(url) = result else { return }
-            Task {
-                let data = await AttachmentImageDecoder.readFileData(url)
-                let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
-                await MainActor.run {
-                    if let data {
-                        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
-                            data,
-                            filename: url.lastPathComponent,
-                            isImage: isImage,
-                            fallbackFilename: "document.jpg"
-                        )
-                        attachmentData = payload.data
-                        attachmentFilename = payload.filename
-                        attachmentIsImage = payload.isImage
-                        hasNewAttachment = true
-                    }
+            fileImportTask?.cancel()
+            fileImportTask = Task {
+                do {
+                    let isImage = UTType(filenameExtension: url.pathExtension)?.conforms(to: .image) == true
+                    let payload = try await AttachmentImageDecoder.readSanitizedDocument(
+                        url,
+                        isImage: isImage,
+                        fallbackFilename: "document.jpg"
+                    )
+                    try Task.checkCancellation()
+                    attachmentData = payload.data
+                    attachmentFilename = payload.filename
+                    attachmentIsImage = payload.isImage
+                    hasNewAttachment = true
+                } catch is CancellationError {
+                    return
+                } catch {
+                    importErrorMessage = error.localizedDescription
+                    showImportErrorAlert = true
                 }
             }
+        }
+        .alert(l.tr(zh: "无法导入附件", en: "Attachment import failed", de: "Anhang konnte nicht importiert werden"), isPresented: $showImportErrorAlert) {
+            Button(l.tr(zh: "好的", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "")
         }
         .sheet(isPresented: $showingCamera) {
             PetCameraPickerView(maxPixel: 1600) { image in
@@ -227,6 +245,10 @@ struct ProtectionDocumentContentPopup: View {
             } onCancel: {
                 showingCamera = false
             }
+        }
+        .onDisappear {
+            fileImportTask?.cancel()
+            fileImportTask = nil
         }
     }
 
@@ -246,252 +268,6 @@ struct ProtectionDocumentContentPopup: View {
             return "attachment"
         }
         return ""
-    }
-
-    private var categoryPicker: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(DocumentCategory.protectionDocumentCases, id: \.rawValue) { option in
-                    Button {
-                        let previousSpec = formSpec
-                        let shouldReplaceTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                            title == previousSpec.defaultTitle ||
-                            previousSpec.quickTitles.contains(title)
-                        withAnimation(GoMotion.feedback) {
-                            category = option
-                            applyCategoryDefaults(for: option, replaceTitle: shouldReplaceTitle, resetDates: true)
-                        }
-                    } label: {
-                        Text("\(option.emoji) \(option.rawValue)")
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(category == option ? Color.arkInk : Color.ohanaPrimaryText)
-                            .padding(.horizontal, 12)
-                            .frame(height: 36)
-                            .background(category == option ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
-        }
-    }
-
-    private var keyFieldsSection: some View {
-        popupBlock {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(formSpec.sectionTitle)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-
-                if !formSpec.quickTitles.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(formSpec.quickTitles, id: \.self) { option in
-                                Button {
-                                    withAnimation(GoMotion.feedback) { title = option }
-                                } label: {
-                                    Text(option)
-                                        .font(OhanaFont.caption2(.black))
-                                        .foregroundStyle(title == option ? Color.arkInk : Color.ohanaPrimaryText)
-                                        .padding(.horizontal, 10)
-                                        .frame(height: 30)
-                                        .background(title == option ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
-                                }
-                                .buttonStyle(ScaleButtonStyle())
-                            }
-                        }
-                    }
-                }
-
-                VStack(spacing: 10) {
-                    formTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                        label: formSpec.titleLabel,
-                        placeholder: formSpec.titlePlaceholder,
-                        text: $title,
-                        icon: formSpec.titleIcon
-                    )
-                    formTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                        label: formSpec.authorityLabel,
-                        placeholder: formSpec.authorityPlaceholder,
-                        text: $issuingAuthority,
-                        icon: formSpec.authorityIcon
-                    )
-                    formTextField( // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                        label: formSpec.notesLabel,
-                        placeholder: formSpec.notesPlaceholder,
-                        text: $notes,
-                        icon: "text.alignleft"
-                    )
-                }
-            }
-        }
-    }
-
-    private func formTextField(label: String, placeholder: String, text: Binding<String>, icon: String) -> some View { // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 24)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(label)
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                TextField(placeholder, text: text, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                    .font(OhanaFont.subheadline(.bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1 ... 3)
-            }
-        }
-        .padding(12)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-    }
-
-    private var dateRows: some View {
-        VStack(spacing: 10) {
-            optionalDateBlock(
-                icon: "calendar.badge.checkmark",
-                title: formSpec.issueDateLabel,
-                isEnabled: $hasIssueDate,
-                date: $issueDate
-            )
-            optionalDateBlock(
-                icon: "clock.badge.checkmark",
-                title: formSpec.expiryDateLabel,
-                isEnabled: $hasExpiryDate,
-                date: $expiryDate
-            )
-        }
-    }
-
-    private func optionalDateBlock(
-        icon: String,
-        title: String,
-        isEnabled: Binding<Bool>,
-        date: Binding<Date>
-    ) -> some View {
-        popupBlock {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 10) {
-                    Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.goPrimary)
-                        .frame(width: 24)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(title)
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(isEnabled.wrappedValue
-                            ? date.wrappedValue.formatted(.dateTime.year().month().day())
-                            : l.tr(zh: "可选", en: "Optional", de: "Optional"))
-                            .font(OhanaFont.caption(.semibold))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    }
-                    Spacer()
-                    Button {
-                        withAnimation(GoMotion.feedback) {
-                            isEnabled.wrappedValue.toggle()
-                        }
-                    } label: {
-                        Text(isEnabled.wrappedValue ? l.tr(zh: "清除", en: "Clear", de: "Leeren") : l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(isEnabled.wrappedValue ? Color.ohanaPrimaryText : Color.arkInk)
-                            .padding(.horizontal, 12)
-                            .frame(height: 32)
-                            .background(isEnabled.wrappedValue ? Color.ohanaCardSurfaceElevated : Color.goPrimary, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-
-                if isEnabled.wrappedValue {
-                    DatePicker("", selection: date, displayedComponents: .date)
-                        .labelsHidden()
-                        .datePickerStyle(.compact)
-                        .tint(Color.goPrimary)
-                }
-            }
-        }
-    }
-
-    private var attachmentSection: some View {
-        popupBlock {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(l.tr(zh: "附件", en: "Attachment", de: "Anhang"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                HStack(spacing: 10) {
-                    Button { presentCamera() } label: {
-                        attachmentButtonLabel("camera.fill", "拍照")
-                    }
-                    PhotosPicker(selection: $photoItem, matching: .images) {
-                        attachmentButtonLabel("photo.fill", "相册")
-                    }
-                    Button { showingFileImporter = true } label: {
-                        attachmentButtonLabel("paperclip", "文件")
-                    }
-                }
-                if attachmentData != nil || !attachmentFilename.isEmpty {
-                    Label(attachmentFilename, systemImage: attachmentIsImage ? "photo.fill" : "doc.fill")
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
-                }
-            }
-        }
-    }
-
-    private func attachmentButtonLabel(_ icon: String, _ title: String) -> some View {
-        VStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(title)
-                .font(OhanaFont.caption2(.black))
-        }
-        .foregroundStyle(Color.ohanaPrimaryText)
-        .frame(maxWidth: .infinity)
-        .frame(height: 54)
-        .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-    }
-
-    private var costSection: some View {
-        popupBlock {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(l.tr(zh: "费用", en: "Cost", de: "Kosten"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                InlineNumericInput(
-                    text: $costText,
-                    placeholder: CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: AppCountry.code),
-                    unit: AppCurrency.symbol,
-                    countryCode: AppCountry.code,
-                    maxFractionDigits: 2,
-                    accent: Color.goPrimary,
-                    valueAlignment: .leading,
-                    fill: Color.ohanaCardSurfaceElevated,
-                    usesMiniKeypad: true
-                )
-                if humans.count > 1 {
-                    Picker(l.tr(zh: "支付人", en: "Payer", de: "Zahler"), selection: Binding(
-                        get: { selectedPayerId ?? currentPayerId ?? "" },
-                        set: { selectedPayerId = $0 }
-                    )) {
-                        ForEach(humans) { human in
-                            Text(human.name).tag(human.id.uuidString)
-                        }
-                    }
-                    .pickerStyle(.menu)
-                    .tint(Color.goPrimary)
-                }
-            }
-        }
-    }
-
-    private func popupBlock(@ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            content()
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
     }
 
     private func presentCamera() {

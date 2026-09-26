@@ -22,20 +22,22 @@ struct FamilyReportAdaptiveLayoutTests {
         #expect(!source.contains(".lineLimit(1)\n                .minimumScaleFactor(0.72)"))
     }
 
-    @Test func plantFeatureCollectionCommandCenterUsesAdaptiveMetricAndPillGrids() throws {
+    @Test func plantFeatureCollectionUsesAdaptiveCardsAfterCommandCenterRetirement() throws {
         let source = try source(
             "Ohana/Features/FunctionMenu/Views/PlantFeatureCollectionView.swift",
             rootURL: repositoryRootURL()
         )
 
-        #expect(source.contains("commandCenterMetricColumns"))
-        #expect(source.contains("GridItem(.adaptive(minimum: 128)"))
-        #expect(source.contains("commandCenterPillColumns"))
-        #expect(source.contains("GridItem(.adaptive(minimum: 112)"))
-        #expect(source.contains("ViewThatFits(in: .horizontal)"))
+        #expect(!source.contains("commandCenterStatus"))
+        #expect(!source.contains("commandCenterMetricColumns"))
+        #expect(!source.contains("commandCenterPillColumns"))
+        #expect(source.contains("@Environment(\\.dynamicTypeSize) private var dynamicTypeSize"))
+        #expect(source.contains("dynamicTypeSize.isAccessibilitySize"))
+        #expect(source.contains("FeatureHubSectionActionView(section: plantActionSection)"))
+        #expect(source.contains("LazyVGrid(columns: columns"))
+        #expect(source.contains("PlantFeatureCollectionCard("))
         #expect(source.contains(".fixedSize(horizontal: false, vertical: true)"))
         #expect(!source.contains("LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8)"))
-        #expect(!source.contains(".lineLimit(1)\n                    .minimumScaleFactor(0.72)"))
     }
 
     private func repositoryRootURL() -> URL {

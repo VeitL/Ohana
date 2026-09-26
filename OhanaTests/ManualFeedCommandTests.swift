@@ -985,6 +985,7 @@ struct ManualFeedCommandTests {
 
         #expect(result.mode == .manualReminder)
         #expect(result.targetCount == 2)
+        #expect(result.affectedPetIDs == [petA.id, petB.id])
         #expect(result.planReminders.isEmpty == false)
         #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petA) }) == 2)
         #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petB) }) == 2)
@@ -1006,6 +1007,186 @@ struct ManualFeedCommandTests {
             ))
             #expect(state.hasPendingLocalChanges)
         }
+    }
+
+    @Test func saveFeedPlanFailureRollsBackAllPetsWithoutCancellingNotifications() throws {
+        struct InjectedPersistenceFailure: Error {}
+
+        let container = try makeContainer()
+        let context = container.mainContext
+        let petA = Pet(name: "Momo", species: "猫")
+        let petB = Pet(name: "Nori", species: "cat")
+        let oldPlanA = makeManualPlanEvent(petID: petA.id, grams: 30)
+        let oldPlanB = makeManualPlanEvent(petID: petB.id, grams: 35)
+        let oldReminderA = Reminder(event: oldPlanA, scheduledAt: Date().addingTimeInterval(3600))
+        let oldReminderB = Reminder(event: oldPlanB, scheduledAt: Date().addingTimeInterval(7200))
+        oldReminderA.notificationId = "old-plan-a"
+        oldReminderB.notificationId = "old-plan-b"
+
+        let defaultEvent = Event(
+            title: "Default feed",
+            startDate: Date().addingTimeInterval(10800),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petA.id.uuidString
+        )
+        let defaultReminder = Reminder(event: defaultEvent, scheduledAt: defaultEvent.startDate)
+        defaultReminder.notificationId = "default-plan-a"
+        let defaultEventKey = "careCalendarEventId_default_feed_\(petA.id.uuidString)"
+        let suppressionKey = "careCalendarDefaultSuppressed_feed_\(petA.id.uuidString)"
+        let notifications = FeedNotificationSpy()
+        let previousNotifications = ReminderNotificationSchedulerRegistry.current
+        ReminderNotificationSchedulerRegistry.current = notifications
+        UserDefaults.standard.set(defaultEvent.id.uuidString, forKey: defaultEventKey)
+        UserDefaults.standard.removeObject(forKey: suppressionKey)
+        defer {
+            ReminderNotificationSchedulerRegistry.current = previousNotifications
+            UserDefaults.standard.removeObject(forKey: defaultEventKey)
+            UserDefaults.standard.removeObject(forKey: suppressionKey)
+        }
+
+        context.insert(petA)
+        context.insert(petB)
+        context.insert(oldPlanA)
+        context.insert(oldPlanB)
+        context.insert(oldReminderA)
+        context.insert(oldReminderB)
+        context.insert(defaultEvent)
+        context.insert(defaultReminder)
+        try context.save()
+
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(
+                    time: Date().addingTimeInterval(14400),
+                    foodKind: .dry,
+                    grams: 45
+                )
+            ]
+        )
+
+        #expect(throws: InjectedPersistenceFailure.self) {
+            _ = try SaveFeedPlanCommand.run(
+                pet: petA,
+                targets: [petB],
+                kind: .manualReminder,
+                draft: draft,
+                allEvents: [oldPlanA, oldPlanB, defaultEvent],
+                context: context,
+                notifications: notifications,
+                persist: { _ in throw InjectedPersistenceFailure() }
+            )
+        }
+
+        let events = try context.fetch(FetchDescriptor<Event>())
+        let reminders = try context.fetch(FetchDescriptor<Reminder>())
+        #expect(notifications.cancelledIDs.isEmpty)
+        #expect(Set(events.map(\.id)).isSuperset(of: [oldPlanA.id, oldPlanB.id, defaultEvent.id]))
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petA) }) == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petB) }) == 1)
+        #expect(Set(reminders.map(\.notificationId)).isSuperset(of: ["old-plan-a", "old-plan-b", "default-plan-a"]))
+        #expect(UserDefaults.standard.string(forKey: defaultEventKey) == defaultEvent.id.uuidString)
+        #expect(!UserDefaults.standard.bool(forKey: suppressionKey))
+    }
+
+    @Test func saveFeedPlanFlushesNotificationCancellationsAfterPersistence() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let oldPlan = makeManualPlanEvent(petID: pet.id, grams: 30)
+        let oldReminder = Reminder(event: oldPlan, scheduledAt: Date().addingTimeInterval(3600))
+        oldReminder.notificationId = "old-plan"
+        context.insert(pet)
+        context.insert(oldPlan)
+        context.insert(oldReminder)
+        try context.save()
+
+        var operationOrder: [String] = []
+        let notifications = FeedNotificationSpy {
+            operationOrder.append("cancel")
+        }
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(
+                    time: Date().addingTimeInterval(14400),
+                    foodKind: .dry,
+                    grams: 45
+                )
+            ]
+        )
+
+        _ = try SaveFeedPlanCommand.run(
+            pet: pet,
+            targets: [pet],
+            kind: .manualReminder,
+            draft: draft,
+            allEvents: [oldPlan],
+            context: context,
+            notifications: notifications,
+            persist: { context in
+                operationOrder.append("persist")
+                _ = try FeedCommandPersistence.save(context: context)
+            }
+        )
+
+        #expect(operationOrder.first == "persist")
+        #expect(operationOrder.dropFirst().allSatisfy { $0 == "cancel" })
+        #expect(notifications.cancelledIDs == ["old-plan"])
+    }
+
+    @Test func multiPetStockReminderRebuildNeverReusesAnInvalidatedEvent() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let petA = Pet(name: "Momo", species: "猫")
+        let petB = Pet(name: "Nori", species: "cat")
+        petA.foodReminderEnabled = false
+        petB.foodReminderEnabled = false
+
+        func stockEvent(for pet: Pet) -> Event {
+            Event(
+                title: "Stock reminder",
+                startDate: Date().addingTimeInterval(86400),
+                eventType: EventType.shoppingList.rawValue,
+                relatedEntityType: FeedingPlanWriter.stockReminderEntityType,
+                relatedEntityId: FeedingPlanWriter.stockReminderEntityId(pet: pet, foodKind: .dry)
+            )
+        }
+
+        let stockA = stockEvent(for: petA)
+        let stockB = stockEvent(for: petB)
+        context.insert(petA)
+        context.insert(petB)
+        context.insert(stockA)
+        context.insert(stockB)
+        try context.save()
+
+        let draft = FeedPlanDraft(
+            kind: .manualReminder,
+            meals: [
+                FeedPlanMealDraft(
+                    time: Date().addingTimeInterval(14400),
+                    foodKind: .dry,
+                    grams: 45
+                )
+            ]
+        )
+        let result = try SaveFeedPlanCommand.run(
+            pet: petA,
+            targets: [petB],
+            kind: .manualReminder,
+            draft: draft,
+            allEvents: [stockA, stockB],
+            context: context
+        )
+        let events = try context.fetch(FetchDescriptor<Event>())
+
+        #expect(result.targetCount == 2)
+        #expect(FeedingPlanWriter.stockReminderEvents(pet: petA, allEvents: events).isEmpty)
+        #expect(FeedingPlanWriter.stockReminderEvents(pet: petB, allEvents: events).isEmpty)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petA) }) == 1)
+        #expect(events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: petB) }) == 1)
     }
 
     @Test func savedPlanResultCarriesFreshEventsBeforeRouteQueryCatchesUp() throws {
@@ -1037,7 +1218,307 @@ struct ManualFeedCommandTests {
 
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: staleRouteEvents, now: now) == .manual)
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: result.events, now: now) == .manualReminder)
+        #expect(result.affectedPetIDs == [pet.id])
         #expect(result.events.count(where: { FeedRuleMetadata.isManualReminderEvent($0, pet: pet) }) == 2)
+    }
+
+    @Test func savedPlanEventsRemainAuthoritativeUntilRouteSnapshotCatchesUp() {
+        let petID = UUID()
+        let savedPlanEvent = makeManualPlanEvent(petID: petID, grams: 45)
+        let staleRouteEvent = makeManualPlanEvent(
+            petID: petID,
+            id: savedPlanEvent.id,
+            createdAt: savedPlanEvent.createdAt,
+            grams: 20
+        )
+        let unrelatedEvent = Event(title: "Unrelated calendar event")
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [savedPlanEvent],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        let merged = runtimeState.ruleSnapshotsMergingPendingWrite(with: [staleRouteEvent, unrelatedEvent])
+        #expect(merged.first(where: { $0.id == savedPlanEvent.id })?.feedAmountGrams == 45)
+        #expect(!runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [staleRouteEvent, unrelatedEvent]))
+        #expect(runtimeState.hasPendingRuleWrite)
+
+        #expect(runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [savedPlanEvent, unrelatedEvent]))
+        #expect(!runtimeState.hasPendingRuleWrite)
+    }
+
+    @Test func invalidatedRouteEventsAreExcludedBeforeSignatureOrReceiptReads() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let petID = UUID()
+        let invalidatedRouteEvent = makeManualPlanEvent(petID: petID, grams: 20)
+        invalidatedRouteEvent.completedOccurrences = ["2026-08-03"]
+        context.insert(invalidatedRouteEvent)
+        try context.save()
+        context.delete(invalidatedRouteEvent)
+        try context.save()
+
+        let savedPlanEvent = makeManualPlanEvent(petID: petID, grams: 45)
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [savedPlanEvent],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        #expect(invalidatedRouteEvent.modelContext == nil)
+        #expect(QuickFeedRouteRevision(events: [invalidatedRouteEvent]).events.isEmpty)
+        #expect(QuickFeedRouteRevision(events: [savedPlanEvent]).events.count == 1)
+        #expect(runtimeState.ruleSnapshotsMergingPendingWrite(with: [invalidatedRouteEvent]).map(\.id) == [savedPlanEvent.id])
+        #expect(!runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [invalidatedRouteEvent]))
+        #expect(runtimeState.hasPendingRuleWrite)
+    }
+
+    @Test func feedHomeRenderStateKeepsOnlyValuesAfterItsPlanEventIsInvalidated() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = date(year: 2026, month: 8, day: 3, hour: 9)
+        let pet = Pet(name: "Momo", species: "猫")
+        pet.dailyPortionGrams = 30
+        let storedPlan = makeManualPlanEvent(petID: pet.id, grams: 45)
+        storedPlan.feedAmountGrams = 0
+        storedPlan.startDate = date(year: 2026, month: 8, day: 3, hour: 18)
+        storedPlan.recurrenceDays = 2
+        storedPlan.recurrenceEndDate = date(year: 2026, month: 9, day: 3, hour: 18)
+        let storedPlanID = storedPlan.id
+        context.insert(pet)
+        context.insert(storedPlan)
+        try context.save()
+
+        let snapshot = FeedHomeSnapshotBuilder.build(input: FeedHomeSnapshotInput(
+            pet: pet,
+            allEvents: [storedPlan],
+            careLogs: [],
+            foodRecords: [],
+            now: now,
+            todayLabel: "Today"
+        ))
+        let viewState = FeedHomeViewState.make(
+            mode: .manualReminder,
+            snapshot: snapshot,
+            pet: pet,
+            isRefreshing: false
+        )
+
+        context.delete(storedPlan)
+        try context.save()
+
+        #expect(storedPlan.modelContext == nil)
+        let frozenPlan = try #require(viewState.task.manualPlanEvents.first)
+        #expect(frozenPlan.id == storedPlanID)
+        #expect(frozenPlan.startDate == date(year: 2026, month: 8, day: 3, hour: 18))
+        #expect(frozenPlan.recurrenceDays == 2)
+        #expect(frozenPlan.recurrenceEndDate == date(year: 2026, month: 9, day: 3, hour: 18))
+        #expect(frozenPlan.foodKind == .dry)
+        #expect(frozenPlan.amountGrams == 45)
+        #expect(viewState.replacingMode(.autoFeeder, pet: pet).task.manualPlanEvents == [frozenPlan])
+    }
+
+    @Test func quickFeedSheetSanitizesInvalidatedEventsBeforeViewInitialization() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "猫")
+        let invalidatedRouteEvent = makeManualPlanEvent(petID: pet.id, grams: 20)
+        invalidatedRouteEvent.completedOccurrences = ["2026-08-03"]
+        context.insert(pet)
+        context.insert(invalidatedRouteEvent)
+        try context.save()
+        context.delete(invalidatedRouteEvent)
+        try context.save()
+
+        let sheet = QuickFeedDetailSheet(
+            pet: pet,
+            onRemove: {},
+            allEvents: [invalidatedRouteEvent],
+            eventRevision: QuickFeedRouteRevision(events: [])
+        )
+
+        #expect(invalidatedRouteEvent.modelContext == nil)
+        #expect(sheet.allEvents.isEmpty)
+    }
+
+    @Test func feedRouteRevisionIgnoresUnrelatedCalendarChangesButTracksReminderStatus() {
+        let petID = UUID()
+        let feedRule = makeManualPlanEvent(petID: petID, grams: 45, reminderID: UUID())
+        let unrelatedEvent = Event(title: "Unrelated calendar event")
+        let initialRevision = QuickFeedRouteRevision(events: [feedRule, unrelatedEvent])
+
+        unrelatedEvent.completedOccurrences = ["2026-08-03"]
+        let unrelatedChangeRevision = QuickFeedRouteRevision(events: [feedRule, unrelatedEvent])
+        #expect(unrelatedChangeRevision == initialRevision)
+
+        feedRule.reminders[0].status = ReminderStatus.completed.rawValue
+        let reminderChangeRevision = QuickFeedRouteRevision(events: [feedRule, unrelatedEvent])
+        #expect(reminderChangeRevision != initialRevision)
+    }
+
+    @Test func feedRuleSignatureSharesTheLegacyRuleClassifier() {
+        let petID = UUID()
+        let ordinaryFoodChange = Event(
+            title: "Diet transition",
+            startDate: Date(timeIntervalSince1970: 3600),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petID.uuidString
+        )
+        let legacyFeedRule = Event(
+            title: "早餐 干粮 45g",
+            startDate: Date(timeIntervalSince1970: 7200),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petID.uuidString
+        )
+
+        #expect(!FeedRuleMetadata.isFeedRuleEvent(ordinaryFoodChange))
+        #expect(QuickFeedRouteEventSignature(ordinaryFoodChange).ruleKind == nil)
+        #expect(FeedRuleMetadata.isFeedRuleEvent(legacyFeedRule))
+        #expect(QuickFeedRouteEventSignature(legacyFeedRule).ruleKind == .manualReminder)
+    }
+
+    @Test func consecutiveRuleWritesNeverReadThePreviousInvalidatedAuthoritativeModel() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let petID = UUID()
+        let firstStoredRule = makeManualPlanEvent(petID: petID, grams: 20)
+        context.insert(firstStoredRule)
+        try context.save()
+
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [firstStoredRule],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        context.delete(firstStoredRule)
+        try context.save()
+        let secondStoredRule = makeManualPlanEvent(petID: petID, grams: 45)
+        context.insert(secondStoredRule)
+        try context.save()
+
+        runtimeState.installSuccessfulRuleWrite(
+            events: [secondStoredRule],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        #expect(firstStoredRule.modelContext == nil)
+        let merged = runtimeState.ruleSnapshotsMergingPendingWrite(with: [firstStoredRule])
+        #expect(merged.map(\.id) == [secondStoredRule.id])
+        #expect(merged.first?.feedAmountGrams == 45)
+    }
+
+    @Test func cancellingFeedTasksPreservesSavedPlanReceiptUntilRouteSnapshotCatchesUp() {
+        let petID = UUID()
+        let savedPlanEvent = makeManualPlanEvent(petID: petID, grams: 45)
+        let staleRouteEvent = makeManualPlanEvent(
+            petID: petID,
+            id: savedPlanEvent.id,
+            createdAt: savedPlanEvent.createdAt,
+            grams: 20
+        )
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [savedPlanEvent],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        runtimeState.cancelTasks()
+
+        #expect(runtimeState.hasPendingRuleWrite)
+        #expect(!runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [staleRouteEvent]))
+        #expect(runtimeState.expectedModeDuringPendingRuleWrite(for: petID) == .manualReminder)
+        #expect(runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [savedPlanEvent]))
+        #expect(!runtimeState.hasPendingRuleWrite)
+    }
+
+    @Test func savedPlanReceiptIgnoresMutableReminderDeliveryState() {
+        let petID = UUID()
+        let reminderID = UUID()
+        let savedPlanEvent = makeManualPlanEvent(
+            petID: petID,
+            grams: 45,
+            reminderID: reminderID
+        )
+        let routeEvent = makeManualPlanEvent(
+            petID: petID,
+            id: savedPlanEvent.id,
+            createdAt: savedPlanEvent.createdAt,
+            grams: 45,
+            reminderID: reminderID
+        )
+        routeEvent.reminders[0].status = ReminderStatus.completed.rawValue
+        routeEvent.reminders[0].completedAt = Date()
+        routeEvent.reminders[0].notificationId = "delivered-notification"
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [savedPlanEvent],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        #expect(runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [routeEvent]))
+        #expect(!runtimeState.hasPendingRuleWrite)
+    }
+
+    @Test func savedPlanReceiptRejectsAnOppositeModeRuleStillInTheRoute() {
+        let petID = UUID()
+        let manualEvent = makeManualPlanEvent(petID: petID, grams: 45)
+        let staleAutoEvent = makeAutoPlanEvent(petID: petID, grams: 45)
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [manualEvent],
+            affectedPetIDs: [petID],
+            mode: .manualReminder
+        )
+
+        #expect(!runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [manualEvent, staleAutoEvent]))
+        #expect(runtimeState.hasPendingRuleWrite)
+    }
+
+    @Test func consecutiveSavedPlanReceiptsPreserveEveryPendingPetScope() {
+        let firstPetID = UUID()
+        let secondPetID = UUID()
+        let firstEvent = makeManualPlanEvent(petID: firstPetID, grams: 35)
+        let secondEvent = makeManualPlanEvent(petID: secondPetID, grams: 55)
+        let runtimeState = QuickFeedRuntimeState()
+        runtimeState.installSuccessfulRuleWrite(
+            events: [firstEvent],
+            affectedPetIDs: [firstPetID],
+            mode: .manualReminder
+        )
+        runtimeState.installSuccessfulRuleWrite(
+            events: [secondEvent],
+            affectedPetIDs: [secondPetID],
+            mode: .manualReminder
+        )
+
+        #expect(runtimeState.pendingRuleWritePetIDs == [firstPetID, secondPetID])
+        #expect(!runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [secondEvent]))
+        #expect(runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(with: [firstEvent, secondEvent]))
+    }
+
+    @Test func resettingPendingFeedRefreshCancelsTheStaleRenderTask() async {
+        let runtimeState = QuickFeedRuntimeState()
+        var didRunStaleRefresh = false
+        runtimeState.pendingFeedRefreshRequest = [.reloadSnapshots, .syncDisplayedMode, .forceDisplayedMode]
+        runtimeState.feedRefreshTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 80) {
+            didRunStaleRefresh = true
+        }
+
+        runtimeState.resetPendingFeedRefresh()
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        #expect(runtimeState.feedRefreshTask == nil)
+        #expect(runtimeState.pendingFeedRefreshRequest.isEmpty)
+        #expect(!didRunStaleRefresh)
     }
 
     @Test func switchFeedModeToAutoFeederDeactivatesManualReminders() throws {
@@ -1094,10 +1575,84 @@ struct ManualFeedCommandTests {
         return FeedingPlanWriter.stockReminderEvents(pet: pet, allEvents: events)
     }
 
+    private func makeManualPlanEvent(
+        petID: UUID,
+        id: UUID = UUID(),
+        createdAt: Date = Date(timeIntervalSince1970: 1),
+        grams: Double,
+        reminderID: UUID? = nil
+    ) -> Event {
+        let event = Event(
+            title: "Breakfast dry food \(Int(grams))g",
+            startDate: Date(timeIntervalSince1970: 3600),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: petID.uuidString
+        )
+        event.id = id
+        event.createdAt = createdAt
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.manualReminder.rawValue
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        event.feedAmountGrams = grams
+        if let reminderID {
+            let reminder = Reminder(event: event, scheduledAt: event.startDate)
+            reminder.id = reminderID
+            event.reminders = [reminder]
+        }
+        return event
+    }
+
+    private func makeAutoPlanEvent(petID: UUID, grams: Double) -> Event {
+        let event = Event(
+            title: "Auto feeder dry food \(Int(grams))g",
+            startDate: Date(timeIntervalSince1970: 7200),
+            eventType: EventType.foodChange.rawValue,
+            relatedEntityType: FeedRuleMetadata.autoFeederEntityType,
+            relatedEntityId: petID.uuidString
+        )
+        event.recurrenceDays = 1
+        event.feedRuleKindRaw = FeedRuleKind.autoFeeder.rawValue
+        event.foodKindRaw = FeedFoodKind.dry.rawValue
+        event.feedAmountGrams = grams
+        return event
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
+    }
+
+    private final class FeedNotificationSpy: ReminderNotificationScheduling, @unchecked Sendable {
+        private(set) var cancelledIDs: [String] = []
+        private let onCancel: () -> Void
+
+        init(onCancel: @escaping () -> Void = {}) {
+            self.onCancel = onCancel
+        }
+
+        func schedule(reminder _: Reminder) {}
+        func schedule(
+            reminder _: Reminder,
+            existingNotificationIds _: Set<String>?,
+            completion _: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {}
+        func schedule(
+            reminder _: Reminder,
+            deliveryDate _: Date?,
+            existingNotificationIds _: Set<String>?,
+            completion _: ((ReminderNotificationScheduleResult) -> Void)?
+        ) {}
+        func pendingNotificationIds() async -> Set<String> { [] }
+        func scheduleRollingWindow(reminders _: [Reminder]) {}
+        func refillWindowIfNeeded(allReminders _: [Reminder]) {}
+        func cancel(notificationId: String) {
+            cancelledIDs.append(notificationId)
+            onCancel()
+        }
+        func cancelAll(for _: Pet, reminders _: [Reminder]) {}
+        func compensate(reminders _: [Reminder]) {}
     }
 
     private func date(year: Int, month: Int, day: Int, hour: Int = 0) -> Date {

@@ -129,6 +129,52 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
         FamilyTaskService.claim(task, by: human, context: context)
     }
 
+    @discardableResult
+    func declineAssignment(
+        _ task: FamilyCollaborationTask,
+        by human: Human,
+        reason: String,
+        context: ModelContext
+    ) -> Bool {
+        FamilyTaskService.declineAssignment(task, by: human, reason: reason, context: context)
+    }
+
+    @discardableResult
+    func postponeOccurrence(
+        _ task: FamilyCollaborationTask,
+        to dueAt: Date,
+        by human: Human,
+        context: ModelContext
+    ) -> Bool {
+        FamilyTaskService.postponeOccurrence(task, to: dueAt, by: human, context: context)
+    }
+
+    @discardableResult
+    func addComment(
+        _ task: FamilyCollaborationTask,
+        body: String,
+        by human: Human,
+        idempotencyKey: String,
+        context: ModelContext
+    ) -> Bool {
+        FamilyTaskService.addComment(
+            task,
+            body: body,
+            by: human,
+            idempotencyKey: idempotencyKey,
+            context: context
+        )
+    }
+
+    @discardableResult
+    func cancelByCreator(
+        _ task: FamilyCollaborationTask,
+        by creator: Human,
+        context: ModelContext
+    ) -> Bool {
+        FamilyTaskService.cancelByCreator(task, by: creator, context: context)
+    }
+
     func canClaim(_ task: FamilyCollaborationTask, by human: Human, context: ModelContext) -> Bool {
         FamilyTaskService.canClaim(task, by: human, context: context)
     }
@@ -139,6 +185,18 @@ final class StaticFamilyTaskManager: FamilyTaskManaging {
 
     func canSubmitForReview(_ task: FamilyCollaborationTask, by human: Human?, context: ModelContext) -> Bool {
         FamilyTaskService.canSubmitForReview(task, by: human, context: context)
+    }
+
+    func occurrenceTimeline(
+        taskID: UUID,
+        limit: Int = FamilyTaskActivityService.defaultOccurrenceTimelineLimit,
+        context: ModelContext
+    ) -> [FamilyTaskActivitySnapshot] {
+        FamilyTaskActivityService.occurrenceTimeline(
+            taskID: taskID,
+            limit: limit,
+            context: context
+        )
     }
 
     func prepareCompletedReminder(

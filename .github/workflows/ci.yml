@@ -30,6 +30,8 @@ on:
     branches: [main, master]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * *'
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -63,6 +65,8 @@ jobs:
         run: scripts/tests/run-ci-policy-tests.sh
       - name: UI test shard completeness
         run: scripts/audit-ui-test-shards.sh
+      - name: Release test-surface audit (whole repo, strict)
+        run: scripts/audit-release-test-surface.sh --all
       # Full-scope strict gates for UI V4 + accessibility + smoothness +
       # route first-frame safety. The
       # ratchet baseline is now zero; keep these direct `--all` scans required.
@@ -119,9 +123,17 @@ jobs:
           fetch-depth: 0
       - name: Install tools
         run: |
-          brew update
-          brew install swiftlint swiftformat
-          brew upgrade swiftlint swiftformat
+          brew install swiftlint
+          # Homebrew's latest SwiftFormat can drift from the reviewed CI pin.
+          curl -fsSL --retry 3 \
+            -o "$RUNNER_TEMP/swiftformat.zip" \
+            https://github.com/nicklockwood/SwiftFormat/releases/download/0.62.0/swiftformat.zip
+          printf '%s  %s\n' \
+            '256be3f71e1b271a52b8bcbf44cf0d122b354c133e15dc9242cce9c97be5ac83' \
+            "$RUNNER_TEMP/swiftformat.zip" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/ohana-tools"
+          unzip -q "$RUNNER_TEMP/swiftformat.zip" -d "$RUNNER_TEMP/ohana-tools"
+          echo "$RUNNER_TEMP/ohana-tools" >> "$GITHUB_PATH"
       - name: Tool version pins
         run: scripts/check-tool-versions.sh swiftlint swiftformat
       - name: Complexity audit self-tests
@@ -142,6 +154,29 @@ jobs:
           fi
 
   # ----------------------------------------------------------------------------
+  # Optional Family guardian backend: pure rule tests, Python syntax, and the
+  # deployable CloudFormation/SAM contract. This does not deploy resources or
+  # require AWS/Apple credentials.
+  # ----------------------------------------------------------------------------
+  backend-guardian:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/guardian/requirements-dev.txt
+      - name: Install backend validation tools
+        run: python -m pip install --disable-pip-version-check -r backend/guardian/requirements-dev.txt
+      - name: Compile guardian backend
+        run: python -m compileall -q backend/guardian/src
+      - name: Guardian rule tests
+        run: python -m unittest discover -s backend/guardian/tests -v
+      - name: CloudFormation lint
+        run: cfn-lint backend/guardian/template.yaml
+
+  # ----------------------------------------------------------------------------
   # Build + test on the pinned-by-name simulator.
   #
   # NOTE: Ohana targets iOS 26.x, so this job REQUIRES a runner image whose
@@ -156,8 +191,8 @@ jobs:
   #     The main Ohana scheme still references the UI test runner through its
   #     test plan, so using a unit-only scheme avoids paying the real UI-suite
   #     cold-runner cost on every push. The local module-exit-gate and launch
-  #     acceptance work run selected UI flows; add a scheduled UI job before
-  #     treating UI coverage as a per-push CI gate.
+  #     acceptance work run selected UI flows. The separate nightly/manual
+  #     ui-regression job runs the full shard manifest without taxing pushes.
   #   - Build intermediates are cached across runs (no SPM deps, so the cache
   #     target is just DerivedData/Build). Exact-key miss on every source change
   #     is expected; restore-keys give the latest partial cache for incremental.
@@ -250,4 +285,48 @@ jobs:
         with:
           name: test-results
           path: ${{ runner.temp }}/TestResults-*.xcresult
+          retention-days: 7
+
+  # Full UI evidence runs nightly or when an RC is dispatched manually. The
+  # governed shard wrapper stops on the first failure and writes one receipt.
+  ui-regression:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
+    timeout-minutes: 360
+    env:
+      COPYFILE_DISABLE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode and prepare disposable Simulator
+        env:
+          OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          xcodebuild -version
+          # This hosted runner has no long-lived user device. The reserved pin
+          # keeps the same test-vs-Dogfood identity guard active in local scripts.
+          mkdir -p .build
+          printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
+          scripts/prepare-test-simulator.sh
+      - name: Audit UI coverage and run every shard
+        env:
+          OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+          OHANA_UI_NIGHTLY_RECEIPT_PATH: ${{ runner.temp }}/ohana-ui-nightly.json
+        run: scripts/test-ui-nightly.sh
+      - name: Upload UI run receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-nightly-receipt
+          path: ${{ runner.temp }}/ohana-ui-nightly.json
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload failed UI test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-failure-results
+          path: ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
+          if-no-files-found: warn
+          compression-level: 0
           retention-days: 7

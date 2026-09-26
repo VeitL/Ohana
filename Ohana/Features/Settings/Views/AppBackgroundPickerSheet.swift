@@ -6,16 +6,21 @@ struct AppBackgroundPickerSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.hasSupporterPackEntitlement) private var hasSupporterPack
     @AppStorage("appBackgroundStyle") private var styleRaw: String = AppBackgroundStyle.goIsland.rawValue
     @AppStorage("appCustomBackgroundVersion") private var customBackgroundVersion = 0
 
     @State private var photoItem: PhotosPickerItem? = nil
     @State private var isSavingPhoto = false
     @State private var errorMessage: String? = nil
+    @State private var showingSupporterPack = false
 
     private var l: L10n { L10n(appLanguage) }
     private var selectedStyle: AppBackgroundStyle {
-        AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland
+        SupporterPackAccessPolicy.resolvedBackgroundStyle(
+            requested: AppBackgroundStyle(rawValue: styleRaw) ?? .goIsland,
+            hasSupporterPack: hasSupporterPack
+        )
     }
 
     var body: some View {
@@ -26,6 +31,7 @@ struct AppBackgroundPickerSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
                         header
+                        supporterBackgrounds
                         officialBackgrounds
                         customBackgroundSection
                     }
@@ -39,6 +45,10 @@ struct AppBackgroundPickerSheet: View {
         .onChange(of: photoItem) { _, item in
             handlePhotoItem(item)
         }
+        .sheet(isPresented: $showingSupporterPack) {
+            SupporterPackView()
+                .ohanaSheetPagePresentation()
+        }
         .alert(l.tr(zh: "背景保存失败", en: "Could not save background", de: "Hintergrund konnte nicht gespeichert werden"), isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -51,18 +61,13 @@ struct AppBackgroundPickerSheet: View {
 
     private var header: some View {
         HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "背景", en: "Background", de: "Hintergrund"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
-                    zh: "选择一组背景，同时决定浅色和深色模式。",
-                    en: "Choose one background pair for both light and dark mode.",
-                    de: "Wähle ein Hintergrundpaar für Hell- und Dunkelmodus."
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-            }
+            Text(l.tr(
+                zh: "背景", en: "Background", de: "Hintergrund",
+                es: "Fondo", pt: "Plano de fundo", fr: "Arrière-plan",
+                ja: "背景", ko: "배경", it: "Sfondo"
+            ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
@@ -79,7 +84,28 @@ struct AppBackgroundPickerSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle(l.tr(zh: "官方背景对", en: "Official background pairs", de: "Offizielle Hintergrundpaare"))
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                ForEach(AppBackgroundStyle.officialPairOptions) { style in
+                ForEach(AppBackgroundStyle.freeOfficialPairOptions) { style in
+                    backgroundOptionCard(style)
+                }
+            }
+        }
+    }
+
+    private var supporterBackgrounds: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                sectionTitle(l.tr(zh: "Personal 背景", en: "Personal backgrounds", de: "Personal-Hintergründe"))
+                if hasSupporterPack {
+                    Label(
+                        l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet"),
+                        systemImage: "checkmark.seal.fill"
+                    )
+                    .font(OhanaFont.caption2(.black))
+                    .foregroundStyle(Color.goPrimary)
+                }
+            }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(AppBackgroundStyle.supporterPackOptions) { style in
                     backgroundOptionCard(style)
                 }
             }
@@ -145,7 +171,13 @@ struct AppBackgroundPickerSheet: View {
 
     private func backgroundOptionCard(_ style: AppBackgroundStyle) -> some View {
         let selected = selectedStyle == style
+        let isLocked = style.isSupporterPackStyle && !hasSupporterPack
         return Button {
+            guard !isLocked else {
+                showingSupporterPack = true
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             guard style != .customPhoto || CustomAppBackgroundStore.exists else {
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 return
@@ -165,19 +197,20 @@ struct AppBackgroundPickerSheet: View {
                                 .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                                 .padding(8)
+                        } else if isLocked {
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                                .foregroundStyle(Color.ohanaPrimaryActionText)
+                                .padding(8)
+                                .background(Color.goPrimary, in: Circle())
+                                .padding(7)
                         }
                     }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(style.localizedName(appLanguage))
-                        .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                    Text(style.localizedSubtitle(appLanguage))
-                        .font(OhanaFont.caption2(.semibold))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .lineLimit(2)
-                }
+                Text(style.localizedName(appLanguage))
+                    .font(OhanaFont.callout(.black))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .lineLimit(1)
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -189,6 +222,14 @@ struct AppBackgroundPickerSheet: View {
         }
         .buttonStyle(ScaleButtonStyle())
         .animation(GoMotion.feedback, value: selected)
+        .accessibilityLabel(style.localizedName(appLanguage))
+        .accessibilityHint(style.localizedSubtitle(appLanguage))
+        .accessibilityValue(isLocked
+            ? l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Benötigt Ohana Personal")
+            : (selected
+                ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                : l.tr(zh: "可选择", en: "Available", de: "Verfügbar")))
+        .accessibilityIdentifier("background-style-\(style.rawValue)")
     }
 
     @ViewBuilder

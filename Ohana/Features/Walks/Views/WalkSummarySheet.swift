@@ -131,9 +131,6 @@ struct WalkSummarySheet: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                Text(l.tr(zh: "目标、总览和历史轨迹", en: "Goals, overview, and route history", de: "Ziele, Übersicht und Routenverlauf"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
         }
@@ -225,7 +222,7 @@ struct WalkSummarySheet: View {
             } label: {
                 Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
@@ -302,7 +299,7 @@ struct WalkSummarySheet: View {
                 } label: {
                     Text(pet.weeklyWalkGoalKm > 0 ? l.tr(zh: "修改", en: "Edit", de: "Bearbeiten") : l.tr(zh: "设定目标", en: "Set goal", de: "Ziel setzen"))
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .background(Color.goPrimary, in: Capsule())
@@ -387,7 +384,7 @@ struct WalkSummarySheet: View {
             } label: {
                 Text(goalDraft == 0 ? l.tr(zh: "清除目标", en: "Clear goal", de: "Ziel löschen") : l.tr(zh: "保存目标", en: "Save goal", de: "Ziel speichern"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))

@@ -81,6 +81,9 @@ scripts/tests/run-ci-policy-tests.sh
 section "UI test shard completeness"
 scripts/audit-ui-test-shards.sh
 
+section "Release test surface"
+scripts/audit-release-test-surface.sh --all
+
 section "Runtime guardrails"
 scripts/audit-runtime-guardrails.sh --all
 

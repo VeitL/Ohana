@@ -24,13 +24,27 @@ enum OasisHomeTabContentPolicy {
     }
 }
 
+enum OasisHomeTreeLayoutStyle: Equatable, Sendable {
+    case standard
+    case zen
+}
+
 struct OasisHomeTabHost: View {
     let lifecycle: VerticalSolidHomePageLifecycle
     let treeSnapshot: OasisTreeRenderSnapshot
     let injectEnergyTrigger: Int
+    let allowsAmbientMotion: Bool
+    let allowsInteractionMotion: Bool
+    let usesFullVisualEffects: Bool
+    var treeLayoutStyle: OasisHomeTreeLayoutStyle = .standard
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     var onInjectEnergy: () -> Void = {}
     var onOpenShop: (ShopItem.ShopCategory) -> Void = { _ in }
+    var onOpenAchievements: () -> Void = {}
+    var onOpenCritters: () -> Void = {}
+    var onOpenGacha: () -> Void = {}
+    var onOpenGrowthRoadmap: () -> Void = {}
+    var onOpenFullOasis: () -> Void = {}
 
     @State private var showsTreeContent = false
     @State private var forwardedInjectEnergyTrigger = 0
@@ -60,8 +74,19 @@ struct OasisHomeTabHost: View {
             } else if rendersFrozenTree {
                 VerticalSolidHomeOasisFrozenTreeStage(
                     snapshot: treeSnapshot,
+                    injectionPulseToken: injectEnergyTrigger,
+                    allowsAmbientMotion: allowsAmbientMotion,
+                    allowsInteractionMotion: allowsInteractionMotion,
+                    usesFullVisualEffects: usesFullVisualEffects,
+                    layoutStyle: treeLayoutStyle,
+                    showsInjectEnergyButton: false,
                     onInjectEnergy: onInjectEnergy,
-                    onOpenShop: onOpenShop
+                    onOpenShop: onOpenShop,
+                    onOpenAchievements: onOpenAchievements,
+                    onOpenCritters: onOpenCritters,
+                    onOpenGacha: onOpenGacha,
+                    onOpenGrowthRoadmap: onOpenGrowthRoadmap,
+                    onOpenFullOasis: onOpenFullOasis
                 )
             } else {
                 Color.clear

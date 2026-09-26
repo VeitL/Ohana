@@ -13,7 +13,7 @@ extension QuickFeedDetailContent {
                     title: treatFrequencyTitle,
                     points: filteredTreatChartPoints,
                     tint: treatTint,
-                    emptyText: l.tr(zh: "记录零食后会显示频率", en: "Log treats to see frequency", de: "Snack eintragen, dann erscheint die Frequenz")
+                    emptyText: l.tr(zh: "暂无零食记录", en: "No treat logs", de: "Keine Snack-Einträge")
                 )
 
                 let logs = Array(filteredTreatLogsInRange.prefix(4))

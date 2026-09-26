@@ -49,7 +49,10 @@ struct PlantActionHumanAttributionTests {
 
     @Test func plantCommandCallsitesUseTheSelectedDraftActor() throws {
         let rootURL = repositoryRootURL()
-        let dashboard = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let dashboard = try source(
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift",
+            rootURL: rootURL
+        )
         let detail = try source("Ohana/Features/Plants/Views/PlantDetailView+Actions.swift", rootURL: rootURL)
         let homeRoute = try source("Ohana/Features/Home/HomePlantCareLogRouteContainer.swift", rootURL: rootURL)
 

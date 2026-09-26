@@ -18,7 +18,8 @@ struct FunctionMenuDestinationRouter: View {
     var body: some View {
         let decision = AppFeatureRouteGuard.functionDestinationDecision(
             destination,
-            currentLevel: appServices.oasisTree.treeLevel.rawValue
+            currentLevel: appServices.oasisTree.treeLevel.rawValue,
+            plan: appServices.commerce.ohanaPlanLevel
         )
         switch decision {
         case .rootMenu:
@@ -47,6 +48,30 @@ struct FunctionMenuDestinationRouter: View {
 
     @ViewBuilder
     private func destinationView(_ dest: FMDest) -> some View {
+        switch dest {
+        case .growthRoadmap, .featureGroup, .petFeatureCollection,
+             .petSharedCheckIn, .plantFeatureCollection, .featureAggregate:
+            collectionDestinationView(dest)
+        case .petHealth, .petMedications, .petFood, .petWater, .petHygiene,
+             .petWalks, .petPotty:
+            petCareDestinationView(dest)
+        case .petBasicInfo, .petDocuments, .petInsurance, .petMoments,
+             .petTimeline, .petAchievements, .petRetention, .petWeight, .petExpense:
+            petProfileDestinationView(dest)
+        case .humanWeight, .humanWorkout, .humanMedication, .humanNote, .humanExpense:
+            humanDestinationView(dest)
+        case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered,
+             .plantsBatchQuickRecord, .plantsList, .plantsPhotos, .plantDetail,
+             .plantFeature, .plantCare, .plantCareAggregate:
+            plantDestinationView(dest)
+        case .wealthDashboard, .bountyBoard, .familyWeeklyReport, .familyLongTermReview,
+             .careLedgerAnalysis, .reminderObservability, .coconutShop, .gacha:
+            householdDestinationView(dest)
+        }
+    }
+
+    @ViewBuilder
+    private func collectionDestinationView(_ dest: FMDest) -> some View {
         switch dest {
         case .growthRoadmap:
             GrowthUnlockRoadmapView(
@@ -91,6 +116,14 @@ struct FunctionMenuDestinationRouter: View {
                 petAggregateSummaries: petAggregateSummaries,
                 showsEntityChips: false
             )
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func petCareDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case let .petHealth(id):
             if let pet = pet(for: id) { PetHealthDetailView(pet: pet, isModal: false) }
         case let .petMedications(id):
@@ -105,6 +138,14 @@ struct FunctionMenuDestinationRouter: View {
             if let pet = pet(for: id) { WalkSummarySheet(pet: pet) }
         case let .petPotty(id):
             if let pet = pet(for: id) { QuickPottyDetailRouteContainer(id: pet.id, onRemove: {}) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func petProfileDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case let .petBasicInfo(id):
             if let pet = pet(for: id) { PetBasicInfoDetailView(pet: pet) }
         case let .petDocuments(id):
@@ -123,6 +164,14 @@ struct FunctionMenuDestinationRouter: View {
             if let pet = pet(for: id) { WeightHistoryView(pet: pet) }
         case let .petExpense(id):
             if let pet = pet(for: id) { ExpenseHistoryView(pet: pet) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func humanDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case let .humanWeight(id):
             if let human = human(for: id) { HumanWeightHistoryView(human: human) }
         case let .humanWorkout(id):
@@ -133,6 +182,14 @@ struct FunctionMenuDestinationRouter: View {
             if let human = human(for: id) { HumanNoteHistorySheet(human: human) }
         case let .humanExpense(id):
             if let human = human(for: id) { HumanExpenseDetailView(human: human) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func plantDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case .plantsDashboard:
             PlantDashboardView(
                 plants: plants,
@@ -220,6 +277,14 @@ struct FunctionMenuDestinationRouter: View {
                 focusedPlantID: nil,
                 focusedCareType: nil
             )
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func householdDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case .wealthDashboard:
             IslandWealthDashboardView()
         case .bountyBoard:
@@ -228,6 +293,8 @@ struct FunctionMenuDestinationRouter: View {
             }
         case .familyWeeklyReport:
             FamilyWeeklyReportDashboardView()
+        case .familyLongTermReview:
+            FamilyLongTermReviewView()
         case .careLedgerAnalysis:
             CareLedgerAnalysisView()
         case .reminderObservability:
@@ -236,6 +303,8 @@ struct FunctionMenuDestinationRouter: View {
             CoconutShopRouteContainer()
         case .gacha:
             GachaRouteContainer()
+        default:
+            EmptyView()
         }
     }
 

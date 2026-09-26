@@ -63,7 +63,7 @@ extension WalkTrackingCard {
             Image(systemName: "plus.circle.fill") // a11y: allow decorative reward glyph; label text names the reward.
                 .font(OhanaFont.adaptive(size: 13, weight: .black))
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
@@ -149,7 +149,7 @@ extension WalkTrackingCard {
         } label: {
             Image(systemName: "slider.horizontal.3") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary, in: Circle())
         }
@@ -226,7 +226,7 @@ extension WalkTrackingCard {
                         goalFlagIcon
                         goalTextBlock(
                             title: L10n(appLanguage).tr(zh: "还没有遛狗目标", en: "No walk goal yet", de: "Noch kein Spaziergangsziel"),
-                            subtitle: L10n(appLanguage).tr(zh: "设一个每周目标，之后会显示完成率", en: "Set a weekly goal to see progress here.", de: "Setze ein Wochenziel, um Fortschritt zu sehen.")
+                            subtitle: L10n(appLanguage).tr(zh: "设置每周目标", en: "Set weekly goal", de: "Wochenziel festlegen")
                         )
                         Spacer(minLength: 8)
                         editGoalButton
@@ -237,7 +237,7 @@ extension WalkTrackingCard {
                             goalFlagIcon
                             goalTextBlock(
                                 title: L10n(appLanguage).tr(zh: "还没有遛狗目标", en: "No walk goal yet", de: "Noch kein Spaziergangsziel"),
-                                subtitle: L10n(appLanguage).tr(zh: "设一个每周目标，之后会显示完成率", en: "Set a weekly goal to see progress here.", de: "Setze ein Wochenziel, um Fortschritt zu sehen.")
+                                subtitle: L10n(appLanguage).tr(zh: "设置每周目标", en: "Set weekly goal", de: "Wochenziel festlegen")
                             )
                             Spacer(minLength: 0)
                         }
@@ -305,7 +305,7 @@ extension WalkTrackingCard {
         } label: {
             Text(L10n(appLanguage).tr(zh: "编辑目标", en: "Edit goal", de: "Ziel ändern"))
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -369,7 +369,7 @@ extension WalkTrackingCard {
                     ? L10n(appLanguage).tr(zh: "清除目标", en: "Clear goal", de: "Ziel löschen")
                     : L10n(appLanguage).tr(zh: "保存目标", en: "Save goal", de: "Ziel speichern"))
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))

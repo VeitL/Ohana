@@ -30,17 +30,17 @@ struct TreeLevelConfig {
 }
 
 private let treeLevelConfigs: [TreeLevelConfig] = [
-    .init(level: 0, name: "沉睡种子", scale: 0.42, leafCount: 0, coconutCount: 0, flowerCount: 0, trunkHeight: 28, trunkWidth: 9, leafWidth: 34, leafHeight: 24, crownOffset: 10, auraTier: 0, rootCount: 0),
-    .init(level: 1, name: "破土新芽", scale: 0.54, leafCount: 2, coconutCount: 0, flowerCount: 0, trunkHeight: 54, trunkWidth: 14, leafWidth: 50, leafHeight: 34, crownOffset: 7, auraTier: 0, rootCount: 0),
-    .init(level: 2, name: "稚嫩幼苗", scale: 0.60, leafCount: 4, coconutCount: 0, flowerCount: 0, trunkHeight: 86, trunkWidth: 16, leafWidth: 64, leafHeight: 40, crownOffset: 5, auraTier: 0, rootCount: 1),
-    .init(level: 3, name: "茁壮小树", scale: 0.68, leafCount: 6, coconutCount: 0, flowerCount: 3, trunkHeight: 114, trunkWidth: 20, leafWidth: 76, leafHeight: 48, crownOffset: 2, auraTier: 0, rootCount: 2),
-    .init(level: 4, name: "青葱树冠", scale: 0.76, leafCount: 8, coconutCount: 0, flowerCount: 5, trunkHeight: 136, trunkWidth: 23, leafWidth: 88, leafHeight: 54, crownOffset: 0, auraTier: 0, rootCount: 3),
-    .init(level: 5, name: "初结硕果", scale: 0.84, leafCount: 10, coconutCount: 1, flowerCount: 6, trunkHeight: 154, trunkWidth: 27, leafWidth: 98, leafHeight: 60, crownOffset: -2, auraTier: 0, rootCount: 4),
-    .init(level: 6, name: "丰收之树", scale: 0.92, leafCount: 13, coconutCount: 3, flowerCount: 8, trunkHeight: 168, trunkWidth: 31, leafWidth: 108, leafHeight: 66, crownOffset: -4, auraTier: 1, rootCount: 5),
-    .init(level: 7, name: "绿洲明珠", scale: 1.00, leafCount: 16, coconutCount: 5, flowerCount: 10, trunkHeight: 180, trunkWidth: 35, leafWidth: 118, leafHeight: 72, crownOffset: -6, auraTier: 1, rootCount: 6),
-    .init(level: 8, name: "繁星树冠", scale: 1.07, leafCount: 19, coconutCount: 7, flowerCount: 12, trunkHeight: 190, trunkWidth: 39, leafWidth: 128, leafHeight: 78, crownOffset: -8, auraTier: 2, rootCount: 7),
-    .init(level: 9, name: "生命之源", scale: 1.14, leafCount: 21, coconutCount: 10, flowerCount: 15, trunkHeight: 198, trunkWidth: 43, leafWidth: 138, leafHeight: 84, crownOffset: -10, auraTier: 3, rootCount: 8),
-    .init(level: 10, name: "永恒神树", scale: 1.20, leafCount: 22, coconutCount: 12, flowerCount: 18, trunkHeight: 206, trunkWidth: 47, leafWidth: 148, leafHeight: 90, crownOffset: -12, auraTier: 4, rootCount: 9)
+    .init(level: 0, name: "沉睡种子", scale: 1.24, leafCount: 0, coconutCount: 0, flowerCount: 0, trunkHeight: 28, trunkWidth: 9, leafWidth: 34, leafHeight: 24, crownOffset: 0, auraTier: 0, rootCount: 0),
+    .init(level: 1, name: "破土新芽", scale: 1.28, leafCount: 2, coconutCount: 0, flowerCount: 0, trunkHeight: 92, trunkWidth: 13, leafWidth: 50, leafHeight: 34, crownOffset: 0, auraTier: 0, rootCount: 0),
+    .init(level: 2, name: "稚嫩幼苗", scale: 1.20, leafCount: 4, coconutCount: 0, flowerCount: 0, trunkHeight: 112, trunkWidth: 16, leafWidth: 64, leafHeight: 40, crownOffset: -1, auraTier: 0, rootCount: 1),
+    .init(level: 3, name: "茁壮小树", scale: 1.14, leafCount: 6, coconutCount: 0, flowerCount: 3, trunkHeight: 130, trunkWidth: 20, leafWidth: 76, leafHeight: 48, crownOffset: -2, auraTier: 0, rootCount: 2),
+    .init(level: 4, name: "青葱树冠", scale: 1.11, leafCount: 8, coconutCount: 0, flowerCount: 5, trunkHeight: 144, trunkWidth: 23, leafWidth: 88, leafHeight: 54, crownOffset: -3, auraTier: 0, rootCount: 3),
+    .init(level: 5, name: "初结硕果", scale: 1.09, leafCount: 10, coconutCount: 1, flowerCount: 6, trunkHeight: 158, trunkWidth: 27, leafWidth: 98, leafHeight: 60, crownOffset: -4, auraTier: 0, rootCount: 4),
+    .init(level: 6, name: "丰收之树", scale: 1.08, leafCount: 13, coconutCount: 3, flowerCount: 8, trunkHeight: 170, trunkWidth: 31, leafWidth: 108, leafHeight: 66, crownOffset: -5, auraTier: 1, rootCount: 5),
+    .init(level: 7, name: "绿洲明珠", scale: 1.07, leafCount: 16, coconutCount: 5, flowerCount: 10, trunkHeight: 182, trunkWidth: 35, leafWidth: 118, leafHeight: 72, crownOffset: -6, auraTier: 1, rootCount: 6),
+    .init(level: 8, name: "繁星树冠", scale: 1.06, leafCount: 19, coconutCount: 7, flowerCount: 12, trunkHeight: 192, trunkWidth: 39, leafWidth: 128, leafHeight: 78, crownOffset: -8, auraTier: 2, rootCount: 7),
+    .init(level: 9, name: "生命之源", scale: 1.055, leafCount: 21, coconutCount: 10, flowerCount: 15, trunkHeight: 200, trunkWidth: 43, leafWidth: 138, leafHeight: 84, crownOffset: -10, auraTier: 3, rootCount: 8),
+    .init(level: 10, name: "永恒神树", scale: 1.05, leafCount: 22, coconutCount: 12, flowerCount: 18, trunkHeight: 208, trunkWidth: 47, leafWidth: 148, leafHeight: 90, crownOffset: -12, auraTier: 4, rootCount: 9)
 ]
 
 // 椰子固定坐标（相对树冠中心）
@@ -78,10 +78,16 @@ struct BeautifulCoconutTree: View {
     var pendingUpgradeCoconutCount: Int = 0
     var dailyCoconutCount: Int?
     var allowsAmbientMotion: Bool = true
+    var allowsInteractionMotion: Bool = true
+    var usesLiquidGlassLeaves: Bool = true
     var harvestedCoconuts: Set<Int> = [] // 已采摘的椰子索引
     var onHarvest: ((Int) -> Void)? // 采摘回调
 
-    @State private var isSwaying = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var windPulseToken = 0
+    @State private var entranceWindTask: Task<Void, Never>?
+    @State private var isLiquidGlassPrepared = false
+    @State private var liquidGlassPreparationTask: Task<Void, Never>?
     @State private var burstKey = 0 // 升级冲击波触发器
     @State private var shockwaveScale: CGFloat = 0
     @State private var shockwaveOpacity: Double = 0
@@ -105,6 +111,9 @@ struct BeautifulCoconutTree: View {
     private var trunkH: CGFloat { cfg.trunkHeight }
     private var trunkW: CGFloat { cfg.trunkWidth }
     private var bend: CGFloat { CGFloat(12 + min(visualLevel, 9) * 3) }
+    private var canPlayWindMotion: Bool { allowsAmbientMotion && !reduceMotion }
+    private var canPlayInteractionMotion: Bool { allowsInteractionMotion && !reduceMotion }
+    private var rendersLiquidGlassLeaves: Bool { usesLiquidGlassLeaves && isLiquidGlassPrepared }
 
     static func coconutCapacity(for level: Int) -> Int {
         treeLevelConfigs[max(0, min(level, 10))].coconutCount
@@ -115,7 +124,13 @@ struct BeautifulCoconutTree: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
+        GeometryReader { proxy in
+            let fitScale = min(
+                max(0, proxy.size.width) / 320,
+                max(0, proxy.size.height) / 300
+            )
+
+            ZStack(alignment: .bottom) {
 
             // ── 背景光效（Sunbeams, Lv9+)
             if visualLevel >= 9 {
@@ -149,6 +164,13 @@ struct BeautifulCoconutTree: View {
                 .frame(width: max(CGFloat(72), trunkW * 5.2), height: max(CGFloat(18), trunkW * 1.45))
                 .animation(GoMotion.hero, value: level)
 
+            if visualLevel == 0 {
+                AwakeningSeedView(
+                    glowColor: glowColor,
+                    isInjecting: isInjecting
+                )
+            }
+
             TreeRootClusterView(
                 rootCount: cfg.rootCount,
                 trunkWidth: trunkW,
@@ -160,7 +182,7 @@ struct BeautifulCoconutTree: View {
                 .offset(x: bend * 0.18, y: 2)
                 .allowsHitTesting(false)
 
-            if visualLevel <= 4 {
+            if visualLevel >= 3, visualLevel <= 4 {
                 ForEach(0 ..< sproutCount, id: \.self) { i in
                     GroundSproutView(color: leafColor(index: i))
                         .scaleEffect(0.58 + CGFloat(i) * 0.14)
@@ -184,6 +206,7 @@ struct BeautifulCoconutTree: View {
                     )
                 )
                 .frame(width: trunkW * 4 + bend + 40, height: trunkH + 10)
+                .opacity(visualLevel == 0 ? 0 : 1)
                 .animation(GoMotion.hero, value: level)
 
             // ── 藤蔓（Lv5+，trim 生长动画）
@@ -203,7 +226,7 @@ struct BeautifulCoconutTree: View {
             // ── 神圣光环 (Divine Halo, Lv6+)
             if visualLevel >= 6 {
                 DivineHaloView(
-                    isSwaying: isSwaying,
+                    isSwaying: false,
                     tier: cfg.auraTier,
                     size: 184 + CGFloat(cfg.auraTier) * 30,
                     allowsAmbientMotion: allowsAmbientMotion
@@ -212,48 +235,54 @@ struct BeautifulCoconutTree: View {
             }
 
             // ── 树冠（树叶 + 椰子，摇摆）
-            ZStack {
-                // 后层树叶让高等级树冠更饱满
+            OasisLeafGlassContainer(isEnabled: rendersLiquidGlassLeaves) {
+                ZStack {
+                // 后层整叶让高等级树冠更饱满，同时保持原来的扇形轮廓。
                 if visualLevel >= 6 {
                     ForEach(0 ..< maxLeafSlots, id: \.self) { i in
                         let isActive = i < cfg.leafCount && i % 2 == 1
                         let angle: Double = cfg.leafCount > 1
                             ? -168 + Double(i) * (336.0 / Double(max(1, cfg.leafCount - 1)))
                             : -150
-                        LeafShape()
-                            .fill(leafColor(index: i + 1).opacity(0.72))
-                            .frame(width: cfg.leafWidth * 0.72, height: cfg.leafHeight * 0.78)
-                            .scaleEffect(isActive ? 1.0 : 0.001, anchor: .topLeading)
-                            .rotationEffect(.degrees(angle + 9), anchor: .topLeading)
-                            .offset(x: -6, y: 10)
-                            .opacity(isActive ? 0.55 : 0)
-                            .animation(
-                                GoMotion.hero.delay(isActive ? Double(i) * 0.025 : 0),
-                                value: cfg.leafCount
-                            )
-                            .allowsHitTesting(false)
+                        OasisPalmLeaf(
+                            tint: leafColor(index: i + 1),
+                            width: cfg.leafWidth * 0.72,
+                            height: cfg.leafHeight * 0.78,
+                            isBackLayer: true,
+                            usesLiquidGlass: rendersLiquidGlassLeaves
+                        )
+                        .scaleEffect(isActive ? 1.0 : 0.001, anchor: .topLeading)
+                        .rotationEffect(.degrees(angle + 9), anchor: .topLeading)
+                        .offset(x: -6, y: 10)
+                        .opacity(isActive ? 0.55 : 0)
+                        .animation(
+                            GoMotion.hero.delay(isActive ? Double(i) * 0.025 : 0),
+                            value: cfg.leafCount
+                        )
+                        .allowsHitTesting(false)
                     }
                 }
 
-                // 树叶（扇形，originX/Y=0 对应 React style.origin）
+                // 前层恢复原有的弧形整叶扇冠。
                 ForEach(0 ..< maxLeafSlots, id: \.self) { i in
                     let isActive = i < cfg.leafCount
                     let angle: Double = cfg.leafCount > 1
                         ? -160 + Double(i) * (320.0 / Double(max(1, cfg.leafCount - 1)))
-                        : -150
-                    LeafShape()
-                        .fill(leafColor(index: i))
-                        .frame(width: cfg.leafWidth, height: cfg.leafHeight)
-                        .scaleEffect(isActive ? (isMax ? 1.08 : 1.0) : 0.001,
-                                     anchor: .topLeading)
-                        .rotationEffect(.degrees(angle), anchor: .topLeading)
-                        .opacity(isActive ? 0.95 : 0)
-                        .animation(
-                            GoMotion.hero
-                                .delay(isActive ? Double(i) * 0.05 : 0),
-                            value: cfg.leafCount
-                        )
-                        .allowsHitTesting(false)
+                        : -140
+                    OasisPalmLeaf(
+                        tint: leafColor(index: i),
+                        width: cfg.leafWidth,
+                        height: cfg.leafHeight,
+                        usesLiquidGlass: rendersLiquidGlassLeaves
+                    )
+                    .scaleEffect(isActive ? (isMax ? 1.08 : 1.0) : 0.001, anchor: .topLeading)
+                    .rotationEffect(.degrees(angle), anchor: .topLeading)
+                    .opacity(isActive ? 0.95 : 0)
+                    .animation(
+                        GoMotion.hero.delay(isActive ? Double(i) * 0.05 : 0),
+                        value: cfg.leafCount
+                    )
+                    .allowsHitTesting(false)
                 }
 
                 // 花朵/能量结晶，3 级后开始出现
@@ -297,34 +326,52 @@ struct BeautifulCoconutTree: View {
 
                 // ── 符文 (Runes, Lv10)
                 if isMax {
-                    RunesView(isSwaying: isSwaying, allowsAmbientMotion: allowsAmbientMotion)
+                    RunesView(isSwaying: false, allowsAmbientMotion: allowsAmbientMotion)
                 }
 
                 // ── 星尘 (Stardust, Lv8+)
                 if visualLevel >= 8 {
                     StardustView(allowsAmbientMotion: allowsAmbientMotion)
                 }
+                }
             }
             // 树冠对齐树干顶端（对应 React animate.x/y）
             .offset(x: bend + trunkW * 0.4,
                     y: -trunkH + cfg.crownOffset)
-            // 持续摇摆
-            .rotationEffect(.degrees(isSwaying ? 2 : -2), anchor: .bottom)
-            .animation(
-                allowsAmbientMotion
-                    ? .easeInOut(duration: 6).repeatForever(autoreverses: true) // runtime-guardrail: allow AppWorkloadPolicy-gated tree sway // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-                    : nil,
-                value: isSwaying
-            )
+            // A finite gust runs when Oasis becomes visible or energy arrives.
+            // This avoids keeping a repeating animation alive while the tab sits open.
+            .phaseAnimator(OasisTreeWindPhase.allCases, trigger: windPulseToken) { crown, phase in
+                crown
+                    .rotationEffect(.degrees(canPlayWindMotion || canPlayInteractionMotion ? phase.angle : 0), anchor: .bottom)
+                    .offset(x: canPlayWindMotion || canPlayInteractionMotion ? phase.xOffset : 0)
+            } animation: { phase in
+                phase.animation
+            }
+            }
+            .frame(width: 320, height: 300)
+            .scaleEffect(fitScale * CGFloat(cfg.scale), anchor: .bottom)
+            .phaseAnimator(OasisTreeChargePhase.allCases, trigger: injectionPulseToken) { tree, phase in
+                tree
+                    .scaleEffect(canPlayInteractionMotion ? phase.scale : 1, anchor: .bottom)
+                    .offset(y: canPlayInteractionMotion ? phase.yOffset : 0)
+                    .brightness(phase.brightness)
+                    .shadow( // ui-v4: allow finite, interaction-triggered Oasis tree charge glow
+                        color: glowColor.opacity(phase.glowOpacity),
+                        radius: phase == .surges ? 18 : 8,
+                        x: 0,
+                        y: 0
+                    )
+            } animation: { phase in
+                canPlayInteractionMotion ? phase.animation : GoMotion.reduced
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
-        // 整体 scale 随等级变化（React 源码 animate.scale）
-        .scaleEffect(CGFloat(cfg.scale))
         .animation(GoMotion.hero, value: cfg.scale)
-        .frame(width: 300, height: 348)
         .onAppear {
-            isSwaying = allowsAmbientMotion
+            scheduleLiquidGlassPreparation()
+            scheduleEntranceWind()
             if visualLevel >= 5 {
-                if allowsAmbientMotion {
+                if canPlayWindMotion {
                     OhanaFrameScheduler.runAfterNextFrame(milliseconds: 300) {
                         vineProgress = 1.0
                     }
@@ -334,16 +381,42 @@ struct BeautifulCoconutTree: View {
             }
         }
         .onChange(of: allowsAmbientMotion) { _, shouldAnimate in
-            isSwaying = shouldAnimate
-            if !shouldAnimate, visualLevel >= 5 {
+            if shouldAnimate {
+                scheduleEntranceWind()
+            } else {
+                entranceWindTask?.cancel()
+                entranceWindTask = nil
+            }
+            if !canPlayWindMotion, visualLevel >= 5 {
                 vineProgress = 1.0
             }
+        }
+        .onChange(of: reduceMotion) { _, shouldReduceMotion in
+            if shouldReduceMotion {
+                entranceWindTask?.cancel()
+                entranceWindTask = nil
+            } else {
+                scheduleEntranceWind()
+            }
+        }
+        .onChange(of: usesLiquidGlassLeaves) { _, shouldUseGlass in
+            if shouldUseGlass {
+                scheduleLiquidGlassPreparation()
+            } else {
+                liquidGlassPreparationTask?.cancel()
+                liquidGlassPreparationTask = nil
+                isLiquidGlassPrepared = false
+            }
+        }
+        .onChange(of: injectionPulseToken) { oldToken, newToken in
+            guard newToken != oldToken, canPlayInteractionMotion else { return }
+            windPulseToken &+= 1
         }
         .onChange(of: level) { oldVal, newVal in
             if newVal > oldVal { triggerShockwave() }
             // 新等级达到 5+ 时重新生长藤蔓
             if newVal >= 5, oldVal < 5 {
-                if allowsAmbientMotion {
+                if canPlayWindMotion {
                     vineProgress = 0
                     OhanaFrameScheduler.runAfterNextFrame(milliseconds: 500) {
                         vineProgress = 1.0
@@ -353,6 +426,13 @@ struct BeautifulCoconutTree: View {
                 }
             }
         }
+        .onDisappear {
+            entranceWindTask?.cancel()
+            entranceWindTask = nil
+            liquidGlassPreparationTask?.cancel()
+            liquidGlassPreparationTask = nil
+            isLiquidGlassPrepared = false
+        }
         .overlay(alignment: .bottom) {
             if pendingUpgradeCoconutCount > 0 {
                 PendingUpgradeCoconutHint(count: pendingUpgradeCoconutCount)
@@ -360,6 +440,24 @@ struct BeautifulCoconutTree: View {
                     .transition(.scale.combined(with: .opacity))
                     .allowsHitTesting(false)
             }
+        }
+    }
+
+    private func scheduleEntranceWind() {
+        guard canPlayWindMotion else { return }
+        entranceWindTask?.cancel()
+        entranceWindTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+            windPulseToken &+= 1
+            entranceWindTask = nil
+        }
+    }
+
+    private func scheduleLiquidGlassPreparation() {
+        guard usesLiquidGlassLeaves, !isLiquidGlassPrepared else { return }
+        liquidGlassPreparationTask?.cancel()
+        liquidGlassPreparationTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+            isLiquidGlassPrepared = true
+            liquidGlassPreparationTask = nil
         }
     }
 
@@ -570,36 +668,41 @@ private struct EnergyRootPulseView: View {
     let color: Color
     let isActive: Bool
 
-    @State private var scale: CGFloat = 0.72
-    @State private var opacity: Double = 0.9
+    @State private var scale: CGFloat = 0.64
+    @State private var opacity: Double = 0
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(color.opacity(0.9), lineWidth: 3)
-                .frame(width: 44, height: 44)
+                .stroke(color.opacity(0.94), lineWidth: 3)
+                .frame(width: 54, height: 54)
                 .scaleEffect(scale)
-                .opacity(isActive ? opacity : 0)
+                .opacity(opacity)
             Circle()
-                .fill(color.opacity(0.18))
-                .frame(width: 36, height: 36) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
+                .stroke(Color.goTeal.opacity(0.72), lineWidth: 1.4)
+                .frame(width: 38, height: 38) // a11y: allow decorative transient root pulse ring
+                .scaleEffect(scale * 0.92)
+                .opacity(opacity * 0.86)
+            Circle()
+                .fill(color.opacity(0.24))
+                .frame(width: 32, height: 32) // a11y: allow decorative preview/art element; non-interactive or labeled by surrounding content.
                 .scaleEffect(scale * 0.84)
-                .opacity(isActive ? opacity : 0)
+                .opacity(opacity)
         }
         .blendMode(.screen)
         .onAppear {
             if isActive { run() }
         }
         .onChange(of: token) { _, _ in
-            if isActive { run() }
+            run()
         }
     }
 
     private func run() {
-        scale = 0.72
-        opacity = 0.9
-        withAnimation(GoMotion.stateChange) {
-            scale = 2.4
+        scale = 0.64
+        opacity = 1
+        withAnimation(GoMotion.zenCardColorReveal) {
+            scale = 3.0
             opacity = 0
         }
     }
@@ -632,6 +735,58 @@ private struct PendingUpgradeCoconutHint: View {
                     .padding(.leading, 4)
             }
         }
+    }
+}
+
+private struct AwakeningSeedView: View {
+    let glowColor: Color
+    let isInjecting: Bool
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Circle()
+                .fill(glowColor.opacity(isInjecting ? 0.26 : 0.10))
+                .frame(width: 72, height: 72)
+                .blur(radius: 12)
+                .offset(y: -8)
+
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [Color(hex: "A76B35"), Color(hex: "6B3D20"), Color(hex: "3D2416")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 42, height: 52)
+                .rotationEffect(.degrees(9))
+                .offset(y: -7)
+                .overlay {
+                    SeedCrackShape()
+                        .stroke(Color(hex: "E7BE79").opacity(0.72), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+                        .frame(width: 17, height: 24) // a11y: allow decorative seed crack; non-interactive and hidden with its parent illustration
+                        .rotationEffect(.degrees(9))
+                        .offset(x: 2, y: -10)
+                }
+
+            Capsule()
+                .fill(Color(hex: "2A160F").opacity(0.72))
+                .frame(width: 58, height: 11)
+        }
+        .frame(width: 86, height: 74)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SeedCrackShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.midX - rect.width * 0.22, y: rect.height * 0.34))
+        path.addLine(to: CGPoint(x: rect.midX + rect.width * 0.18, y: rect.height * 0.55))
+        path.addLine(to: CGPoint(x: rect.midX - rect.width * 0.08, y: rect.maxY))
+        return path
     }
 }
 

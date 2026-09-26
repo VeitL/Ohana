@@ -17,6 +17,33 @@ struct WalksLogicTests {
         #expect(!WalkFeaturePolicy.canStartWalk(for: deceasedDog))
     }
 
+    @Test func walkLifecyclePublishesLiveActivityStateWithoutOwningBusinessFacts() {
+        let pet = Pet(name: "Piper", species: "dog")
+        let location = FakeWalkLocationManager()
+        let presenter = SpyWalkActivityPresenter()
+        let manager = PetWalkingManager(
+            locationManager: location,
+            questManager: QuestManager(),
+            activityPresenter: presenter
+        )
+
+        manager.start(pet: pet)
+        location.emitDistance(125)
+        manager.addPoop()
+        manager.pause()
+        manager.resume()
+        manager.reset()
+
+        #expect(presenter.startAttributes?.petID == pet.id)
+        #expect(presenter.startAttributes?.languageCode == AppLanguage.normalize(AppLanguage.code))
+        #expect(presenter.startedState?.phase == .running)
+        #expect(presenter.updates.contains { $0.phase == .running && $0.distanceMeters == 125 })
+        #expect(presenter.updates.contains { $0.poopCount == 1 })
+        #expect(presenter.updates.contains { $0.phase == .paused })
+        #expect(presenter.endedState?.phase == .finished)
+        #expect(presenter.didEndImmediately == true)
+    }
+
     @Test func sharedWalkTargetsRejectTheWholeSelectionWhenAnyTargetIsIneligible() {
         let source = Pet(name: "Piper", species: "狗")
         let secondDog = Pet(name: "Rex", species: "dog")
@@ -253,6 +280,33 @@ struct WalksLogicTests {
         #expect(checkpoints.isEmpty)
         #expect(authoritativeLogs.count == 1)
         #expect(authoritativeLogs.first?.distanceMeters == 80)
+    }
+
+    @Test func discardingAnUnrestoredCheckpointEndsItsLiveActivitySession() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Piper", species: "狗")
+        let sessionID = UUID()
+        let checkpoint = PetWalkLog(
+            startDate: Date().addingTimeInterval(-120),
+            pet: pet,
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID(id: sessionID)
+        )
+        context.insert(pet)
+        context.insert(checkpoint)
+        try context.save()
+
+        let presenter = SpyWalkActivityPresenter()
+        let manager = PetWalkingManager(
+            locationManager: FakeWalkLocationManager(),
+            questManager: QuestManager(),
+            activityPresenter: presenter
+        )
+
+        manager.discardRecoveryCheckpoint(checkpoint, modelContext: context)
+
+        #expect(presenter.endedSessionID == sessionID)
+        #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
     }
 
     @Test func restoredWalkMergesCheckpointRouteAndNewRouteOnStop() throws {
@@ -599,6 +653,7 @@ private final class FakeWalkLocationManager: WalkLocationManaging {
     var collectedLocations: [CLLocation] = []
     var totalDistance: Double = 0
     private(set) var startWalkSessionCount = 0
+    private var metricsUpdateHandler: ((Double) -> Void)?
 
     func startWalkSession() {
         startWalkSessionCount += 1
@@ -612,6 +667,56 @@ private final class FakeWalkLocationManager: WalkLocationManaging {
     func returnActiveWalkToForegroundDelivery() {}
     func enforceNoLocationUnlessRunningWalk(_: Bool, reason _: String) {}
     func routeLocationsForPersistence(maxCount _: Int) -> [CLLocation] { collectedLocations }
+    func setWalkMetricsUpdateHandler(_ handler: ((Double) -> Void)?) {
+        metricsUpdateHandler = handler
+    }
+
+    func emitDistance(_ distance: Double) {
+        totalDistance = distance
+        metricsUpdateHandler?(distance)
+    }
+}
+
+private final class SpyWalkActivityPresenter: WalkActivityPresenting {
+    private(set) var startAttributes: WalkActivityAttributes?
+    private(set) var startedState: WalkActivityAttributes.ContentState?
+    private(set) var updates: [WalkActivityAttributes.ContentState] = []
+    private(set) var endedState: WalkActivityAttributes.ContentState?
+    private(set) var didEndImmediately: Bool?
+    private(set) var endedSessionID: UUID?
+    private(set) var didEndAll = false
+
+    func dismissStaleActivities() {}
+
+    func start(
+        attributes: WalkActivityAttributes,
+        state: WalkActivityAttributes.ContentState
+    ) {
+        startAttributes = attributes
+        startedState = state
+    }
+
+    func restore(
+        attributes _: WalkActivityAttributes,
+        state _: WalkActivityAttributes.ContentState
+    ) {}
+
+    func update(_ state: WalkActivityAttributes.ContentState, force _: Bool) {
+        updates.append(state)
+    }
+
+    func end(_ state: WalkActivityAttributes.ContentState, immediate: Bool) {
+        endedState = state
+        didEndImmediately = immediate
+    }
+
+    func endSession(_ sessionID: UUID, immediate _: Bool) {
+        endedSessionID = sessionID
+    }
+
+    func endAll(immediate _: Bool) {
+        didEndAll = true
+    }
 }
 
 private final nonisolated class MutableWalkActiveHumanSelection: ActiveHumanSelecting {

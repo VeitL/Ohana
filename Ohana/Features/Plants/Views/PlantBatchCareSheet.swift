@@ -213,7 +213,7 @@ struct PlantBatchCareSheet: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
-            .foregroundStyle(selectedTasks.isEmpty ? Color.ohanaSecondaryText : Color.arkInk)
+            .foregroundStyle(selectedTasks.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 50)
             .background(selectedTasks.isEmpty ? Color.ohanaControlFill.opacity(0.72) : Color.goPrimary, in: Capsule())
@@ -246,9 +246,11 @@ struct PlantBatchCareSheet: View {
                 Text(emptyStateTitle)
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(emptyStateDetail)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                if let emptyStateDetail {
+                    Text(emptyStateDetail)
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
             }
         }
         .padding(14)
@@ -261,9 +263,9 @@ struct PlantBatchCareSheet: View {
             : l.tr(zh: "没有匹配的照护", en: "No matching care", de: "Keine passenden Aufgaben")
     }
 
-    private var emptyStateDetail: String {
+    private var emptyStateDetail: String? {
         activeTaskCount == 0
-            ? l.tr(zh: "可以直接关闭，或稍后再回来查看。", en: "You can close this sheet or check back later.", de: "Du kannst schließen oder später erneut prüfen.")
+            ? nil
             : l.tr(zh: "换一个类型，或回到全部查看。", en: "Choose another type or return to all.", de: "Anderen Typ wählen oder alle anzeigen.")
     }
 

@@ -238,7 +238,7 @@ struct VerticalSolidHomeDataContainer: View {
         .onChange(of: isHomeSurfaceVisible) { _, isVisible in
             handleHomeSurfaceVisibilityChange(isVisible)
         }
-        .onChange(of: homeSurfaceGate.allowsRefresh) { _, allowsRefresh in
+        .onChange(of: canRefreshHomeSurface) { _, allowsRefresh in
             handleHomeSurfaceRefreshAllowanceChange(allowsRefresh)
         }
         .onChange(of: scenePhase) { _, phase in
@@ -289,13 +289,25 @@ struct VerticalSolidHomeDataContainer: View {
     }
 
     private func requestReadModelRefresh(force: Bool) {
-        guard HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
-            isHomeSurfaceVisible: isHomeSurfaceVisible,
-            isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh
-        ) else {
-            if force {
-                pendingForcedRefresh = true
+        guard canRefreshHomeSurface else {
+            if !readModelStore.payload.snapshot.isReady {
+                OhanaLog.warning(
+                    "Home initial read suppressed: visible=\(isHomeSurfaceVisible), live=\(scenePhase == .active), refreshAllowed=\(homeSurfaceGate.allowsRefresh)",
+                    category: "Home",
+                    privacy: .publicText
+                )
             }
+            // A refresh-key change can arrive while Settings, the account
+            // switcher, or another route covers Home. The key will already
+            // contain the new value when Home becomes visible again, so there
+            // may be no second task invocation to recover a non-forced request.
+            // Preserve every suppressed request and consume it as one forced
+            // read-model refresh when the surface resumes.
+            pendingForcedRefresh = HomeSurfaceRefreshPolicy
+                .pendingForcedRefreshAfterSuppressedRequest(
+                    requestWasSuppressed: true,
+                    wasPending: pendingForcedRefresh
+                )
             return
         }
         readModelStore.requestRefresh(
@@ -379,9 +391,14 @@ struct VerticalSolidHomeDataContainer: View {
     }
 
     private var canRefreshHomeSurface: Bool {
-        HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
+        let allowsEssentialInitialRead = workloadPolicy.allowsEssentialInitialSnapshotRead(
+            isVisible: isHomeSurfaceVisible,
+            isLive: scenePhase == .active,
+            hasSnapshot: readModelStore.payload.snapshot.isReady
+        )
+        return HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
             isHomeSurfaceVisible: isHomeSurfaceVisible,
-            isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh
+            isRuntimeRefreshAllowed: homeSurfaceGate.allowsRefresh || allowsEssentialInitialRead
         )
     }
 
@@ -463,6 +480,10 @@ struct VerticalSolidHomeDataContainer: View {
             return
         }
 
+        pendingForcedRefresh = HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+            snapshotIsReady: readModelStore.payload.snapshot.isReady,
+            wasPending: pendingForcedRefresh
+        )
         refreshKeyStateTask?.cancel()
         refreshKeyStateTask = nil
         languageRefreshTask?.cancel()
@@ -473,6 +494,10 @@ struct VerticalSolidHomeDataContainer: View {
 
     private func handleHomeSurfaceRefreshAllowanceChange(_ allowsRefresh: Bool) {
         guard allowsRefresh else {
+            pendingForcedRefresh = HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: readModelStore.payload.snapshot.isReady,
+                wasPending: pendingForcedRefresh
+            )
             refreshKeyStateTask?.cancel()
             refreshKeyStateTask = nil
             languageRefreshTask?.cancel()
@@ -520,5 +545,19 @@ nonisolated enum HomeSurfaceRefreshPolicy {
         isRuntimeRefreshAllowed: Bool
     ) -> Bool {
         isHomeSurfaceVisible && isRuntimeRefreshAllowed
+    }
+
+    static func pendingForcedRefreshAfterSuspension(
+        snapshotIsReady: Bool,
+        wasPending: Bool
+    ) -> Bool {
+        wasPending || !snapshotIsReady
+    }
+
+    static func pendingForcedRefreshAfterSuppressedRequest(
+        requestWasSuppressed: Bool,
+        wasPending: Bool
+    ) -> Bool {
+        wasPending || requestWasSuppressed
     }
 }

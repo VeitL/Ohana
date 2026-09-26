@@ -690,10 +690,12 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private func performBulkDefer() {
         guard !isBulkDeferPending else { return }
-        guard !SettingsDebugTools.isRunningUITests else {
-            statusMessage = bulkDeferUITestMessage()
-            return
-        }
+        #if DEBUG
+            guard !SettingsDebugTools.isRunningUITests else {
+                statusMessage = bulkDeferUITestMessage()
+                return
+            }
+        #endif
 
         isBulkDeferPending = true
         statusMessage = bulkDeferInProgressMessage()

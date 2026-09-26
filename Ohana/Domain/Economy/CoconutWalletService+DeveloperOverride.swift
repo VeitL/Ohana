@@ -8,6 +8,7 @@
 import Foundation
 import SwiftData
 
+#if DEBUG
 extension CoconutWalletService {
     static func setDeveloperOverrideBalance(
         amount rawAmount: Int,
@@ -91,3 +92,4 @@ extension CoconutWalletService {
         }
     }
 }
+#endif

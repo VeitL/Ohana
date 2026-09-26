@@ -66,9 +66,9 @@ extension Color {
     static let ohanaAccentEnd = Color(hex: "e0c3fc")
 
     // MARK: - Go UI Color Palette
-    static let goLime = Color(hex: "C8FF00")
+    static let goLime = Color(hex: "C8F34A")
     static let goBackground = Color(hex: "4338FF")
-    static let goLimeLight = Color(hex: "E8FFB0")
+    static let goLimeLight = Color(hex: "E3FA97")
     static let goMint = Color(hex: "B8FFD0")
     static let goYellow = Color(hex: "FFF44F")
     static let goYellowBright = Color(hex: "FFEB3B")
@@ -80,19 +80,20 @@ extension Color {
     static let goTeal = Color(hex: "00D4AA")
     static let goOrange = Color(hex: "FF8C42")
     static let goRed = Color(hex: "FF4757")
-    static let goBlue = Color(hex: "3B82F6")
+    static let goBlue = Color(hex: "2563EB")
     static let goPurple = Color(hex: "A855F7")
     static let goDarkBlue = Color(hex: "1A0E4B")
     static let goDeepNavy = Color(hex: "0D0638")
     static let foodDry = Color(light: Color(hex: "D97706"), dark: Color(hex: "FFB84D"))
     static let foodWet = Color(light: Color(hex: "DB2777"), dark: Color(hex: "F472B6"))
     static let foodStock = Color(light: Color(hex: "16A34A"), dark: Color(hex: "86EFAC"))
-    /// V4 主强调色：深色模式使用 lime，浅色模式使用清爽蓝，避免浅底 lime 对比不足。
-    static let goPrimary = Color(light: goBlue, dark: goLime)
-    static let goPrimaryLight = Color(light: Color(hex: "60A5FA"), dark: Color(hex: "E0FF80"))
-    static let goPrimaryDark = Color(light: Color(hex: "2563EB"), dark: Color(hex: "9ECC00"))
+    /// V4 主强调色：产品默认深色使用 lime、浅色使用清爽蓝。Debug
+    /// 主色实验室可以临时替换两套颜色，Release 始终回到产品默认值。
+    static var goPrimary: Color { OhanaPrimaryAccentPreferences.adaptivePrimaryColor }
+    static var goPrimaryLight: Color { OhanaPrimaryAccentPreferences.adaptiveLighterColor }
+    static var goPrimaryDark: Color { OhanaPrimaryAccentPreferences.adaptiveDarkerColor }
     /// V4 功能图标色：所有导航、设置行、快捷操作和功能入口使用同一套纯色 glyph。
-    static let ohanaFunctionalIcon = Color.goPrimary
+    static var ohanaFunctionalIcon: Color { Color.goPrimary }
 
     // MARK: - Theme Semantic Colors
     static let ohanaCardSurface = Color(light: Color(hex: "EEF1F6"), dark: Color(hex: "1A2030"))
@@ -107,7 +108,7 @@ extension Color {
     static let ohanaPopupSurfaceHighlight = Color(light: Color.white.opacity(0.38), dark: Color.white.opacity(0.16)) // ui-v4: allow semantic popup glass edge highlight
     static let ohanaCardStroke = Color(light: Color.clear, dark: Color.clear)
     static let ohanaGlassStroke = Color(light: Color.black.opacity(0.08), dark: Color.white.opacity(0.14)) // ui-v4: allow semantic color token source
-    static let ohanaPrimaryActionText = Color(light: Color.white, dark: Color.arkInk) // ui-v4: allow semantic color token source
+    static var ohanaPrimaryActionText: Color { OhanaPrimaryAccentPreferences.adaptiveActionTextColor } // ui-v4: allow semantic color token source
 
     // MARK: - Alert Semantic Colors (from Figma Tokens, Light/Dark adaptive)
     // Alert/Success
@@ -214,14 +215,16 @@ extension Color {
 }
 
 nonisolated enum OhanaThemeColorPolicy {
-    static let darkPrimaryHex = "C8FF00"
-    static let lightPrimaryHex = "3B82F6"
+    static let darkPrimaryHex = "C8F34A"
+    static let lightPrimaryHex = "2563EB"
     static let petFallbackHex = "FF5252"
     static let humanFallbackHex = "F97316"
 
     private static let reservedMemberThemeHexes: Set<String> = [
-        darkPrimaryHex, "E8FFB0", "E0FF80", "9ECC00",
-        lightPrimaryHex, "60A5FA", "2563EB", "007AFF", "4DA1FF",
+        darkPrimaryHex, "E3FA97", "91B82E",
+        "C8FF00", "E8FFB0", "E0FF80", "9ECC00",
+        lightPrimaryHex, "60A5FA", "1D4ED8",
+        "3B82F6", "007AFF", "4DA1FF",
         "38BDF8", "233BFF", "4338FF"
     ]
 

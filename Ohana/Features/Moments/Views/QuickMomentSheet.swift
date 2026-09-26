@@ -53,10 +53,19 @@ struct QuickMomentSheet: View {
     @State private var popupDragOffset: CGFloat = 0
 
     /// 记录时刻强调色：有宠物时用主题色
-    private var momentAccent: Color {
-        guard let pet else { return Color.goPrimary }
+    private var momentAccentHex: String? {
+        guard let pet else { return nil }
         let hex = pet.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Color(hex: hex.isEmpty ? "FF7600" : hex)
+        return hex.isEmpty ? "FF7600" : hex
+    }
+
+    private var momentAccent: Color {
+        momentAccentHex.map { Color(hex: $0) } ?? Color.goPrimary
+    }
+
+    private var momentAccentForeground: Color {
+        guard let momentAccentHex else { return Color.ohanaPrimaryActionText }
+        return OhanaResolvedPrimaryAccent(customHex: momentAccentHex)?.actionTextColor ?? Color.ohanaPrimaryText
     }
 
     private var canSave: Bool {
@@ -328,7 +337,7 @@ struct QuickMomentSheet: View {
                     } label: {
                         Text(l.tr(zh: "定位", en: "Locate", de: "Orten"))
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(momentAccentForeground)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(Capsule().fill(momentAccent))
@@ -385,14 +394,20 @@ struct QuickMomentSheet: View {
                             title: selectedPhotos.isEmpty
                                 ? l.tr(zh: "相册", en: "Album", de: "Album")
                                 : l.tr(zh: "继续添加", en: "Add More", de: "Mehr hinzufügen"),
-                            color: momentAccent
+                            color: momentAccent,
+                            foreground: momentAccentForeground
                         )
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(selectedPhotos.count >= maxDraftPhotos)
 
                     Button { presentMomentCamera() } label: {
-                        photoActionLabel(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: Color.goTeal)
+                        photoActionLabel(
+                            icon: "camera.fill",
+                            title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"),
+                            color: Color.goTeal,
+                            foreground: Color.arkInk
+                        )
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .disabled(selectedPhotos.count >= maxDraftPhotos)
@@ -438,7 +453,10 @@ struct QuickMomentSheet: View {
             }
             .padding(10)
         }
-        .frame(width: max(0, min(ScreenCompat.width - 64, 320)), height: 240)
+        .containerRelativeFrame(.horizontal) { width, _ in
+            max(0, min(width - 44, 320))
+        }
+        .frame(height: 240)
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
@@ -446,14 +464,14 @@ struct QuickMomentSheet: View {
         }
     }
 
-    private func photoActionLabel(icon: String, title: String, color: Color) -> some View {
+    private func photoActionLabel(icon: String, title: String, color: Color, foreground: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
                 .font(OhanaFont.callout(.black))
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(foreground)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(color, in: Capsule())
@@ -533,7 +551,7 @@ struct QuickMomentSheet: View {
             HStack(spacing: 8) {
                 if isSaving {
                     ProgressView()
-                        .tint(Color.arkInk)
+                        .tint(Color.ohanaPrimaryActionText)
                         .scaleEffect(0.8)
                 } else {
                     Image(systemName: canSave ? "checkmark.circle.fill" : "lock.fill")
@@ -546,7 +564,7 @@ struct QuickMomentSheet: View {
                         : l.tr(zh: "写点什么或添加照片", en: "Add text or a photo", de: "Text oder Foto hinzufügen")))
                     .font(OhanaFont.body(.black))
             }
-            .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
+            .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(

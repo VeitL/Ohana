@@ -10,6 +10,37 @@
 
 import SwiftUI
 
+extension View {
+    /// Matches the system rounded input on iOS 27 while preserving the iOS 26 form style.
+    @ViewBuilder
+    func ohanaRoundedTextFieldStyle() -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            textFieldStyle(.bordered)
+                .textInputBorderShape(.roundedRectangle)
+        } else {
+            textFieldStyle(.roundedBorder)
+        }
+        #else
+        textFieldStyle(.roundedBorder)
+        #endif
+    }
+
+    /// A compact switch between alternate content views, announced as tabs on iOS 27.
+    @ViewBuilder
+    func ohanaContentTabsPickerStyle() -> some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            pickerStyle(.tabs)
+        } else {
+            pickerStyle(.segmented)
+        }
+        #else
+        pickerStyle(.segmented)
+        #endif
+    }
+}
+
 // MARK: - Radius Scale
 // Anchored on verified V4 values already shipping in the app. Do not invent
 // new steps here without updating ui规范.selection.json and docs/design/ui规范.md.
@@ -174,7 +205,7 @@ struct OhanaChoiceChipRow: View {
         } label: {
             Text(option)
                 .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .padding(.horizontal, 12)

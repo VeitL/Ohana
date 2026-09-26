@@ -40,11 +40,19 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     func testAddPlantPrimaryPathUsesCatalogAndChoiceChipsWithoutTyping() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true, plantBaselineSeedCount: 1)
+        let app = launchEnglishApp(
+            resetPersistentState: true,
+            enableProductionOverlays: true,
+            plantBaselineSeedCount: 1
+        )
         ensureHouseholdHome(in: app)
         _ = ensureReusablePlantBaselineAndReturnHomePlantName(in: app)
 
-        let plantName = addPlantFromHomePlantsTab(in: app)
+        let plantName = addPlantFromHomePlantsTab(
+            in: app,
+            catalogID: "monstera-deliciosa",
+            expectedPlantName: "monstera"
+        )
         assertHomePlantCard(named: plantName, in: app)
     }
 
@@ -97,20 +105,22 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    func testExistingPlantWalletExpandCollapseReturnsToStableDeckWithoutReset() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true, plantBaselineSeedCount: 6)
+    func testPlantWalletExpandCollapseReturnsToStableRoomDeck() throws {
+        let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true, plantBaselineSeedCount: 6)
         ensureHouseholdHome(in: app)
 
         let plantNames = seedPlantWalletBaselineAndReturnVisibleNames(count: 6, in: app)
-        XCTAssertGreaterThanOrEqual(plantNames.count, 6, "Plant wallet stability test needs six visible plant cards.")
+        XCTAssertGreaterThanOrEqual(plantNames.count, 6, "Plant wallet stability test needs six seeded plant cards.")
 
-        let visibleCards = plantNames.prefix(6).map { plantCard(named: $0, in: app) }
+        let firstCard = revealPlantCard(named: plantNames[0], in: app)
+        XCTAssertTrue(firstCard.waitForExistence(timeout: 8), "The first room did not reveal its plant cards.")
+        let visibleCards = Array(plantWalletCardElements(in: app).prefix(3))
+        XCTAssertEqual(visibleCards.count, 3, "Six seeded plants should open as three cards in the selected room.")
         for (index, card) in visibleCards.enumerated() {
             XCTAssertTrue(waitForTapFrame(card, in: app, timeout: 8), "Plant wallet card \(index + 1) was not tappable before expansion.")
         }
 
-        let framesBefore = visibleCards.map(\.frame)
-        let firstCard = visibleCards[0]
+        let cardIdentifiersBefore = visibleCards.map(\.identifier)
 
         XCTAssertTrue(tapWhenFrameReady(firstCard, timeout: 8), "First plant wallet card did not accept the expansion tap.")
         let expandedDetail = app.buttons["home-expanded-detail-plant"]
@@ -120,49 +130,47 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(tapWhenFrameReady(expandedCollapse, timeout: 8), "Expanded plant wallet card did not expose a collapse hit layer.")
         XCTAssertTrue(waitUntil(timeout: 8) { !expandedCollapse.exists && !expandedDetail.exists }, "Expanded plant wallet controls stayed visible after collapsing.")
 
-        for (index, card) in visibleCards.enumerated() {
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { plantWalletCardElements(in: app).count == 3 },
+            "The selected room did not restore all three cards after the collapse animation."
+        )
+        let visibleCardsAfter = Array(plantWalletCardElements(in: app).prefix(3))
+        XCTAssertEqual(
+            visibleCardsAfter.map(\.identifier),
+            cardIdentifiersBefore,
+            "Expanding and collapsing a plant should preserve the selected room's card order."
+        )
+        for (index, card) in visibleCardsAfter.enumerated() {
             XCTAssertTrue(waitForTapFrame(card, in: app, timeout: 8), "Plant wallet card \(index + 1) did not return to a tappable collapsed state.")
-            assertFrame(card.frame, isNear: framesBefore[index], tolerance: 28, message: "Plant card \(index + 1) shifted after expand/collapse.")
         }
     }
 
     @MainActor
-    func testPlantWalletLongListKeepsCardsInOneBalancedDeck() throws {
+    func testPlantWalletLongListGroupsCardsIntoRoomStacks() throws {
         let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true, plantBaselineSeedCount: 8)
         ensureHouseholdHome(in: app)
 
-        _ = seedPlantWalletBaselineAndReturnVisibleNames(count: 8, in: app)
-        let initialCards = plantWalletCardElements(in: app)
-        let initialFrameDiagnostics = initialCards.map { "\($0.identifier)=\($0.frame)" }.joined(separator: "; ")
-        XCTAssertGreaterThanOrEqual(
-            initialCards.count,
-            8,
-            "Eight seeded plant cards should stay mounted in one balanced deck. frames=\(initialFrameDiagnostics)"
-        )
+        let plantNames = seedPlantWalletBaselineAndReturnVisibleNames(count: 8, in: app)
+        XCTAssertEqual(plantNames.count, 8, "The two room stacks should expose all eight seeded plants.")
 
-        let sortedMidY = initialCards.map(\.frame.midY).sorted()
-        let maxVerticalGap = zip(sortedMidY.dropFirst(), sortedMidY)
-            .map { next, previous in next - previous }
-            .max() ?? 0
-        XCTAssertLessThan(
-            maxVerticalGap,
-            220,
-            "Plant cards should be evenly distributed without a detached seventh-card section. maxGap=\(maxVerticalGap), frames=\(initialFrameDiagnostics)"
-        )
-
-        let lastCard = try XCTUnwrap(initialCards.last, "Could not find the trailing plant card in the balanced deck.")
-        XCTAssertTrue(waitForTapFrameHittable(lastCard, in: app, timeout: 8), "The trailing plant card should be reachable in the balanced deck without scrolling to a separate section.")
-        XCTAssertTrue(tapWhenFrameReady(lastCard, timeout: 8), "The trailing plant card did not accept an expand tap from the balanced deck.")
-        let expandedDetail = app.buttons["home-expanded-detail-plant"]
-        XCTAssertTrue(expandedDetail.waitForExistence(timeout: 8), "The trailing plant card did not expand from the balanced deck.")
-
-        let expandedCollapse = app.buttons["home-expanded-collapse-plant"]
-        XCTAssertTrue(tapWhenFrameReady(expandedCollapse, timeout: 8), "The expanded trailing plant card did not expose a collapse hit layer.")
-        XCTAssertTrue(waitUntil(timeout: 8) { !expandedCollapse.exists && !expandedDetail.exists }, "Expanded balanced-deck plant controls stayed visible after collapsing.")
+        let stackIdentifiers = plantRoomStackIdentifiers(in: app)
+        XCTAssertEqual(stackIdentifiers.count, 2, "Eight alternating seeded plants should produce two room stacks.")
+        for identifier in stackIdentifiers {
+            let stack = app.buttons[identifier]
+            XCTAssertTrue(
+                scrollElementIntoTapFrame(stack, in: app, maxSwipes: 8),
+                "Room stack \(identifier) did not enter the visible viewport."
+            )
+            XCTAssertTrue(tapWhenFrameReady(stack, timeout: 8), "Room stack \(identifier) was not tappable.")
+            XCTAssertTrue(app.buttons["home-plants-room-stack-close"].waitForExistence(timeout: 8), "Room stack \(identifier) did not open.")
+            XCTAssertEqual(plantWalletCardElements(in: app).count, 4, "Each seeded room should contain four real plant cards.")
+            XCTAssertTrue(tapWhenFrameReady(app.buttons["home-plants-room-stack-close"], timeout: 8), "Room stack \(identifier) did not close.")
+            XCTAssertTrue(app.descendants(matching: .any)["home-plants-room-stack-overview"].waitForExistence(timeout: 8), "Closing \(identifier) did not restore the room stack overview.")
+        }
     }
 
     @MainActor
-    func testPlantRoomRailFiltersAfterCollapsingExpandedCard() throws {
+    func testPlantRoomStacksFilterAndRestoreOverview() throws {
         let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true, plantBaselineSeedCount: 4)
         ensureHouseholdHome(in: app)
 
@@ -176,103 +184,61 @@ final class PlantModuleUITests: XCTestCase {
             "Seeded plant names did not include a Balcony plant. names=\(plantNames)"
         )
 
-        let balconyFilter = app.buttons["home-plants-room-edge-balcony"]
-        let allFilter = app.buttons["home-plants-room-edge-all"]
-        if !balconyFilter.waitForExistence(timeout: 8) || !allFilter.waitForExistence(timeout: 2) {
-            XCTFail("Plants room rail buttons did not appear with multiple seeded rooms.")
-            return
-        }
-        XCTAssertTrue(waitForTapFrame(balconyFilter, in: app, timeout: 8), "Balcony room rail button was not tappable.")
-        XCTAssertTrue(waitForTapFrame(allFilter, in: app, timeout: 8), "All room rail button was not tappable.")
-
-        let livingRoomCard = plantCard(named: livingRoomPlant, in: app)
-        XCTAssertTrue(waitForTapFrame(livingRoomCard, in: app, timeout: 8), "Living room plant card was not tappable before filtering.")
-        let livingRoomFrameBeforeFiltering = livingRoomCard.frame
-        let balconyCardBeforeFiltering = plantCard(named: balconyPlant, in: app)
-        XCTAssertTrue(waitForTapFrame(balconyCardBeforeFiltering, in: app, timeout: 8), "Balcony plant card was not tappable before filtering.")
-        let balconyFrameBeforeFiltering = balconyCardBeforeFiltering.frame
-        XCTAssertTrue(tapWhenFrameReady(livingRoomCard, timeout: 8), "Living room plant card did not expand before room filtering.")
-        let expandedDetail = app.buttons["home-expanded-detail-plant"]
-        XCTAssertTrue(expandedDetail.waitForExistence(timeout: 8), "Expanded plant card did not expose detail before room filtering.")
-        XCTAssertFalse(
-            balconyFilter.exists || allFilter.exists,
-            "Room rail should stay hidden while a plant card is expanded."
-        )
-
-        let expandedCollapse = app.buttons["home-expanded-collapse-plant"]
+        let livingRoomStack = app.buttons["home-plants-room-stack-living-room"]
         XCTAssertTrue(
-            tapWhenFrameReady(expandedCollapse, timeout: 8),
-            "Expanded plant card did not expose a stable collapse action before room filtering."
+            scrollElementIntoTapFrame(livingRoomStack, in: app, maxSwipes: 8),
+            "Living room card stack did not enter the visible viewport."
         )
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                !expandedDetail.exists && balconyFilter.exists && allFilter.exists
-            },
-            "Collapsing the plant card did not restore the room rail."
-        )
+        XCTAssertTrue(tapWhenFrameReady(livingRoomStack, timeout: 8), "Living room card stack did not open.")
+        XCTAssertTrue(plantCard(named: livingRoomPlant, in: app).waitForExistence(timeout: 8), "Living room stack did not reveal its plant cards.")
+        XCTAssertFalse(plantCard(named: balconyPlant, in: app).exists, "Living room stack should not expose Balcony cards.")
 
-        XCTAssertTrue(tapWhenFrameReady(balconyFilter, timeout: 8), "Balcony room rail button did not accept a tap.")
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                plantCard(named: balconyPlant, in: app).exists &&
-                    !plantCard(named: livingRoomPlant, in: app).exists
-            },
-            "Balcony filter did not hide the expanded Living room plant and show the Balcony plant."
-        )
-        let balconyCardAfterFiltering = plantCard(named: balconyPlant, in: app)
-        XCTAssertTrue(waitForTapFrame(balconyCardAfterFiltering, in: app, timeout: 8), "Balcony plant card was not tappable after filtering.")
-        let balconyFrameAfterFiltering = balconyCardAfterFiltering.frame
-        XCTAssertLessThan(
-            abs(balconyFrameAfterFiltering.midX - livingRoomFrameBeforeFiltering.midX),
-            max(36, abs(balconyFrameBeforeFiltering.midX - livingRoomFrameBeforeFiltering.midX) * 0.42),
-            "Room rail filtering should recompute the deck and move the Balcony card into the filtered front slot."
-        )
-        XCTAssertGreaterThan(
-            abs(balconyFrameAfterFiltering.midX - balconyFrameBeforeFiltering.midX),
-            48,
-            "Room rail filtering should not leave the Balcony card in its previous all-room deck slot."
-        )
+        let closeRoom = app.buttons["home-plants-room-stack-close"]
+        XCTAssertTrue(tapWhenFrameReady(closeRoom, timeout: 8), "Living room stack did not close.")
+        XCTAssertTrue(app.descendants(matching: .any)["home-plants-room-stack-overview"].waitForExistence(timeout: 8), "Closing Living room did not restore the overview.")
 
-        XCTAssertTrue(tapWhenFrameReady(allFilter, timeout: 8), "All room rail button did not accept a tap.")
+        let balconyStack = app.buttons["home-plants-room-stack-balcony"]
         XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                plantCard(named: balconyPlant, in: app).exists &&
-                    plantCard(named: livingRoomPlant, in: app).exists
-            },
-            "All room filter did not restore both room groups."
+            scrollElementIntoTapFrame(balconyStack, in: app, maxSwipes: 8),
+            "Balcony card stack did not enter the visible viewport."
         )
-        let balconyCardAfterAll = plantCard(named: balconyPlant, in: app)
-        XCTAssertTrue(waitForTapFrame(balconyCardAfterAll, in: app, timeout: 8), "Balcony plant card was not tappable after returning to All.")
-        assertFrame(
-            balconyCardAfterAll.frame,
-            isNear: balconyFrameBeforeFiltering,
-            tolerance: 28,
-            message: "Returning to All should restore the Balcony card's original all-room deck slot."
-        )
+        XCTAssertTrue(tapWhenFrameReady(balconyStack, timeout: 8), "Balcony card stack did not open.")
+        XCTAssertTrue(plantCard(named: balconyPlant, in: app).waitForExistence(timeout: 8), "Balcony stack did not reveal its plant cards.")
+        XCTAssertFalse(plantCard(named: livingRoomPlant, in: app).exists, "Balcony stack should not expose Living room cards.")
     }
 
     @MainActor
-    func testHomePlantViewSwitcherRailSwitchesToListMode() throws {
+    func testHomePlantExpandAllGroupsCompactCardsByRoom() throws {
         let app = launchEnglishApp(resetPersistentState: true, enableProductionOverlays: true, plantBaselineSeedCount: 4)
         ensureHouseholdHome(in: app)
 
         _ = seedPlantWalletBaselineAndReturnVisibleNames(count: 4, in: app)
 
-        let deckButton = app.buttons["home-plants-view-deck"]
-        let listButton = app.buttons["home-plants-view-list"]
-        XCTAssertTrue(deckButton.waitForExistence(timeout: 8), "Home plants view switcher did not expose the card-stack button.")
-        XCTAssertTrue(listButton.waitForExistence(timeout: 8), "Home plants view switcher did not expose the list button.")
-        XCTAssertTrue(waitForTapFrame(listButton, in: app, timeout: 8), "Home plants list view switcher was not frame-ready.")
-        XCTAssertTrue(tapWhenFrameReady(listButton, timeout: 8), "Home plants list view switcher did not accept a tap.")
+        let expandAll = app.buttons["home-plants-expand-all"]
+        XCTAssertTrue(expandAll.waitForExistence(timeout: 8), "Home plants did not expose the Expand all button.")
+        XCTAssertTrue(tapWhenFrameReady(expandAll, timeout: 8), "Home plants Expand all button did not accept a tap.")
 
-        let listCards = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-plants-room-list-card-"))
-        XCTAssertTrue(
-            waitUntil(timeout: 8) { listCards.count > 0 },
-            "Home plants list cards did not appear after selecting list mode."
+        let expandedView = app.descendants(matching: .any)["home-plants-all-expanded-view"]
+        XCTAssertTrue(expandedView.waitForExistence(timeout: 8), "Home plants grouped card grid did not appear.")
+        let expandedCards = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "home-plants-all-expanded-card-")
         )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { expandedCards.count == 4 },
+            "Expand all should expose all four compact plant cards."
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["home-plants-all-expanded-room-living-room"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["home-plants-all-expanded-room-balcony"].exists)
         XCTAssertFalse(
             app.descendants(matching: .any)["home-plants-room-edge-rail"].exists,
-            "Home plants room rail should hide in list mode."
+            "Home plants room rail should hide while every room is expanded."
+        )
+
+        let collapseAll = app.buttons["home-plants-collapse-all"]
+        XCTAssertTrue(tapWhenFrameReady(collapseAll, timeout: 8), "Home plants Collapse button did not accept a tap.")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["home-plants-room-stack-overview"].waitForExistence(timeout: 8),
+            "Collapse did not restore the room-stack overview."
         )
     }
 
@@ -283,7 +249,7 @@ final class PlantModuleUITests: XCTestCase {
 
         let plantNames = seedPlantWalletBaselineAndReturnVisibleNames(count: 4, in: app)
         let plantName = try XCTUnwrap(plantNames.first, "Plant quick-action route test needs a seeded visible plant.")
-        let card = plantCard(named: plantName, in: app)
+        let card = revealPlantCard(named: plantName, in: app)
         XCTAssertTrue(waitForTapFrame(card, in: app, timeout: 8), "Seeded plant card was not tappable before opening quick actions.")
         XCTAssertTrue(tapWhenFrameReady(card, timeout: 8), "Seeded plant card did not expand.")
 
@@ -291,7 +257,7 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(waterAction.waitForExistence(timeout: 8), "Expanded plant card did not expose the default Water quick action.")
         XCTAssertTrue(tapWhenFrameReady(waterAction, timeout: 8), "Plant Water quick action did not accept a tap.")
 
-        let quickRecordAction = app.buttons
+        let quickRecordActions = app.buttons
             .matching(
                 NSPredicate(
                     format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
@@ -299,8 +265,7 @@ final class PlantModuleUITests: XCTestCase {
                     "-plantWater-quick"
                 )
             )
-            .firstMatch
-        let detailAction = app.buttons
+        let detailActions = app.buttons
             .matching(
                 NSPredicate(
                     format: "identifier BEGINSWITH %@ AND identifier ENDSWITH %@",
@@ -308,13 +273,30 @@ final class PlantModuleUITests: XCTestCase {
                     "-plantWater-detail"
                 )
             )
-            .firstMatch
-        XCTAssertTrue(quickRecordAction.waitForExistence(timeout: 8), "Plant Water quick action did not expose the Quick Record submenu action.")
-        XCTAssertTrue(detailAction.waitForExistence(timeout: 8), "Plant Water quick action did not expose the Detail submenu action.")
-        XCTAssertTrue(tapWhenFrameReady(detailAction, timeout: 8), "Plant Water detail submenu action did not accept a tap.")
+        guard let quickRecordAction = firstVisibleEnabledHittableButton(
+            matching: quickRecordActions,
+            in: app,
+            timeout: 8
+        ) else {
+            XCTFail("Plant Water quick action did not expose a visible, enabled Quick Record submenu button.")
+            return
+        }
+        guard let detailAction = firstVisibleEnabledHittableButton(
+            matching: detailActions,
+            in: app,
+            timeout: 8
+        ) else {
+            XCTFail("Plant Water quick action did not expose a visible, enabled Detail submenu button.")
+            return
+        }
+        XCTAssertTrue(quickRecordAction.exists, "Plant Water quick action did not expose the Quick Record submenu action.")
+        detailAction.tap()
+
+        let careRouteRoot = app.descendants(matching: .any)["plant-care-feature-header"]
+        let waterGuidedHome = app.descendants(matching: .any)["plant-care-feature-water-guided-home"]
         XCTAssertTrue(
-            app.descendants(matching: .any)["plant-care-feature-water-guided-home"].waitForExistence(timeout: 12),
-            "Plant Water detail submenu action did not open the watering care detail."
+            waitUntil(timeout: 12) { careRouteRoot.exists && waterGuidedHome.exists },
+            "Plant Water detail submenu action did not open the watering care route root and guided-home marker."
         )
     }
 
@@ -429,14 +411,14 @@ final class PlantModuleUITests: XCTestCase {
         openPlantReminderPanel(in: app)
         let bulkDefer = app.descendants(matching: .any)["settings-plant-reminders-defer-all"]
         for _ in 0 ..< 6 where !isTapFrameVisible(bulkDefer, in: app) {
-            scrollSettingsDown(in: app)
+            scrollSettingsTowardTapFrame(of: bulkDefer, in: app)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
         XCTAssertTrue(
-            waitForTapFrame(bulkDefer, in: app, timeout: 8),
-            "Plant reminder bulk defer action did not expose a visible touch frame."
+            waitForTapFrameHittable(bulkDefer, in: app, timeout: 8),
+            "Plant reminder bulk defer action did not become semantically tappable."
         )
-        bulkDefer.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        bulkDefer.tap()
 
         closeSettingsToHome(in: app)
         openPlantDetail(named: originalPlantName, in: app)
@@ -464,13 +446,22 @@ final class PlantModuleUITests: XCTestCase {
         if resetPersistentState {
             app.launchArguments += ["-OHANA_RESET_PERSISTENT_STATE"]
         }
+        let shouldSeedCompletePlantFixture = resetPersistentState && plantBaselineSeedCount != nil
+        if shouldSeedCompletePlantFixture {
+            app.launchArguments += [
+                "-OHANA_UI_TEST_SEED_HUMAN_BASELINE",
+                "-OHANA_UI_TEST_HUMAN_BASELINE_NAME",
+                "Codex Plant Module Human",
+                "-OHANA_UI_TEST_SEED_MEMBER_CARD_BASELINE"
+            ]
+        }
         if enableProductionOverlays {
             app.launchArguments += ["-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS"]
         }
         if enableAnimations {
             app.launchArguments += ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
         }
-        if unlockRewardTier {
+        if unlockRewardTier || shouldSeedCompletePlantFixture {
             app.launchArguments += ["-OHANA_UI_TEST_UNLOCK_REWARD_TIER"]
         }
         if let plantBaselineSeedCount {
@@ -481,6 +472,22 @@ final class PlantModuleUITests: XCTestCase {
             ]
         }
         app.launch()
+        if app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 3) {
+            tapWhenHittable(app.buttons["zen-toolbar-settings"], timeout: 8)
+            XCTAssertTrue(
+                app.descendants(matching: .any)["settings-screen"].waitForExistence(timeout: 12),
+                "Settings did not open to restore the Standard experience for the plant test."
+            )
+            tapWhenHittable(app.buttons["settings-experience-mode-standard"], timeout: 8)
+            XCTAssertTrue(
+                app.buttons["home-tab-home"].waitForExistence(timeout: 20),
+                "Switching from Zen to Standard did not restore the plant-test shell."
+            )
+        }
+        let standardMode = app.buttons["app-experience-standard"]
+        if standardMode.waitForExistence(timeout: 3) {
+            standardMode.tap()
+        }
         return app
     }
 
@@ -503,14 +510,15 @@ final class PlantModuleUITests: XCTestCase {
     @MainActor
     private func completeFirstDayStarterFunnel(in app: XCUIApplication) {
         openFirstPetCreationFromJourney(in: app)
+        let petName = "Codex Pet \(Int(Date().timeIntervalSince1970))"
         createMember(
             in: app,
-            name: "Codex Pet \(Int(Date().timeIntervalSince1970))",
+            name: petName,
             flowTitle: "Create Pet Card",
             missingFieldMessage: "Pet creation name field did not appear.",
             completionMessage: "Creating the first pet did not leave the pet creation handoff in time.",
             starterPetWeight: "7",
-            postSaveMarkerIdentifiers: ["starter-gift-finish-action"]
+            postSaveMarkerIdentifiers: ["home-card-pet-\(petName)"]
         )
         finishRequiredStarterGift(in: app)
     }
@@ -518,12 +526,28 @@ final class PlantModuleUITests: XCTestCase {
     @MainActor
     private func ensureHouseholdHome(in app: XCUIApplication) {
         if app.buttons["home-settings-action"].waitForExistence(timeout: 8) {
+            dismissZenIntroductionIfPresent(in: app)
             return
         }
 
         createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
         XCTAssertTrue(app.buttons["home-settings-action"].waitForExistence(timeout: 12), "Home did not become available after creating the baseline household.")
+        dismissZenIntroductionIfPresent(in: app)
+    }
+
+    @MainActor
+    private func dismissZenIntroductionIfPresent(in app: XCUIApplication) {
+        let introduction = app.buttons["zen-introduction-banner"]
+        guard introduction.waitForExistence(timeout: 2) else { return }
+        XCTAssertTrue(
+            tapWhenFrameReady(introduction, timeout: 8),
+            "Zen introduction did not accept its semantic dismiss action."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !introduction.exists },
+            "Zen introduction stayed mounted after dismissal."
+        )
     }
 
     @MainActor
@@ -640,7 +664,11 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
-    private func addPlantFromHomePlantsTab(in app: XCUIApplication) -> String {
+    private func addPlantFromHomePlantsTab(
+        in app: XCUIApplication,
+        catalogID: String = "epipremnum-aureum",
+        expectedPlantName: String = "pothos"
+    ) -> String {
         let addEntry = app.buttons["home-primary-action"]
         tapWhenHittable(addEntry, timeout: 8)
         let addPlantShortcut = app.buttons["home-add-plant-action"]
@@ -650,11 +678,13 @@ final class PlantModuleUITests: XCTestCase {
         let addPlantStep = app.descendants(matching: .any)["add-plant-step-plant-room"]
         XCTAssertTrue(addPlantStep.waitForExistence(timeout: 8), "Add Plant did not open on the plant-and-room step.")
 
-        let pothosChoice = app.descendants(matching: .any)["add-plant-common-catalog-epipremnum-aureum"]
-        scrollToElement(pothosChoice, in: app, maxSwipes: 2)
-        XCTAssertTrue(tapWhenFrameReady(pothosChoice, timeout: 8), "Pothos catalog choice did not become tappable.")
+        let catalogChoice = app.descendants(matching: .any)["add-plant-common-catalog-\(catalogID)"]
+        scrollToElement(catalogChoice, in: app, maxSwipes: 2)
+        XCTAssertTrue(
+            tapWhenFrameReady(catalogChoice, timeout: 8),
+            "Plant catalog choice \(catalogID) did not become tappable."
+        )
 
-        let expectedPlantName = "pothos"
         let defaultName = app.staticTexts["add-plant-name-summary-secondary-value"]
         XCTAssertTrue(defaultName.waitForExistence(timeout: 8), "Catalog choice did not expose the default plant name summary.")
         XCTAssertTrue(
@@ -699,9 +729,15 @@ final class PlantModuleUITests: XCTestCase {
         )
 
         let didReturnToPlants = waitUntil(timeout: 20) {
-            plantCard(named: expectedPlantName, in: app).exists || app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", expectedPlantName)).firstMatch.exists
+            app.descendants(matching: .any)["home-plants-page"].exists &&
+                (app.descendants(matching: .any)["home-plants-room-stack-overview"].exists ||
+                    plantCard(named: expectedPlantName, in: app).exists)
         }
-        XCTAssertTrue(didReturnToPlants, "Adding a plant did not return to the Home plants page with the new plant visible.")
+        XCTAssertTrue(didReturnToPlants, "Adding a plant did not return to the Home plants page.")
+        XCTAssertTrue(
+            revealPlantCard(named: expectedPlantName, in: app).waitForExistence(timeout: 12),
+            "The new plant was not available inside its room stack."
+        )
         return expectedPlantName
     }
 
@@ -721,7 +757,7 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func assertHomePlantCard(named plantName: String, in app: XCUIApplication) {
-        let card = plantCard(named: plantName, in: app)
+        let card = revealPlantCard(named: plantName, in: app)
         XCTAssertTrue(card.waitForExistence(timeout: 12), "Home plants tab did not show the created plant card.")
     }
 
@@ -731,7 +767,7 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(plantsTab.waitForExistence(timeout: 12), "Plants tab did not exist before opening plant detail.")
         XCTAssertTrue(tapWhenFrameReady(plantsTab, timeout: 8), "Plants tab did not become frame-ready before opening plant detail.")
         XCTAssertTrue(app.descendants(matching: .any)["home-plants-page"].waitForExistence(timeout: 12), "Home plants page did not open before opening plant detail.")
-        let card = plantCard(named: plantName, in: app)
+        let card = revealPlantCard(named: plantName, in: app)
         XCTAssertTrue(card.waitForExistence(timeout: 14), "Plant card was not visible before opening detail.")
         tapWhenFrameReady(card, timeout: 8)
         if !app.descendants(matching: .any)["plant-detail-screen"].waitForExistence(timeout: 2) {
@@ -770,14 +806,12 @@ final class PlantModuleUITests: XCTestCase {
     private func openPlantsTabAndReturnFirstPlantName(in app: XCUIApplication) -> String {
         let plantsTab = app.buttons["home-tab-plants"]
         XCTAssertTrue(plantsTab.waitForExistence(timeout: 14), "Plants tab did not appear after seeding plant baseline.")
-        tapWhenFrameReady(plantsTab, timeout: 8)
+        XCTAssertTrue(tapWhenFrameReady(plantsTab, timeout: 8), "Plants tab did not become tappable after seeding plant baseline.")
         XCTAssertTrue(app.descendants(matching: .any)["home-plants-page"].waitForExistence(timeout: 12), "Home plants page did not open.")
 
-        let firstPlantCard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "home-card-plant-")).firstMatch
-        XCTAssertTrue(firstPlantCard.waitForExistence(timeout: 12), "Home plants page did not show any plant card after seeding.")
-        let prefix = "home-card-plant-"
-        XCTAssertTrue(firstPlantCard.identifier.hasPrefix(prefix), "First plant card did not expose a plant-card identifier.")
-        return String(firstPlantCard.identifier.dropFirst(prefix.count))
+        let plantNames = plantNamesAcrossRoomStacks(minCount: 1, in: app, timeout: 12)
+        XCTAssertFalse(plantNames.isEmpty, "Home plants page did not show any room stack after seeding.")
+        return plantNames.first ?? ""
     }
 
     @MainActor
@@ -786,12 +820,7 @@ final class PlantModuleUITests: XCTestCase {
         guard tapWhenFrameReady(plantsTab, timeout: 5) else { return "" }
         guard app.descendants(matching: .any)["home-plants-page"].waitForExistence(timeout: 8) else { return "" }
 
-        let prefix = "home-card-plant-"
-        let firstPlantCard = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix)).firstMatch
-        guard firstPlantCard.waitForExistence(timeout: 4), firstPlantCard.identifier.hasPrefix(prefix) else {
-            return ""
-        }
-        return String(firstPlantCard.identifier.dropFirst(prefix.count))
+        return plantNamesAcrossRoomStacks(minCount: 1, in: app, timeout: 4).first ?? ""
     }
 
     @MainActor
@@ -801,16 +830,9 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(tapWhenFrameReady(plantsTab, timeout: 8), "Plants tab did not become tappable after seeding plant baseline.")
         XCTAssertTrue(app.descendants(matching: .any)["home-plants-page"].waitForExistence(timeout: 12), "Home plants page did not open.")
 
-        let prefix = "home-card-plant-"
-        let cards = plantWalletCardsQuery(in: app, prefix: prefix)
-        XCTAssertTrue(waitUntil(timeout: 12) { cards.count >= minCount }, "Home plants page did not show \(minCount) plant wallet cards after seeding.")
-
-        let visibleCount = min(cards.count, max(0, minCount))
-        return (0 ..< visibleCount).compactMap { index in
-            let identifier = cards.element(boundBy: index).identifier
-            guard identifier.hasPrefix(prefix) else { return nil }
-            return String(identifier.dropFirst(prefix.count))
-        }
+        let plantNames = plantNamesAcrossRoomStacks(minCount: minCount, in: app, timeout: 12)
+        XCTAssertGreaterThanOrEqual(plantNames.count, minCount, "Home plants page did not expose \(minCount) plant cards across its room stacks after seeding.")
+        return Array(plantNames.prefix(max(0, minCount)))
     }
 
     @MainActor
@@ -819,17 +841,9 @@ final class PlantModuleUITests: XCTestCase {
         guard tapWhenFrameReady(plantsTab, timeout: 5) else { return [] }
         guard app.descendants(matching: .any)["home-plants-page"].waitForExistence(timeout: 8) else { return [] }
 
-        let prefix = "home-card-plant-"
-        let cards = plantWalletCardsQuery(in: app, prefix: prefix)
-        let hasEnoughCards = waitUntil(timeout: 8) { cards.count >= minCount }
-        guard hasEnoughCards else { return [] }
-
-        let visibleCount = min(cards.count, max(0, minCount))
-        return (0 ..< visibleCount).compactMap { index in
-            let identifier = cards.element(boundBy: index).identifier
-            guard identifier.hasPrefix(prefix) else { return nil }
-            return String(identifier.dropFirst(prefix.count))
-        }
+        let plantNames = plantNamesAcrossRoomStacks(minCount: minCount, in: app, timeout: 8)
+        guard plantNames.count >= minCount else { return [] }
+        return Array(plantNames.prefix(max(0, minCount)))
     }
 
     @MainActor
@@ -866,11 +880,134 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     @MainActor
+    private func revealPlantCard(named plantName: String, in app: XCUIApplication) -> XCUIElement {
+        let existingCard = plantCard(named: plantName, in: app)
+        if existingCard.exists {
+            return existingCard
+        }
+
+        restoreRoomStackOverviewIfPossible(in: app)
+        let overview = app.descendants(matching: .any)["home-plants-room-stack-overview"]
+        guard overview.waitForExistence(timeout: 8) else {
+            return plantCard(named: plantName, in: app)
+        }
+
+        for identifier in plantRoomStackIdentifiers(in: app) {
+            let stack = app.buttons[identifier]
+            scrollToElement(stack, in: app, maxSwipes: 5)
+            guard tapWhenFrameReady(stack, timeout: 8) else { continue }
+
+            let card = plantCard(named: plantName, in: app)
+            if card.waitForExistence(timeout: 3) {
+                return card
+            }
+
+            closeSelectedPlantRoomIfPossible(in: app)
+            _ = overview.waitForExistence(timeout: 8)
+        }
+
+        return plantCard(named: plantName, in: app)
+    }
+
+    @MainActor
+    private func plantNamesAcrossRoomStacks(
+        minCount: Int,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> [String] {
+        guard minCount > 0 else { return [] }
+
+        var plantNames: [String] = []
+        appendVisiblePlantNames(to: &plantNames, in: app)
+        if plantNames.count >= minCount {
+            closeSelectedPlantRoomIfPossible(in: app)
+            return plantNames
+        }
+
+        restoreRoomStackOverviewIfPossible(in: app)
+        let overview = app.descendants(matching: .any)["home-plants-room-stack-overview"]
+        guard overview.waitForExistence(timeout: timeout) else { return plantNames }
+
+        let stackIdentifiers = plantRoomStackIdentifiers(in: app)
+        for identifier in stackIdentifiers {
+            let stack = app.buttons[identifier]
+            scrollToElement(stack, in: app, maxSwipes: 5)
+            guard tapWhenFrameReady(stack, timeout: 8) else { continue }
+
+            _ = waitUntil(timeout: 5) { !plantWalletCardElements(in: app).isEmpty }
+            appendVisiblePlantNames(to: &plantNames, in: app)
+            closeSelectedPlantRoomIfPossible(in: app)
+            _ = overview.waitForExistence(timeout: 8)
+
+            if plantNames.count >= minCount {
+                break
+            }
+        }
+
+        return plantNames
+    }
+
+    @MainActor
+    private func appendVisiblePlantNames(to plantNames: inout [String], in app: XCUIApplication) {
+        let prefix = "home-card-plant-"
+        let cards = plantWalletCardsQuery(in: app, prefix: prefix)
+        for index in 0 ..< cards.count {
+            let identifier = cards.element(boundBy: index).identifier
+            guard identifier.hasPrefix(prefix) else { continue }
+            let plantName = String(identifier.dropFirst(prefix.count))
+            if !plantNames.contains(plantName) {
+                plantNames.append(plantName)
+            }
+        }
+    }
+
+    @MainActor
+    private func plantRoomStackIdentifiers(in app: XCUIApplication) -> [String] {
+        let prefix = "home-plants-room-stack-"
+        let excludedIdentifiers = Set([
+            "home-plants-room-stack-close",
+            "home-plants-room-stack-overview"
+        ])
+        let stacks = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
+        var identifiers: [String] = []
+        for index in 0 ..< stacks.count {
+            let identifier = stacks.element(boundBy: index).identifier
+            guard !identifier.isEmpty, !excludedIdentifiers.contains(identifier), !identifiers.contains(identifier) else {
+                continue
+            }
+            identifiers.append(identifier)
+        }
+        return identifiers
+    }
+
+    @MainActor
+    private func restoreRoomStackOverviewIfPossible(in app: XCUIApplication) {
+        closeSelectedPlantRoomIfPossible(in: app)
+
+        let overview = app.descendants(matching: .any)["home-plants-room-stack-overview"]
+        if overview.exists { return }
+
+        let collapseAll = app.buttons["home-plants-collapse-all"]
+        if collapseAll.exists {
+            _ = tapWhenFrameReady(collapseAll, timeout: 5)
+            _ = overview.waitForExistence(timeout: 8)
+        }
+    }
+
+    @MainActor
+    private func closeSelectedPlantRoomIfPossible(in app: XCUIApplication) {
+        let closeRoom = app.buttons["home-plants-room-stack-close"]
+        if closeRoom.exists {
+            _ = tapWhenFrameReady(closeRoom, timeout: 8)
+        }
+    }
+
+    @MainActor
     private func exercisePlantEditCancelAndSave(originalName: String, in app: XCUIApplication) {
         let cancelledName = "\(originalName) Cancelled"
         openPlantEditSheet(in: app)
         replaceText(cancelledName, inTextField: "plant-edit-name-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        submitPlantEditName(cancelledName, in: app)
         if !tapWhenFrameReady(app.buttons["ohana-sheet-close-action"], timeout: 4) {
             dismissCurrentSheetByDrag(in: app)
         }
@@ -881,11 +1018,23 @@ final class PlantModuleUITests: XCTestCase {
         let savedName = "\(originalName) Edited"
         openPlantEditSheet(in: app)
         replaceText(savedName, inTextField: "plant-edit-name-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        submitPlantEditName(savedName, in: app)
         scrollToElement(app.buttons["plant-edit-save-action"], in: app, maxSwipes: 6)
         tapWhenFrameReady(app.buttons["plant-edit-save-action"], timeout: 8)
         XCTAssertTrue(waitUntil(timeout: 12) { !app.descendants(matching: .any)["plant-edit-sheet"].exists }, "Plant edit sheet did not close after saving.")
         assertPlantDetailName(savedName, in: app, timeout: 12, context: "after saving edit")
+    }
+
+    @MainActor
+    private func submitPlantEditName(_ expectedName: String, in app: XCUIApplication) {
+        let nameInput = app.textFields["plant-edit-name-input"]
+        nameInput.typeText("\n")
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists },
+            "Submitting the plant name did not dismiss the keyboard."
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["plant-edit-sheet"].exists, "Submitting the plant name unexpectedly closed its draft.")
+        XCTAssertEqual(nameInput.value as? String, expectedName, "Completing name entry changed the plant draft.")
     }
 
     @MainActor
@@ -982,6 +1131,19 @@ final class PlantModuleUITests: XCTestCase {
         let overview = app.descendants(matching: .any)["settings-plant-reminders-overview"]
         if overview.exists { return }
 
+        let notificationsCategory = app.buttons["settings-destination-notifications"]
+        scrollToElement(notificationsCategory, in: app, maxSwipes: 10)
+        XCTAssertTrue(
+            notificationsCategory.waitForExistence(timeout: 8),
+            "Settings did not expose the Notifications category."
+        )
+        tapWhenFrameReady(notificationsCategory, timeout: 8)
+        XCTAssertTrue(
+            app.descendants(matching: .any)["settings-notifications-screen"]
+                .waitForExistence(timeout: 8),
+            "Settings did not open the Notifications page."
+        )
+
         let disclosure = app.buttons["settings-advanced-notifications-disclosure"]
         scrollToElement(disclosure, in: app, maxSwipes: 10)
         XCTAssertTrue(disclosure.waitForExistence(timeout: 8), "Advanced reminder settings disclosure did not appear in Settings.")
@@ -995,6 +1157,10 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func assertPlantReminderToggleCanRoundTrip(_ plantToggle: XCUIElement, in app: XCUIApplication) {
+        guard waitForTapFrame(plantToggle, in: app, timeout: 8) else {
+            XCTFail("Per-plant reminder control did not become frame-ready: \(plantToggle)")
+            return
+        }
         guard let startsEnabled = switchOnState(of: plantToggle) else {
             XCTFail("Per-plant reminder control did not expose an initial on/off value. label=\(plantToggle.label), value=\(String(describing: plantToggle.value ?? ""))")
             return
@@ -1017,15 +1183,20 @@ final class PlantModuleUITests: XCTestCase {
     private func findPlantReminderToggle(named plantName: String, in app: XCUIApplication, maxSwipes: Int) -> XCUIElement {
         let slug = plantReminderIdentifierSlug(for: plantName)
         let identified = app.descendants(matching: .any)["settings-plant-reminders-plant-toggle-\(slug)"]
-        let row = app.otherElements.matching(NSPredicate(
+        let labeledSwitch = app.switches.matching(NSPredicate(
+            format: "label CONTAINS[c] %@",
+            plantName
+        )).firstMatch
+        let row = app.descendants(matching: .any).matching(NSPredicate(
             format: "identifier BEGINSWITH %@ AND label CONTAINS[c] %@",
             "settings-plant-reminders-plant-row-",
             plantName
         )).firstMatch
-        let section = app.otherElements["settings-plant-reminders-plant-section"]
-        let emptyState = app.otherElements["settings-plant-reminders-empty-state"]
+        let section = app.descendants(matching: .any)["settings-plant-reminders-plant-section"]
+        let emptyState = app.descendants(matching: .any)["settings-plant-reminders-empty-state"]
 
         for _ in 0 ..< maxSwipes {
+            if isTapFrameVisible(labeledSwitch, in: app) { return labeledSwitch }
             if isTapFrameVisible(identified, in: app) { return identified }
             if isTapFrameVisible(row, in: app) { return row }
             if emptyState.exists {
@@ -1034,17 +1205,24 @@ final class PlantModuleUITests: XCTestCase {
             }
             if section.exists {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+                if isTapFrameVisible(labeledSwitch, in: app) { return labeledSwitch }
                 if isTapFrameVisible(identified, in: app) { return identified }
                 if isTapFrameVisible(row, in: app) { return row }
             }
-            scrollSettingsDown(in: app)
+            if let positionedCandidate = [labeledSwitch, identified, row].first(where: {
+                $0.exists && isFiniteFrame($0.frame)
+            }) {
+                scrollSettingsTowardTapFrame(of: positionedCandidate, in: app)
+            } else {
+                scrollSettingsOneStepTowardLaterContent(in: app)
+            }
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
 
         if emptyState.exists {
             XCTFail("Settings plant reminder panel loaded with no plants after creating \(plantName).")
         }
-        return identified
+        return labeledSwitch.exists ? labeledSwitch : identified
     }
 
     private func plantReminderIdentifierSlug(for plantName: String) -> String {
@@ -1150,11 +1328,17 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(calendarTab.waitForExistence(timeout: 12), "Calendar tab did not exist.")
         tapWhenHittable(calendarTab, timeout: 8)
 
-        let allFilter = app.buttons["calendar-filter-all"]
-        XCTAssertTrue(allFilter.waitForExistence(timeout: 14), "Calendar screen did not open after tapping the Home Calendar tab.")
-        tapWhenHittable(allFilter, timeout: 8)
+        let calendarSurface = app.buttons["task-center-surface-calendar"]
+        XCTAssertTrue(
+            calendarSurface.waitForExistence(timeout: 14),
+            "Task Center did not expose the Calendar surface from the Home tab."
+        )
+        tapWhenHittable(calendarSurface, timeout: 8)
 
+        let allFilter = app.buttons["calendar-filter-all"]
         let listMode = app.buttons["calendar-view-mode-list"]
+        XCTAssertTrue(allFilter.waitForExistence(timeout: 14), "Calendar All filter did not appear.")
+        tapWhenHittable(allFilter, timeout: 8)
         XCTAssertTrue(listMode.waitForExistence(timeout: 10), "Calendar list-view toggle did not appear.")
         tapWhenHittable(listMode, timeout: 8)
     }
@@ -1198,30 +1382,61 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(addEventAction.waitForExistence(timeout: 10), "Calendar add-event action did not appear.")
         XCTAssertTrue(tapWhenFrameReady(addEventAction, timeout: 8), "Calendar add-event action did not become tappable.")
         typeText(title, intoTextField: "add-event-title-input", in: app)
-        dismissKeyboardIfPresent(in: app)
+        let keyboardDone = app.buttons["add-event-keyboard-dismiss-action"]
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { keyboardDone.exists && keyboardDone.isHittable },
+            "Calendar keyboard Done did not become tappable."
+        )
+        keyboardDone.tap()
+        XCTAssertTrue(waitUntil(timeout: 8) { !app.keyboards.firstMatch.exists }, "Calendar Done did not dismiss the keyboard.")
+        XCTAssertEqual(app.textFields["add-event-title-input"].value as? String, title, "Calendar Done changed or closed the event draft.")
 
         if let linkedPlantName {
-            let plantChip = app.buttons["add-event-related-plant-\(linkedPlantName)"]
-            XCTAssertTrue(plantChip.waitForExistence(timeout: 8), "Calendar add-event sheet did not expose the related plant chip for \(linkedPlantName).")
-            for _ in 0 ..< 10 where !isTapFrameVisible(plantChip, in: app) {
-                scrollTowardTapFrame(of: plantChip, in: app)
-                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            }
-            XCTAssertTrue(waitForTapFrame(plantChip, in: app, timeout: 8), "Calendar related plant chip was not visibly tappable for \(linkedPlantName).")
-            plantChip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            let relatedEntityPicker = app.descendants(matching: .any)["add-event-related-entity-picker"]
+            scrollToElement(relatedEntityPicker, in: app, maxSwipes: 6)
             XCTAssertTrue(
-                waitUntil(timeout: 4) { plantChip.value as? String == "Selected" },
-                "Calendar related plant chip did not enter the selected state for \(linkedPlantName)."
+                relatedEntityPicker.waitForExistence(timeout: 8),
+                "Calendar add-event sheet did not expose the related-entity picker."
+            )
+
+            let plantOption = app.buttons["add-event-related-plant-\(linkedPlantName)"]
+            XCTAssertTrue(
+                plantOption.waitForExistence(timeout: 8),
+                "Calendar related-entity picker did not expose \(linkedPlantName)."
+            )
+            tapWhenHittable(plantOption, timeout: 8)
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    relatedEntityPicker.exists
+                        && String(describing: relatedEntityPicker.value).contains(linkedPlantName)
+                },
+                "Calendar related-entity selection did not return \(linkedPlantName) to the editor."
             )
         }
 
-        let saveAction = app.buttons["add-event-save-action"]
-        scrollToElement(saveAction, in: app, maxSwipes: 4)
+        let saveAction = app.buttons["add-event-navigation-save-action"]
         XCTAssertTrue(tapWhenFrameReady(saveAction, timeout: 8), "Calendar add-event save action did not become tappable.")
+        allowPendingNotificationAuthorization(in: app)
         XCTAssertTrue(
             waitUntil(timeout: 14) { !app.textFields["add-event-title-input"].exists },
             "Calendar add-event sheet did not close after saving \(title)."
         )
+    }
+
+    @MainActor
+    private func allowPendingNotificationAuthorization(in app: XCUIApplication) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let labels = ["Allow", "Zulassen", "允许"]
+        let appButtons = labels.map { app.alerts.buttons[$0].firstMatch }
+        let springboardButtons = labels.map { springboard.alerts.buttons[$0].firstMatch }
+        guard waitUntil(timeout: 3, condition: {
+            appButtons.contains(where: \.exists) || springboardButtons.contains(where: \.exists)
+        }) else { return }
+
+        if let button = appButtons.first(where: { $0.exists && $0.isEnabled }) ??
+            springboardButtons.first(where: { $0.exists && $0.isEnabled }) {
+            button.tap()
+        }
     }
 
     @MainActor
@@ -1292,12 +1507,27 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func tapPlantDetailDeleteAction(in app: XCUIApplication) {
-        let deleteAction = app.buttons["plant-detail-delete-action"]
-        XCTAssertTrue(
-            waitForTapFrame(deleteAction, in: app, timeout: 8),
-            "Plant detail delete action did not become visible."
+        let detailScreen = app.descendants(matching: .any)["plant-detail-screen"]
+        XCTAssertTrue(detailScreen.waitForExistence(timeout: 8), "Plant detail screen did not exist before deletion.")
+        guard detailScreen.exists else { return }
+
+        // Navigation-bar toolbar items are exposed as application buttons,
+        // not descendants of the identified scroll/detail container.
+        let deleteActions = app.buttons.matching(
+            NSPredicate(format: "identifier == %@", "plant-detail-delete-action")
         )
-        deleteAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        guard let deleteAction = firstVisibleEnabledHittableButton(
+            matching: deleteActions,
+            in: app,
+            timeout: 8
+        ) else {
+            XCTFail(
+                "Plant detail did not expose a visible, enabled delete action inside plant-detail-screen; runtime matches=\(deleteActions.count)."
+            )
+            return
+        }
+
+        deleteAction.tap()
     }
 
     @MainActor
@@ -1340,7 +1570,7 @@ final class PlantModuleUITests: XCTestCase {
         let settings = app.buttons["home-settings-action"]
         XCTAssertTrue(settings.waitForExistence(timeout: 12), "Home settings action did not appear.")
         tapWhenHittable(settings, timeout: 8)
-        XCTAssertTrue(app.otherElements["settings-screen"].waitForExistence(timeout: 12), "Settings screen did not open.")
+        XCTAssertTrue(app.buttons["settings-close-action"].waitForExistence(timeout: 12), "Settings screen did not open.")
     }
 
     @MainActor
@@ -1372,11 +1602,22 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func finishRequiredStarterGift(in app: XCUIApplication) {
+        let taskClaim = app.buttons["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
+        if !taskClaim.exists {
+            XCTAssertTrue(
+                tapWhenFrameReady(app.buttons["home-tab-calendar"], timeout: 8),
+                "Tasks was not reachable to claim the first-pet reward."
+            )
+        }
+        XCTAssertTrue(taskClaim.waitForExistence(timeout: 20), "First-pet reward task did not appear after the Pet was saved.")
+        XCTAssertFalse(app.buttons["starter-gift-finish-action"].exists, "Starter gift appeared before the reward task was opened.")
+        tapWhenHittable(taskClaim, timeout: 8)
+
         let finish = app.buttons["starter-gift-finish-action"]
-        XCTAssertTrue(finish.waitForExistence(timeout: 20), "Starter coconut gift unlock action did not appear.")
+        XCTAssertTrue(finish.waitForExistence(timeout: 20), "Starter coconut gift action did not appear after the reward task was opened.")
         XCTAssertFalse(app.buttons["home-tab-oasis"].exists, "Oasis tab should stay hidden until starter gift is tapped.")
         tapWhenHittable(finish, timeout: 8)
-        XCTAssertTrue(app.buttons["home-tab-oasis"].waitForExistence(timeout: 8), "Oasis tab did not appear after starter gift.")
+        XCTAssertTrue(app.buttons["home-tab-oasis"].waitForExistence(timeout: 8), "Oasis tab did not appear after unlocking the Coconut Tree.")
     }
 
     @MainActor
@@ -1430,6 +1671,7 @@ final class PlantModuleUITests: XCTestCase {
             }
             selectFirstPetSpeciesIfPresent(in: app)
             selectFirstPetBreedIfPresent(in: app)
+            selectFirstPetAppearanceIfPresent(in: app)
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
             if actionLabel.contains("Join Island") || actionLabel.contains("加入岛屿") || actionLabel.contains("Insel beitreten") {
@@ -1483,51 +1725,37 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func selectFirstPetSpeciesIfPresent(in app: XCUIApplication) {
-        let speciesMenu = app.buttons["member-pet-species-picker"]
-        guard speciesMenu.exists else { return }
+        let speciesButton = app.buttons["member-pet-species-option-dog"]
+        guard speciesButton.exists else { return }
         let creationPrimary = app.buttons["member-creation-primary-action"]
         if creationPrimary.isEnabled { return }
 
-        for _ in 0 ..< 3 {
-            guard tapWhenFrameReady(speciesMenu, timeout: 8) else { continue }
-            let options = ["Dog", "狗", "Hund"]
-            guard let option = options
-                .map({ app.buttons[$0].firstMatch })
-                .first(where: { $0.waitForExistence(timeout: 2) }) else { continue }
-            guard tapWhenFrameReady(option, timeout: 8) else { continue }
-            if waitUntil(timeout: 4, condition: {
-                app.buttons["member-pet-breed-picker"].exists
-            }) {
-                return
-            }
-        }
-        XCTFail("Pet creation species selection did not apply.")
+        XCTAssertTrue(tapWhenFrameReady(speciesButton, timeout: 8))
+        XCTAssertTrue(
+            app.buttons["member-pet-breed-picker"].waitForExistence(timeout: 8),
+            "Pet creation species selection did not apply."
+        )
     }
 
     @MainActor
     private func selectFirstPetAppearanceIfPresent(in app: XCUIApplication) {
-        let coatMenu = app.buttons["member-pet-coat-picker"]
-        guard coatMenu.exists else { return }
+        let boy = app.buttons["member-gender-boy"]
+        guard boy.exists else { return }
         let creationPrimary = app.buttons["member-creation-primary-action"]
         if creationPrimary.isEnabled { return }
 
-        let boy = app.buttons["member-gender-boy"]
-        if boy.waitForExistence(timeout: 3) {
-            tapWhenFrameReady(boy, timeout: 4)
-        }
-
-        for _ in 0 ..< 3 {
-            guard tapWhenFrameReady(coatMenu, timeout: 8) else { continue }
-            let menu = app.collectionViews.firstMatch
-            guard menu.waitForExistence(timeout: 6) else { continue }
-            let option = menu.cells.element(boundBy: 0).buttons.firstMatch
-            guard option.waitForExistence(timeout: 6) else { continue }
-            guard tapWhenFrameReady(option, timeout: 8) else { continue }
-            if waitUntil(timeout: 4, condition: { creationPrimary.isEnabled }) {
-                return
-            }
-        }
-        XCTFail("Pet creation appearance selection did not apply.")
+        XCTAssertTrue(
+            boy.waitForExistence(timeout: 3),
+            "Pet appearance did not expose the required sex choice."
+        )
+        XCTAssertTrue(
+            tapWhenFrameReady(boy, timeout: 4),
+            "Pet appearance required sex choice did not become tappable."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 6, condition: { creationPrimary.isEnabled }),
+            "Pet creation appearance selection did not enable the primary action."
+        )
     }
 
     @MainActor
@@ -1577,7 +1805,10 @@ final class PlantModuleUITests: XCTestCase {
     private func dismissKeyboardIfPresent(in app: XCUIApplication) {
         guard app.keyboards.firstMatch.exists else { return }
 
-        let returnKeyTitles = ["Done", "Return", "Search", "Go", "OK"]
+        let returnKeyTitles = [
+            "Done", "Return", "Search", "Go", "OK",
+            "Hide keyboard", "隐藏键盘", "Tastatur ausblenden"
+        ]
         if let key = returnKeyTitles
             .map({ app.keyboards.buttons[$0] })
             .first(where: { $0.exists && $0.isHittable }) {
@@ -1586,22 +1817,21 @@ final class PlantModuleUITests: XCTestCase {
         }
 
         if app.keyboards.firstMatch.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.16)).tap()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
-
-        if app.keyboards.firstMatch.exists {
             let keyboard = app.keyboards.firstMatch
-            keyboard.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
-                .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.92)))
+            keyboard.swipeDown()
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
     }
 
     @MainActor
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
-        for _ in 0 ..< maxSwipes where !element.exists || !element.isHittable {
-            app.swipeUp()
+        for _ in 0 ..< maxSwipes {
+            if isTapFrameVisible(element, in: app) {
+                if element.isHittable { return }
+                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+                continue
+            }
+            scrollTowardTapFrame(of: element, in: app)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
     }
@@ -1636,18 +1866,40 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func dragTowardEarlierContent(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.24))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.78))
-        start.press(forDuration: 0.04, thenDragTo: end)
+        let scrollView = plantDetailScrollView(in: app)
+        XCTAssertTrue(
+            scrollView.waitForExistence(timeout: 2),
+            "Plant detail did not expose a runtime ScrollView for an earlier-content search."
+        )
+        guard scrollView.exists else { return }
+        scrollView.swipeDown()
         RunLoop.current.run(until: Date().addingTimeInterval(0.35))
     }
 
     @MainActor
     private func dragTowardLaterContent(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.78))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.24))
-        start.press(forDuration: 0.04, thenDragTo: end)
+        let scrollView = plantDetailScrollView(in: app)
+        XCTAssertTrue(
+            scrollView.waitForExistence(timeout: 2),
+            "Plant detail did not expose a runtime ScrollView for a later-content search."
+        )
+        guard scrollView.exists else { return }
+        scrollView.swipeUp()
         RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+    }
+
+    private func plantDetailScrollView(in app: XCUIApplication) -> XCUIElement {
+        let identifiedScrollView = app.scrollViews["plant-detail-screen"]
+        if identifiedScrollView.exists {
+            return identifiedScrollView
+        }
+
+        let detailScreen = app.descendants(matching: .any)["plant-detail-screen"]
+        let nestedScrollView = detailScreen.descendants(matching: .scrollView).firstMatch
+        if nestedScrollView.exists {
+            return nestedScrollView
+        }
+        return app.scrollViews.firstMatch
     }
 
     @MainActor
@@ -1713,9 +1965,13 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func dismissCurrentSheetByDrag(in app: XCUIApplication) {
-        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.08))
-        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.86))
-        start.press(forDuration: 0.12, thenDragTo: end)
+        let sheet = app.descendants(matching: .any)["plant-edit-sheet"]
+        XCTAssertTrue(
+            sheet.waitForExistence(timeout: 2),
+            "Plant edit did not expose its semantic sheet element for interactive dismissal."
+        )
+        guard sheet.exists else { return }
+        sheet.swipeDown()
         RunLoop.current.run(until: Date().addingTimeInterval(0.6))
     }
 
@@ -1727,13 +1983,14 @@ final class PlantModuleUITests: XCTestCase {
 
         let later = app.buttons["growth-unlock-later-action"]
         let close = app.buttons["growth-unlock-close-action"]
-        if tapWhenFrameReady(later, timeout: 4) || tapWhenFrameReady(close, timeout: 4) {
-            _ = waitUntil(timeout: 5) { !popup.exists }
-            return
-        }
-
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
-        _ = waitUntil(timeout: 5) { !popup.exists }
+        XCTAssertTrue(
+            tapWhenFrameReady(later, timeout: 4) || tapWhenFrameReady(close, timeout: 4),
+            "Growth unlock popup did not expose a semantic Later or Close action."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 5) { !popup.exists },
+            "Growth unlock popup did not close after tapping its semantic dismissal action."
+        )
     }
 
     @MainActor
@@ -1757,10 +2014,12 @@ final class PlantModuleUITests: XCTestCase {
 
         let didBecomeFrameReady = waitForFrameReady(element, timeout: 1)
         let elementValue = element.value.map { String(describing: $0) } ?? "nil"
-        XCTAssertTrue(
-            didBecomeFrameReady,
-            "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
-        )
+        guard didBecomeFrameReady else {
+            XCTFail(
+                "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
+            )
+            return
+        }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
@@ -1789,6 +2048,25 @@ final class PlantModuleUITests: XCTestCase {
         }
     }
 
+    @MainActor
+    private func firstVisibleEnabledHittableButton(
+        matching query: XCUIElementQuery,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> XCUIElement? {
+        var matchedButton: XCUIElement?
+        let didFindMatch = waitUntil(timeout: timeout) {
+            guard let button = query.allElementsBoundByIndex.first(where: {
+                isTapFrameHittable($0, in: app)
+            }) else {
+                return false
+            }
+            matchedButton = button
+            return true
+        }
+        return didFindMatch ? matchedButton : nil
+    }
+
     private func isTapFrameHittable(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
         isTapFrameVisible(element, in: app) && element.isHittable
     }
@@ -1813,10 +2091,39 @@ final class PlantModuleUITests: XCTestCase {
             app.swipeUp()
             return
         }
-        if element.frame.midY < app.frame.minY {
+        let visibleFrame = app.frame.insetBy(dx: 0, dy: 8)
+        if element.frame.midY < visibleFrame.minY {
             app.swipeDown()
-        } else {
+        } else if element.frame.midY > visibleFrame.maxY {
             app.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func scrollElementIntoTapFrame(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int
+    ) -> Bool {
+        for _ in 0 ..< maxSwipes {
+            if isTapFrameHittable(element, in: app) { return true }
+            scrollTowardTapFrame(of: element, in: app)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+        return waitForTapFrameHittable(element, in: app, timeout: 2)
+    }
+
+    @MainActor
+    private func scrollSettingsTowardTapFrame(of element: XCUIElement, in app: XCUIApplication) {
+        guard element.exists, isFiniteFrame(element.frame) else {
+            scrollSettingsOneStepTowardLaterContent(in: app)
+            return
+        }
+        let visibleFrame = app.frame.insetBy(dx: 0, dy: 8)
+        if element.frame.midY < visibleFrame.minY {
+            scrollSettingsOneStepTowardEarlierContent(in: app)
+        } else if element.frame.midY > visibleFrame.maxY {
+            scrollSettingsOneStepTowardLaterContent(in: app)
         }
     }
 
@@ -1827,6 +2134,26 @@ final class PlantModuleUITests: XCTestCase {
             settingsScroll.swipeUp(velocity: .fast)
         } else {
             app.swipeUp(velocity: .fast)
+        }
+    }
+
+    @MainActor
+    private func scrollSettingsOneStepTowardLaterContent(in app: XCUIApplication) {
+        let settingsScroll = app.scrollViews["settings-main-scroll"]
+        if settingsScroll.exists {
+            settingsScroll.swipeUp()
+        } else {
+            app.swipeUp()
+        }
+    }
+
+    @MainActor
+    private func scrollSettingsOneStepTowardEarlierContent(in app: XCUIApplication) {
+        let settingsScroll = app.scrollViews["settings-main-scroll"]
+        if settingsScroll.exists {
+            settingsScroll.swipeDown()
+        } else {
+            app.swipeDown()
         }
     }
 

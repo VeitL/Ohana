@@ -10,6 +10,9 @@
 		4FDA09012F7A0001004B725F /* PetAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09002F7A0001004B725F /* PetAvatarAssets */; };
 		4FDA09112F7B0001004B725F /* HumanAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09102F7B0001004B725F /* HumanAvatarAssets */; };
 		4FDA09212F870001004B725F /* PlantAvatarAssets in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA09202F870001004B725F /* PlantAvatarAssets */; };
+		4FDA0C012FA10001004B725F /* Ohana.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 4FDA0C002FA10001004B725F /* Ohana.storekit */; };
+		AA000000000000000000000C /* OhanaWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000001 /* OhanaWidgets.appex */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		AA0000000000000000000011 /* SystemSurfaceContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000010 /* SystemSurfaceContracts.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,7 +30,28 @@
 			remoteGlobalIDString = 4FDA02302F54E0D4004B725F;
 			remoteInfo = Ohana;
 		};
+		AA000000000000000000000F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4FDA02292F54E0D4004B725F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = AA0000000000000000000004;
+			remoteInfo = OhanaWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		AA000000000000000000000D /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AA000000000000000000000C /* OhanaWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		4FDA02312F54E0D4004B725F /* Ohana.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Ohana.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -36,16 +60,127 @@
 		4FDA09002F7A0001004B725F /* PetAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PetAvatarAssets; path = Resources/Avatars/PetAvatarAssets; sourceTree = "<group>"; };
 		4FDA09102F7B0001004B725F /* HumanAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HumanAvatarAssets; path = Resources/Avatars/HumanAvatarAssets; sourceTree = "<group>"; };
 		4FDA09202F870001004B725F /* PlantAvatarAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PlantAvatarAssets; path = Resources/Avatars/PlantAvatarAssets; sourceTree = "<group>"; };
+		4FDA0C002FA10001004B725F /* Ohana.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; name = Ohana.storekit; path = Ohana/Configuration/Ohana.storekit; sourceTree = SOURCE_ROOT; };
+		AA0000000000000000000001 /* OhanaWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = OhanaWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000010 /* SystemSurfaceContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SystemSurfaceContracts.swift; path = Ohana/SystemSurfaces/SystemSurfaceContracts.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
 		4FDA07102F5C3A14004B725F /* Exceptions for "Ohana" folder in "Ohana" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"App/SharedCareUndoCoordinator 2.swift",
+				"App/SharedCareUndoCoordinator 3.swift",
+				Configuration/Ohana.storekit,
+				"Domain/Services/CarePlanCalendarSync+StrictScoopPlan 2.swift",
+				"Domain/Services/CarePlanCalendarSync+StrictScoopPlan 3.swift",
+				"Domain/Services/DataBackupManager+HumanNoteRecords 2.swift",
+				"Domain/Services/DataBackupManager+HumanNoteRecords 3.swift",
+				"Domain/Services/DataBackupManager+PrivacyFiltering 2.swift",
+				"Domain/Services/DataBackupManager+PrivacyFiltering 3.swift",
+				"Domain/Services/DomainHumanNoteRecordRehydrateWriter 2.swift",
+				"Domain/Services/DomainHumanNoteRecordRehydrateWriter 3.swift",
+				"Domain/Services/HumanActionAttributionPolicy 2.swift",
+				"Domain/Services/HumanActionAttributionPolicy 3.swift",
+				"Domain/Services/PhysicalDeletionService+HumanAttribution 2.swift",
+				"Domain/Services/PhysicalDeletionService+HumanAttribution 3.swift",
+				"Domain/Services/PhysicalDeletionService+UndoReceipts 2.swift",
+				"Domain/Services/PhysicalDeletionService+UndoReceipts 3.swift",
+				"Domain/Services/SharedCareDeferredFinalization 2.swift",
+				"Domain/Services/SharedCareDeferredFinalization 3.swift",
+				"Domain/Services/SharedCareSessionUndoService 2.swift",
+				"Domain/Services/SharedCareSessionUndoService 3.swift",
+				"Domain/Services/SharedCareUndoFinalizationService 2.swift",
+				"Domain/Services/SharedCareUndoFinalizationService 3.swift",
+				"Domain/Services/SharedPetActionRecorderSupport 2.swift",
+				"Domain/Services/SharedPetActionRecorderSupport 3.swift",
+				"Features/Calendar/CalendarEventCompletionCommands 2.swift",
+				"Features/Calendar/CalendarEventCompletionCommands 3.swift",
+				"Features/FamilyTasks/FamilyTaskService+Subject 2.swift",
+				"Features/FamilyTasks/FamilyTaskService+Subject 3.swift",
+				"Features/Home/ExpandedQuickActionExecutor+WriteIntent 2.swift",
+				"Features/Home/ExpandedQuickActionExecutor+WriteIntent 3.swift",
+				"Features/Home/HomeCommandExecutor+QuickActionWriteIntent 2.swift",
+				"Features/Home/HomeCommandExecutor+QuickActionWriteIntent 3.swift",
+				"Features/Home/TodayFocusEventActionHumanPolicy 2.swift",
+				"Features/Home/TodayFocusEventActionHumanPolicy 3.swift",
+				"Features/Home/Views/OverviewQuickActionGlyphDrawing 2.swift",
+				"Features/Home/Views/OverviewQuickActionGlyphDrawing 3.swift",
+				"Features/Home/Views/VerticalSolidHomePageDeck 2.swift",
+				"Features/Home/Views/VerticalSolidHomePageDeck 3.swift",
+				"Features/Home/Views/VerticalSolidHomeTodayFocusChrome 2.swift",
+				"Features/Home/Views/VerticalSolidHomeTodayFocusChrome 3.swift",
+				"Features/Home/Views/VerticalSolidHomeView+ActionHuman 2.swift",
+				"Features/Home/Views/VerticalSolidHomeView+ActionHuman 3.swift",
+				"Features/Plants/PlantBatchQuickRecordSnapshot 2.swift",
+				"Features/Plants/PlantBatchQuickRecordSnapshot 3.swift",
+				"Features/QuickCare/ActionHumanPickerDataContainer 2.swift",
+				"Features/QuickCare/ActionHumanPickerDataContainer 3.swift",
+				"Features/Tasks/TaskActionCommands 2.swift",
+				"Features/Tasks/TaskActionCommands 3.swift",
+				"Features/Tasks/TaskCareAssignmentCommands 2.swift",
+				"Features/Tasks/TaskCareAssignmentCommands 3.swift",
+				"Features/Tasks/TaskCenterRouting 2.swift",
+				"Features/Tasks/TaskCenterRouting 3.swift",
+				"Features/Tasks/TaskCreationValueModels 2.swift",
+				"Features/Tasks/TaskCreationValueModels 3.swift",
+				"Features/Walks/WalkActionHumanSelectionPolicy 2.swift",
+				"Features/Walks/WalkActionHumanSelectionPolicy 3.swift",
 				Info.plist,
 				InfoLocalDevice.plist,
+				"Models/HumanNoteRecord 2.swift",
+				"Models/HumanNoteRecord 3.swift",
+				"Models/SharedCareUndoReceipt 2.swift",
+				"Models/SharedCareUndoReceipt 3.swift",
+				"Shared/Components/ActionHumanConfirmationDialog 2.swift",
+				"Shared/Components/ActionHumanConfirmationDialog 3.swift",
+				"Shared/Components/ActionHumanPicker 2.swift",
+				"Shared/Components/ActionHumanPicker 3.swift",
 			);
 			target = 4FDA02302F54E0D4004B725F /* Ohana */;
+		};
+		4FDA0B102FA00001004B725F /* Exceptions for "OhanaTests" folder in "OhanaTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"ActionHumanPickerTests 2.swift",
+				"ActionHumanPickerTests 3.swift",
+				"ActorUXDefaultPolicyTests 2.swift",
+				"ActorUXDefaultPolicyTests 3.swift",
+				"AddEventTaskCreationTests 2.swift",
+				"AddEventTaskCreationTests 3.swift",
+				"CareLedgerStatsAggregationTests 2.swift",
+				"CareLedgerStatsAggregationTests 3.swift",
+				"HomeQuickActionWriteIntentTests 2.swift",
+				"HomeQuickActionWriteIntentTests 3.swift",
+				"PlantActionHumanAttributionTests 2.swift",
+				"PlantActionHumanAttributionTests 3.swift",
+				"QuickCareActionHumanAttributionTests 2.swift",
+				"QuickCareActionHumanAttributionTests 3.swift",
+				"SharedCareUndoRecoveryQueueTests 2.swift",
+				"SharedCareUndoRecoveryQueueTests 3.swift",
+				"TaskActionCommandExecutorTests 2.swift",
+				"TaskActionCommandExecutorTests 3.swift",
+				"TaskCareAssignmentCommandExecutorTests 2.swift",
+				"TaskCareAssignmentCommandExecutorTests 3.swift",
+				"TaskCareKindEventMarkerTests 2.swift",
+				"TaskCareKindEventMarkerTests 3.swift",
+				"TaskCreationValueModelsTests 2.swift",
+				"TaskCreationValueModelsTests 3.swift",
+				"TodayFocusTaskProjectionTests 2.swift",
+				"TodayFocusTaskProjectionTests 3.swift",
+				"WalkActionHumanSelectionPolicyTests 2.swift",
+				"WalkActionHumanSelectionPolicyTests 3.swift",
+				"WeightActionHumanAttributionTests 2.swift",
+				"WeightActionHumanAttributionTests 3.swift",
+			);
+			target = 4FDA023D2F54E0D6004B725F /* OhanaTests */;
+		};
+		AA0000000000000000000003 /* Exceptions for "OhanaWidgets" folder in "OhanaWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = AA0000000000000000000004 /* OhanaWidgets */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -60,12 +195,23 @@
 		};
 		4FDA02412F54E0D6004B725F /* OhanaTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4FDA0B102FA00001004B725F /* Exceptions for "OhanaTests" folder in "OhanaTests" target */,
+			);
 			path = OhanaTests;
 			sourceTree = "<group>";
 		};
 		4FDA024B2F54E0D6004B725F /* OhanaUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = OhanaUITests;
+			sourceTree = "<group>";
+		};
+		AA0000000000000000000002 /* OhanaWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA0000000000000000000003 /* Exceptions for "OhanaWidgets" folder in "OhanaWidgets" target */,
+			);
+			path = OhanaWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -92,19 +238,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000000000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		4F30B520300AF57C0056FC6C /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000010 /* SystemSurfaceContracts.swift */,
+				4FDA0C002FA10001004B725F /* Ohana.storekit */,
+			);
+			name = "Recovered References";
+			sourceTree = "<group>";
+		};
 		4FDA02282F54E0D4004B725F = {
 			isa = PBXGroup;
 			children = (
 				4FDA02332F54E0D4004B725F /* Ohana */,
+				AA0000000000000000000002 /* OhanaWidgets */,
 				4FDA09102F7B0001004B725F /* HumanAvatarAssets */,
 				4FDA09002F7A0001004B725F /* PetAvatarAssets */,
 				4FDA09202F870001004B725F /* PlantAvatarAssets */,
 				4FDA02412F54E0D6004B725F /* OhanaTests */,
 				4FDA024B2F54E0D6004B725F /* OhanaUITests */,
 				4FDA02322F54E0D4004B725F /* Products */,
+				4F30B520300AF57C0056FC6C /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -112,6 +276,7 @@
 			isa = PBXGroup;
 			children = (
 				4FDA02312F54E0D4004B725F /* Ohana.app */,
+				AA0000000000000000000001 /* OhanaWidgets.appex */,
 				4FDA023E2F54E0D6004B725F /* OhanaTests.xctest */,
 				4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */,
 			);
@@ -128,11 +293,13 @@
 				4FDA022D2F54E0D4004B725F /* Sources */,
 				4FDA022E2F54E0D4004B725F /* Frameworks */,
 				4FDA022F2F54E0D4004B725F /* Resources */,
+				AA000000000000000000000D /* Embed Foundation Extensions */,
 				4FDA09202F7C0001004B725F /* Strip Bundle Extended Attributes */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				AA000000000000000000000E /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4FDA02332F54E0D4004B725F /* Ohana */,
@@ -192,6 +359,28 @@
 			productReference = 4FDA02482F54E0D6004B725F /* OhanaUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		AA0000000000000000000004 /* OhanaWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000008 /* Build configuration list for PBXNativeTarget "OhanaWidgets" */;
+			buildPhases = (
+				AA0000000000000000000005 /* Sources */,
+				AA0000000000000000000006 /* Frameworks */,
+				AA0000000000000000000007 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AA0000000000000000000002 /* OhanaWidgets */,
+			);
+			name = OhanaWidgets;
+			packageProductDependencies = (
+			);
+			productName = OhanaWidgets;
+			productReference = AA0000000000000000000001 /* OhanaWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -212,6 +401,9 @@
 					4FDA02472F54E0D6004B725F = {
 						CreatedOnToolsVersion = 26.3;
 						TestTargetID = 4FDA02302F54E0D4004B725F;
+					};
+					AA0000000000000000000004 = {
+						CreatedOnToolsVersion = 26.3;
 					};
 				};
 			};
@@ -238,6 +430,7 @@
 			projectRoot = "";
 			targets = (
 				4FDA02302F54E0D4004B725F /* Ohana */,
+				AA0000000000000000000004 /* OhanaWidgets */,
 				4FDA023D2F54E0D6004B725F /* OhanaTests */,
 				4FDA02472F54E0D6004B725F /* OhanaUITests */,
 			);
@@ -263,6 +456,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4FDA02462F54E0D6004B725F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4FDA0C012FA10001004B725F /* Ohana.storekit in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AA0000000000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -359,6 +560,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		AA0000000000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000011 /* SystemSurfaceContracts.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -371,6 +580,11 @@
 			isa = PBXTargetDependency;
 			target = 4FDA02302F54E0D4004B725F /* Ohana */;
 			targetProxy = 4FDA02492F54E0D6004B725F /* PBXContainerItemProxy */;
+		};
+		AA000000000000000000000E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = AA0000000000000000000004 /* OhanaWidgets */;
+			targetProxy = AA000000000000000000000F /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -802,6 +1016,98 @@
 			};
 			name = LocalDeviceDebug;
 		};
+		AA0000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = OhanaWidgets/OhanaWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OhanaWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.guanchen.li.Ohana.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		AA000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = OhanaWidgets/OhanaWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OhanaWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.guanchen.li.Ohana.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		AA000000000000000000000B /* LocalDeviceDebug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = OhanaWidgets/OhanaWidgetsLocalDevice.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 567SK733UN;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = OhanaWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Ohana Local";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.guanchen.li.Ohana.LocalDevice.Widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "OHANA_LOCAL_DEVICE $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = LocalDeviceDebug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -841,6 +1147,16 @@
 				4FDA02592F54E0D6004B725F /* Debug */,
 				4FDA025A2F54E0D6004B725F /* Release */,
 				4FDE386D2FDC4BC700EE81BF /* LocalDeviceDebug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AA0000000000000000000008 /* Build configuration list for PBXNativeTarget "OhanaWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AA0000000000000000000009 /* Debug */,
+				AA000000000000000000000B /* LocalDeviceDebug */,
+				AA000000000000000000000A /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

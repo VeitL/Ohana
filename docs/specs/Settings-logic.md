@@ -1,14 +1,20 @@
 # Settings Module Logic
 
-Updated: 2026-06-12
+Updated: 2026-07-18
 
 ## Product Contract
 
 Settings is a release-facing control surface. First-launch/release users must only see controls that either work immediately or intentionally route to a real system setting. Developer-only diagnostics, visual labs, balance mutation tools, and experimental playgrounds are not release UI.
 
+Settings remains a native sheet. Its root is a lightweight index containing current member and pet management, experience mode, Personal, and six value-routed destinations: Region & Language, Appearance & Performance, Notifications, Privacy & Security, Data & Backup, and About. Destination pages use the system back action and retain a close action for dismissing the entire sheet.
+
+The route shell mounts immediately. Member, pet, and household rows are filled from `Sendable` snapshots produced by `SettingsRouteDataActor` after the first frame. A newer revision cancels and replaces stale work; a failed refresh preserves the last good snapshots and exposes retry without blocking the six destinations.
+
 ## Release Gates
 
 - Developer tools are Debug-only. Release builds must not expose design labs, performance diagnostics, privacy test panels, collaboration playgrounds, or coconut balance mutation tools.
+- Reduced visual effects A/B is available only from the Debug performance diagnostics destination; it is not a release Settings preference.
+- About renders the installed version as static information rather than an interactive control.
 - Empty action rows are not allowed in release UI. Privacy policy/contact entries stay hidden or tracked until final URLs or contact channels exist.
 - Notification category switches are real controls. If a Settings switch disables a category, reminder scheduling must skip local notification registration for that category while keeping the in-app reminder fact intact.
 - Notification preference decisions live in one shared policy path, not in Settings views. Settings only reads/writes user preference; `NotificationDeliveryPolicy` makes the scheduling decision.
@@ -30,9 +36,14 @@ When a group is off:
 - scheduling ledger records a user-disabled skip result;
 - the reminder status remains pending unless another domain service changes it.
 
+Advanced notification controls use a native `DisclosureGroup`. Plant and category reminder views are mounted only while that group is expanded.
+
+## Settings Open Performance Contract
+
+Home starts the `flow.settings.open` performance flow before presenting the sheet. Settings records `first_frame` after the route shell's first frame and `data_ready` when background snapshots become available. Fixed route delays are not part of the loading contract.
+
 ## Out Of Scope
 
 - No CloudKit enablement, remote push, subscription, account, or entitlement work.
 - No startup-path work beyond reading lightweight `UserDefaults` preferences during reminder scheduling.
 - No schema changes owned by Settings.
-

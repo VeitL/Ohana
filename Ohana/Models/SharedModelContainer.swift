@@ -1018,6 +1018,89 @@ enum ArkSchemaV91: VersionedSchema {
     }
 }
 
+// MARK: - Schema V92（商店购买外部发放恢复）
+enum ArkSchemaV92: VersionedSchema {
+    static var versionIdentifier = Schema.Version(92, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV91.models + [ShopPurchaseAttempt.self]
+    }
+}
+
+// MARK: - Schema V93（佛系模式打卡、参与区间、奖励回执与本机安全联系人）
+enum ArkSchemaV93: VersionedSchema {
+    static var versionIdentifier = Schema.Version(93, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV92.models + [
+            PresenceCheckIn.self,
+            PresenceParticipationPeriod.self,
+            PresenceRewardReceipt.self,
+            SafetyContact.self
+        ]
+    }
+}
+
+// MARK: - Schema V94（成就永久解锁与奖励回执）
+enum ArkSchemaV94: VersionedSchema {
+    static var versionIdentifier = Schema.Version(94, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV93.models + [
+            AchievementUnlock.self,
+            AchievementRewardReceipt.self
+        ]
+    }
+}
+
+// MARK: - Schema V95（家庭协作重复计划与收件人活动流）
+enum ArkSchemaV95: VersionedSchema {
+    static var versionIdentifier = Schema.Version(95, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV94.models + [
+            FamilyTaskPlan.self,
+            FamilyTaskActivity.self
+        ]
+    }
+}
+
+// MARK: - Schema V96（Family App 守护本机投影与可靠同步 outbox）
+enum ArkSchemaV96: VersionedSchema {
+    static var versionIdentifier = Schema.Version(96, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV95.models + [
+            GuardianSafetyPolicyProjection.self,
+            GuardianRelationshipProjection.self,
+            GuardianIncidentProjection.self,
+            GuardianSafetySyncOutbox.self
+        ]
+    }
+}
+
+// MARK: - Schema V97（成员健康状况与状态观察记录）
+enum ArkSchemaV97: VersionedSchema {
+    static var versionIdentifier = Schema.Version(97, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV96.models + [
+            HumanHealthCondition.self,
+            HumanHealthObservation.self
+        ]
+    }
+}
+
+// MARK: - Schema V98（端侧化验单导入来源与实验室参考范围）
+enum ArkSchemaV98: VersionedSchema {
+    static var versionIdentifier = Schema.Version(98, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV97.models
+    }
+}
+
+// MARK: - Schema V99（单笔花费多人支付明细）
+enum ArkSchemaV99: VersionedSchema {
+    static var versionIdentifier = Schema.Version(99, 0, 0)
+    static var models: [any PersistentModel.Type] {
+        ArkSchemaV98.models
+    }
+}
+
 // MARK: - Migration Plan
 // 只保留有真实 custom logic 的 stage；轻量新增字段/模型不需要显式 stage。
 // 相邻 schema hash 相同时，显式 stage 会触发 iOS 26 "model reference cannot be equal"。
@@ -1042,7 +1125,9 @@ enum ArkMigrationPlan: SchemaMigrationPlan {
          ArkSchemaV75.self, ArkSchemaV76.self, ArkSchemaV77.self, ArkSchemaV78.self, ArkSchemaV79.self,
          ArkSchemaV80.self, ArkSchemaV81.self, ArkSchemaV82.self, ArkSchemaV83.self, ArkSchemaV84.self,
          ArkSchemaV85.self, ArkSchemaV86.self, ArkSchemaV87.self, ArkSchemaV88.self,
-         ArkSchemaV89.self, ArkSchemaV90.self, ArkSchemaV91.self]
+         ArkSchemaV89.self, ArkSchemaV90.self, ArkSchemaV91.self, ArkSchemaV92.self,
+         ArkSchemaV93.self, ArkSchemaV94.self, ArkSchemaV95.self, ArkSchemaV96.self,
+         ArkSchemaV97.self, ArkSchemaV98.self, ArkSchemaV99.self]
     }
 
     static var stages: [MigrationStage] { [] }
@@ -1064,6 +1149,14 @@ enum SharedModelContainerStoreKind: String, CaseIterable, Equatable, Sendable {
 
 struct SharedModelContainerOpenFailure: Error, Equatable, Sendable {
     let attemptedStoreKinds: [SharedModelContainerStoreKind]
+}
+
+struct SharedModelContainerPrivacyPreparationFailure: LocalizedError, Equatable, Sendable {
+    let underlyingDescription: String
+
+    var errorDescription: String? {
+        "Local persistence could not be opened safely because device-backup exclusion failed: \(underlyingDescription)"
+    }
 }
 
 enum SharedModelContainerOpenPolicy {
@@ -1091,6 +1184,22 @@ enum SharedModelContainerOpenPolicy {
     }
 }
 
+enum SharedModelContainerCreationPolicy {
+    static func open<Value>(
+        preparingLocalPersistence: () throws -> Void,
+        using opener: (SharedModelContainerStoreKind) throws -> Value
+    ) throws -> Value {
+        do {
+            try preparingLocalPersistence()
+        } catch {
+            throw SharedModelContainerPrivacyPreparationFailure(
+                underlyingDescription: error.localizedDescription
+            )
+        }
+        return try SharedModelContainerOpenPolicy.open(using: opener)
+    }
+}
+
 enum SharedModelContainer {
     private static let lock = NSLock()
     private static var _shared: ModelContainer?
@@ -1105,8 +1214,16 @@ enum SharedModelContainer {
         return created
     }
 
+    static func invalidateCachedContainer(_ container: ModelContainer) {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared === container {
+            _shared = nil
+        }
+    }
+
     static func makePreview() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV99.models)
         let configuration = ModelConfiguration(
             isStoredInMemoryOnly: true,
             cloudKitDatabase: .none
@@ -1115,15 +1232,18 @@ enum SharedModelContainer {
     }
 
     private static func createPersistentContainer() throws -> ModelContainer {
-        ensureApplicationSupportDirectory()
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV99.models)
         let primaryConfiguration = ModelConfiguration(
             isStoredInMemoryOnly: false,
             cloudKitDatabase: .none
         )
 
         do {
-            return try SharedModelContainerOpenPolicy.open { storeKind in
+            return try SharedModelContainerCreationPolicy.open(
+                preparingLocalPersistence: {
+                    _ = try LocalBackupExclusionPolicy.prepareApplicationSupportDirectory()
+                }
+            ) { storeKind in
                 switch storeKind {
                 case .primaryWithMigrationPlan:
                     do {
@@ -1176,23 +1296,18 @@ enum SharedModelContainer {
                     }
                 }
             }
+        } catch let error as SharedModelContainerPrivacyPreparationFailure {
+            OhanaLog.error(
+                "SwiftData: Application Support backup exclusion failed - \(error.localizedDescription)",
+                category: "Privacy"
+            )
+            throw error
         } catch {
             OhanaLog.error(
                 "SwiftData: primary store unavailable; stopped before creating an alternate writable store",
                 category: "SwiftData"
             )
             throw error
-        }
-    }
-
-    private static func ensureApplicationSupportDirectory() {
-        do {
-            try LocalBackupExclusionPolicy.prepareApplicationSupportDirectory()
-        } catch {
-            OhanaLog.error(
-                "SwiftData: Application Support backup exclusion failed - \(error.localizedDescription)",
-                category: "Privacy"
-            )
         }
     }
 }

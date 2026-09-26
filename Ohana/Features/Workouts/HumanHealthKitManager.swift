@@ -9,6 +9,13 @@ import Combine
 import Foundation
 import HealthKit
 
+private extension Result {
+    var humanHealthReadSucceeded: Bool {
+        if case .success = self { return true }
+        return false
+    }
+}
+
 enum HumanHealthAuthorizationStatus: Equatable, Sendable {
     case notAvailable
     case notDetermined
@@ -42,6 +49,51 @@ nonisolated enum HumanHealthActivityGoalAvailability: Equatable, Sendable {
     case complete
 }
 
+nonisolated enum HumanHealthTodayComponentReadState: Equatable, Sendable {
+    case notLoaded
+    case available
+    case unavailable
+}
+
+nonisolated struct HumanHealthTodayComponentAvailability: Equatable, Sendable {
+    let steps: HumanHealthTodayComponentReadState
+    let distance: HumanHealthTodayComponentReadState
+    let move: HumanHealthTodayComponentReadState
+    let exercise: HumanHealthTodayComponentReadState
+    let stand: HumanHealthTodayComponentReadState
+
+    static let notLoaded = HumanHealthTodayComponentAvailability(
+        steps: .notLoaded,
+        distance: .notLoaded,
+        move: .notLoaded,
+        exercise: .notLoaded,
+        stand: .notLoaded
+    )
+
+    var hasUnavailableComponent: Bool {
+        [steps, distance, move, exercise, stand].contains(.unavailable)
+    }
+}
+
+nonisolated enum HumanHealthTodayComponentAvailabilityResolver {
+    static func resolve(
+        hasReadableActivitySummary: Bool,
+        stepsReadSucceeded: Bool,
+        distanceReadSucceeded: Bool,
+        activeEnergyReadSucceeded: Bool,
+        exerciseReadSucceeded: Bool,
+        standReadSucceeded: Bool
+    ) -> HumanHealthTodayComponentAvailability {
+        HumanHealthTodayComponentAvailability(
+            steps: stepsReadSucceeded ? .available : .unavailable,
+            distance: distanceReadSucceeded ? .available : .unavailable,
+            move: hasReadableActivitySummary || activeEnergyReadSucceeded ? .available : .unavailable,
+            exercise: hasReadableActivitySummary || exerciseReadSucceeded ? .available : .unavailable,
+            stand: hasReadableActivitySummary || standReadSucceeded ? .available : .unavailable
+        )
+    }
+}
+
 struct HumanHealthHourlyPoint: Equatable, Identifiable, Sendable {
     let hour: Int
     let value: Double
@@ -63,6 +115,7 @@ struct HumanWorkoutHealthSnapshot: Equatable, Sendable {
     var standGoalHours: Int
     var hourlySteps: [HumanHealthHourlyPoint]
     var hourlyDistanceKm: [HumanHealthHourlyPoint]
+    var componentAvailability: HumanHealthTodayComponentAvailability
 
     static let empty = HumanWorkoutHealthSnapshot(
         steps: 0,
@@ -77,7 +130,8 @@ struct HumanWorkoutHealthSnapshot: Equatable, Sendable {
         exerciseGoalMinutes: 0,
         standGoalHours: 0,
         hourlySteps: (0 ..< 24).map { HumanHealthHourlyPoint(hour: $0, value: 0) },
-        hourlyDistanceKm: (0 ..< 24).map { HumanHealthHourlyPoint(hour: $0, value: 0) }
+        hourlyDistanceKm: (0 ..< 24).map { HumanHealthHourlyPoint(hour: $0, value: 0) },
+        componentAvailability: .notLoaded
     )
 
     var moveValue: Int {
@@ -189,6 +243,7 @@ protocol HumanHealthKitManaging: ObservableObject {
     var recentWorkoutsStatus: HumanHealthRecentWorkoutsStatus { get }
     var snapshot: HumanWorkoutHealthSnapshot { get }
     var recentWorkouts: [HumanHealthKitWorkoutSnapshot] { get }
+    var recentWorkoutsWereTruncated: Bool { get }
     var isLoading: Bool { get }
     var errorMessage: String? { get }
 
@@ -196,6 +251,7 @@ protocol HumanHealthKitManaging: ObservableObject {
     func requestReadAuthorization() async
     func loadTodaySummary() async
     func loadRecentWorkouts(since: Date, limit: Int) async -> [HumanHealthKitWorkoutSnapshot]
+    func clearVisibleData()
 }
 
 private enum HumanHealthKitReadError: LocalizedError {
@@ -251,6 +307,15 @@ private final class HumanHealthKitRunningQuery: @unchecked Sendable {
     }
 }
 
+private struct HumanHealthTodayReadResults {
+    let hourlySteps: Result<[HumanHealthHourlyPoint], Error>
+    let hourlyDistance: Result<[HumanHealthHourlyPoint], Error>
+    let activeEnergy: Result<Double, Error>
+    let exerciseMinutes: Result<Double, Error>
+    let standHours: Result<Double, Error>
+    let activitySummary: Result<HumanHealthActivityValues?, Error>
+}
+
 @MainActor
 final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
     @Published private(set) var authorizationStatus: HumanHealthAuthorizationStatus
@@ -258,12 +323,14 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
     @Published private(set) var recentWorkoutsStatus: HumanHealthRecentWorkoutsStatus = .notLoaded
     @Published private(set) var snapshot: HumanWorkoutHealthSnapshot = .empty
     @Published private(set) var recentWorkouts: [HumanHealthKitWorkoutSnapshot] = []
+    @Published private(set) var recentWorkoutsWereTruncated = false
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
 
     private let healthStore: HKHealthStore?
     private let calendar: Calendar
     private let queryTimeoutSeconds: TimeInterval
+    private var recentWorkoutsLoadGeneration = 0
 
     init(
         healthStore: HKHealthStore? = HKHealthStore.isHealthDataAvailable() ? HKHealthStore() : nil,
@@ -274,6 +341,16 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
         self.calendar = calendar
         self.queryTimeoutSeconds = max(1, queryTimeoutSeconds)
         authorizationStatus = healthStore == nil ? .notAvailable : .notDetermined
+    }
+
+    func clearVisibleData() {
+        recentWorkoutsLoadGeneration &+= 1
+        activitySummaryStatus = .notLoaded
+        recentWorkoutsStatus = .notLoaded
+        snapshot = .empty
+        recentWorkouts = []
+        recentWorkoutsWereTruncated = false
+        errorMessage = nil
     }
 
     func refreshAuthorizationStatus() async {
@@ -347,6 +424,19 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
 
         let now = Date()
         let startOfDay = calendar.startOfDay(for: now)
+        let results = await readTodayHealthResults(
+            startOfDay: startOfDay,
+            now: now,
+            healthStore: healthStore
+        )
+        applyTodayHealthResults(results)
+    }
+
+    private func readTodayHealthResults(
+        startOfDay: Date,
+        now: Date,
+        healthStore: HKHealthStore
+    ) async -> HumanHealthTodayReadResults {
         async let hourlyStepsResult = loadHealthValue("Apple Health step count") {
             try await hourlyQuantity(
                 .stepCount,
@@ -394,29 +484,32 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
             try await activitySummary(for: now, healthStore: healthStore)
         }
 
-        let results = await (
-            hourlyStepsResult,
-            hourlyDistanceResult,
-            activeEnergyResult,
-            exerciseResult,
-            standHoursResult,
-            activityResult
+        return await HumanHealthTodayReadResults(
+            hourlySteps: hourlyStepsResult,
+            hourlyDistance: hourlyDistanceResult,
+            activeEnergy: activeEnergyResult,
+            exerciseMinutes: exerciseResult,
+            standHours: standHoursResult,
+            activitySummary: activityResult
         )
+    }
+
+    private func applyTodayHealthResults(_ results: HumanHealthTodayReadResults) {
         var readErrors: [Error] = []
         let hourlySteps = resolvedHealthValue(
-            results.0,
+            results.hourlySteps,
             fallback: HumanWorkoutHealthSnapshot.empty.hourlySteps,
             errors: &readErrors
         )
         let hourlyDistance = resolvedHealthValue(
-            results.1,
+            results.hourlyDistance,
             fallback: HumanWorkoutHealthSnapshot.empty.hourlyDistanceKm,
             errors: &readErrors
         )
-        let activeEnergy = resolvedHealthValue(results.2, fallback: 0, errors: &readErrors)
-        let exerciseMinutes = resolvedHealthValue(results.3, fallback: 0, errors: &readErrors)
-        let standHours = resolvedHealthValue(results.4, fallback: 0, errors: &readErrors)
-        let activitySummaryResult = results.5
+        let activeEnergy = resolvedHealthValue(results.activeEnergy, fallback: 0, errors: &readErrors)
+        let exerciseMinutes = resolvedHealthValue(results.exerciseMinutes, fallback: 0, errors: &readErrors)
+        let standHours = resolvedHealthValue(results.standHours, fallback: 0, errors: &readErrors)
+        let activitySummaryResult = results.activitySummary
         switch activitySummaryResult {
         case let .success(activity):
             activitySummaryStatus = activity == nil ? .noData : .available
@@ -427,6 +520,14 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
             activitySummaryResult,
             fallback: HumanHealthActivityValues?.none,
             errors: &readErrors
+        )
+        let componentAvailability = HumanHealthTodayComponentAvailabilityResolver.resolve(
+            hasReadableActivitySummary: activity != nil,
+            stepsReadSucceeded: results.hourlySteps.humanHealthReadSucceeded,
+            distanceReadSucceeded: results.hourlyDistance.humanHealthReadSucceeded,
+            activeEnergyReadSucceeded: results.activeEnergy.humanHealthReadSucceeded,
+            exerciseReadSucceeded: results.exerciseMinutes.humanHealthReadSucceeded,
+            standReadSucceeded: results.standHours.humanHealthReadSucceeded
         )
         let resolvedActivity = HumanHealthActivityResolver.resolve(
             summary: activity,
@@ -448,7 +549,8 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
             exerciseGoalMinutes: resolvedActivity.exerciseGoalMinutes,
             standGoalHours: resolvedActivity.standGoalHours,
             hourlySteps: hourlySteps,
-            hourlyDistanceKm: hourlyDistance
+            hourlyDistanceKm: hourlyDistance,
+            componentAvailability: componentAvailability
         )
 
         if let firstError = readErrors.first {
@@ -463,21 +565,34 @@ final class HumanHealthKitManager: ObservableObject, HumanHealthKitManaging {
         since: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date(),
         limit: Int = 12
     ) async -> [HumanHealthKitWorkoutSnapshot] {
+        recentWorkoutsLoadGeneration &+= 1
+        let loadGeneration = recentWorkoutsLoadGeneration
         guard let healthStore else {
             recentWorkouts = []
+            recentWorkoutsWereTruncated = false
             recentWorkoutsStatus = .notLoaded
             authorizationStatus = .notAvailable
             return []
         }
 
+        let safeLimit = max(1, min(limit, 512))
         do {
-            let workouts = try await queryRecentWorkouts(since: since, limit: limit, healthStore: healthStore)
-            recentWorkouts = workouts
-            recentWorkoutsStatus = workouts.isEmpty ? .noData : .available
+            let workouts = try await queryRecentWorkouts(
+                since: since,
+                limit: safeLimit + 1,
+                healthStore: healthStore
+            )
+            guard loadGeneration == recentWorkoutsLoadGeneration else { return [] }
+            let visibleWorkouts = Array(workouts.prefix(safeLimit))
+            recentWorkouts = visibleWorkouts
+            recentWorkoutsWereTruncated = workouts.count > safeLimit
+            recentWorkoutsStatus = visibleWorkouts.isEmpty ? .noData : .available
             errorMessage = nil
-            return workouts
+            return visibleWorkouts
         } catch {
+            guard loadGeneration == recentWorkoutsLoadGeneration else { return [] }
             recentWorkouts = []
+            recentWorkoutsWereTruncated = false
             recentWorkoutsStatus = .failed(error.localizedDescription)
             errorMessage = error.localizedDescription
             return []

@@ -6,10 +6,16 @@ typealias CareRecordResult = CareEventService.CareRecordResult
 nonisolated struct ExpenseActorAttribution: Hashable, Sendable {
     let executorId: String?
     let recordedByHumanId: String?
+    let payerContributions: [ExpensePayerContribution]
 
-    init(executorId: String? = nil, recordedByHumanId: String? = nil) {
+    init(
+        executorId: String? = nil,
+        recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution] = []
+    ) {
         self.executorId = executorId
         self.recordedByHumanId = recordedByHumanId
+        self.payerContributions = payerContributions
     }
 }
 

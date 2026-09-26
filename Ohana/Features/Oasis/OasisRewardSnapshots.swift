@@ -172,6 +172,7 @@ struct OasisRewardActionSnapshot: Equatable {
     var injectionCoconutBalance: Int = 0
     var activeCoconutBalance: Int = 0
     var critterFragmentTotal: Int = 0
+    var stardustBalance: Int = 0
 }
 
 struct OasisCheckInSnapshot: Equatable {
@@ -206,6 +207,9 @@ struct OasisCritterRenderSnapshot: Equatable {
     var starFragmentsCost: Int
     var starCoconutsCost: Int
     var canUpgradeStar: Bool
+    var specificFragmentBalance: Int
+    var stardustBalance: Int
+    var starAvailability: CompanionActionAvailability
 
     @MainActor
     static func lightweight(
@@ -216,13 +220,26 @@ struct OasisCritterRenderSnapshot: Equatable {
             state: critter.lifeState,
             deathReason: critter.deathReason,
             recommendedAction: nil,
-            isRescuable: critter.lifeState == .critical || critter.lifeState == .sick,
+            isRescuable: critter.lifeState == .sleeping || critter.lifeState == .critical || critter.lifeState == .dead,
             hoursUntilDeath: nil,
             ageDays: max(0, Calendar.current.dateComponents([.day], from: critter.obtainedAt, to: Date()).day ?? 0),
             urgencyScore: 0
         )
         let xpProgress = rewards.xpProgress(for: critter)
         let starCost = rewards.starUpgradeCost(for: critter)
+        let fundingPlan = CompanionFundingPlan.make(
+            requiredGrowthCurrency: starCost.fragments,
+            coconutCost: starCost.coconuts,
+            specificFragmentBalance: 0,
+            stardustBalance: 0,
+            coconutBalance: 0
+        )
+        let availability = CompanionActionAvailability(
+            action: .starUpgrade,
+            isAvailable: false,
+            reason: critter.starLevel >= OasisCompanionCurrency.maxStarLevel ? .maxStars : .processing,
+            fundingPlan: fundingPlan
+        )
         return OasisCritterRenderSnapshot(
             lifecycle: lifecycle,
             dailyWish: nil,
@@ -247,7 +264,10 @@ struct OasisCritterRenderSnapshot: Equatable {
             restCost: 0,
             starFragmentsCost: starCost.fragments,
             starCoconutsCost: starCost.coconuts,
-            canUpgradeStar: false
+            canUpgradeStar: false,
+            specificFragmentBalance: 0,
+            stardustBalance: 0,
+            starAvailability: availability
         )
     }
 

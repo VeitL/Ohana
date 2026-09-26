@@ -16,6 +16,12 @@ enum WalkRecoveryCheckpoint {
         isCheckpoint(walk) && walk.endDate == nil
     }
 
+    static func sessionID(from walk: PetWalkLog) -> UUID? {
+        guard isCheckpoint(walk) else { return nil }
+        let rawID = walk.sharedSessionId.dropFirst(PetWalkLog.recoveryCheckpointSessionPrefix.count)
+        return UUID(uuidString: String(rawID))
+    }
+
     static func metadata(elapsedTime: TimeInterval, poopMarkers: [WalkPoopMarker]) -> WalkRecoveryCheckpointMetadata {
         WalkRecoveryCheckpointMetadata(
             elapsedSeconds: max(0, elapsedTime),

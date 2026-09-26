@@ -55,6 +55,7 @@ struct QuickHumanNoteSheet: View {
     @State private var isClosing = false
     @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
@@ -89,11 +90,13 @@ struct QuickHumanNoteSheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("quick-human-note-sheet")
             .navigationTitle(l.tr(zh: "添加记录", en: "Add Record", de: "Eintrag hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel) { close() }
+                        .accessibilityIdentifier("ohana-sheet-close-action")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
@@ -155,6 +158,9 @@ struct QuickHumanNoteSheet: View {
         } message: {
             Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in system settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen."))
         }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+        }
     }
 
     private var popupBackdrop: some View {
@@ -203,7 +209,6 @@ struct QuickHumanNoteSheet: View {
                 Text(l.tr(zh: "添加记录", en: "Add Record", de: "Eintrag hinzufügen"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .accessibilityIdentifier("quick-human-note-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -247,17 +252,32 @@ struct QuickHumanNoteSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 PhotosPicker(selection: $selectedItems, maxSelectionCount: 6, matching: .images) {
-                    attachmentButton(icon: "photo.on.rectangle.angled", title: l.tr(zh: "相册", en: "Album", de: "Album"), color: Color.goPrimary)
+                    attachmentButton(
+                        icon: "photo.on.rectangle.angled",
+                        title: l.tr(zh: "相册", en: "Album", de: "Album"),
+                        color: Color.goPrimary,
+                        foreground: Color.ohanaPrimaryActionText
+                    )
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 Button { presentCamera() } label: {
-                    attachmentButton(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: Color.goTeal)
+                    attachmentButton(
+                        icon: "camera.fill",
+                        title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"),
+                        color: Color.goTeal,
+                        foreground: Color.arkInk
+                    )
                 }
                 .buttonStyle(ScaleButtonStyle())
 
                 Button { showFileImporter = true } label: {
-                    attachmentButton(icon: "paperclip", title: l.tr(zh: "文件", en: "File", de: "Datei"), color: Color.goPurple)
+                    attachmentButton(
+                        icon: "paperclip",
+                        title: l.tr(zh: "文件", en: "File", de: "Datei"),
+                        color: Color.goPurple,
+                        foreground: OhanaResolvedPrimaryAccent(customHex: "A855F7")?.actionTextColor ?? Color.ohanaPrimaryText
+                    )
                 }
                 .buttonStyle(ScaleButtonStyle())
             }
@@ -271,7 +291,7 @@ struct QuickHumanNoteSheet: View {
         .padding(.horizontal, 22)
     }
 
-    private func attachmentButton(icon: String, title: String, color: Color) -> some View {
+    private func attachmentButton(icon: String, title: String, color: Color, foreground: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -280,7 +300,7 @@ struct QuickHumanNoteSheet: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(foreground)
         .frame(maxWidth: .infinity)
         .frame(height: 40)
         .background(color, in: Capsule())
@@ -398,7 +418,7 @@ struct QuickHumanNoteSheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -458,18 +478,33 @@ struct QuickHumanNoteSheet: View {
 
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
-            guard HumanCareCommandExecutor(context: modelContext, services: appServices).recordNote(
-                human: human,
-                noteText: savedNote,
-                date: savedDate,
-                imageAttachments: savedImages,
-                fileAttachments: savedFiles,
-                reminderDate: savedReminderDate,
-                appLanguage: languageCode,
-                recordedByHumanId: savedRecorderID,
-                note: "human.note"
-            ) != nil else {
+            do {
+                guard try HumanCareCommandExecutor(
+                    context: modelContext,
+                    services: appServices
+                ).recordNoteEnforcingPersonalAccess(
+                    human: human,
+                    noteText: savedNote,
+                    date: savedDate,
+                    imageAttachments: savedImages,
+                    fileAttachments: savedFiles,
+                    reminderDate: savedReminderDate,
+                    appLanguage: languageCode,
+                    recordedByHumanId: savedRecorderID,
+                    note: "human.note"
+                ) != nil else {
+                    isSaving = false
+                    return
+                }
+            } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
                 isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                return
+            } catch {
+                isSaving = false
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                appServices.domainRevisions.publishFailure(command: command, error: error)
                 return
             }
             onSaved?()

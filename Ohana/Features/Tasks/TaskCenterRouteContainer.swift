@@ -13,13 +13,27 @@ enum TaskCenterPresentation: Equatable {
     case sheet
 }
 
+struct TaskCenterFamilyTaskDetailRoute: Identifiable {
+    let snapshot: TaskCenterFamilyTaskDetailSnapshot
+
+    var id: String {
+        "family-task-\(snapshot.taskID.uuidString)"
+    }
+}
+
+private struct TaskCenterFamilyTaskInboxRoute: Identifiable, Equatable {
+    let humanID: UUID
+
+    var id: UUID { humanID }
+}
+
 struct TaskCenterRouteContainer: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
+    @Environment(\.modelContext) var modelContext
+    @Environment(AppServices.self) var appServices
     @AppStorage(StarterGiftStorageKey.ceremonySeen) private var starterGiftCeremonySeen = false
 
     @State private var selectedSurface: TaskCenterSurface
-    @State private var routeData = TaskCenterRouteData()
+    @State var routeData = TaskCenterRouteData()
     @State private var routeDataGeneration = 0
     @State private var dataLoadTask: Task<Void, Never>?
     @State private var revisionReloadTask: Task<Void, Never>?
@@ -27,7 +41,12 @@ struct TaskCenterRouteContainer: View {
     @State private var showingAddEvent = false
     @State private var showingAddChoice = false
     @State private var didAutoPresentCreation = false
-    @State private var familyTaskEditorRoute: FamilyCollaborationEditorRoute?
+    @State private var familyTaskActivities: [FamilyTaskActivitySnapshot] = []
+    @State private var familyTaskUnreadActivityCount = 0
+    @State private var familyTaskInboxRoute: TaskCenterFamilyTaskInboxRoute?
+    @State var familyTaskDetailRoute: TaskCenterFamilyTaskDetailRoute?
+    @State var familyTaskEditorRoute: FamilyCollaborationEditorRoute?
+    @State private var selectedMemberFilter: TaskCenterMemberFilter?
     @State private var pendingActionHumanConfirmation: ActionHumanConfirmationDraft?
     @State private var systemJourneyItemPresentation: TaskCenterItemSnapshot?
 
@@ -87,71 +106,115 @@ struct TaskCenterRouteContainer: View {
     }
 
     var body: some View {
+        lifecycleContent
+    }
+
+    private var taskCenterContent: some View {
         ZStack {
-            if presentation == .sheet {
-                OhanaAppBackground()
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-            }
-
-            VStack(spacing: 0) {
-                TaskCenterHeader(
-                    selectedSurface: $selectedSurface,
-                    snapshot: visibleSnapshot,
-                    isLoading: !routeData.hasLoaded,
-                    showsAddButton: true,
-                    showsCloseButton: presentation == .sheet,
-                    filterLabel: scopeLabel,
-                    onAdd: requestAdd,
-                    onClose: onDismiss
-                )
-
-                Group {
-                    switch selectedSurface {
-                    case .tasks:
-                        TaskCenterView(
-                            snapshot: visibleSnapshot,
-                            isLoading: !routeData.hasLoaded,
-                            bottomClearance: presentation == .embeddedHome ? 190 : 42,
-                            showsDailyProgress: routeContext.scope == .all,
-                            focusedItemID: focusedItemID,
-                            focusRequestID: routeContext.focusRequestID,
-                            onAction: { item, action in
-                                performTaskAction(item, action: action)
-                            },
-                            onOpen: openTask,
-                            onScrollOffsetChange: onEmbeddedScrollOffsetChange
-                        )
-                    case .calendar:
-                        VStack(spacing: 0) {
-                            TaskCenterCalendarWorkflowStrip(
-                                items: calendarWorkflowItems,
-                                onOpen: openTask,
-                                onAction: { item, action in
-                                    performTaskAction(item, action: action)
-                                }
-                            )
-                            CalendarRouteContainer(
-                                preselectedPetId: effectivePreselectedPetID,
-                                preselectedHumanId: effectivePreselectedHumanID,
-                                hideToolbar: true,
-                                showsEmbeddedControls: true,
-                                isEmbeddedPrepared: isEmbeddedPrepared,
-                                isEmbeddedVisible: isEmbeddedVisible,
-                                isEmbeddedActive: isEmbeddedActive,
-                                onRequestAddEvent: onRequestAddEvent,
-                                onPlantsLoaded: onPlantsLoaded,
-                                onEmbeddedScrollOffsetChange: onEmbeddedScrollOffsetChange,
-                                onOpenEventDestination: onOpenEventDestination,
-                                onPresentCoconutLog: onPresentCoconutLog,
-                                onCompleteEvent: completeEvent
-                            )
-                        }
-                    }
-                }
-                .contentTransition(.opacity)
-            }
+            taskCenterBackground
+            taskCenterStack
         }
+    }
+
+    @ViewBuilder
+    private var taskCenterBackground: some View {
+        if presentation == .sheet {
+            OhanaAppBackground()
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var taskCenterStack: some View {
+        VStack(spacing: 0) {
+            taskCenterHeader
+            taskCenterSelectedSurface
+                .contentTransition(.opacity)
+        }
+    }
+
+    private var taskCenterHeader: some View {
+        TaskCenterHeader(
+            selectedSurface: $selectedSurface,
+            snapshot: headerSnapshot,
+            isLoading: !routeData.hasLoaded,
+            showsAddButton: true,
+            showsCloseButton: presentation == .sheet,
+            filterLabel: scopeLabel,
+            inboxUnreadCount: familyTaskUnreadActivityCount,
+            onOpenInbox: taskCenterInboxAction,
+            onAdd: requestAdd,
+            onClose: onDismiss
+        )
+    }
+
+    private var taskCenterInboxAction: (() -> Void)? {
+        guard selectedActiveHumanID != nil else { return nil }
+        return { openFamilyTaskInbox() }
+    }
+
+    @ViewBuilder
+    private var taskCenterSelectedSurface: some View {
+        switch selectedSurface {
+        case .tasks:
+            taskListSurface
+        case .calendar:
+            taskCalendarSurface
+        }
+    }
+
+    private var taskListSurface: some View {
+        TaskCenterView(
+            selectedMemberFilter: $selectedMemberFilter,
+            snapshot: visibleSnapshot,
+            isLoading: !routeData.hasLoaded,
+            bottomClearance: presentation == .embeddedHome ? 190 : 42,
+            showsDailyProgress: routeContext.scope == .all,
+            focusedItemID: focusedItemID,
+            focusRequestID: routeContext.focusRequestID,
+            onAction: { item, action in
+                performTaskAction(item, action: action)
+            },
+            onClaimSystemJourneyReward: { item in
+                claimStarterJourneyReward(for: item)
+            },
+            onDismissSuggestion: { item in
+                dismissStarterSuggestion(item)
+            },
+            onOpen: openTask,
+            onScrollOffsetChange: onEmbeddedScrollOffsetChange
+        )
+    }
+
+    private var taskCalendarSurface: some View {
+        VStack(spacing: 0) {
+            TaskCenterCalendarWorkflowStrip(
+                items: calendarWorkflowItems,
+                onOpen: openTask,
+                onAction: { item, action in
+                    performTaskAction(item, action: action)
+                }
+            )
+            CalendarRouteContainer(
+                preselectedPetId: effectivePreselectedPetID,
+                preselectedHumanId: effectivePreselectedHumanID,
+                hideToolbar: true,
+                showsEmbeddedControls: true,
+                isEmbeddedPrepared: isEmbeddedPrepared,
+                isEmbeddedVisible: isEmbeddedVisible,
+                isEmbeddedActive: isEmbeddedActive,
+                onRequestAddEvent: onRequestAddEvent,
+                onPlantsLoaded: onPlantsLoaded,
+                onEmbeddedScrollOffsetChange: onEmbeddedScrollOffsetChange,
+                onOpenEventDestination: onOpenEventDestination,
+                onPresentCoconutLog: onPresentCoconutLog,
+                onCompleteEvent: completeEvent
+            )
+        }
+    }
+
+    private var modalContent: some View {
+        taskCenterContent
         .fullScreenCover(item: $eventDetailPresentation) { presentation in
             CalendarEventDetailPage(
                 event: presentation.event,
@@ -186,6 +249,26 @@ struct TaskCenterRouteContainer: View {
                 taskCreationPreset: routeContext.creationPreset
             )
         }
+        .sheet(item: $familyTaskDetailRoute) { route in
+            familyTaskDetail(route)
+                .presentationDetents([.medium, .large])
+                .presentationContentInteraction(.scrolls)
+        }
+        .sheet(item: $familyTaskInboxRoute) { route in
+            FamilyTaskInboxView(
+                activities: familyTaskActivities,
+                unreadCount: familyTaskUnreadActivityCount,
+                memberName: familyTaskInboxMemberName(route.humanID),
+                onOpen: { activity in
+                    openFamilyTaskActivity(activity, inboxHumanID: route.humanID)
+                },
+                onMarkAllRead: {
+                    markAllFamilyTaskActivitiesRead(inboxHumanID: route.humanID)
+                }
+            )
+            .presentationDetents([.medium, .large])
+            .presentationContentInteraction(.scrolls)
+        }
         .sheet(item: $familyTaskEditorRoute) { route in
             familyTaskEditor(route)
         }
@@ -193,7 +276,23 @@ struct TaskCenterRouteContainer: View {
             TaskCenterSystemJourneySheet(
                 item: item,
                 taskState: starterJourneyState(for: item),
-                onOpenDestination: { openSystemJourneyDestination(item) },
+                humanProfileTarget: humanProfileTarget(for: item),
+                petProfileTarget: petProfileTarget(for: item),
+                onPrepareEditorRoute: { checkpoint in
+                    makeSystemJourneyEditorRoute(item, checkpoint: checkpoint)
+                },
+                editorContent: { route, onDismiss in
+                    AnyView(systemJourneyEditor(route, onDismiss: onDismiss))
+                },
+                onEditorDismiss: {
+                    scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+                },
+                onUpdateHumanProfile: { update in
+                    updateStarterHumanProfile(for: item, applying: update)
+                },
+                onUpdatePetProfile: { update in
+                    updateStarterPetProfile(for: item, applying: update)
+                },
                 onClaim: { claimStarterJourneyReward(for: item) },
                 onRecordResolution: { checkpoint, resolution in
                     recordStarterJourneyResolution(
@@ -202,11 +301,17 @@ struct TaskCenterRouteContainer: View {
                         resolution: resolution
                     )
                 },
-                onClose: { systemJourneyItemPresentation = nil }
+                onClose: {
+                    systemJourneyItemPresentation = nil
+                }
             )
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
             .presentationContentInteraction(.scrolls)
         }
+    }
+
+    private var lifecycleContent: some View {
+        modalContent
         .confirmationDialog(
             L10n.current.tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen"),
             isPresented: $showingAddChoice,
@@ -223,6 +328,7 @@ struct TaskCenterRouteContainer: View {
         .actionHumanConfirmationDialog(draft: $pendingActionHumanConfirmation)
         .onAppear {
             scheduleRouteDataLoad(delayMilliseconds: routeDataLoadDelayMilliseconds)
+            refreshFamilyTaskActivities()
             if routeContext.creationPreset != nil, !didAutoPresentCreation {
                 didAutoPresentCreation = true
                 showingAddEvent = true
@@ -253,6 +359,14 @@ struct TaskCenterRouteContainer: View {
                 scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
             }
         }
+        .onChange(of: appServices.activeHumanSelection.currentHumanId) { _, _ in
+            selectedMemberFilter = nil
+            familyTaskDetailRoute = nil
+            familyTaskInboxRoute = nil
+            familyTaskEditorRoute = nil
+            refreshFamilyTaskActivities()
+            scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+        }
         .onDisappear {
             dataLoadTask?.cancel()
             dataLoadTask = nil
@@ -269,7 +383,7 @@ struct TaskCenterRouteContainer: View {
         return isEmbeddedPrepared ? 96 : 180
     }
 
-    private func scheduleRouteDataLoad(delayMilliseconds: UInt64, force: Bool = false) {
+    func scheduleRouteDataLoad(delayMilliseconds: UInt64, force: Bool = false) {
         guard presentation == .sheet || isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive else { return }
         guard force || !routeData.hasLoaded else { return }
         if force {
@@ -291,7 +405,7 @@ struct TaskCenterRouteContainer: View {
             }
 
             do {
-                let actor = TaskCenterDataActor(modelContainer: container)
+                let actor = TaskCenterRouteDataActor(modelContainer: container)
                 let reference = try await actor.load(
                     loadPlants: loadPlants,
                     activeHumanID: appServices.activeHumanSelection.currentHumanId,
@@ -301,8 +415,13 @@ struct TaskCenterRouteContainer: View {
                 guard !Task.isCancelled, generation == routeDataGeneration else { return }
                 let loaded = TaskCenterRouteData(reference: reference, context: modelContext)
                 routeData = loaded
+                if loaded.pets.contains(where: { !$0.hasPassedAway }) {
+                    StarterPetSuggestionPolicy.markResolved()
+                }
+                refreshFamilyTaskActivities()
                 onPlantsLoaded?(loaded.plants)
-                onBadgeChange?(TaskCenterBadgeSnapshot(snapshot: loaded.snapshot))
+                let actionableSnapshot = loaded.snapshot.filtered(for: .actionRequired)
+                onBadgeChange?(TaskCenterBadgeSnapshot(snapshot: actionableSnapshot))
             } catch is CancellationError {
                 return
             } catch {
@@ -498,11 +617,12 @@ struct TaskCenterRouteContainer: View {
             }
             return
         }
+        if let familyTaskID = item.familyTaskID {
+            presentFamilyTaskDetail(taskID: familyTaskID, preferredItem: item)
+            return
+        }
         guard let eventID = item.eventID,
               let event = routeData.events.first(where: { $0.id == eventID }) else {
-            if let familyTaskID = item.familyTaskID {
-                familyTaskEditorRoute = .editTask(familyTaskID)
-            }
             return
         }
         let allowsEditing = CalendarEventInteractionPolicy.allowsUserEventDetail(
@@ -537,7 +657,7 @@ struct TaskCenterRouteContainer: View {
         )
     }
 
-    private var activeHumans: [Human] {
+    var activeHumans: [Human] {
         routeData.humans.filter { !$0.hasPassedAway }
     }
 
@@ -553,13 +673,19 @@ struct TaskCenterRouteContainer: View {
         return nil
     }
 
-    private var currentHuman: Human? {
+    var currentHuman: Human? {
         let selectedID = appServices.activeHumanSelection.currentHumanId
         return activeHumans.first { $0.id.uuidString == selectedID } ?? activeHumans.first
     }
 
     private var visibleSnapshot: TaskCenterSnapshot {
         routeData.snapshot.filtered(for: routeContext.scope)
+    }
+
+    private var headerSnapshot: TaskCenterSnapshot {
+        guard selectedSurface == .tasks else { return visibleSnapshot }
+        let filter = visibleSnapshot.resolvedMemberFilter(explicitSelection: selectedMemberFilter)
+        return visibleSnapshot.filtered(for: filter)
     }
 
     private var scopeLabel: String? {
@@ -612,22 +738,22 @@ struct TaskCenterRouteContainer: View {
 
     private var requestedSystemDestinations: Set<TaskCenterSystemDestination> {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "ohana_has_onboarded"),
-              defaults.bool(forKey: StarterGiftStorageKey.pending),
-              !defaults.bool(forKey: StarterGiftStorageKey.claimed) else { return [] }
-        return [.createFirstPet, .claimStarterGift]
+        guard defaults.bool(forKey: "ohana_has_onboarded") else { return [] }
+        var destinations: Set<TaskCenterSystemDestination> = []
+        if defaults.bool(forKey: StarterGiftStorageKey.pending),
+           !defaults.bool(forKey: StarterGiftStorageKey.claimed) {
+            destinations.insert(.claimStarterGift)
+        }
+        if defaults.object(forKey: OnboardingJourneyCoordinator.Key.journeyStartedAt) != nil,
+           !defaults.bool(forKey: StarterPetSuggestionStorageKey.resolved) {
+            destinations.insert(.createFirstPet)
+        }
+        return destinations
     }
 
     private var isStarterJourneyEnabled: Bool {
         let defaults = UserDefaults.standard
-        guard defaults.bool(forKey: "ohana_has_onboarded"),
-              !defaults.bool(forKey: StarterGiftStorageKey.pending) else { return false }
-        if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
-            return starterGiftCeremonySeen
-        }
-        // Existing users predate the starter-gift flags. Keep their journey
-        // available instead of reclassifying them as a fresh install.
-        return true
+        return defaults.bool(forKey: "ohana_has_onboarded")
     }
 
     private func starterJourneyState(
@@ -651,11 +777,157 @@ struct TaskCenterRouteContainer: View {
         }
     }
 
-    private func openSystemJourneyDestination(_ item: TaskCenterItemSnapshot) {
-        systemJourneyItemPresentation = nil
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
-            onOpenSystemDestination?(item)
+    private func dismissStarterSuggestion(_ item: TaskCenterItemSnapshot) {
+        guard item.source == .suggestion,
+              item.systemDestination == .createFirstPet else { return }
+        StarterPetSuggestionPolicy.markResolved()
+        OhanaFeedback.light()
+        scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+    }
+}
+
+// MARK: - System journey
+
+private extension TaskCenterRouteContainer {
+    private func makeSystemJourneyEditorRoute(
+        _ item: TaskCenterItemSnapshot,
+        checkpoint: HouseholdStarterJourneyCheckpoint?
+    ) -> TaskCenterSystemJourneyEditorRoute? {
+        guard item.systemDestination != .completeHumanProfile else { return nil }
+        let routedItem = systemJourneyDestinationItem(item, checkpoint: checkpoint)
+        guard let task = starterJourneyTask(for: item),
+              let targetID = routedItem.subject.id,
+              let destination = routedItem.systemDestination else {
+            systemJourneyItemPresentation = nil
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 120) {
+                onOpenSystemDestination?(routedItem)
+            }
+            return nil
         }
+        return TaskCenterSystemJourneyEditorRoute(
+            targetID: targetID,
+            task: task,
+            destination: destination,
+            checkpoint: checkpoint,
+            completionWasSatisfiedAtPresentation: TaskCenterSystemJourneyEditorCompletionPolicy.shouldDismissEditor(
+                task: task,
+                checkpoint: checkpoint,
+                state: routeData.snapshot.starterJourney?.state(for: task)
+            )
+        )
+    }
+
+    private func systemJourneyDestinationItem(
+        _ item: TaskCenterItemSnapshot,
+        checkpoint: HouseholdStarterJourneyCheckpoint?
+    ) -> TaskCenterItemSnapshot {
+        guard let task = starterJourneyTask(for: item) else { return item }
+        let guide = TaskCenterSystemJourneyGuide(task: task)
+        guard let question = guide.questions.first(where: { $0.checkpoint == checkpoint }) else {
+            return item
+        }
+        let destination = guide.systemDestination(for: question)
+        guard destination != item.systemDestination else { return item }
+
+        return TaskCenterItemSnapshot(
+            id: item.id,
+            eventID: item.eventID,
+            reminderID: item.reminderID,
+            familyTaskID: item.familyTaskID,
+            source: item.source,
+            systemDestination: destination,
+            systemJourneyPresentationState: item.systemJourneyPresentationState,
+            title: item.title,
+            subject: item.subject,
+            eventType: item.eventType,
+            symbol: item.symbol,
+            occurrenceDate: item.occurrenceDate,
+            scheduledAt: item.scheduledAt,
+            dueAt: item.dueAt,
+            isAllDay: item.isAllDay,
+            isRecurring: item.isRecurring,
+            urgency: item.urgency,
+            workflowStatus: item.workflowStatus,
+            availableActions: item.availableActions,
+            participantHumanIDs: item.participantHumanIDs,
+            createdByMember: item.createdByMember,
+            assignedToMember: item.assignedToMember,
+            claimedByMember: item.claimedByMember,
+            completedByMember: item.completedByMember,
+            rewardCoconuts: item.rewardCoconuts
+        )
+    }
+
+    @ViewBuilder
+    private func systemJourneyEditor(
+        _ route: TaskCenterSystemJourneyEditorRoute,
+        onDismiss: @escaping () -> Void
+    ) -> some View {
+        switch route.destination {
+        case .completeHumanProfile:
+            if let human = routeData.humans.first(where: { $0.id == route.targetID }) {
+                NavigationStack {
+                    HumanBasicInfoDetailView(
+                        human: human,
+                        startsEditing: true,
+                        requiresStarterProfileFields: true,
+                        onSave: onDismiss,
+                        onClose: onDismiss
+                    )
+                }
+            } else {
+                missingSystemJourneyEditorTarget(onDismiss: onDismiss)
+            }
+        case .completeFirstPetProfile:
+            if let pet = routeData.pets.first(where: { $0.id == route.targetID }) {
+                NavigationStack {
+                    PetBasicInfoDetailView(
+                        pet: pet,
+                        startsEditing: true,
+                        onSave: onDismiss,
+                        onClose: onDismiss
+                    )
+                }
+            } else {
+                missingSystemJourneyEditorTarget(onDismiss: onDismiss)
+            }
+        case .confirmPetIdentityProtection:
+            petSystemJourneyEditor(route, destination: .documents, onDismiss: onDismiss)
+        case .confirmPetPreventiveCare:
+            petSystemJourneyEditor(route, destination: .health(.preventive), onDismiss: onDismiss)
+        case .configureFirstCarePlan:
+            petSystemJourneyEditor(
+                route,
+                destination: .food,
+                showsFoodCloseButton: true,
+                onDismiss: onDismiss
+            )
+        case .recordFirstCare:
+            petSystemJourneyEditor(route, destination: .feed(true), onDismiss: onDismiss)
+        case .createFirstPet, .claimStarterGift:
+            missingSystemJourneyEditorTarget(onDismiss: onDismiss)
+        }
+    }
+
+    private func petSystemJourneyEditor(
+        _ route: TaskCenterSystemJourneyEditorRoute,
+        destination: AppPetDetailSheetDestination,
+        showsFoodCloseButton: Bool = false,
+        onDismiss: @escaping () -> Void
+    ) -> some View {
+        AppPetDetailSheetRouteContainer(
+            id: route.targetID,
+            destination: destination,
+            onMissing: onDismiss,
+            onDismiss: onDismiss,
+            showsFoodCloseButton: showsFoodCloseButton
+        )
+    }
+
+    private func missingSystemJourneyEditorTarget(onDismiss: @escaping () -> Void) -> some View {
+        Color.clear
+            .onAppear(perform: onDismiss)
+            .accessibilityHidden(true)
     }
 
     private func claimStarterJourneyReward(
@@ -734,507 +1006,220 @@ struct TaskCenterRouteContainer: View {
         return .success
     }
 
-    @ViewBuilder
-    private func familyTaskEditor(_ route: FamilyCollaborationEditorRoute) -> some View {
-        let context = FamilyCollaborationEditorContext.resolve(
-            route: route,
-            reminders: routeData.reminders,
-            tasks: routeData.familyTasks
+    private func humanProfileTarget(for item: TaskCenterItemSnapshot) -> Human? {
+        guard item.systemDestination == .completeHumanProfile,
+              let targetID = item.subject.id else { return nil }
+        return routeData.humans.first { $0.id == targetID && !$0.hasPassedAway }
+    }
+
+    private func petProfileTarget(for item: TaskCenterItemSnapshot) -> Pet? {
+        guard item.systemDestination == .completeFirstPetProfile,
+              let targetID = item.subject.id else { return nil }
+        return routeData.pets.first { $0.id == targetID && !$0.hasPassedAway }
+    }
+
+    private func updateStarterHumanProfile(
+        for item: TaskCenterItemSnapshot,
+        applying update: TaskCenterHumanProfileInlineUpdate
+    ) -> TaskCenterSystemJourneyMutationOutcome {
+        guard let human = humanProfileTarget(for: item),
+              HumanProfileEditPolicy.canEdit(hasPassedAway: human.hasPassedAway) else {
+            return .failure(L10n.current.tr(
+                zh: "未找到这位成员。",
+                en: "This member is unavailable.",
+                de: "Dieses Mitglied ist nicht verfügbar.",
+                es: "Este miembro no está disponible.",
+                pt: "Este membro não está disponível.",
+                fr: "Ce membre n’est pas disponible.",
+                ja: "このメンバーは利用できません。",
+                ko: "이 구성원을 사용할 수 없습니다.",
+                it: "Questo membro non è disponibile."
+            ))
+        }
+        let input = TaskCenterHumanProfileInlineInputBuilder.input(
+            for: human,
+            applying: update
         )
-        let commandExecutor = FamilyCollaborationCommandExecutor(modelContext: modelContext)
-        NavigationStack {
-            Group {
-                if let context {
-                    FamilyTaskEditorPanel(
-                        context: context,
-                        humans: activeHumans,
-                        currentHuman: currentHuman,
-                        pets: routeData.pets.filter { !$0.hasPassedAway },
-                        onClose: dismissFamilyTaskEditor,
-                        onAssignReminder: { reminder, human, reward, note in
-                            commandExecutor.assignReminder(
-                                reminder,
-                                to: human,
-                                by: currentHuman,
-                                rewardCoconuts: reward,
-                                note: note
-                            )
-                        },
-                        onCreateTask: { title, note, human, reward, dueAt, emoji in
-                            commandExecutor.createTask(
-                                title: title,
-                                note: note,
-                                assignedTo: human,
-                                by: currentHuman,
-                                rewardCoconuts: reward,
-                                dueAt: dueAt,
-                                emoji: emoji
-                            )
-                        },
-                        onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
-                            commandExecutor.updateTask(
-                                task,
-                                title: title,
-                                note: note,
-                                assignedTo: human,
-                                rewardCoconuts: reward,
-                                dueAt: dueAt,
-                                emoji: emoji,
-                                by: currentHuman
-                            )
-                        },
-                        onDeleteTask: { task in
-                            commandExecutor.deleteTask(task, by: currentHuman)
-                        }
-                    )
-                } else {
-                    ContentUnavailableView(
-                        L10n.current.tr(zh: "任务不可用", en: "Task unavailable", de: "Aufgabe nicht verfügbar"),
-                        systemImage: "exclamationmark.triangle"
-                    )
-                }
-            }
-            .navigationTitle(editorTitle(route))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.current.cancel, action: dismissFamilyTaskEditor)
-                }
-            }
+        let result = MemberCommandExecutor(
+            context: modelContext,
+            services: appServices
+        ).updateHumanProfile(
+            human,
+            input: input,
+            note: "taskCenter.starterJourney.inlineHumanProfile"
+        )
+        guard result.didPersist else {
+            return .failure(L10n.current.tr(
+                zh: "资料没有保存，请重试。",
+                en: "The profile was not saved. Try again.",
+                de: "Das Profil wurde nicht gespeichert. Bitte erneut versuchen.",
+                es: "El perfil no se guardó. Inténtalo de nuevo.",
+                pt: "O perfil não foi salvo. Tente novamente.",
+                fr: "Le profil n’a pas été enregistré. Réessayez.",
+                ja: "プロフィールを保存できませんでした。もう一度お試しください。",
+                ko: "프로필이 저장되지 않았어요. 다시 시도해 주세요.",
+                it: "Il profilo non è stato salvato. Riprova."
+            ))
         }
-        .presentationDetents([.medium, .large])
-        .presentationContentInteraction(.scrolls)
+        scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+        return .success
     }
 
-    private func dismissFamilyTaskEditor() {
-        familyTaskEditorRoute = nil
-        scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
-    }
-
-    private func editorTitle(_ route: FamilyCollaborationEditorRoute) -> String {
-        switch route {
-        case .assignReminder:
-            L10n.current.tr(zh: "分配提醒", en: "Assign reminder", de: "Erinnerung zuweisen")
-        case .editTask:
-            L10n.current.tr(zh: "编辑任务", en: "Edit task", de: "Aufgabe bearbeiten")
-        case .create:
-            L10n.current.tr(zh: "新建任务", en: "New task", de: "Neue Aufgabe")
+    private func updateStarterPetProfile(
+        for item: TaskCenterItemSnapshot,
+        applying update: TaskCenterPetProfileInlineUpdate
+    ) -> TaskCenterSystemJourneyMutationOutcome {
+        guard let pet = petProfileTarget(for: item) else {
+            return .failure(L10n.current.tr(
+                zh: "未找到这只宠物。",
+                en: "This pet is unavailable.",
+                de: "Dieses Tier ist nicht verfügbar.",
+                es: "Esta mascota no está disponible.",
+                pt: "Este pet está indisponível.",
+                fr: "Cet animal n’est pas disponible.",
+                ja: "このペットは利用できません。",
+                ko: "이 반려동물을 사용할 수 없습니다.",
+                it: "Questo animale non è disponibile."
+            ))
         }
+        let input = TaskCenterPetProfileInlineInputBuilder.input(
+            for: pet,
+            applying: update
+        )
+        let result = MemberCommandExecutor(
+            context: modelContext,
+            services: appServices
+        ).updatePetProfile(
+            pet,
+            input: input,
+            note: "taskCenter.starterJourney.inlinePetProfile"
+        )
+        guard result.didPersist else {
+            return .failure(L10n.current.tr(
+                zh: "资料没有保存，请重试。",
+                en: "The profile was not saved. Try again.",
+                de: "Das Profil wurde nicht gespeichert. Bitte erneut versuchen.",
+                es: "El perfil no se guardó. Inténtalo de nuevo.",
+                pt: "O perfil não foi salvo. Tente novamente.",
+                fr: "Le profil n’a pas été enregistré. Réessayez.",
+                ja: "プロフィールを保存できませんでした。もう一度お試しください。",
+                ko: "프로필이 저장되지 않았어요. 다시 시도해 주세요.",
+                it: "Il profilo non è stato salvato. Riprova."
+            ))
+        }
+        scheduleRouteDataLoad(delayMilliseconds: 0, force: true)
+        return .success
     }
 }
 
-private nonisolated struct TaskCenterRouteDataReference: Sendable {
-    let snapshot: TaskCenterSnapshot
-    let eventModelIDs: [PersistentIdentifier]
-    let reminderModelIDs: [PersistentIdentifier]
-    let familyTaskModelIDs: [PersistentIdentifier]
-    let petModelIDs: [PersistentIdentifier]
-    let humanModelIDs: [PersistentIdentifier]
-    let plantModelIDs: [PersistentIdentifier]
-    let humanMedicationModelIDs: [PersistentIdentifier]
-}
+// MARK: - Family task inbox
 
-private struct TaskCenterRouteData {
-    var snapshot = TaskCenterSnapshot.empty
-    var events: [Event] = []
-    var reminders: [Reminder] = []
-    var familyTasks: [FamilyCollaborationTask] = []
-    var pets: [Pet] = []
-    var humans: [Human] = []
-    var plants: [Plant] = []
-    var humanMedications: [HumanMedication] = []
-    var hasLoaded = false
-
-    init() {}
-
-    @MainActor
-    init(reference: TaskCenterRouteDataReference, context: ModelContext) {
-        snapshot = reference.snapshot
-        events = Self.rehydrate(reference.eventModelIDs, as: Event.self, context: context)
-        reminders = Self.rehydrate(reference.reminderModelIDs, as: Reminder.self, context: context)
-        familyTasks = Self.rehydrate(
-            reference.familyTaskModelIDs,
-            as: FamilyCollaborationTask.self,
-            context: context
+extension TaskCenterRouteContainer {
+    func refreshFamilyTaskActivities() {
+        guard let humanID = selectedActiveHumanID else {
+            familyTaskActivities = []
+            familyTaskUnreadActivityCount = 0
+            familyTaskInboxRoute = nil
+            return
+        }
+        if let route = familyTaskInboxRoute, route.humanID != humanID {
+            familyTaskInboxRoute = nil
+        }
+        familyTaskActivities = FamilyTaskActivityService.inbox(
+            recipientHumanID: humanID,
+            context: modelContext
         )
-        pets = Self.rehydrate(reference.petModelIDs, as: Pet.self, context: context)
-        humans = Self.rehydrate(reference.humanModelIDs, as: Human.self, context: context)
-        plants = Self.rehydrate(reference.plantModelIDs, as: Plant.self, context: context)
-        humanMedications = Self.rehydrate(
-            reference.humanMedicationModelIDs,
-            as: HumanMedication.self,
-            context: context
+        familyTaskUnreadActivityCount = FamilyTaskActivityService.unreadCount(
+            recipientHumanID: humanID,
+            context: modelContext
         )
-        hasLoaded = true
     }
 
-    @MainActor
-    private static func rehydrate<T: PersistentModel>(
-        _ identifiers: [PersistentIdentifier],
-        as _: T.Type,
-        context: ModelContext
-    ) -> [T] {
-        identifiers.compactMap { context.model(for: $0) as? T }
+    func openFamilyTaskInbox() {
+        guard let humanID = selectedActiveHumanID else { return }
+        refreshFamilyTaskActivities()
+        familyTaskInboxRoute = TaskCenterFamilyTaskInboxRoute(humanID: humanID)
+        OhanaFeedback.light()
     }
-}
 
-@ModelActor
-private actor TaskCenterDataActor {
-    private static let completedFamilyTaskFetchLimit = 300
+    func familyTaskInboxMemberName(_ humanID: UUID) -> String {
+        routeData.humans.first(where: { $0.id == humanID })?.name
+            ?? L10n.current.tr(zh: "当前成员", en: "Current member", de: "Aktuelles Mitglied")
+    }
 
-    func load(
-        loadPlants: Bool,
-        activeHumanID: String?,
-        systemDestinations: Set<TaskCenterSystemDestination> = [],
-        starterJourneyEnabled: Bool = false,
-        now: Date = Date()
-    ) throws -> TaskCenterRouteDataReference {
-        try Task.checkCancellation()
-        let pets = fetch(FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.createdAt)]), name: "Pet")
-        let humans = fetch(FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]), name: "Human")
-        let plants = loadPlants
-            ? fetch(FetchDescriptor<Plant>(sortBy: [SortDescriptor(\.createdAt)]), name: "Plant")
-            : []
-        let insurances = fetch(
-            FetchDescriptor<PetInsurance>(sortBy: [SortDescriptor(\.createdAt)]),
-            name: "PetInsurance"
-        )
-        let petMedications = fetch(
-            FetchDescriptor<PetMedication>(sortBy: [SortDescriptor(\.createdAt)]),
-            name: "PetMedication"
-        )
-        let humanMedications = fetch(
-            FetchDescriptor<HumanMedication>(sortBy: [SortDescriptor(\.createdAt)]),
-            name: "HumanMedication"
-        )
-        let allEvents = fetchVisibleEvents(now: now)
-        let reminders = fetchVisibleReminders()
-        let activeFamilyTasks = fetchActiveFamilyTasks()
-        let completedFamilyTasks = fetchCompletedFamilyTasks(on: now)
-        let starterJourneyTargetPet = starterJourneyEnabled
-            ? pets.filter { !$0.hasPassedAway }.sorted(by: starterJourneyPetWasCreatedEarlier).first
-            : nil
-        let starterJourneyCarePlanEvents = fetchStarterJourneyCarePlanEvents(
-            targetPetID: starterJourneyTargetPet?.id.uuidString
-        )
-        let starterJourneyCarePlanReminderEventIDs = fetchStarterJourneyCarePlanReminderEventIDs(
-            targetPetID: starterJourneyTargetPet?.id.uuidString
-        )
-        let starterJourneyCareLedgerEvents = starterJourneyEnabled
-            ? fetchStarterJourneyCareLedgerEvents(activePetID: starterJourneyTargetPet?.id.uuidString)
-            : []
-        let starterJourneyCoconutLedgerEntries = starterJourneyEnabled
-            ? fetchStarterJourneyCoconutLedgerEntries()
-            : []
-        let events = allEvents.filter { event in
-            if !loadPlants, DomainEntityLinkRegistry.plantId(for: event) != nil {
-                return false
-            }
-            return !MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
-                event,
-                pets: pets,
-                humans: humans,
-                petMedications: petMedications,
-                humanMedications: humanMedications,
-                insurances: insurances,
-                now: now
+    func openFamilyTaskActivity(
+        _ activity: FamilyTaskActivitySnapshot,
+        inboxHumanID: UUID
+    ) {
+        guard selectedActiveHumanID == inboxHumanID,
+              activity.recipientHumanID == inboxHumanID else { return }
+        if activity.isUnread {
+            _ = FamilyTaskActivityService.markRead(
+                activityID: activity.id,
+                recipientHumanID: inboxHumanID,
+                context: modelContext
             )
         }
-        let starterJourneyQualificationFacts = starterJourneyQualificationFacts(
-            targetPet: starterJourneyTargetPet,
-            carePlanEvents: starterJourneyCarePlanEvents,
-            carePlanReminderEventIDs: starterJourneyCarePlanReminderEventIDs
-        )
-        let starterJourney = HouseholdStarterJourneyService.buildSnapshot(
-            enabled: starterJourneyEnabled,
-            activeHumanID: activeHumanID,
-            humans: humans,
-            pets: pets,
-            qualificationFacts: starterJourneyQualificationFacts,
-            careLedgerEvents: starterJourneyCareLedgerEvents,
-            coconutLedgerEntries: starterJourneyCoconutLedgerEntries
-        )
-        let snapshot = TaskCenterSnapshotBuilder.make(
-            events: events,
-            allEvents: events,
-            pets: pets,
-            humans: humans,
-            plants: plants,
-            insurances: insurances,
-            petMedications: petMedications,
-            humanMedications: humanMedications,
-            reminders: reminders,
-            familyTasks: activeFamilyTasks + completedFamilyTasks,
-            systemDestinations: systemDestinations,
-            starterJourney: starterJourney,
-            activeHumanId: activeHumanID,
-            now: now
-        )
-        try Task.checkCancellation()
+        refreshFamilyTaskActivities()
+        if let task = familyTaskModel(for: activity) {
+            presentFamilyTaskActivity(task, inboxHumanID: inboxHumanID)
+            return
+        }
 
-        return TaskCenterRouteDataReference(
-            snapshot: snapshot,
-            eventModelIDs: events.map(\.persistentModelID),
-            reminderModelIDs: reminders.map(\.persistentModelID),
-            familyTaskModelIDs: activeFamilyTasks.map(\.persistentModelID),
-            petModelIDs: pets.map(\.persistentModelID),
-            humanModelIDs: humans.map(\.persistentModelID),
-            plantModelIDs: plants.map(\.persistentModelID),
-            humanMedicationModelIDs: humanMedications.map(\.persistentModelID)
-        )
-    }
-
-    private func fetchStarterJourneyCareLedgerEvents(activePetID: String?) -> [CareLedgerEvent] {
-        let checkpointAction = HouseholdStarterJourneyService.checkpointActionType
-        let rewardAction = HouseholdStarterJourneyService.rewardActionType
-        var markerDescriptor = FetchDescriptor<CareLedgerEvent>(
-            predicate: #Predicate<CareLedgerEvent> { event in
-                event.actionType == checkpointAction || event.actionType == rewardAction
-            },
-            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
-        )
-        markerDescriptor.fetchLimit = 64
-        var values = fetch(markerDescriptor, name: "CareLedgerEvent.starterJourneyMarkers")
-
-        if let activePetID {
-            let careKind = CareLedgerEventKind.care.rawValue
-            let pottyKind = CareLedgerEventKind.potty.rawValue
-            let walkKind = CareLedgerEventKind.walk.rawValue
-            let hygieneKind = CareLedgerEventKind.hygiene.rawValue
-            var careDescriptor = FetchDescriptor<CareLedgerEvent>(
-                predicate: #Predicate<CareLedgerEvent> { event in
-                    event.subjectId == activePetID &&
-                        (event.eventKind == careKind ||
-                            event.eventKind == pottyKind ||
-                            event.eventKind == walkKind ||
-                            event.eventKind == hygieneKind)
-                },
-                sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
+        Task { @MainActor in
+            let loader = TaskCenterRouteDataActor(modelContainer: modelContext.container)
+            let modelID = try? await loader.resolveFamilyTaskModelID(
+                taskID: activity.taskID,
+                occurrenceKey: activity.occurrenceKey,
+                planID: activity.planID
             )
-            careDescriptor.fetchLimit = 16
-            values.append(contentsOf: fetch(careDescriptor, name: "CareLedgerEvent.starterJourneyCare"))
+            guard !Task.isCancelled,
+                  selectedActiveHumanID == inboxHumanID,
+                  familyTaskInboxRoute?.humanID == inboxHumanID,
+                  let modelID,
+                  let task = modelContext.model(for: modelID) as? FamilyCollaborationTask else { return }
+            presentFamilyTaskActivity(task, inboxHumanID: inboxHumanID)
         }
-
-        var seen: Set<UUID> = []
-        return values.filter { seen.insert($0.id).inserted }
     }
 
-    private func fetchStarterJourneyCoconutLedgerEntries() -> [CoconutLedgerEntry] {
-        let sourceModelName = HouseholdStarterJourneyService.rewardSourceModelName
-        var descriptor = FetchDescriptor<CoconutLedgerEntry>(
-            predicate: #Predicate<CoconutLedgerEntry> { entry in
-                entry.sourceModelName == sourceModelName
-            },
-            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
-        )
-        descriptor.fetchLimit = HouseholdStarterJourneyTask.allCases.count
-        return fetch(descriptor, name: "CoconutLedgerEntry.starterJourney")
+    func presentFamilyTaskActivity(
+        _ task: FamilyCollaborationTask,
+        inboxHumanID: UUID
+    ) {
+        let nextRoute = makeFamilyTaskDetailRoute(task: task, preferredItem: nil)
+        familyTaskInboxRoute = nil
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+            guard selectedActiveHumanID == inboxHumanID else { return }
+            familyTaskDetailRoute = nextRoute
+        }
     }
 
-    private func starterJourneyQualificationFacts(
-        targetPet: Pet?,
-        carePlanEvents: [Event],
-        carePlanReminderEventIDs: Set<UUID>
-    ) -> HouseholdStarterJourneyQualificationFacts {
-        guard let targetPet else { return .empty }
-        let targetPetID = targetPet.id
-        let carePlan = HouseholdStarterJourneyService.carePlanEvidence(
-            targetPet: targetPet,
-            events: carePlanEvents,
-            reminderEventIDs: carePlanReminderEventIDs
-        )
-        return HouseholdStarterJourneyQualificationFacts(
-            targetPetID: targetPetID,
-            hasProtectionDocument: hasStarterJourneyProtectionDocument(petID: targetPetID),
-            hasInsurance: hasStarterJourneyInsurance(petID: targetPetID),
-            hasPreventiveHealthRecord: hasStarterJourneyPreventiveHealthRecord(petID: targetPetID),
-            hasExplicitCarePlan: carePlan.hasExplicitCarePlan,
-            hasDefaultRecommendedCarePlan: carePlan.hasDefaultRecommendedCarePlan
-        )
-    }
-
-    private func hasStarterJourneyProtectionDocument(petID: UUID) -> Bool {
-        let passport = DocumentCategory.passport.rawValue
-        let medical = DocumentCategory.medical.rawValue
-        let registration = DocumentCategory.registration.rawValue
-        let other = DocumentCategory.other.rawValue
-        var descriptor = FetchDescriptor<PetDocument>(
-            predicate: #Predicate<PetDocument> { document in
-                document.pet?.id == petID
-                    && (document.category == passport
-                        || document.category == medical
-                        || document.category == registration
-                        || document.category == other)
+    func familyTaskModel(for activity: FamilyTaskActivitySnapshot) -> FamilyCollaborationTask? {
+        if let taskID = activity.taskID, let task = familyTaskModel(id: taskID) {
+            return task
+        }
+        if let occurrenceKey = activity.occurrenceKey {
+            if let task = routeData.familyTasks.first(where: { $0.occurrenceKey == occurrenceKey }) {
+                return task
             }
-        )
-        descriptor.fetchLimit = 1
-        return !fetch(descriptor, name: "PetDocument.starterJourneyProtection").isEmpty
-    }
-
-    private func hasStarterJourneyInsurance(petID: UUID) -> Bool {
-        var descriptor = FetchDescriptor<PetInsurance>(
-            predicate: #Predicate<PetInsurance> { insurance in
-                insurance.pet?.id == petID
-            }
-        )
-        descriptor.fetchLimit = 1
-        return !fetch(descriptor, name: "PetInsurance.starterJourney").isEmpty
-    }
-
-    private func hasStarterJourneyPreventiveHealthRecord(petID: UUID) -> Bool {
-        let vaccine = HealthLogType.vaccine.rawValue
-        let internalDeworming = HealthLogType.dewormingInternal.rawValue
-        let externalDeworming = HealthLogType.dewormingExternal.rawValue
-        let checkup = HealthLogType.checkup.rawValue
-        var descriptor = FetchDescriptor<PetHealthLog>(
-            predicate: #Predicate<PetHealthLog> { log in
-                log.pet?.id == petID
-                    && (log.type == vaccine
-                        || log.type == internalDeworming
-                        || log.type == externalDeworming
-                        || log.type == checkup)
-            }
-        )
-        descriptor.fetchLimit = 1
-        return !fetch(descriptor, name: "PetHealthLog.starterJourneyPreventive").isEmpty
-    }
-
-    private func fetchStarterJourneyCarePlanEvents(targetPetID: String?) -> [Event] {
-        guard let targetPetID else { return [] }
-        var descriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.relatedEntityId == targetPetID
-                    && event.recurrenceDays > 0
-                    && !event.isCompleted
-            },
-            sortBy: [
-                SortDescriptor(\.createdAt, order: .reverse),
-                SortDescriptor(\.id)
-            ]
-        )
-        descriptor.fetchLimit = 64
-        return fetch(descriptor, name: "Event.starterJourneyCarePlan")
-    }
-
-    private func fetchStarterJourneyCarePlanReminderEventIDs(targetPetID: String?) -> Set<UUID> {
-        guard let targetPetID else { return [] }
-        var descriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { reminder in
-                reminder.event?.relatedEntityId == targetPetID
-            },
-            sortBy: [
-                SortDescriptor(\.createdAt, order: .reverse),
-                SortDescriptor(\.id)
-            ]
-        )
-        descriptor.fetchLimit = 128
-        return Set(fetch(descriptor, name: "Reminder.starterJourneyCarePlan").compactMap { $0.event?.id })
-    }
-
-    private func starterJourneyPetWasCreatedEarlier(_ lhs: Pet, _ rhs: Pet) -> Bool {
-        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
-        return lhs.id.uuidString < rhs.id.uuidString
-    }
-
-    private func fetchVisibleEvents(now: Date) -> [Event] {
-        let calendar = Calendar.current
-        let window = CalendarTimelineWindowPolicy.bounds(around: now, calendar: calendar)
-        let windowStart = window.start
-        let windowEnd = window.end
-        var windowedDescriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.startDate >= windowStart && event.startDate <= windowEnd
-            },
-            sortBy: [
-                SortDescriptor(\.startDate),
-                SortDescriptor(\.id)
-            ]
-        )
-        windowedDescriptor.fetchLimit = CalendarTimelineWindowPolicy.windowedEventFetchLimit
-        let windowedEvents = fetch(windowedDescriptor, name: "Event.window")
-
-        var recurringDescriptor = FetchDescriptor<Event>(
-            predicate: #Predicate<Event> { event in
-                event.recurrenceDays > 0 && event.startDate <= windowEnd
-            },
-            sortBy: [
-                SortDescriptor(\.startDate, order: .reverse),
-                SortDescriptor(\.id)
-            ]
-        )
-        recurringDescriptor.fetchLimit = CalendarTimelineWindowPolicy.recurringEventFetchLimit
-        let recurringEvents = fetch(recurringDescriptor, name: "Event.recurring").filter { event in
-            guard let recurrenceEndDate = event.recurrenceEndDate else { return true }
-            return recurrenceEndDate >= windowStart
         }
-
-        var uniqueEvents: [UUID: Event] = [:]
-        for event in windowedEvents + recurringEvents {
-            uniqueEvents[event.id] = event
-        }
-        return uniqueEvents.values.sorted { $0.startDate < $1.startDate }
+        guard let planID = activity.planID else { return nil }
+        let rawPlanID = planID.uuidString
+        let tasks = routeData.familyTasks
+            .filter { $0.planId == rawPlanID }
+            .sorted { ($0.nominalAt ?? .distantPast) > ($1.nominalAt ?? .distantPast) }
+        return tasks.first(where: { !$0.isFinished }) ?? tasks.first
     }
 
-    private func fetchVisibleReminders() -> [Reminder] {
-        let pendingStatus = "pending"
-        var descriptor = FetchDescriptor<Reminder>(
-            predicate: #Predicate<Reminder> { reminder in
-                reminder.status == pendingStatus
-            },
-            sortBy: [SortDescriptor(\.scheduledAt), SortDescriptor(\.id)]
-        )
-        descriptor.fetchLimit = 400
-        return fetch(descriptor, name: "Reminder.pending")
-    }
-
-    private func fetchActiveFamilyTasks() -> [FamilyCollaborationTask] {
-        let active = FamilyCollaborationTaskStatus.active.rawValue
-        let claimed = FamilyCollaborationTaskStatus.claimed.rawValue
-        let pendingReview = FamilyCollaborationTaskStatus.pendingReview.rawValue
-        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
-            predicate: #Predicate<FamilyCollaborationTask> { task in
-                task.statusRaw == active ||
-                    task.statusRaw == claimed ||
-                    task.statusRaw == pendingReview
-            },
-            sortBy: [SortDescriptor(\.updatedAt, order: .reverse), SortDescriptor(\.id)]
-        )
-        descriptor.fetchLimit = 300
-        return fetch(descriptor, name: "FamilyCollaborationTask.active")
-    }
-
-    private func fetchCompletedFamilyTasks(on date: Date) -> [FamilyCollaborationTask] {
-        let calendar = Calendar.current
-        let dayStart = calendar.startOfDay(for: date)
-        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? date
-        let completed = FamilyCollaborationTaskStatus.completed.rawValue
-        var descriptor = FetchDescriptor<FamilyCollaborationTask>(
-            predicate: #Predicate<FamilyCollaborationTask> { task in
-                task.statusRaw == completed &&
-                    task.updatedAt >= dayStart &&
-                    task.updatedAt < dayEnd
-            },
-            sortBy: [SortDescriptor(\.updatedAt, order: .reverse), SortDescriptor(\.id)]
-        )
-        descriptor.fetchLimit = Self.completedFamilyTaskFetchLimit
-        return fetch(descriptor, name: "FamilyCollaborationTask.completedToday").filter { task in
-            guard let completedAt = task.completedAt else { return false }
-            return completedAt >= dayStart && completedAt < dayEnd
-        }
-    }
-
-    private func fetch<T: PersistentModel>(
-        _ descriptor: FetchDescriptor<T>,
-        name: String
-    ) -> [T] {
-        do {
-            return try modelContext.fetch(descriptor)
-        } catch {
-            OhanaLog.warning(
-                "Task center data fetch failed for \(name): \(error.localizedDescription)",
-                category: "Tasks"
+    func markAllFamilyTaskActivitiesRead(inboxHumanID: UUID) {
+        guard selectedActiveHumanID == inboxHumanID else { return }
+        for _ in 0 ..< 20 {
+            let markedCount = FamilyTaskActivityService.markAllRead(
+                recipientHumanID: inboxHumanID,
+                context: modelContext
             )
-            return []
+            if markedCount == 0 { break }
         }
+        refreshFamilyTaskActivities()
     }
 }

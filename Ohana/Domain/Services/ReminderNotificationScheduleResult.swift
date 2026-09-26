@@ -5,6 +5,7 @@ enum ReminderNotificationScheduleResult: Equatable {
     case deferred(String)
     case skippedDuplicate
     case skippedPastDue
+    case skippedInactiveMember
     case missingEvent
     case skippedBudget(String)
     case skippedMerged(String)
@@ -17,6 +18,7 @@ enum ReminderNotificationScheduleResult: Equatable {
         case .deferred: "scheduleDeferred"
         case .skippedDuplicate: "scheduleDuplicate"
         case .skippedPastDue: "scheduleSkippedPastDue"
+        case .skippedInactiveMember: "scheduleSkippedInactiveMember"
         case .missingEvent: "scheduleMissingEvent"
         case .skippedBudget: "scheduleSkippedBudget"
         case .skippedMerged: "scheduleMerged"

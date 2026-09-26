@@ -430,10 +430,42 @@ extension PlantDetailContentView {
                         .lineLimit(2)
                 }
             }
+            .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
+
+            Menu {
+                Button {
+                    careHistoryRoute = PlantCareHistoryRoute(
+                        recordID: log.historyRecordID(plantID: plant.id),
+                        action: .edit
+                    )
+                } label: {
+                    Label(l.tr(zh: "编辑记录", en: "Edit log", de: "Eintrag bearbeiten"), systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    careHistoryRoute = PlantCareHistoryRoute(
+                        recordID: log.historyRecordID(plantID: plant.id),
+                        action: .delete
+                    )
+                } label: {
+                    Label(l.tr(zh: "删除记录", en: "Delete log", de: "Eintrag löschen"), systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(l.tr(
+                zh: "编辑或删除\(log.careType.displayName(l: l))记录",
+                en: "Edit or delete \(log.careType.displayName(l: l)) log",
+                de: "Eintrag \(log.careType.displayName(l: l)) bearbeiten oder löschen"
+            ))
+            .accessibilityIdentifier("plant-detail-history-menu-\(log.id.uuidString)")
         }
         .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     func timelineDateText(for log: PlantDetailLogSnapshot) -> String {

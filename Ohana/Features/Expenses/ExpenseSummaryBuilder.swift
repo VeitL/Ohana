@@ -32,6 +32,61 @@ struct ExpenseCategoryBreakdown: Identifiable, Equatable {
     let pct: Double
 }
 
+protocol ExpenseSummaryRecord {
+    var date: Date { get }
+    var amount: Double { get }
+    var expenseCategory: ExpenseCategory { get }
+    var executorId: String? { get }
+    var expensePetID: UUID? { get }
+    var payerContributions: [ExpensePayerContribution] { get }
+    var hasStructuredPayerSnapshot: Bool { get }
+}
+
+extension ExpenseSummaryRecord {
+    /// Legacy/test summary records have no structured split and continue to use
+    /// their singular executor as the payer of the whole amount.
+    var payerContributions: [ExpensePayerContribution] { [] }
+    var hasStructuredPayerSnapshot: Bool { false }
+}
+
+extension PetExpenseLog: ExpenseSummaryRecord {
+    var expensePetID: UUID? { pet?.id }
+    var hasStructuredPayerSnapshot: Bool { !payerContributionsJSON.isEmpty }
+}
+
+nonisolated struct ExpensePayerShare: Equatable, Sendable {
+    let humanID: String?
+    let amount: Double
+}
+
+nonisolated struct ExpenseSummarySlice: ExpenseSummaryRecord, Equatable {
+    let date: Date
+    let amount: Double
+    let expenseCategory: ExpenseCategory
+    let executorId: String?
+    let expensePetID: UUID?
+    let payerContributions: [ExpensePayerContribution]
+    let hasStructuredPayerSnapshot: Bool
+
+    init(
+        date: Date,
+        amount: Double,
+        expenseCategory: ExpenseCategory,
+        executorId: String?,
+        expensePetID: UUID?,
+        payerContributions: [ExpensePayerContribution] = [],
+        hasStructuredPayerSnapshot: Bool = false
+    ) {
+        self.date = date
+        self.amount = amount
+        self.expenseCategory = expenseCategory
+        self.executorId = executorId
+        self.expensePetID = expensePetID
+        self.payerContributions = payerContributions
+        self.hasStructuredPayerSnapshot = hasStructuredPayerSnapshot
+    }
+}
+
 enum ExpenseAmountPresets {
     static func defaults(for category: ExpenseCategory) -> [Double] {
         switch category {
@@ -51,55 +106,125 @@ enum ExpenseAmountPresets {
 }
 
 enum ExpenseSummaryBuilder {
-    static func sortedRecent(_ logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func sortedRecent<Log: ExpenseSummaryRecord>(_ logs: [Log]) -> [Log] {
         logs.sorted { $0.date > $1.date }
     }
 
-    static func logs(
-        _ logs: [PetExpenseLog],
+    static func logs<Log: ExpenseSummaryRecord>(
+        _ logs: [Log],
         in range: ExpenseDashboardRange,
         now: Date = Date(),
         calendar: Calendar = .current
-    ) -> [PetExpenseLog] {
+    ) -> [Log] {
         guard let cutoff = range.startDate(now: now, calendar: calendar) else {
             return logs
         }
         return logs.filter { $0.date >= cutoff }
     }
 
-    static func logs(
-        _ logs: [PetExpenseLog],
+    static func logs<Log: ExpenseSummaryRecord>(
+        _ logs: [Log],
         category: ExpenseCategory?
-    ) -> [PetExpenseLog] {
+    ) -> [Log] {
         guard let category else { return logs }
         return logs.filter { $0.expenseCategory == category }
     }
 
-    static func paidBy(_ humanID: UUID, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func paidBy<Log: ExpenseSummaryRecord>(_ humanID: UUID, from logs: [Log]) -> [Log] {
         paidBy(humanID.uuidString, from: logs)
     }
 
-    static func paidBy(_ humanID: String, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
-        logs.filter { $0.executorId == humanID }
+    static func paidBy<Log: ExpenseSummaryRecord>(_ humanID: String, from logs: [Log]) -> [Log] {
+        logs.filter { amountPaid(by: humanID, for: $0) != 0 }
     }
 
-    static func linkedToPet(_ petID: UUID, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
-        logs.filter { $0.pet?.id == petID }
+    static func linkedToPet<Log: ExpenseSummaryRecord>(_ petID: UUID, from logs: [Log]) -> [Log] {
+        logs.filter { $0.expensePetID == petID }
     }
 
-    static func humanDirectExpenses(_ humanID: UUID, from logs: [PetExpenseLog]) -> [PetExpenseLog] {
-        logs.filter { $0.executorId == humanID.uuidString && $0.pet == nil }
+    static func humanDirectExpenses<Log: ExpenseSummaryRecord>(_ humanID: UUID, from logs: [Log]) -> [Log] {
+        logs.filter { $0.expensePetID == nil && amountPaid(by: humanID.uuidString, for: $0) != 0 }
     }
 
-    static func positiveLogs(_ logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func payerShares(for log: some ExpenseSummaryRecord) -> [ExpensePayerShare] {
+        if !log.payerContributions.isEmpty {
+            return log.payerContributions.map {
+                ExpensePayerShare(humanID: $0.humanID?.uuidString, amount: $0.amount)
+            }
+        }
+        if log.hasStructuredPayerSnapshot {
+            return [ExpensePayerShare(humanID: nil, amount: log.amount)]
+        }
+        return [ExpensePayerShare(humanID: normalizedHumanID(log.executorId), amount: log.amount)]
+    }
+
+    static func amountPaid(by humanID: UUID, for log: some ExpenseSummaryRecord) -> Double {
+        amountPaid(by: humanID.uuidString, for: log)
+    }
+
+    static func amountPaid(by humanID: String, for log: some ExpenseSummaryRecord) -> Double {
+        payerShares(for: log)
+            .filter { payerIDsMatch($0.humanID, humanID) }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    static func summarySlices(
+        from logs: [some ExpenseSummaryRecord],
+        attributedTo humanID: String? = nil
+    ) -> [ExpenseSummarySlice] {
+        logs.compactMap { log in
+            let attributedAmount: Double
+            if let humanID {
+                attributedAmount = amountPaid(by: humanID, for: log)
+                guard attributedAmount != 0 else { return nil }
+            } else {
+                attributedAmount = log.amount
+            }
+            return ExpenseSummarySlice(
+                date: log.date,
+                amount: attributedAmount,
+                expenseCategory: log.expenseCategory,
+                executorId: humanID ?? log.executorId,
+                expensePetID: log.expensePetID,
+                payerContributions: humanID == nil ? log.payerContributions : [],
+                hasStructuredPayerSnapshot: humanID == nil && log.hasStructuredPayerSnapshot
+            )
+        }
+    }
+
+    /// Projects every expense into one exact slice per payer contribution.
+    /// Household member rollups must consume these slices instead of assigning
+    /// the whole expense to `executorId`, which is only the legacy/primary payer.
+    static func payerContributionSlices(
+        from logs: [some ExpenseSummaryRecord],
+        attributedTo humanID: String? = nil
+    ) -> [ExpenseSummarySlice] {
+        logs.flatMap { log in
+            payerShares(for: log).compactMap { share in
+                guard share.amount != 0 else { return nil }
+                if let humanID, !payerIDsMatch(share.humanID, humanID) {
+                    return nil
+                }
+                return ExpenseSummarySlice(
+                    date: log.date,
+                    amount: share.amount,
+                    expenseCategory: log.expenseCategory,
+                    executorId: normalizedHumanID(share.humanID),
+                    expensePetID: log.expensePetID
+                )
+            }
+        }
+    }
+
+    static func positiveLogs<Log: ExpenseSummaryRecord>(_ logs: [Log]) -> [Log] {
         logs.filter { $0.amount > 0 }
     }
 
-    static func reimbursementLogs(_ logs: [PetExpenseLog]) -> [PetExpenseLog] {
+    static func reimbursementLogs<Log: ExpenseSummaryRecord>(_ logs: [Log]) -> [Log] {
         logs.filter { $0.amount < 0 }
     }
 
-    static func totals(from logs: [PetExpenseLog]) -> ExpenseTotals {
+    static func totals(from logs: [some ExpenseSummaryRecord]) -> ExpenseTotals {
         guard !logs.isEmpty else { return .empty }
         let spentLogs = positiveLogs(logs)
         let refunds = reimbursementLogs(logs)
@@ -115,7 +240,7 @@ enum ExpenseSummaryBuilder {
         )
     }
 
-    static func categoryBreakdown(from logs: [PetExpenseLog]) -> [ExpenseCategoryBreakdown] {
+    static func categoryBreakdown(from logs: [some ExpenseSummaryRecord]) -> [ExpenseCategoryBreakdown] {
         let positiveLogs = positiveLogs(logs)
         let grandTotal = max(1, positiveLogs.reduce(0) { $0 + $1.amount })
         var totalsByCategory: [ExpenseCategory: Double] = [:]
@@ -131,7 +256,19 @@ enum ExpenseSummaryBuilder {
             .sorted { $0.total > $1.total }
     }
 
-    static func topCategory(from logs: [PetExpenseLog]) -> ExpenseCategoryBreakdown? {
+    static func topCategory(from logs: [some ExpenseSummaryRecord]) -> ExpenseCategoryBreakdown? {
         categoryBreakdown(from: logs).first
+    }
+
+    static func payerIDsMatch(_ lhs: String?, _ rhs: String) -> Bool {
+        guard let left = normalizedHumanID(lhs), let right = normalizedHumanID(rhs) else { return false }
+        return left == right
+    }
+
+    private static func normalizedHumanID(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clean.isEmpty else { return nil }
+        return UUID(uuidString: clean)?.uuidString ?? clean
     }
 }

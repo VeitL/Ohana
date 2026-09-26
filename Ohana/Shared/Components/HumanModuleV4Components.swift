@@ -47,13 +47,11 @@ struct HumanModulePageHeader<Trailing: View>: View {
                 Text(title)
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
@@ -68,6 +66,7 @@ struct HumanModulePageHeader<Trailing: View>: View {
                         .contentShape(Rectangle())
                 }
                 .ohanaGlassIconButton()
+                .accessibilityIdentifier("human-module-close-action")
                 .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
             }
         }
@@ -143,10 +142,12 @@ struct HumanModuleFloatingActionButton: View {
                     .font(OhanaFont.adaptive(size: 15, weight: .black))
                 Text(title)
                     .font(OhanaFont.callout(.black))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 22)
-            .frame(height: 54)
+            .padding(.vertical, 12)
+            .frame(minHeight: 54)
         }
         .ohanaGlassProminentButton()
     }

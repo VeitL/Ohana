@@ -366,20 +366,15 @@ struct GlobalCoconutRewardFeedbackLayer: View {
     }
 
     private static var shouldHideGlobalRewardFeedbackOverlay: Bool {
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS") {
+        #if DEBUG
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("-OHANA_ENABLE_PRODUCTION_OVERLAYS_IN_UI_TESTS") {
+                return false
+            }
+            return OhanaUITestLaunchOptions.isRunningUITests
+        #else
             return false
-        }
-        return isRunningTests
-    }
-
-    private static var isRunningTests: Bool {
-        let environment = ProcessInfo.processInfo.environment
-        let arguments = ProcessInfo.processInfo.arguments
-        return environment["XCTestConfigurationFilePath"] != nil
-            || environment["XCTestBundlePath"] != nil
-            || environment["XCTestSessionIdentifier"] != nil
-            || arguments.contains("-OHANA_UI_TESTS")
+        #endif
     }
 }
 

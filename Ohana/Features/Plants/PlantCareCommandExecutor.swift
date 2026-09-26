@@ -13,10 +13,39 @@ struct PlantCareCommandRequest {
     let careType: PlantCareType
     let plant: Plant
     let executorID: String?
-    var now = Date()
-    var careNote = ""
+    var now: Date
+    /// Economy uses the day on which the user submitted the command. This is
+    /// intentionally independent from `now`, which may be a historical care
+    /// fact date during backfill.
+    var rewardOperationDate: Date
+    var careNote: String
     var photoData: Data?
     var healthStatus: PlantHealthStatus?
+    /// Stable identifier for one user intent. Reuse the same request when a
+    /// command is retried; a new tap should create a new operation identifier.
+    var operationID: UUID
+
+    init(
+        careType: PlantCareType,
+        plant: Plant,
+        executorID: String?,
+        now: Date = Date(),
+        careNote: String = "",
+        photoData: Data? = nil,
+        healthStatus: PlantHealthStatus? = nil,
+        operationID: UUID = UUID(),
+        rewardOperationDate: Date = Date()
+    ) {
+        self.careType = careType
+        self.plant = plant
+        self.executorID = executorID
+        self.now = now
+        self.rewardOperationDate = rewardOperationDate
+        self.careNote = careNote
+        self.photoData = photoData
+        self.healthStatus = healthStatus
+        self.operationID = operationID
+    }
 }
 
 @MainActor
@@ -28,6 +57,9 @@ struct PlantCareCommandOptions {
     var reminderScheduling: ReminderSchedulingManaging?
     var saveChanges = true
     var awardRewards = true
+    var persistChanges: (ModelContext) -> ModelContextSaveResult = { context in
+        context.safeSaveResult(publishFailureEvent: true)
+    }
 }
 
 @MainActor
@@ -63,7 +95,9 @@ struct PlantCareCommandExecutor {
             context: context,
             options: options
         )
-        revisions.publishPlantCare(result, note: note)
+        if result.didWrite {
+            revisions.publishPlantCare(result, note: note)
+        }
         return result
     }
 
@@ -73,14 +107,18 @@ struct PlantCareCommandExecutor {
         executorId: String?,
         note: String,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init
     ) -> PlantBatchCareCommandResult {
         let result = PlantBatchCareCommandService.completeDueCare(
             selections: selections,
             context: context,
             executorId: executorId,
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            operationID: operationID,
+            clock: clock
         )
         revisions.publishPlantBatchCare(result, note: note)
         return result
@@ -92,14 +130,18 @@ struct PlantCareCommandExecutor {
         executorId: String?,
         note: String,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init
     ) -> PlantBatchCareCommandResult {
         let result = PlantBatchCareCommandService.recordQuickCare(
             selections: selections,
             context: context,
             executorId: executorId,
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            operationID: operationID,
+            clock: clock
         )
         revisions.publishPlantBatchQuickRecord(result, note: note)
         return result

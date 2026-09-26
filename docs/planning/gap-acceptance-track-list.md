@@ -1,6 +1,6 @@
 # 人工验收总 Track List
 
-更新日期：2026-07-15
+更新日期：2026-08-02
 
 本文件是 GAP 建设阶段与模块门禁阶段唯一的人工验收 track list。后续不再新增 `gap-*-acceptance-track-list.md` 或模块单独 track list；需要人工目检、真机、真实 iCloud、真实通知或真实数据确认的项目，都追加到本文对应小节。
 
@@ -29,8 +29,47 @@
 | Phase 6 Settings + Health | 🟢 | `5d4e71928` / `8f6c792dc` recheck | Debug-only 设置开发工具、真实通知开关策略、Health 物理删除 + tombstone/read-only 不变量、目标测试与全仓 gate / CI 复验通过 | 待 Release 真机 / 真实 UI 抽查 |
 | Phase 6 Economy | 🏁 | `92133da2a` / `8f6c792dc` recheck | 兑换入口首发门禁、冻结钱包写入拒绝、特殊奖励 active human 归属、隐私 / 冻结财富口径；最终纯复审 P0/P1/P2=0；全仓 gate / CI 复验通过 | 待真实 UI 抽查 |
 | Phase 7 Walks | 🟢* | `e0c1d69d3` / `8f6c792dc` recheck | `WalkFeaturePolicy` active dog 硬门、删除/离世过滤、遛狗中便便事实+ledger、共享遛狗服务适配器、全仓 gate / CI 复验通过 | 待真机定位 / 真实 UI 抽查 |
+| Phase 7 System Surfaces | 🟡* | 2026-07-20 current worktree | WidgetKit target、最多三项的隐私最小化 snapshot、Personal gate、typed deep link、walk Live Activity / Dynamic Island 生命周期与中央能耗策略已实现；7 个聚焦 suite 89/89 通过，Simulator、LocalDevice、clean-cache 与最终增量 `-O` Simulator Release 均嵌入并验证 extension | 待 App Group 注册、签名产物检查和支持 Dynamic Island 的真机抽查 |
 | Phase 7 Gacha + Shop | 🟢* | `92763c164` / `8f6c792dc` recheck | 扭蛋概率/区间、合资抽取、冻结钱包、Shop 定价/汇率、购买合资、SwiftData 所有权迁移、备份恢复、Gacha/Shop CloudSync serializer/applier 与 schema 迁移目标测试均通过 | 待真机 App Icon / 真实 UI 抽查 |
 | Phase 7 其余中小模块 smoke | 🟡* | `8f6c792dc` + current worktree | Medication、FamilyTasks、Expenses、Calendar、CrewRoster、Documents、Insurance、Privacy、Security、CareLedger 的旧边界证据保留；当前 Onboarding/Task Center/D28 变更尚待 TFU-20260715-002 | 新 Human-first 核心链路未签收；CrewRoster / FunctionMenu / 其余真实 UI 抽查继续推进 |
+| D34 Human 健康与 Personal 化验单 | 🟡* | 2026-08-02 current worktree | V97/V98 Human 健康状况、观察、手工记录与 Personal `documentScanning` 已纳入 1.0；本机迁移、原子写入、Free gate、降级保留、易失原图/OCR、备份/系统表面排除和删除/reset 证据正在收口 | 待当前本地门禁、真实既有安装升级及签名 Camera/Photos 逐项验收 |
+
+## D34 Human 健康与 Personal 化验单
+
+人工验收目标：Free 的基础 Human 健康记录不被付费墙截断；Personal 扫描只作为端侧
+录入辅助，每一项都必须由用户明确复核后才可保存，且不产生诊断或原始页面持久化。
+本节属于 `TFU-20260715-003` 的 1.0 关闭条件，不新增一条平行 release follow-up。
+
+- [ ] 在 Free 状态从 Health Report 与 Checkup 两个入口尝试扫描。
+  - 预期：入口显示一致的 Personal 说明；绕过 UI 直接调用导入命令仍被拒绝且不写报告、
+    指标或导入上下文；手工新增、查看、编辑和删除基础健康报告/指标继续可用。
+  - 记录：
+
+- [ ] 在同一签名 Personal 构建中分别使用文档相机和 Photos 导入真实化验单。
+  - 预期：每个识别候选默认未确认；用户逐项检查并可修正名称、值、单位和参考范围，
+    只有明确确认且结构有效的项目能保存；批量操作不能替代逐项确认。报告不生成诊断、
+    治疗建议、异常结论或紧急判断。
+  - 记录：
+
+- [ ] 覆盖相机不可用/拒绝、Photos 取消、空白或不可读页面、页数超限、识别取消、
+  保存失败、重试、离开页面和重启 App。
+  - 预期：失败路径不部分写入；源页面、完整 OCR 文本和未提交草稿不在 SwiftData、
+    附件、日志、通知、Widget、Live Activity 或重启后的 UI 中出现。
+  - 记录：
+
+- [ ] 用包含既有 Human 健康报告与指标的旧安装覆盖升级，再重启并新增一次扫描结果。
+  - 预期：旧事实与关系完整保留，V98 新字段使用安全默认值；新增结构化结果重启可读，
+    同一导入重试幂等且不会重复写入。
+  - 记录：
+
+- [ ] Personal 导入后降级到 Free，再查看、编辑和删除既有扫描结果。
+  - 预期：既有结构化结果不隐藏、不删除且仍可维护；只有启动新的扫描被拦截。
+  - 记录：
+
+- [ ] 通过真实 UI 检查受限备份、Human 删除与 App Reset。
+  - 预期：Human 健康状况、观察、报告和指标不进入受限 iCloud/外部恢复包；删除 Human
+    与 App Reset 会清理对应本机事实；其他成员和允许备份的数据不受影响。
+  - 记录：
 
 ## GAP-1 联机功能门
 
@@ -368,7 +407,7 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 ## GAP-12 植物功能门
 
-人工验收目标：首发支持本地免费基础植物，但只在 Lv.4「家庭树冠」解锁；已有植物数据在低等级 grandfather。Lv.1–3 不抢占宠物核心习惯，联机、订阅、CloudKit、AI 或天气能力都不是基础植物前置。
+人工验收目标：首发支持本地免费基础植物，但只在 Lv.4「生命树冠」解锁；已有植物数据在低等级 grandfather。Lv.1–3 不抢占宠物核心习惯，联机、订阅、CloudKit、AI 或天气能力都不是基础植物前置。
 
 当前自动边界见 `docs/specs/PlantFeatureGate-logic.md`：`PlantFeatureGate` 表示 build 支持，`PlantUnlockPolicy` 独占可见性；Lv.1–3 隐藏入口并 redirect Growth Roadmap，Lv.4 开放基础植物，已有数据 grandfather。旧 2026-06-16 “首发恒关”证据已被 D19 后续产品决定取代，不再作为当前验收标准。
 
@@ -514,6 +553,47 @@ iPhoneOS 编译和签名，`Ohana.app` 保留 development Push 与 iCloud entitl
 
 - [ ] 准备一个已删除或 legacy recycle-flagged 的 walk / poop marker 样本，打开 DogActivityCard、WalkSummarySheet、WalkDetailView 和 GlobalWalkBanner。
   - 预期：普通统计、周摘要、详情路线和 banner 不显示该 walk / poop marker；不会提供恢复入口。
+  - 记录：
+
+## Phase 7 System Surfaces
+
+人工验收目标：Personal 用户可从 Home / Lock Screen Widget 安全查看最多三项照护
+摘要；Free 与降级用户不会继续看到旧 Personal 内容；活跃遛狗可在 Lock Screen 与
+Dynamic Island 持续显示，但不复制 session、不绕过 Walk 领域写入或能耗策略。
+
+自动验收已完成（2026-07-20 current worktree）：新增独立 `OhanaWidgets` target、
+标准与 LocalDevice 环境隔离的 App Group/URL scheme、版本化且原子写入的 bounded
+snapshot、Personal entitlement 投影、cold/warm typed route inbox、walk Activity
+start/update/restore/end/stale cleanup，以及 `AppWorkloadPolicy` 正常/低电量/高热预算。
+7 个聚焦 suite 执行 89/89 测试；Simulator 与 LocalDevice lane 以及 clean-cache 与
+最终增量的双架构 `-O` Simulator Release 均编译、嵌入并通过 extension validation。
+这不证明 Developer Portal、签名 provisioning、SpringBoard、锁屏隐私、后台定位或
+真实 Dynamic Island。
+
+- [ ] 注册 `group.com.guanchen.li.Ohana` 与
+  `group.com.guanchen.li.Ohana.LocalDevice`，让每个环境的 App 和 Widget extension
+  使用完全匹配的 provisioning profile，再检查签名 Release 的嵌入与 entitlements。
+  - 预期：每个产物只申领对应环境的一个 App Group；extension 正确嵌入且版本、
+    deployment target 与主 App 可解释；无 Sign in with Apple、CloudKit、APNs 或
+    remote-notification 能力漂移。
+  - 记录：
+
+- [ ] 在真机添加 small、medium、accessory rectangular Widget，覆盖 Personal、
+  Free、降级、空、过期、App reset、锁屏和 app-group 不可用状态。
+  - 预期：最多三项；不暴露自由输入任务标题、健康详情、已删除/已离世对象；
+    Free/降级不残留旧 Personal 内容；冷/热启动链接进入正确待办或设置。
+  - 记录：
+
+- [ ] 在支持 Dynamic Island 的 iPhone 上完整执行一次活跃狗狗遛狗：开始、暂停、
+  继续、距离变化、添加便便、锁屏、后台、杀进程重开、点击 Activity、停止。
+  - 预期：始终只有一个 Activity；expanded/compact/minimal 与 Lock Screen 状态
+    一致；重开不复制 walk；停止后正确结束，陈旧 Activity 会清理。
+  - 记录：
+
+- [ ] 在中文、英文、德文和任一长语言下，以大号 Dynamic Type、Reduce Motion、
+  Low Power 与锁屏隐私状态目检 Widget 和 Live Activity。
+  - 预期：关键内容不截断、不重叠；敏感文本按系统隐私规则遮挡；降级节流不影响
+    遛狗事实或最终状态，且没有可见高频刷新。
   - 记录：
 
 ## Phase 7 Gacha + Shop

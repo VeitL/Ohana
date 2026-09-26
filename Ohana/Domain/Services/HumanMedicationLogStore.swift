@@ -24,11 +24,16 @@ enum HumanMedicationLogStore {
         scheduledTime: Date,
         calendar: Calendar = .current
     ) -> HumanMedicationLog? {
-        logs.first {
-            $0.humanId == humanId &&
-                $0.medicationId == medicationId &&
-                sameScheduledMinute($0.scheduledTime, scheduledTime, calendar: calendar)
-        }
+        guard let humanId = canonicalID(humanId),
+              let medicationId = canonicalID(medicationId) else { return nil }
+
+        return logs
+            .filter {
+                canonicalID($0.humanId) == humanId &&
+                    canonicalID($0.medicationId) == medicationId &&
+                    sameScheduledMinute($0.scheduledTime, scheduledTime, calendar: calendar)
+            }
+            .max(by: actionPrecedes)
     }
 
     @MainActor
@@ -61,8 +66,8 @@ enum HumanMedicationLogStore {
                 return HumanMedicationDoseLogUpdate(log: nil, previousStatus: nil, didChange: false)
             }
             let log = HumanMedicationLog(
-                humanId: humanId,
-                medicationId: medicationId,
+                humanId: canonicalID(humanId) ?? humanId,
+                medicationId: canonicalID(medicationId) ?? medicationId,
                 scheduledTime: scheduledTime,
                 status: status,
                 recordedTime: now
@@ -82,19 +87,33 @@ enum HumanMedicationLogStore {
     }
 
     @MainActor
-    private static func fetchMatchingLog(
+    static func fetchMatchingLog(
         humanId: String,
         medicationId: String,
         scheduledTime: Date,
         context: ModelContext,
         calendar: Calendar
     ) -> HumanMedicationLog? {
-        var descriptor = FetchDescriptor<HumanMedicationLog>(
+        guard let canonicalHumanId = canonicalID(humanId),
+              let canonicalMedicationId = canonicalID(medicationId),
+              let minute = calendar.dateInterval(of: .minute, for: scheduledTime) else {
+            return nil
+        }
+        let minuteStart = minute.start
+        let minuteEnd = minute.end
+        let descriptor = FetchDescriptor<HumanMedicationLog>(
             predicate: #Predicate<HumanMedicationLog> { log in
-                log.humanId == humanId && log.medicationId == medicationId
-            }
+                log.scheduledTime >= minuteStart &&
+                    log.scheduledTime < minuteEnd
+            },
+            sortBy: [
+                SortDescriptor(\HumanMedicationLog.createdAt, order: .reverse),
+                SortDescriptor(\HumanMedicationLog.id)
+            ]
         )
-        descriptor.fetchLimit = 128
+        // A one-minute household window remains time-bounded while allowing
+        // in-memory UUID normalization to recover whitespace legacy owners.
+        // Do not apply a fixed row limit: it could exclude the target owner.
         let logs: [HumanMedicationLog]
         do {
             logs = try context.fetch(descriptor)
@@ -107,10 +126,25 @@ enum HumanMedicationLogStore {
         }
         return matchingLog(
             in: logs,
-            humanId: humanId,
-            medicationId: medicationId,
+            humanId: canonicalHumanId,
+            medicationId: canonicalMedicationId,
             scheduledTime: scheduledTime,
             calendar: calendar
         )
+    }
+
+    nonisolated static func canonicalID(_ raw: String) -> String? {
+        UUID(uuidString: raw.trimmingCharacters(in: .whitespacesAndNewlines))?.uuidString
+    }
+
+    /// Orders duplicate rows by the user's effective action, then by stable
+    /// creation and identity tie-breakers. Adherence and exact-minute lookup
+    /// must use the same winner when legacy stores contain conflicting rows.
+    nonisolated static func actionPrecedes(_ lhs: HumanMedicationLog, _ rhs: HumanMedicationLog) -> Bool {
+        let lhsActionTime = lhs.recordedTime ?? lhs.createdAt
+        let rhsActionTime = rhs.recordedTime ?? rhs.createdAt
+        if lhsActionTime != rhsActionTime { return lhsActionTime < rhsActionTime }
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+        return lhs.id.uuidString < rhs.id.uuidString
     }
 }

@@ -363,22 +363,97 @@ extension CloudSyncRecordApplier {
         metadata: RemoteMetadata,
         context: ModelContext
     ) throws -> CloudSyncRecordApplyResult {
+        let amount = record.double(for: "amount") ?? 0
+        let attribution = try sanitizedRemoteExpenseAttribution(
+            amount: amount,
+            executorID: record.string(for: "executorId"),
+            recordedByHumanID: record.string(for: "recordedByHumanId"),
+            payerContributionsJSON: record.string(for: "payerContributionsJSON") ?? "",
+            context: context
+        )
         let result = try DomainCareFactRehydrateWriter.insertPetExpenseLogIfNeeded(
             snapshot: DomainPetExpenseLogRehydrateSnapshot(
                 id: metadata.localRecordUUID,
                 date: record.date(for: "date") ?? metadata.lastModifiedAt,
-                amount: record.double(for: "amount") ?? 0,
+                amount: amount,
                 categoryRaw: record.string(for: "category") ?? ExpenseCategory.other.rawValue,
                 note: record.string(for: "note") ?? "",
                 petId: record.string(for: "petId").flatMap(UUID.init(uuidString:)),
-                executorId: record.string(for: "executorId"),
-                recordedByHumanId: record.string(for: "recordedByHumanId"),
-                sharedSessionId: record.string(for: "sharedSessionId") ?? ""
+                executorId: attribution.executorID,
+                recordedByHumanId: attribution.recordedByHumanID,
+                sharedSessionId: record.string(for: "sharedSessionId") ?? "",
+                payerContributionsJSON: attribution.payerContributionsJSON
             ),
             source: .cloudApply,
             context: context
         )
         return rehydrateApplyResult(inserted: result.inserted, didPersist: result.didPersist, metadata: metadata)
+    }
+
+    /// Human tombstones permanently win over an older expense payload. Missing
+    /// Humans are not treated as deleted because records may arrive in another
+    /// CloudKit page; only an explicit local tombstone anonymizes attribution.
+    private nonisolated static func sanitizedRemoteExpenseAttribution(
+        amount: Double,
+        executorID: String?,
+        recordedByHumanID: String?,
+        payerContributionsJSON: String,
+        context: ModelContext
+    ) throws -> (executorID: String?, recordedByHumanID: String?, payerContributionsJSON: String) {
+        let cleanSnapshot = payerContributionsJSON.trimmingCharacters(in: .whitespacesAndNewlines)
+        var contributions = try ExpensePayerContributionPolicy.validatedDecoded(
+            cleanSnapshot,
+            total: amount
+        )
+        var didAnonymize = false
+        for payerID in contributions.compactMap(\.humanID) {
+            guard try isTombstonedHuman(payerID, context: context) else { continue }
+            contributions = try ExpensePayerContributionPolicy.anonymized(
+                contributions,
+                removing: payerID,
+                total: amount
+            )
+            didAnonymize = true
+        }
+
+        let sanitizedExecutorID: String? = if cleanSnapshot.isEmpty {
+            try scrubbedRemoteHumanID(executorID, context: context)
+        } else {
+            // A structured snapshot is authoritative; never retain a legacy
+            // primary payer that is absent from its exact allocation.
+            contributions.compactMap(\.humanID).first?.uuidString
+        }
+        let sanitizedRecorderID = try scrubbedRemoteHumanID(recordedByHumanID, context: context)
+        let sanitizedSnapshot = didAnonymize
+            ? ExpensePayerContributionPolicy.encode(contributions)
+            : payerContributionsJSON
+        return (sanitizedExecutorID, sanitizedRecorderID, sanitizedSnapshot)
+    }
+
+    private nonisolated static func scrubbedRemoteHumanID(
+        _ raw: String?,
+        context: ModelContext
+    ) throws -> String? {
+        guard let raw,
+              let humanID = UUID(uuidString: raw),
+              try isTombstonedHuman(humanID, context: context) else {
+            return raw
+        }
+        return nil
+    }
+
+    private nonisolated static func isTombstonedHuman(
+        _ humanID: UUID,
+        context: ModelContext
+    ) throws -> Bool {
+        guard let state = try CloudSyncMetadataService.state(
+            entityName: String(describing: Human.self),
+            localRecordId: humanID,
+            context: context
+        ) else {
+            return false
+        }
+        return state.isDeleted || state.isDeletionTombstone
     }
 
     private nonisolated static func applyPetFoodRecord(
@@ -648,6 +723,9 @@ extension CloudSyncRecordApplier {
                 instantCoconutDelta: record.int(for: "instantCoconutDelta") ?? existing?.instantCoconutDelta ?? 0,
                 costCoconuts: record.int(for: "costCoconuts") ?? existing?.costCoconuts ?? DomainGachaDrawDefaults.costPerDraw,
                 dailySequence: record.int(for: "dailySequence") ?? existing?.dailySequence ?? 1,
+                oddsVersion: record.int(for: "oddsVersion") ?? existing?.oddsVersion,
+                guaranteeKindRaw: record.string(for: "guaranteeKindRaw") ?? existing?.guaranteeKindRaw,
+                stardustDelta: record.int(for: "stardustDelta") ?? existing?.stardustDelta,
                 drawDate: record.date(for: "drawDate") ?? existing?.drawDate ?? metadata.lastModifiedAt,
                 createdAt: record.date(for: "createdAt") ?? existing?.createdAt ?? metadata.lastModifiedAt
             ),

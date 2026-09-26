@@ -5,11 +5,34 @@
 //  宠物用药打卡写入 Event，避免改动 PetMedication Schema。
 //
 
+import CryptoKit
 import Foundation
 import SwiftData
 
 nonisolated enum PetMedicationDoseLogging {
     static let relatedEntityTypeMedication = DomainEntityLinkRegistry.petMedicationDose
+
+    struct ScheduledOccurrence: Sendable {
+        let scheduledAt: Date
+        let doseIndex: Int
+
+        func eventID(medicationID: UUID) -> UUID {
+            let minute = Int64((scheduledAt.timeIntervalSince1970 / 60).rounded(.down))
+            let key = "pet-medication-dose:\(medicationID.uuidString):\(minute):\(doseIndex)"
+            let bytes = Array(SHA256.hash(data: Data(key.utf8)))
+            return UUID(uuid: (
+                bytes[0], bytes[1], bytes[2], bytes[3],
+                bytes[4], bytes[5], bytes[6], bytes[7],
+                bytes[8], bytes[9], bytes[10], bytes[11],
+                bytes[12], bytes[13], bytes[14], bytes[15]
+            ))
+        }
+
+        func marker(calendar: Calendar = .current) -> String {
+            let day = Int64(calendar.startOfDay(for: scheduledAt).timeIntervalSince1970)
+            return "petMedicationScheduledDose:\(day):\(doseIndex)"
+        }
+    }
 
     static func doseMedicationId(for event: Event) -> UUID? {
         guard event.eventType == EventType.petMedicationDose.rawValue else { return nil }
@@ -33,23 +56,22 @@ nonisolated enum PetMedicationDoseLogging {
     }
 
     /// 某日该药应喂次数（`asNeeded` 为 0，不产生委托）
-    static func requiredDoses(on date: Date, for med: PetMedication) -> Int {
+    static func requiredDoses(on date: Date, for med: PetMedication, calendar: Calendar = .current) -> Int {
         guard med.isActive else { return 0 }
-        let cal = Calendar.current
-        let d0 = cal.startOfDay(for: date)
-        if d0 < cal.startOfDay(for: med.startDate) { return 0 }
-        if let end = med.endDate, d0 > cal.startOfDay(for: end) { return 0 }
+        let d0 = calendar.startOfDay(for: date)
+        if d0 < calendar.startOfDay(for: med.startDate) { return 0 }
+        if let end = med.endDate, d0 > calendar.startOfDay(for: end) { return 0 }
 
         switch med.frequency {
         case .daily: return 1
         case .twiceDaily: return 2
         case .threeTimesDaily: return 3
         case .everyOtherDay:
-            let start = cal.startOfDay(for: med.startDate)
-            let days = cal.dateComponents([.day], from: start, to: d0).day ?? 0
+            let start = calendar.startOfDay(for: med.startDate)
+            let days = calendar.dateComponents([.day], from: start, to: d0).day ?? 0
             return days % 2 == 0 ? 1 : 0
         case .weekly:
-            return cal.component(.weekday, from: date) == cal.component(.weekday, from: med.startDate) ? 1 : 0
+            return calendar.component(.weekday, from: date) == calendar.component(.weekday, from: med.startDate) ? 1 : 0
         case .asNeeded:
             return 0
         case .custom:
@@ -95,7 +117,8 @@ nonisolated enum PetMedicationDoseLogging {
         economy: CareEventEconomyAwarding,
         executorId: String?,
         careLedger providedCareLedger: CareLedgerRecording? = nil,
-        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
+        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil,
+        scheduledOccurrence: ScheduledOccurrence? = nil
     ) -> Event {
         recordDoseResult(
             medication: medication,
@@ -106,7 +129,8 @@ nonisolated enum PetMedicationDoseLogging {
             economy: economy,
             executorId: executorId,
             careLedger: providedCareLedger,
-            medicationReminders: providedMedicationReminders
+            medicationReminders: providedMedicationReminders,
+            scheduledOccurrence: scheduledOccurrence
         ).event
     }
 
@@ -121,37 +145,29 @@ nonisolated enum PetMedicationDoseLogging {
         economy: CareEventEconomyAwarding,
         executorId: String?,
         careLedger providedCareLedger: CareLedgerRecording? = nil,
-        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
+        medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil,
+        scheduledOccurrence: ScheduledOccurrence? = nil
     ) -> RecordDoseResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
         let medicationReminders = providedMedicationReminders ?? DomainServiceDependencyRegistry.medicationReminders(careLedger: careLedger)
         let now = Date()
+        let doseDate = scheduledOccurrence?.scheduledAt ?? now
         let confirmedExecutorId = EconomyRewardOwnerResolver.normalizedExecutorId(executorId)
-        let previewIntent = DomainScheduleCreateIntent(
-            title: doseEventTitle(petName: pet.name, medicationName: medication.name),
-            startDate: now,
-            isAllDay: false,
-            eventType: EventType.petMedicationDose.rawValue,
-            relatedEntityType: relatedEntityTypeMedication,
-            relatedEntityId: medication.id.uuidString,
-            assigneeId: confirmedExecutorId,
-            writeKind: .care,
-            source: .domainService
-        )
+        let previewIntent = makeDoseIntent(medication: medication, pet: pet, date: doseDate, executorID: confirmedExecutorId)
         guard let actor = resolvedConfirmedExecutor(executorId: confirmedExecutorId, context: modelContext) else {
             return rejectedConfirmedExecutorResult(previewIntent: previewIntent)
         }
-        let writeIntent = DomainScheduleCreateIntent(
-            title: previewIntent.title,
-            startDate: previewIntent.startDate,
-            isAllDay: previewIntent.isAllDay,
-            eventType: previewIntent.eventType,
-            relatedEntityType: previewIntent.relatedLink.rawType,
-            relatedEntityId: previewIntent.relatedLink.rawId,
-            assigneeId: actor.effectiveExecutorId,
-            writeKind: .care,
-            source: .domainService
-        )
+        let writeIntent = makeDoseIntent(medication: medication, pet: pet, date: doseDate, executorID: actor.effectiveExecutorId)
+        if let scheduledOccurrence,
+           let result = scheduledDosePreflight(
+               scheduledOccurrence,
+               medication: medication,
+               now: now,
+               intent: writeIntent,
+               context: modelContext
+           ) {
+            return result
+        }
         guard let plan = DomainScheduleWriteAuthorizer.authorizeCreate(
             intent: writeIntent,
             context: modelContext
@@ -167,10 +183,14 @@ nonisolated enum PetMedicationDoseLogging {
             )
         }
         let event = DomainScheduleWriter.createEvent(plan: plan, context: modelContext).event
+        if let scheduledOccurrence {
+            event.id = scheduledOccurrence.eventID(medicationID: medication.id)
+            event.completedOccurrences = [scheduledOccurrence.marker()]
+        }
         CloudSyncMutationRecorder.markModified(event, context: modelContext, modifiedAt: now)
         let effectsPlan = DomainEffectWriteAuthorizer.authorizePetEffect(
             pet: pet,
-            occurredAt: now,
+            occurredAt: doseDate,
             writeKind: .care,
             source: .domainService,
             executorId: actor.effectiveExecutorId,
@@ -254,6 +274,98 @@ nonisolated enum PetMedicationDoseLogging {
             didPersist: true,
             persistenceErrorDescription: nil
         )
+    }
+
+    private static func makeDoseIntent(
+        medication: PetMedication,
+        pet: Pet,
+        date: Date,
+        executorID: String?
+    ) -> DomainScheduleCreateIntent {
+        DomainScheduleCreateIntent(
+            title: doseEventTitle(petName: pet.name, medicationName: medication.name),
+            startDate: date,
+            isAllDay: false,
+            eventType: EventType.petMedicationDose.rawValue,
+            relatedEntityType: relatedEntityTypeMedication,
+            relatedEntityId: medication.id.uuidString,
+            assigneeId: executorID,
+            writeKind: .care,
+            source: .domainService
+        )
+    }
+
+    @MainActor
+    private static func scheduledDosePreflight(
+        _ occurrence: ScheduledOccurrence,
+        medication: PetMedication,
+        now: Date,
+        intent: DomainScheduleCreateIntent,
+        context: ModelContext
+    ) -> RecordDoseResult? {
+        guard occurrence.scheduledAt.timeIntervalSince1970.isFinite,
+              occurrence.doseIndex >= 0,
+              occurrence.doseIndex < requiredDoses(on: occurrence.scheduledAt, for: medication),
+              occurrence.scheduledAt <= now.addingTimeInterval(5 * 60) else {
+            return rejectedConfirmedExecutorResult(previewIntent: intent)
+        }
+        do {
+            guard let existing = try alreadyRecordedOccurrence(occurrence, medication: medication, context: context) else {
+                return nil
+            }
+            return RecordDoseResult(
+                event: existing,
+                didRecord: false,
+                coconutDelta: 0,
+                allowsDerivedEffects: false,
+                didPersist: true,
+                persistenceErrorDescription: nil
+            )
+        } catch {
+            return RecordDoseResult(
+                event: DomainScheduleWriter.makeUnpersistedEvent(intent: intent),
+                didRecord: false,
+                coconutDelta: 0,
+                allowsDerivedEffects: false,
+                didPersist: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
+    }
+
+    @MainActor
+    private static func alreadyRecordedOccurrence(
+        _ occurrence: ScheduledOccurrence,
+        medication: PetMedication,
+        context: ModelContext,
+        calendar: Calendar = .current
+    ) throws -> Event? {
+        let occurrenceID = occurrence.eventID(medicationID: medication.id)
+        var identity = FetchDescriptor<Event>(predicate: #Predicate<Event> { $0.id == occurrenceID })
+        identity.fetchLimit = 1
+        if let existing = try context.fetch(identity).first { return existing }
+
+        let dayStart = calendar.startOfDay(for: occurrence.scheduledAt)
+        let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart.addingTimeInterval(86400)
+        let eventType = EventType.petMedicationDose.rawValue
+        let medicationID = medication.id.uuidString
+        let dayEvents = try context.fetch(FetchDescriptor<Event>(predicate: #Predicate<Event> { event in
+            event.eventType == eventType && event.relatedEntityId == medicationID &&
+                event.startDate >= dayStart && event.startDate < dayEnd
+        }))
+        let markerPrefix = "petMedicationScheduledDose:\(Int64(dayStart.timeIntervalSince1970)):"
+        let plannedIndices = Set(dayEvents.flatMap(\.completedOccurrences).compactMap { marker -> Int? in
+            guard marker.hasPrefix(markerPrefix) else { return nil }
+            return Int(marker.dropFirst(markerPrefix.count))
+        })
+        if plannedIndices.contains(occurrence.doseIndex) {
+            return dayEvents.first { $0.completedOccurrences.contains(occurrence.marker(calendar: calendar)) }
+        }
+        let manualEvents = dayEvents.filter { event in
+            !event.completedOccurrences.contains { $0.hasPrefix(markerPrefix) }
+        }
+        let unfilledThroughIndex = (0 ... occurrence.doseIndex).count(where: { !plannedIndices.contains($0) })
+        return manualEvents.count >= unfilledThroughIndex ? manualEvents.first : nil
     }
 
     @MainActor

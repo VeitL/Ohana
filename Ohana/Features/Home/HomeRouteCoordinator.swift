@@ -40,6 +40,7 @@ enum HomeSheetRoute: Identifiable {
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
+    case humanConditions(UUID)
     case humanReport(UUID)
     case humanExpenseQuick(UUID)
     case humanExpense(UUID)
@@ -81,6 +82,7 @@ enum HomeSheetRoute: Identifiable {
         case let .humanWorkout(id): "human-workout-\(id.uuidString)"
         case let .humanWorkoutDashboard(id): "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id): "human-metrics-\(id.uuidString)"
+        case let .humanConditions(id): "human-conditions-\(id.uuidString)"
         case let .humanReport(id): "human-report-\(id.uuidString)"
         case let .humanExpenseQuick(id): "human-expense-quick-\(id.uuidString)"
         case let .humanExpense(id): "human-expense-\(id.uuidString)"
@@ -104,6 +106,7 @@ private extension PetHealthInitialSection {
 
 enum HomeModalRoute: Identifiable {
     case functionMenu(destination: FMDest?)
+    case critterCodex
     case streakDetail
     case addEntity(EntityType)
     case coconutLog(CoconutLogSubject?)
@@ -116,6 +119,8 @@ enum HomeModalRoute: Identifiable {
         switch self {
         case let .functionMenu(destination):
             "function-menu-\(String(describing: destination))"
+        case .critterCodex:
+            "critter-codex"
         case .streakDetail:
             "streak-detail"
         case let .addEntity(type):
@@ -280,11 +285,16 @@ final class HomeRouteCoordinator: ObservableObject {
         modal = nil
     }
 
-    func openFunctionMenu(destination: FMDest?, currentLevel: Int) {
+    func openFunctionMenu(
+        destination: FMDest?,
+        currentLevel: Int,
+        plan: OhanaPlanLevel = .free
+    ) {
         let routedDestination: FMDest?
         switch AppFeatureRouteGuard.functionDestinationDecision(
             destination,
-            currentLevel: currentLevel
+            currentLevel: currentLevel,
+            plan: plan
         ) {
         case .rootMenu:
             routedDestination = nil
@@ -303,6 +313,17 @@ final class HomeRouteCoordinator: ObservableObject {
             return
         }
         modal = .functionMenu(destination: routedDestination)
+    }
+
+    func openCritterCodex(currentLevel: Int) {
+        guard AppFeatureRouteGuard.allowsOasisSheetRoute(.critterCodex, currentLevel: currentLevel) else {
+            AppFeatureRouteGuard.recordIntercept(
+                AppFeatureRouteGuard.lockedRouteNote(for: .critterCodex, currentLevel: currentLevel)
+            )
+            openFunctionMenu(destination: .growthRoadmap, currentLevel: currentLevel)
+            return
+        }
+        modal = .critterCodex
     }
 
     func openStreakDetail() {
@@ -385,6 +406,7 @@ final class HomeRouteCoordinator: ObservableObject {
     }
 
     func openSettings() {
+        SettingsOpenPerformance.start(source: "home")
         if let appSheetRouteSink {
             appSheetRouteSink(.appSheet(.settings))
             modal = nil
@@ -624,6 +646,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpense,
              .humanWishlist,
@@ -675,6 +698,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpense,
              .humanWishlist,
@@ -719,6 +743,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpenseQuick,
              .humanExpense,
@@ -742,6 +767,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanConditions,
              .humanReport,
              .humanExpenseQuick,
              .humanExpense,
@@ -835,6 +861,8 @@ private extension HomeSheetRoute {
             .humanWorkoutDashboard(id)
         case let .humanMetrics(id):
             .humanMetrics(id)
+        case let .humanConditions(id):
+            .humanConditions(id)
         case let .humanReport(id):
             .humanReport(id)
         case let .humanExpenseQuick(id):

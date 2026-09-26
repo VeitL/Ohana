@@ -18,10 +18,7 @@ extension OasisUpgradeRewardService {
         snapshot: OasisCritterLifecycleSnapshot,
         now: Date = Date()
     ) -> OasisCritterDailyWish {
-        if snapshot.state == .dead {
-            return dailyWish(for: .rescue)
-        }
-        if snapshot.state == .atRisk || snapshot.state == .sick || snapshot.state == .critical {
+        if snapshot.state == .sleeping || snapshot.state == .dead || snapshot.state == .critical {
             return dailyWish(for: .rescue)
         }
 
@@ -72,27 +69,60 @@ extension OasisUpgradeRewardService {
         critter.level >= maxCritterLevel ? critterXPPerLevel : max(0, min(critterXPPerLevel, critter.xp))
     }
 
+    static func levelUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        isProcessing: Bool = false
+    ) -> CompanionActionAvailability {
+        let plan = CompanionFundingPlan.make(
+            requiredGrowthCurrency: 0,
+            coconutCost: 0,
+            specificFragmentBalance: 0,
+            stardustBalance: 0,
+            coconutBalance: 0
+        )
+        let reason: CompanionActionUnavailableReason? = if isProcessing {
+            .processing
+        } else if critter.level >= maxCritterLevel {
+            .maxLevel
+        } else if critter.lifeState == .sleeping || critter.lifeState == .critical || critter.lifeState == .dead {
+            .sleeping
+        } else if critter.xp < critterXPPerLevel {
+            .insufficientXP
+        } else {
+            nil
+        }
+        return CompanionActionAvailability(
+            action: .levelUpgrade,
+            isAvailable: reason == nil,
+            reason: reason,
+            fundingPlan: plan
+        )
+    }
+
     static func canUpgradeLevel(for critter: OasisElectronicPet) -> Bool {
-        critter.lifeState != .dead &&
-            critter.level < maxCritterLevel &&
-            critter.xp >= critterXPPerLevel
+        levelUpgradeAvailability(for: critter).isAvailable
     }
 
     @discardableResult
     static func upgradeLevel(for critter: OasisElectronicPet, context: ModelContext) throws -> Bool {
-        normalizeLifecycle(for: critter, context: context)
-        guard canUpgradeLevel(for: critter) else { return false }
-        critter.xp = 0
-        critter.level = min(maxCritterLevel, critter.level + 1)
-        critter.appearanceStage = appearanceStage(forLevel: critter.level)
-        critter.mood = min(100, critter.mood + 10)
-        critter.bond = min(999, critter.bond + 8)
-        critter.lastInteractionAt = Date()
-        critter.lastStateRefreshAt = Date()
-        context.insert(actionLog(for: critter, action: .levelUpgrade, xpDelta: 0))
-        refreshLifecycleState(for: critter, now: Date())
-        try saveRewardChanges(context: context)
-        return true
+        try PersistenceWriteFence.withExclusiveAccess(
+            context: context,
+            unavailable: { false }
+        ) {
+            normalizeLifecycle(for: critter, context: context)
+            guard canUpgradeLevel(for: critter) else { return false }
+            critter.xp = 0
+            critter.level = min(maxCritterLevel, critter.level + 1)
+            critter.appearanceStage = appearanceStage(forLevel: critter.level)
+            critter.mood = min(100, critter.mood + 10)
+            critter.bond = min(999, critter.bond + 8)
+            critter.lastInteractionAt = Date()
+            critter.lastStateRefreshAt = Date()
+            context.insert(actionLog(for: critter, action: .levelUpgrade, xpDelta: 0))
+            refreshLifecycleState(for: critter, now: Date())
+            try saveRewardChanges(context: context)
+            return true
+        }
     }
 
     @discardableResult

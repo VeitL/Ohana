@@ -59,7 +59,6 @@ struct EditPetContentSheet: View {
                         formField(l.tr(zh: "名字", en: "Name", de: "Name"), text: $name)
                         formField(l.tr(zh: "物种", en: "Species", de: "Tierart"), text: $species)
                         formField(l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed)
-                        formField(l.tr(zh: "头像 Emoji", en: "Avatar emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
                         Picker(l.tr(zh: "主性格", en: "Primary vibe", de: "Hauptcharakter"), selection: $primaryPersonalityTagID) {
                             if primaryPersonalityTagID.isEmpty {
@@ -179,7 +178,7 @@ struct EditPetContentSheet: View {
                 } label: {
                     Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
                         .font(OhanaFont.headline(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 14)
                         .background(Color.goPrimary, in: Capsule())

@@ -140,7 +140,7 @@ struct PetMedicationActionHumanConfirmationSheet: View {
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(Color.goPrimary, in: Capsule())
                 }

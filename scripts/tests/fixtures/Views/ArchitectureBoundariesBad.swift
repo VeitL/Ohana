@@ -10,6 +10,7 @@ struct ArchitectureBoundariesBad {
     let platformImage: UIImage? = nil
 
     func run() {
+        _ = PhysicalDeletionService.deleteHuman(human, context: context)
         _ = CareEventServiceDependencies.live()
         _ = ReminderSchedulingManager.self
         _ = PetMedicationCommandExecutor.self

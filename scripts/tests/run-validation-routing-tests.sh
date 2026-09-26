@@ -4,13 +4,13 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo_root"
 
-fixture_root="Ohana/Features/__ValidationRoutingFixture"
-ui_fixture="$fixture_root/Views/ValidationRoutingView.swift"
-model_fixture="Ohana/Models/__ValidationRoutingModel.swift"
+ui_fixture_root="$(mktemp -d "Ohana/Features/__ValidationRoutingFixture.XXXXXX")"
+model_fixture_root="$(mktemp -d "Ohana/Models/__ValidationRoutingFixture.XXXXXX")"
+ui_fixture="$ui_fixture_root/Views/ValidationRoutingView.swift"
+model_fixture="$model_fixture_root/ValidationRoutingModel.swift"
 
 cleanup() {
-  rm -rf "$fixture_root"
-  rm -f "$model_fixture"
+  rm -rf -- "$ui_fixture_root" "$model_fixture_root"
 }
 trap cleanup EXIT
 
@@ -55,12 +55,55 @@ if grep -qF "SwiftData save-failure audit for touched app Swift" <<<"$model_outp
   fail "model changes must not run both incremental and full data-safety lanes"
 fi
 
+system_surface_output="$(
+  scripts/dev-check-changed.sh --dry-run Ohana/SystemSurfaces/SystemSurfaceSnapshotCoordinator.swift
+)"
+grep -qF "Release data safety contract audit for affected persistence/privacy files" \
+  <<<"$system_surface_output" || \
+  fail "system-surface snapshot changes must escalate to the whole release-data contract audit"
+if grep -qF "SwiftData save-failure audit for touched app Swift" <<<"$system_surface_output"; then
+  fail "system-surface snapshot changes must not run both incremental and full data-safety lanes"
+fi
+grep -qF "build recommended before final handoff" <<<"$system_surface_output" || \
+  fail "system-surface source changes must recommend an app build"
+grep -qF "targeted tests recommended" <<<"$system_surface_output" || \
+  fail "system-surface coordinator changes must recommend targeted tests"
+
+widget_output="$(
+  scripts/dev-check-changed.sh --dry-run OhanaWidgets/TodayCareWidget.swift
+)"
+grep -qF "Release data safety contract audit for affected persistence/privacy files" \
+  <<<"$widget_output" || \
+  fail "Widget extension source changes must escalate to the data-safety contract audit"
+if grep -qF "SwiftData save-failure audit for touched app Swift" <<<"$widget_output"; then
+  fail "Widget extension changes must not run both incremental and full data-safety lanes"
+fi
+grep -qF "build recommended before final handoff" <<<"$widget_output" || \
+  fail "Widget extension source changes must recommend an app build"
+grep -qF "targeted tests recommended" <<<"$widget_output" || \
+  fail "Widget extension source changes must recommend targeted tests"
+
+system_surface_audit_output="$(
+  scripts/dev-check-changed.sh --dry-run scripts/audit-system-surface-contract.sh
+)"
+grep -qF "Release data safety contract audit for affected persistence/privacy files" \
+  <<<"$system_surface_audit_output" || \
+  fail "system-surface audit changes must rerun the release data-safety contract"
+
+system_surface_fence_audit_output="$(
+  scripts/dev-check-changed.sh --dry-run scripts/audit-system-surface-reset-fence.sh
+)"
+grep -qF "Release data safety contract audit for affected persistence/privacy files" \
+  <<<"$system_surface_fence_audit_output" || \
+  fail "system-surface Reset fence audit changes must rerun the release data-safety contract"
+
 if rg -q 'scripts/audit-[a-z0-9-]+\.sh' scripts/module-exit-gate.sh; then
   fail "module-exit-gate must delegate static checks instead of re-running audits"
 fi
 
 release_ci_audits=(
   audit-ui-test-shards.sh
+  audit-release-test-surface.sh
   audit-runtime-guardrails.sh
   audit-architecture-boundaries.sh
   audit-economy-boundaries.sh

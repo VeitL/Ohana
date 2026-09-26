@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Ohana
 
@@ -504,6 +505,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(!singleHuman.showsMemberFilters)
         #expect(singleHuman.resolvedMemberFilter(explicitSelection: nil) == .all)
         #expect(singleHuman.resolvedMemberFilter(explicitSelection: .waitingForOthers) == .all)
+        #expect(singleHuman.memberFilterSummary.allCount == 2)
         #expect(try #require(singleHumanItems["Open chore"]).availableActions == [.complete])
         #expect(try #require(singleHumanItems["Review bounty"]).availableActions.isEmpty)
 
@@ -521,10 +523,14 @@ struct TaskCenterSnapshotBuilderTests {
         let workerItems = Dictionary(uniqueKeysWithValues: allItems(workerView).map { ($0.title, $0) })
         #expect(workerView.showsMemberFilters)
         #expect(workerView.memberFilterContext.activeHumanName == worker.name)
-        #expect(workerView.resolvedMemberFilter(explicitSelection: nil) == .currentMember)
+        #expect(workerView.resolvedMemberFilter(explicitSelection: nil) == .actionRequired)
         #expect(workerView.resolvedMemberFilter(explicitSelection: .all) == .all)
         #expect(try #require(workerItems["Open chore"]).availableActions == [.claim])
         #expect(try #require(workerItems["Assigned bounty"]).availableActions == [.submitForReview])
+        #expect(Set(workerView.filtered(for: .actionRequired).allItems.map(\.title)) == [
+            "Open chore", "Assigned bounty"
+        ])
+        #expect(workerView.filtered(for: .waitingForFamily).allItems.isEmpty)
 
         let creatorView = TaskCenterSnapshotBuilder.make(
             events: [],
@@ -540,6 +546,8 @@ struct TaskCenterSnapshotBuilderTests {
         let creatorItems = Dictionary(uniqueKeysWithValues: allItems(creatorView).map { ($0.title, $0) })
         #expect(try #require(creatorItems["Assigned bounty"]).availableActions.isEmpty)
         #expect(try #require(creatorItems["Review bounty"]).availableActions == [.approve, .reject])
+        #expect(creatorView.filtered(for: .actionRequired).allItems.map(\.title) == ["Review bounty"])
+        #expect(creatorView.filtered(for: .waitingForFamily).allItems.map(\.title) == ["Assigned bounty"])
     }
 
     @Test func linkedPendingReviewUsesEventDayInsteadOfLeadReminderDay() throws {
@@ -590,7 +598,81 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(item.dueAt.map { calendar.isDate($0, inSameDayAs: occurrenceDate) } == true)
     }
 
-    @Test func memberFiltersComposeWithObjectScopeAndKeepReviewSeparate() {
+    @Test func reviewAndDeclineRouteToActorQueuesWithoutExposingThirdPartyTasks() {
+        #expect(TaskCenterMemberFilter.allCases == [.actionRequired, .waitingForFamily, .all])
+        #expect(TaskCenterMemberFilter.allCases.map(\.id) == [
+            "actionRequired", "waitingForFamily", "all"
+        ])
+
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let creator = Human(name: "Ava")
+        let assignee = Human(name: "Kai")
+        let unrelated = Human(name: "Mina")
+        let review = FamilyCollaborationTask(
+            title: "Confirm completed chore",
+            kind: .bounty,
+            status: .pendingReview,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name,
+            assignedToId: assignee.id.uuidString,
+            assignedToName: assignee.name,
+            rewardCoconuts: 5,
+            dueAt: makeDate(calendar, year: 2026, month: 7, day: 14, hour: 10)
+        )
+        review.completedById = assignee.id.uuidString
+        review.completedByName = assignee.name
+        let declined = FamilyCollaborationTask(
+            title: "Reassign declined chore",
+            kind: .householdTask,
+            status: .declined,
+            createdById: creator.id.uuidString,
+            createdByName: creator.name,
+            assignedToId: assignee.id.uuidString,
+            assignedToName: assignee.name,
+            dueAt: makeDate(calendar, year: 2026, month: 7, day: 14, hour: 11)
+        )
+        let humans = [creator, assignee, unrelated]
+
+        func snapshot(for human: Human) -> TaskCenterSnapshot {
+            TaskCenterSnapshotBuilder.make(
+                events: [],
+                allEvents: [],
+                pets: [],
+                humans: humans,
+                plants: [],
+                familyTasks: [review, declined],
+                activeHumanId: human.id.uuidString,
+                now: now,
+                calendar: calendar
+            )
+        }
+
+        let creatorSnapshot = snapshot(for: creator)
+        #expect(Set(creatorSnapshot.filtered(for: .actionRequired).allItems.map(\.title)) == [
+            review.title, declined.title
+        ])
+        #expect(creatorSnapshot.filtered(for: .waitingForFamily).allItems.isEmpty)
+        #expect(creatorSnapshot.memberFilterSummary.actionRequiredCount == 2)
+        #expect(creatorSnapshot.allItems.first { $0.familyTaskID == declined.id }?.workflowStatus == .declined)
+
+        let assigneeSnapshot = snapshot(for: assignee)
+        #expect(assigneeSnapshot.filtered(for: .actionRequired).allItems.isEmpty)
+        #expect(Set(assigneeSnapshot.filtered(for: .waitingForFamily).allItems.map(\.title)) == [
+            review.title, declined.title
+        ])
+        #expect(assigneeSnapshot.memberFilterSummary.waitingForFamilyCount == 2)
+
+        let unrelatedSnapshot = snapshot(for: unrelated)
+        #expect(unrelatedSnapshot.filtered(for: .actionRequired).allItems.isEmpty)
+        #expect(unrelatedSnapshot.filtered(for: .waitingForFamily).allItems.isEmpty)
+        #expect(Set(unrelatedSnapshot.filtered(for: TaskCenterMemberFilter.all).allItems.map(\.title)) == [
+            review.title, declined.title
+        ])
+        #expect(unrelatedSnapshot.memberFilterSummary.otherCount == 2)
+    }
+
+    @Test func actionQueuesComposeWithObjectScopeAndExposeScopedSummaries() {
         let calendar = utcCalendar()
         let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
         let dueAt = makeDate(calendar, year: 2026, month: 7, day: 14, hour: 10)
@@ -627,6 +709,15 @@ struct TaskCenterSnapshotBuilderTests {
             rewardCoconuts: 5,
             dueAt: dueAt
         )
+        let delegated = FamilyCollaborationTask(
+            title: "Delegated to Kai",
+            kind: .householdTask,
+            createdById: current.id.uuidString,
+            createdByName: current.name,
+            assignedToId: other.id.uuidString,
+            assignedToName: other.name,
+            dueAt: dueAt
+        )
         let events = [currentFirst, otherFirst, currentSecond]
 
         let snapshot = TaskCenterSnapshotBuilder.make(
@@ -635,26 +726,42 @@ struct TaskCenterSnapshotBuilderTests {
             pets: [firstPet, secondPet],
             humans: [current, other],
             plants: [],
-            familyTasks: [review],
+            familyTasks: [review, delegated],
             activeHumanId: current.id.uuidString,
             now: now,
             calendar: calendar
         )
 
-        #expect(Set(snapshot.filtered(for: .currentMember).allItems.map(\.title)) == [
+        #expect(Set(snapshot.filtered(for: .actionRequired).allItems.map(\.title)) == [
             "Momo care by Ava", "Luna care by Ava", "Review Kai task"
         ])
-        #expect(snapshot.filtered(for: .waitingForOthers).allItems.map(\.title) == ["Momo care by Kai"])
-        #expect(snapshot.filtered(for: .pendingReview).allItems.map(\.title) == ["Review Kai task"])
+        #expect(snapshot.filtered(for: .waitingForFamily).allItems.map(\.title) == ["Delegated to Kai"])
+        #expect(Set(snapshot.filtered(for: TaskCenterMemberFilter.all).allItems.map(\.title)) == [
+            "Momo care by Ava", "Momo care by Kai", "Luna care by Ava",
+            "Review Kai task", "Delegated to Kai"
+        ])
+        #expect(snapshot.filtered(for: .pendingReview) == snapshot.filtered(for: .actionRequired))
+        #expect(snapshot.memberFilterSummary == TaskCenterMemberFilterSummary(
+            actionRequiredCount: 3,
+            waitingForFamilyCount: 1,
+            allCount: 5,
+            systemJourneyCount: 0
+        ))
+        #expect(snapshot.memberFilterSummary.otherCount == 1)
 
         let scopeThenMember = snapshot
             .filtered(for: .pet(firstPet.id))
-            .filtered(for: .currentMember)
+            .filtered(for: .actionRequired)
         let memberThenScope = snapshot
-            .filtered(for: .currentMember)
+            .filtered(for: .actionRequired)
             .filtered(for: .pet(firstPet.id))
         #expect(scopeThenMember.allItems.map(\.title) == ["Momo care by Ava"])
         #expect(memberThenScope.allItems.map(\.title) == scopeThenMember.allItems.map(\.title))
+        let petScope = snapshot.filtered(for: .pet(firstPet.id))
+        #expect(petScope.memberFilterSummary.actionRequiredCount == 1)
+        #expect(petScope.memberFilterSummary.waitingForFamilyCount == 0)
+        #expect(petScope.memberFilterSummary.allCount == 2)
+        #expect(petScope.memberFilterSummary.otherCount == 1)
     }
 
     @Test func currentMemberFilterRebuildsForActiveHumanWithoutTreatingHumanSubjectAsResponsibility() {
@@ -692,9 +799,9 @@ struct TaskCenterSnapshotBuilderTests {
         let avaSnapshot = make(activeHumanID: ava.id)
         let kaiSnapshot = make(activeHumanID: kai.id)
 
-        #expect(avaSnapshot.resolvedMemberFilter(explicitSelection: nil) == .currentMember)
-        #expect(avaSnapshot.filtered(for: .currentMember).allItems.map(\.title) == ["Ava assignment"])
-        #expect(kaiSnapshot.filtered(for: .currentMember).allItems.map(\.title) == ["Kai assignment"])
+        #expect(avaSnapshot.resolvedMemberFilter(explicitSelection: nil) == .actionRequired)
+        #expect(avaSnapshot.filtered(for: .actionRequired).allItems.map(\.title) == ["Ava assignment"])
+        #expect(kaiSnapshot.filtered(for: .actionRequired).allItems.map(\.title) == ["Kai assignment"])
         #expect(avaSnapshot.filtered(for: TaskCenterScope.all).allItems.contains { $0.title == "Ava appointment" })
     }
 
@@ -768,7 +875,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(snapshot.todayCompletedCount == 1)
     }
 
-    @Test func createFirstPetSystemJourneyIsStableUnscheduledAndVisibleToCurrentMember() throws {
+    @Test func firstPetSuggestionIsStableDismissibleAndExcludedFromTaskCounts() throws {
         let calendar = utcCalendar()
         let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
         let current = Human(name: "Ava")
@@ -789,7 +896,7 @@ struct TaskCenterSnapshotBuilderTests {
         let item = try #require(snapshot.unscheduled.first)
         #expect(snapshot.allItems.count == 1)
         #expect(item.id == "system-journey-create-first-pet")
-        #expect(item.source == .systemJourney)
+        #expect(item.source == .suggestion)
         #expect(item.systemDestination == .createFirstPet)
         #expect(item.subject == .household)
         #expect(item.eventID == nil)
@@ -797,10 +904,190 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(item.familyTaskID == nil)
         #expect(item.dueAt == nil)
         #expect(item.availableActions.isEmpty)
-        #expect(item.rewardCoconuts == 50)
-        #expect(snapshot.filtered(for: .currentMember).allItems.map(\.id) == [item.id])
-        #expect(snapshot.filtered(for: .waitingForOthers).allItems.isEmpty)
-        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 1)
+        #expect(item.rewardCoconuts == 0)
+        #expect(snapshot.filtered(for: .actionRequired).suggestionItems.map(\.id) == [item.id])
+        #expect(snapshot.filtered(for: .waitingForFamily).suggestionItems.map(\.id) == [item.id])
+        #expect(snapshot.memberFilterContext.actionRequiredItemIDs.isEmpty)
+        #expect(snapshot.memberFilterContext.waitingForFamilyItemIDs.isEmpty)
+        #expect(snapshot.filtered(for: TaskCenterMemberFilter.all).allItems.map(\.id) == [item.id])
+        #expect(snapshot.memberFilterSummary == TaskCenterMemberFilterSummary(
+            actionRequiredCount: 0,
+            waitingForFamilyCount: 0,
+            allCount: 0,
+            systemJourneyCount: 0
+        ))
+        #expect(snapshot.pendingCount == 0)
+        #expect(snapshot.hasDisplayableItems)
+        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 0)
+    }
+
+    @Test func firstPetSuggestionDoesNotEnterCalendarOrChangeTaskBadgeAndRewardAggregates() throws {
+        let calendar = utcCalendar()
+        let now = makeDate(calendar, year: 2026, month: 7, day: 13, hour: 12)
+        let current = Human(name: "Ava")
+        let other = Human(name: "Kai")
+        let profileState = HouseholdStarterJourneyTaskState(
+            task: .humanProfile,
+            status: .actionRequired,
+            rewardCoconuts: HouseholdStarterJourneyTask.humanProfile.rewardCoconuts,
+            completedCheckpointCount: 0,
+            requiredCheckpointCount: HouseholdStarterJourneyPolicy.requiredCheckpointCount(for: .humanProfile),
+            targetID: current.id,
+            completedCheckpoints: [],
+            checkpointResolutions: [:]
+        )
+        let journey = HouseholdStarterJourneySnapshot(
+            isEnabled: true,
+            activeHumanID: current.id,
+            taskStates: [profileState],
+            visibleTaskStates: [profileState]
+        )
+
+        func makeSnapshot(
+            destinations: Set<TaskCenterSystemDestination>
+        ) -> TaskCenterSnapshot {
+            TaskCenterSnapshotBuilder.make(
+                events: [],
+                allEvents: [],
+                pets: [],
+                humans: [current, other],
+                plants: [],
+                systemDestinations: destinations,
+                starterJourney: journey,
+                activeHumanId: current.id.uuidString,
+                now: now,
+                calendar: calendar
+            )
+        }
+
+        let baseline = makeSnapshot(destinations: [.claimStarterGift])
+        let withSuggestion = makeSnapshot(
+            destinations: [.claimStarterGift, .createFirstPet]
+        )
+        let suggestion = try #require(withSuggestion.suggestionItems.first)
+
+        #expect(baseline.allItems.count == 2)
+        #expect(withSuggestion.allItems.count == 3)
+        #expect(suggestion.eventID == nil)
+        #expect(suggestion.dueAt == nil)
+        #expect(suggestion.rewardCoconuts == 0)
+        #expect(withSuggestion.pendingCount == baseline.pendingCount)
+        #expect(withSuggestion.todayTotalCount == baseline.todayTotalCount)
+        #expect(withSuggestion.memberFilterSummary == baseline.memberFilterSummary)
+        #expect(
+            TaskCenterBadgeSnapshot(snapshot: withSuggestion)
+                == TaskCenterBadgeSnapshot(snapshot: baseline)
+        )
+        #expect(
+            withSuggestion.allItems.reduce(0) { $0 + $1.rewardCoconuts }
+                == baseline.allItems.reduce(0) { $0 + $1.rewardCoconuts }
+        )
+        #expect(withSuggestion.allItems.reduce(0) { $0 + $1.rewardCoconuts } == 150)
+
+        let calendarSnapshot = CalendarSnapshotBuilder.preparedSnapshot(
+            filteredEvents: [],
+            allEvents: [],
+            pets: [],
+            weekDays: [now],
+            monthDays: [now],
+            now: now,
+            calendar: calendar
+        )
+        #expect(calendarSnapshot.filteredEvents.isEmpty)
+        #expect(calendarSnapshot.timeline.expandedOccurrences.isEmpty)
+        #expect(calendarSnapshot.events(for: now).isEmpty)
+        #expect(calendarSnapshot.monthEventDayIDs.isEmpty)
+    }
+
+    @Test func routeDataKeepsMemorialSchedulesStoredButExcludesTheirActiveTaskProjection() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat")
+        pet.passedAwayDate = now.addingTimeInterval(-60)
+        let event = Event(
+            title: "Memorial future care",
+            startDate: now.addingTimeInterval(3600),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        let reminder = Reminder(event: event, scheduledAt: event.startDate)
+        let task = FamilyCollaborationTask(
+            title: event.title,
+            kind: .careReminder,
+            subjectKind: .pet,
+            subjectId: pet.id.uuidString,
+            relatedPetId: pet.id.uuidString,
+            relatedEventId: event.id.uuidString,
+            relatedReminderId: reminder.id.uuidString,
+            createdById: human.id.uuidString,
+            createdByName: human.name,
+            assignedToId: human.id.uuidString,
+            assignedToName: human.name,
+            dueAt: event.startDate
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(event)
+        context.insert(reminder)
+        context.insert(task)
+        try context.save()
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            now: now
+        )
+
+        #expect(!reference.eventModelIDs.contains(event.persistentModelID))
+        #expect(!reference.reminderModelIDs.contains(reminder.persistentModelID))
+        #expect(!reference.familyTaskModelIDs.contains(task.persistentModelID))
+        #expect(allItems(reference.snapshot).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Event>()).contains { $0.id == event.id })
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).contains { $0.id == reminder.id })
+    }
+
+    @Test func routeDataHidesLegacyDefaultPetPlansButKeepsExplicitEvents() async throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let now = Date()
+        let human = Human(name: "Ava")
+        let pet = Pet(name: "Momo", species: "cat")
+        let defaultTitle = try #require(
+            CarePlanCalendarSync.defaultGeneratedCalendarPlanTitles(for: pet).sorted().first
+        )
+        let defaultEvent = Event(
+            title: defaultTitle,
+            startDate: now.addingTimeInterval(3600),
+            eventType: EventType.daily.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        defaultEvent.recurrenceDays = 1
+        let explicitEvent = Event(
+            title: "Vet visit",
+            startDate: now.addingTimeInterval(7200),
+            eventType: EventType.vetVisit.rawValue,
+            relatedEntityType: EntityKind.pet.rawValue,
+            relatedEntityId: pet.id.uuidString
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(defaultEvent)
+        context.insert(explicitEvent)
+        try context.save()
+
+        let reference = try await TaskCenterRouteDataActor(modelContainer: container).load(
+            loadPlants: false,
+            activeHumanID: human.id.uuidString,
+            now: now
+        )
+
+        #expect(!reference.eventModelIDs.contains(defaultEvent.persistentModelID))
+        #expect(reference.eventModelIDs.contains(explicitEvent.persistentModelID))
+        #expect(try context.fetch(FetchDescriptor<Event>()).contains { $0.id == defaultEvent.id })
     }
 
     @Test func createFirstPetSystemJourneyRequiresAnActiveHumanAndNoActivePet() {
@@ -826,7 +1113,7 @@ struct TaskCenterSnapshotBuilderTests {
 
         #expect(snapshot(humans: [], pets: []).allItems.isEmpty)
         #expect(snapshot(humans: [human], pets: [activePet]).allItems.isEmpty)
-        #expect(snapshot(humans: [human], pets: [memorialPet]).allItems.map(\.source) == [.systemJourney])
+        #expect(snapshot(humans: [human], pets: [memorialPet]).allItems.map(\.source) == [.suggestion])
     }
 
     @Test func firstPetReplacesCreationJourneyWithUnscheduledGiftClaim() throws {
@@ -853,7 +1140,9 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(item.systemDestination == .claimStarterGift)
         #expect(item.rewardCoconuts == 50)
         #expect(item.dueAt == nil)
-        #expect(snapshot.filtered(for: .currentMember).allItems.map(\.id) == [item.id])
+        #expect(snapshot.resolvedMemberFilter(explicitSelection: .actionRequired) == .all)
+        #expect(snapshot.filtered(for: TaskCenterMemberFilter.all).allItems.map(\.id) == [item.id])
+        #expect(snapshot.memberFilterSummary.systemJourneyCount == 1)
         #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 1)
     }
 
@@ -896,9 +1185,9 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(snapshot.overdueCount == 1)
         #expect(snapshot.today.count == 1)
         #expect(snapshot.today.first?.workflowStatus == .pendingReview)
-        #expect(snapshot.unscheduled.first?.source == .systemJourney)
+        #expect(snapshot.unscheduled.first?.source == .suggestion)
         #expect(badge.overdueCount == 1)
-        #expect(badge.attentionCount == 3)
+        #expect(badge.attentionCount == 2)
     }
 
     @Test func starterJourneyProjectsAtMostThreeStableTypedItemsWithSummary() throws {
@@ -998,11 +1287,17 @@ struct TaskCenterSnapshotBuilderTests {
             calendar: calendar
         )
 
-        #expect(snapshot.systemJourneyItems.count == 1)
-        let item = try #require(snapshot.systemJourneyItems.first)
-        #expect(item.id == "system-journey-claim-starter-gift")
-        #expect(item.systemDestination == .claimStarterGift)
-        #expect(item.systemJourneyPresentationState == .rewardReady)
+        #expect(snapshot.systemJourneyItems.count == 2)
+        let gift = try #require(snapshot.systemJourneyItems.first {
+            $0.systemDestination == .claimStarterGift
+        })
+        #expect(gift.id == "system-journey-claim-starter-gift")
+        #expect(gift.systemJourneyPresentationState == .rewardReady)
+        let humanProfile = try #require(snapshot.systemJourneyItems.first {
+            $0.systemDestination == .completeHumanProfile
+        })
+        #expect(humanProfile.id == HouseholdStarterJourneyTask.humanProfile.id)
+        #expect(humanProfile.systemJourneyPresentationState == .actionRequired)
     }
 
     @Test func recurringBirthdayReminderDoesNotQualifyAsCarePlan() {
@@ -1066,7 +1361,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(!qualification.hasDefaultRecommendedCarePlan)
     }
 
-    @Test func carePlanResolutionIsOfferedOnlyForAnExistingDefaultPlan() throws {
+    @Test func defaultCarePlanNeverOffersACompletionResolution() throws {
         let human = Human(name: "Ava")
         let pet = Pet(name: "Momo", species: "cat", breed: "Ragdoll")
         let noPlan = HouseholdStarterJourneyService.buildSnapshot(
@@ -1106,12 +1401,19 @@ struct TaskCenterSnapshotBuilderTests {
             coconutLedgerEntries: []
         )
         let recommendedState = try #require(recommendedPlan.state(for: .carePlan))
-        #expect(recommendedState.availableResolutionCheckpoints == [.acceptedRecommendedCarePlan])
+        #expect(recommendedState.availableResolutionCheckpoints.isEmpty)
+        #expect(recommendedState.completedCheckpoints.isEmpty)
         #expect(recommendedState.status == .actionRequired)
     }
 
     private func allItems(_ snapshot: TaskCenterSnapshot) -> [TaskCenterItemSnapshot] {
         snapshot.overdue + snapshot.today + snapshot.upcoming + snapshot.unscheduled
+    }
+
+    private func makeContainer() throws -> ModelContainer {
+        let schema = Schema(ArkSchemaV85.models)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+        return try ModelContainer(for: schema, configurations: [config])
     }
 
     private func assignedEvent(

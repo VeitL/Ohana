@@ -571,19 +571,12 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(section.title)
-                    .font(OhanaFont.headline(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(section.subtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(3)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(section.title)
+                .font(OhanaFont.headline(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityLabel("\(section.title). \(section.subtitle)")
 
             ForEach(Array(prominentItems.enumerated()), id: \.element.id) { index, item in
                 destinationButton(item, index: index)

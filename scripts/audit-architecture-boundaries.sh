@@ -28,6 +28,8 @@ Purpose:
   - Views do not directly use UserDefaults or construct command executors.
   - Members views do not publish member profile revisions directly; profile
     command executors own the publish boundary.
+  - Production code cannot call the legacy fail-open Human deletion entry point;
+    it must use deleteHumanFailClosed so health-row preflight failures abort.
   - Swift file length is a heuristic: files above the manifest warning target
     are reported, while only files beyond its hard limit or a grandfathered
     baseline's growth allowance fail.
@@ -156,7 +158,7 @@ query_outside_containers() {
   fi
   [[ -z "$input" ]] && return 0
   printf '%s\n' "$input" \
-    | rg -v '(DataContainer\.swift|RouteContainer\.swift|Ohana/App/RouteContainers/.*\.swift):' || true
+    | rg -v '(DataContainer\.swift|RouteContainer\.swift|ZenExperienceContainer\.swift|Ohana/App/RouteContainers/.*\.swift):' || true
 }
 
 forbidden_patterns() {
@@ -244,6 +246,10 @@ member_view_direct_profile_revision_publishes() {
   fi
   [[ ${#scoped_files[@]} -eq 0 ]] && return 0
   rg -n --with-filename --pcre2 '\bpublishMemberProfile\s*\(' "${scoped_files[@]}" || true
+}
+
+human_deletion_fail_open_calls() {
+  forbidden_patterns '\bPhysicalDeletionService\.deleteHuman\s*\('
 }
 
 oversized_swift_files() {
@@ -348,6 +354,7 @@ coconut_balance_writes_outside_wallet() {
     | rg -v '^\s*Ohana/Domain/Services/DataBackupManager\+Decode\.swift:' \
     | rg -v '^\s*Ohana/Models/Human\.swift:' \
     | rg -v '^\s*Ohana/Models/Pet\.swift:' \
+    | rg -v '^\s*Ohana/Features/Zen/ZenModels\.swift:' \
     | rg -v '^\s*Ohana/Features/Home/Views/FocusHomeHeaderView\.swift:' || true
 }
 
@@ -383,6 +390,7 @@ static_service_calls_outside_facades() {
     | rg -v '^\s*Ohana/Features/Medication/SharedMedicationReminderManager\.swift:' \
     | rg -v '^\s*Ohana/Features/Notifications/ReminderSchedulingManager\.swift:' \
     | rg -v '^\s*Ohana/Features/Oasis/OasisRewardServices\.swift:' \
+    | rg -v '^\s*Ohana/Features/Oasis/OasisCompanionLifecycleCompatibilityService\.swift:' \
     | rg -v '^\s*Ohana/Features/Walks/StaticWalkCareEventManager\.swift:' \
     | rg -v ':\s*// ' || true
 }
@@ -661,6 +669,11 @@ record_matches \
   "member-view-direct-profile-revision" \
   "Members views must not publish profile revisions directly; MemberCommandExecutor.update*Profile owns the single profile revision publish." \
   member_view_direct_profile_revision_publishes
+
+record_matches \
+  "human-deletion-fail-open-entrypoint" \
+  "Production code must use PhysicalDeletionService.deleteHumanFailClosed so every Human-health collection is fetched before the first deletion mutation." \
+  human_deletion_fail_open_calls
 
 record_matches \
   "oversized-swift-file" \

@@ -22,6 +22,10 @@ extension VerticalSolidHomeView {
             for: FMDest.gacha,
             currentLevel: 0
         ).step.requiredLevel
+        let achievementsUnlockLevel = GrowthUnlockPolicy.status(
+            for: PetFeature.achievements,
+            currentLevel: 0
+        ).step.requiredLevel
         let critterUnlockLevel = OasisUpgradeRewardCatalog.critter(
             id: OasisUpgradeRewardCatalog.firstCritterId
         )?.sourceLevel ?? 10
@@ -30,27 +34,53 @@ extension VerticalSolidHomeView {
         return OasisHomeTabHost(
             lifecycle: lifecycle,
             treeSnapshot: OasisTreeRenderSnapshot(
+                revision: oasisTreeRenderRevision,
                 level: treeLevel,
                 progressToNextLevel: treeManager.progressToNextLevel,
                 totalEnergy: treeManager.totalEnergy,
                 nextLevelThreshold: treeManager.nextLevelThreshold,
+                coconutBalance: islandCoconutBalance,
                 shopLockedLevel: treeLevel >= shopUnlockLevel ? nil : shopUnlockLevel,
                 shopInitialCategory: shopInitialCategory,
+                achievementsLockedLevel: treeLevel >= achievementsUnlockLevel ? nil : achievementsUnlockLevel,
                 crittersLockedLevel: treeLevel >= critterUnlockLevel ? nil : critterUnlockLevel,
                 gachaLockedLevel: treeLevel >= gachaUnlockLevel ? nil : gachaUnlockLevel
             ),
             injectEnergyTrigger: oasisInjectEnergyTrigger,
+            allowsAmbientMotion: workloadPolicy
+                .ambientMotionBudget(isVisible: lifecycle.isVisible)
+                .allowsMotion,
+            allowsInteractionMotion: workloadPolicy
+                .interactionMotionBudget(isVisible: lifecycle.isVisible)
+                .allowsMotion,
+            usesFullVisualEffects: workloadPolicy
+                .visualEffectsBudget(isVisible: lifecycle.isVisible)
+                .usesFullEffects,
             onPresentCoconutLog: onPresentCoconutLog,
             onInjectEnergy: injectEmbeddedOasisEnergy,
             onOpenShop: { category in
                 routeCoordinator.openCoconutShop(category, currentLevel: treeLevel)
-            }
+            },
+            onOpenAchievements: {
+                openFunctionMenu(destination: .featureAggregate(.achievements))
+            },
+            onOpenCritters: {
+                routeCoordinator.openCritterCodex(currentLevel: treeLevel)
+            },
+            onOpenGacha: {
+                openFunctionMenu(destination: .gacha)
+            },
+            onOpenGrowthRoadmap: {
+                openFunctionMenu(destination: .growthRoadmap)
+            },
+            onOpenFullOasis: onPresentOasisReward
         )
     }
 
     func embeddedPlantsPage(topChromeHeight: CGFloat) -> some View {
         VerticalSolidHomePlantsPage(
             plants: controller.snapshot.plants,
+            hasMorePlants: controller.snapshot.hasMorePlants,
             localization: l,
             plantQuickActionItemsRaw: $plantQuickActionItemsRaw,
             pendingQuickCareKeys: pendingPlantQuickCareKeys,
@@ -72,7 +102,8 @@ extension VerticalSolidHomeView {
                     destination: .plantsBatchCare,
                     currentLevel: treeManager.treeLevel.rawValue
                 )
-            }
+            },
+            onOpenAllPlants: { openFunctionMenu(destination: .plantsList) }
         )
     }
 
@@ -164,6 +195,7 @@ extension VerticalSolidHomeView {
     }
 
     func preloadFirstScreenAvatars() async {
+        guard canRunAvatarPreload else { return }
         let requests = payload.mediaPreloadRequests
         let legacyPayloads = avatarPreloadPayloads()
         let legacyPopoutPayloads = popoutPreloadPayloads()
@@ -249,9 +281,9 @@ extension VerticalSolidHomeView {
     ) async -> Data? {
         switch request.source {
         case .pet:
-            await loader.petAvatarImageData(modelID: request.modelID)
+            await loader.petAvatarImageData(id: request.id)
         case .human:
-            await loader.humanAvatarImageData(modelID: request.modelID)
+            await loader.humanAvatarImageData(id: request.id)
         }
     }
 
@@ -261,7 +293,7 @@ extension VerticalSolidHomeView {
         loader: SwiftDataMediaBlobLoader
     ) async -> Data? {
         guard request.source == .pet else { return nil }
-        if let data = await loader.petCardPopoutImageData(modelID: request.modelID) {
+        if let data = await loader.petCardPopoutImageData(id: request.id) {
             return data
         }
         guard request.popoutSignature == request.avatarSignature else { return nil }

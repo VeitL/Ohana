@@ -29,6 +29,8 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
     private var activePurpose: LocationPurpose = .none
     private var oneShotLocationHandler: ((Result<CLLocation, Error>) -> Void)?
     private var pendingOneShotAccuracy: CLLocationAccuracy?
+    private var walkMetricsUpdateHandler: ((Double) -> Void)?
+    private var trackedDistanceMeters: Double = 0
 
     var currentLocation: CLLocation?
     var collectedLocations: [CLLocation] = []
@@ -155,6 +157,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
 
         collectedLocations.removeAll()
         lastAcceptedLocation = nil
+        trackedDistanceMeters = 0
         isTracking = true
         manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         manager.distanceFilter = 8
@@ -302,14 +305,22 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
             return
         }
         currentLocation = locations.last
+        var didAcceptRoutePoint = false
         for location in locations where shouldAcceptRoutePoint(location) {
+            if let previous = lastAcceptedLocation {
+                trackedDistanceMeters += location.distance(from: previous)
+            }
             collectedLocations.append(location)
             lastAcceptedLocation = location
+            didAcceptRoutePoint = true
         }
         // F6: 防止无界增长 — 保留可见轨迹形状，同时限制内存和后续渲染成本。
         if collectedLocations.count > 1600 {
             collectedLocations = downsample(collectedLocations, maxCount: 800)
             lastAcceptedLocation = collectedLocations.last
+        }
+        if didAcceptRoutePoint {
+            walkMetricsUpdateHandler?(trackedDistanceMeters)
         }
     }
 
@@ -334,6 +345,10 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
 
     func routeLocationsForPersistence(maxCount: Int = 600) -> [CLLocation] {
         downsample(collectedLocations, maxCount: maxCount)
+    }
+
+    func setWalkMetricsUpdateHandler(_ handler: ((Double) -> Void)?) {
+        walkMetricsUpdateHandler = handler
     }
 
     private func downsample(_ locations: [CLLocation], maxCount: Int) -> [CLLocation] {
@@ -404,12 +419,7 @@ final class LocationManager: NSObject, CLLocationManagerDelegate {
 
     // MARK: - Computed
     var totalDistance: Double {
-        guard collectedLocations.count > 1 else { return 0 }
-        var total: Double = 0
-        for i in 1 ..< collectedLocations.count {
-            total += collectedLocations[i].distance(from: collectedLocations[i - 1])
-        }
-        return total
+        trackedDistanceMeters
     }
 
     private func recordLocationPolicy(reason: String) {

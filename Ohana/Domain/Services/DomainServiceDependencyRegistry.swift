@@ -3,6 +3,7 @@ import SwiftData
 
 @MainActor
 enum DomainServiceDependencyRegistry {
+    private weak static var registrationOwner: AnyObject?
     private static var makeCareEventDependencies: (() -> CareEventServiceDependencies)?
     private static var makeCareEventEconomy: (() -> CareEventEconomyAwarding)?
     private static var makeFamilyTasks: (() -> FamilyTaskManaging)?
@@ -11,6 +12,7 @@ enum DomainServiceDependencyRegistry {
     private static var makeReminderCompletion: ((CareLedgerRecording) -> ReminderCompleting)?
 
     static func register(
+        owner: AnyObject,
         careEventDependencies: (() -> CareEventServiceDependencies)? = nil,
         careEventEconomy: (() -> CareEventEconomyAwarding)? = nil,
         familyTasks: (() -> FamilyTaskManaging)? = nil,
@@ -18,6 +20,10 @@ enum DomainServiceDependencyRegistry {
         medicationReminders: ((CareLedgerRecording) -> MedicationReminderManaging)? = nil,
         reminderCompletion: ((CareLedgerRecording) -> ReminderCompleting)? = nil
     ) {
+        if registrationOwner !== owner {
+            clearRegistration()
+            registrationOwner = owner
+        }
         if let careEventDependencies {
             makeCareEventDependencies = careEventDependencies
         }
@@ -39,6 +45,7 @@ enum DomainServiceDependencyRegistry {
     }
 
     static func careEventDependencies() -> CareEventServiceDependencies {
+        pruneExpiredRegistration()
         if let makeCareEventDependencies {
             return makeCareEventDependencies()
         }
@@ -46,6 +53,7 @@ enum DomainServiceDependencyRegistry {
     }
 
     static func careEventEconomy() -> CareEventEconomyAwarding {
+        pruneExpiredRegistration()
         if let makeCareEventEconomy {
             return makeCareEventEconomy()
         }
@@ -53,6 +61,7 @@ enum DomainServiceDependencyRegistry {
     }
 
     static func familyTasks() -> FamilyTaskManaging {
+        pruneExpiredRegistration()
         if let makeFamilyTasks {
             return makeFamilyTasks()
         }
@@ -60,13 +69,25 @@ enum DomainServiceDependencyRegistry {
     }
 
     static func reminderScheduling(careLedger: CareLedgerRecording) -> ReminderSchedulingManaging {
+        pruneExpiredRegistration()
         if let makeReminderScheduling {
             return makeReminderScheduling(careLedger)
         }
         return debugReminderScheduling()
     }
 
+    /// Returns the app-registered scheduling pipeline without manufacturing a
+    /// debug fallback. Domain services use this to preserve an intentional
+    /// low-level notification fallback before the live graph is installed.
+    static func registeredReminderScheduling(
+        careLedger: CareLedgerRecording
+    ) -> ReminderSchedulingManaging? {
+        pruneExpiredRegistration()
+        return makeReminderScheduling?(careLedger)
+    }
+
     static func medicationReminders(careLedger: CareLedgerRecording) -> MedicationReminderManaging {
+        pruneExpiredRegistration()
         if let makeMedicationReminders {
             return makeMedicationReminders(careLedger)
         }
@@ -74,6 +95,7 @@ enum DomainServiceDependencyRegistry {
     }
 
     static func reminderCompletion(careLedger: CareLedgerRecording) -> ReminderCompleting {
+        pruneExpiredRegistration()
         if let makeReminderCompletion {
             return makeReminderCompletion(careLedger)
         }
@@ -83,6 +105,21 @@ enum DomainServiceDependencyRegistry {
             reminderScheduling: reminderScheduling(careLedger: careLedger),
             notifications: ReminderNotificationSchedulerRegistry.current
         )
+    }
+
+    private static func pruneExpiredRegistration() {
+        guard registrationOwner == nil else { return }
+        clearRegistration()
+    }
+
+    private static func clearRegistration() {
+        registrationOwner = nil
+        makeCareEventDependencies = nil
+        makeCareEventEconomy = nil
+        makeFamilyTasks = nil
+        makeReminderScheduling = nil
+        makeMedicationReminders = nil
+        makeReminderCompletion = nil
     }
 
     private static func unregisteredDependency(_ name: String) -> Never {
@@ -304,4 +341,18 @@ private final class DomainNoOpMedicationReminderManager: MedicationReminderManag
     func undoDose(for _: UUID) {}
     func scheduleMedicationReminders(for _: Pet, context _: ModelContext?) {}
     func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+    func refreshScheduledMedicationReminders(
+        context _: ModelContext,
+        hidingDetails _: Bool
+    ) async -> MedicationNotificationPrivacyRefreshResult {
+        .unavailable
+    }
+
+    func reconcileHumanMedicationRollingWindow(
+        context _: ModelContext,
+        budget _: OhanaBackgroundWorkBudget,
+        now _: Date
+    ) async -> HumanMedicationReminderRollingRefreshResult {
+        .deferred
+    }
 }

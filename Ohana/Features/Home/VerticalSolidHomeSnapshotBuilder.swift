@@ -13,7 +13,9 @@ nonisolated struct VerticalSolidHomeSourceState {
     let pets: [Pet]
     let humans: [Human]
     let islandCoconutReserveBalance: Int
+    let familyCoconutTotalOverride: Int?
     let plants: [Plant]
+    let plantPlanningHistories: [UUID: PlantCarePlanningHistory]
     let electronicPets: [OasisElectronicPet]
     let events: [Event]
     let pendingReminders: [Reminder]
@@ -27,6 +29,7 @@ nonisolated struct VerticalSolidHomeSourceState {
     let walkLedgerEntries: [HomeWalkQuickActionEntry]
     let pottyLedgerEntries: [HomePottyQuickActionEntry]
     let petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry]
+    let humanExpenseEntries: [HomeExpensePreviewEntry]
     let petWeightLedgerEntries: [HomePetWeightQuickActionEntry]
     let petMomentEntries: [HomePetMomentQuickActionEntry]
     let humanWeightLogs: [HumanWeightLog]
@@ -44,7 +47,9 @@ nonisolated struct VerticalSolidHomeSourceState {
         pets: [Pet],
         humans: [Human],
         islandCoconutReserveBalance: Int = 0,
+        familyCoconutTotalOverride: Int? = nil,
         plants: [Plant],
+        plantPlanningHistories: [UUID: PlantCarePlanningHistory] = [:],
         electronicPets: [OasisElectronicPet],
         events: [Event],
         pendingReminders: [Reminder],
@@ -58,6 +63,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         walkLedgerEntries: [HomeWalkQuickActionEntry],
         pottyLedgerEntries: [HomePottyQuickActionEntry],
         petExpenseLedgerEntries: [HomePetExpenseQuickActionEntry] = [],
+        humanExpenseEntries: [HomeExpensePreviewEntry] = [],
         petWeightLedgerEntries: [HomePetWeightQuickActionEntry] = [],
         petMomentEntries: [HomePetMomentQuickActionEntry] = [],
         humanWeightLogs: [HumanWeightLog],
@@ -74,7 +80,9 @@ nonisolated struct VerticalSolidHomeSourceState {
         self.pets = pets
         self.humans = humans
         self.islandCoconutReserveBalance = max(0, islandCoconutReserveBalance)
+        self.familyCoconutTotalOverride = familyCoconutTotalOverride
         self.plants = plants
+        self.plantPlanningHistories = plantPlanningHistories
         self.electronicPets = electronicPets
         self.events = events
         self.pendingReminders = pendingReminders
@@ -88,6 +96,7 @@ nonisolated struct VerticalSolidHomeSourceState {
         self.walkLedgerEntries = walkLedgerEntries
         self.pottyLedgerEntries = pottyLedgerEntries
         self.petExpenseLedgerEntries = petExpenseLedgerEntries
+        self.humanExpenseEntries = humanExpenseEntries
         self.petWeightLedgerEntries = petWeightLedgerEntries
         self.petMomentEntries = petMomentEntries
         self.humanWeightLogs = humanWeightLogs
@@ -165,20 +174,26 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             equippedTitleRaw: source.equippedTitleRaw,
             language: source.language
         )
-        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? source.plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel)
+            ? source.plants.filter { !$0.isArchived }
+            : []
 
         return VerticalSolidHomeSnapshot(
             isReady: true,
             greeting: greetingText(l, now: now),
             activeName: source.activeHuman?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie"),
-            coconutText: "\(source.islandCoconutReserveBalance + EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans))",
+            coconutText: "\(source.islandCoconutReserveBalance + (source.familyCoconutTotalOverride ?? EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans)))",
             // Compatibility field for legacy render helpers. Home no longer
             // projects or displays the generated Today Focus task deck.
             todayFocus: .empty,
             cards: cards,
             firstPetEmptyState: nil,
             plants: visiblePlants.sorted { $0.createdAt > $1.createdAt }.map { plant in
-                let plantTasks = PlantCarePlanService.tasks(for: plant, now: now)
+                let plantTasks = PlantCarePlanService.tasks(
+                    for: plant,
+                    history: source.plantPlanningHistories[plant.id] ?? .empty,
+                    now: now
+                )
                 let dueCareTypes = plantTasks
                     .filter { $0.daysUntilDue <= 0 }
                     .map(\.careType)
@@ -207,6 +222,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                     roomName: plant.roomName,
                     avatarImageSignature: plant.hasAvatarImageAttachment ? plant.avatarThumbnailSignature : "asset:\(assetName)",
                     avatarImageAssetName: plant.hasAvatarImageAttachment ? nil : assetName,
+                    isArchived: plant.isArchived,
                     needsCare: needsCare,
                     hasDueWatering: hasDueWatering,
                     hasDueFertilizing: hasDueFertilizing,
@@ -228,13 +244,19 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
     }
 
     static func signature(for source: VerticalSolidHomeSourceState, now: Date = Date()) -> String {
-        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel) ? source.plants : []
+        let visiblePlants = PlantUnlockPolicy.isUnlocked(currentLevel: AppFeatureRouteGuard.currentFeatureLevel)
+            ? source.plants.filter { !$0.isArchived }
+            : []
         return [
             "day:\(dayToken(for: now))",
             petSignature(source.pets),
             humanSignature(source.humans),
             "islandReserve:\(source.islandCoconutReserveBalance)",
-            plantSignature(visiblePlants, now: now),
+            plantSignature(
+                visiblePlants,
+                histories: source.plantPlanningHistories,
+                now: now
+            ),
             electronicPetSignature(source.electronicPets),
             eventSignature(source.events),
             reminderSignature(source.pendingReminders),
@@ -246,6 +268,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             walkLedgerSignature(source.walkLedgerEntries),
             pottyLedgerSignature(source.pottyLedgerEntries),
             petExpenseLedgerSignature(source.petExpenseLedgerEntries),
+            humanExpenseSignature(source.humanExpenseEntries),
             petWeightLedgerSignature(source.petWeightLedgerEntries),
             petMomentSignature(source.petMomentEntries),
             source.activeHumanIdRaw,
@@ -299,20 +322,20 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
                 copy.avatarImageData = nil
                 copy.avatarImageSignature = human.avatarThumbnailSignature
                 if human.id.uuidString == activeHumanIdRaw {
-                    copy.equippedTitleBadgeText = equippedTitleBadgeText(for: equippedTitleRaw)
+                    copy.equippedTitleBadgeText = equippedTitleBadgeText(
+                        for: equippedTitleRaw,
+                        language: language
+                    )
                 }
             }
             return copy
         }
     }
 
-    private static func equippedTitleBadgeText(for raw: String) -> String? {
-        switch raw {
-        case "title_guardian": "🛡️ 守护者"
-        case "title_pioneer": "🚀 先行者"
-        case "title_chef": "👨‍🍳 首席厨师"
-        default: nil
-        }
+    private static func equippedTitleBadgeText(for raw: String, language: String) -> String? {
+        guard case .title = ShopProductApplicationCatalog.application(for: raw),
+              let item = ShopCatalog.item(id: raw) else { return nil }
+        return "\(item.emoji) \(item.name(L10n(language)))"
     }
 
     static func heroPreparationRevision(for cards: [FocusCard]) -> String {
@@ -359,23 +382,81 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
         }.joined(separator: "|")
     }
 
-    private static func plantSignature(_ plants: [Plant], now: Date) -> String {
+    private static func plantSignature(
+        _ plants: [Plant],
+        histories: [UUID: PlantCarePlanningHistory],
+        now: Date
+    ) -> String {
         plants.map { plant in
-            [
+            let history = histories[plant.id] ?? .empty
+            let taskSignature = PlantCarePlanService.tasks(
+                for: plant,
+                history: history,
+                now: now
+            )
+                .map { task in
+                    [
+                        task.id,
+                        task.plantID.uuidString,
+                        task.careType.rawValue,
+                        task.title,
+                        task.subtitle,
+                        task.explanation,
+                        String(timestamp(task.dueDate)),
+                        String(task.isOverdue),
+                        String(task.daysUntilDue),
+                        String(task.priority),
+                        String(task.effectiveIntervalDays),
+                        task.learningSummary
+                    ].joined(separator: "~")
+                }
+                .joined(separator: ",")
+            let latestCareSignature = history.latestCareDates
+                .map { "\($0.key.rawValue):\(timestamp($0.value))" }
+                .sorted()
+                .joined(separator: ",")
+            let wateringSignature = history.recentWateringDates
+                .map { String(timestamp($0)) }
+                .joined(separator: ",")
+            let noteSignature = history.recentCustomNotes
+                .map { "\(timestamp($0.date)):\($0.note)" }
+                .joined(separator: ",")
+            return [
                 plant.id.uuidString,
                 plant.name,
                 plant.species,
                 plant.location,
                 plant.avatarEmoji,
                 plant.avatarThumbnailSignature,
+                plant.avatarAttachmentStateRaw,
+                String(plant.hasAvatarImageAttachment),
                 plant.catalogSpeciesId,
                 plant.themeColorHex,
+                String(timestamp(plant.createdAt)),
                 String(timestamp(plant.lastWateredDate)),
                 String(timestamp(plant.lastFertilizedDate)),
+                String(timestamp(plant.lastHealthCheckDate)),
                 String(plant.wateringIntervalDays),
                 String(plant.fertilizingIntervalDays),
-                String(PlantCarePlanService.intervalDays(for: .watering, plant: plant)),
-                String(PlantCarePlanService.intervalDays(for: .fertilizing, plant: plant))
+                plant.roomName,
+                plant.healthStatusRaw,
+                plant.lightLevelRaw,
+                plant.windowDirectionRaw,
+                plant.humidityPreferenceRaw,
+                String(plant.lastLightMeasurementLux),
+                String(plant.potDiameterCm),
+                plant.potMaterial,
+                String(plant.potHasDrainage),
+                String(plant.currentHeightCm),
+                String(plant.isIndoor),
+                String(plant.isNearClimateSource),
+                String(plant.isHydroponic),
+                String(plant.isSucculent),
+                String(timestamp(plant.archivedAt)),
+                latestCareSignature,
+                wateringSignature,
+                noteSignature,
+                taskSignature
             ].joined(separator: ":")
         }.joined(separator: "|")
     }
@@ -610,6 +691,17 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             [
                 entry.id.uuidString,
                 entry.petId.uuidString,
+                String(Int(entry.date.timeIntervalSince1970)),
+                String(Int(entry.amount.rounded()))
+            ].joined(separator: ":")
+        }.joined(separator: "|")
+    }
+
+    private static func humanExpenseSignature(_ entries: [HomeExpensePreviewEntry]) -> String {
+        entries.map { entry in
+            [
+                entry.id.uuidString,
+                entry.actorId,
                 String(Int(entry.date.timeIntervalSince1970)),
                 String(Int(entry.amount.rounded()))
             ].joined(separator: ":")

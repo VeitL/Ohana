@@ -15,6 +15,14 @@ extension FamilyCollaborationDashboardView {
     }
 
     func presentEditor(_ route: FamilyCollaborationEditorRoute) {
+        if case .editTask = route, authorizedEditorContext(for: route) == nil {
+            commandFailureMessage = l.tr(
+                zh: "只有任务发布者可以编辑这项任务。",
+                en: "Only the task publisher can edit this task.",
+                de: "Nur der Ersteller kann diese Aufgabe bearbeiten."
+            )
+            return
+        }
         activeEditor = route
         onEditorVisibilityChanged(true)
     }
@@ -24,59 +32,36 @@ extension FamilyCollaborationDashboardView {
         onEditorVisibilityChanged(false)
     }
 
-    @ViewBuilder
-    func nativeTaskEditorSheet(_ route: FamilyCollaborationEditorRoute) -> some View {
-        let editorContext = FamilyCollaborationEditorContext.resolve(
+    func closeRoleScopedRoutes() {
+        activeTaskDetail = nil
+        activeSheetRoute = nil
+        pendingPostSheetAction = nil
+        dismissEditor()
+    }
+
+    func authorizedEditorContext(
+        for route: FamilyCollaborationEditorRoute
+    ) -> FamilyCollaborationEditorContext? {
+        guard let context = FamilyCollaborationEditorContext.resolve(
             route: route,
             reminders: pendingReminders,
             tasks: familyTasks
-        )
+        ) else { return nil }
+        guard let task = context.task else { return context }
+        return FamilyTaskCapabilities.resolve(
+            task: task,
+            currentHumanID: currentHuman?.id
+        ).canEdit ? context : nil
+    }
+
+    @ViewBuilder
+    func nativeTaskEditorSheet(_ route: FamilyCollaborationEditorRoute) -> some View {
+        let editorContext = authorizedEditorContext(for: route)
 
         NavigationStack {
             Group {
                 if let editorContext {
-                    FamilyTaskEditorPanel(
-                    context: editorContext,
-                    humans: humans,
-                    currentHuman: currentHuman,
-                    pets: pets,
-                    onClose: dismissEditor,
-                    onAssignReminder: { reminder, human, reward, note in
-                        commandExecutor.assignReminder(
-                            reminder,
-                            to: human,
-                            by: currentHuman,
-                            rewardCoconuts: reward,
-                            note: note
-                        )
-                    },
-                    onCreateTask: { title, note, human, reward, dueAt, emoji in
-                        commandExecutor.createTask(
-                            title: title,
-                            note: note,
-                            assignedTo: human,
-                            by: currentHuman,
-                            rewardCoconuts: reward,
-                            dueAt: dueAt,
-                            emoji: emoji
-                        )
-                    },
-                    onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
-                        commandExecutor.updateTask(
-                            task,
-                            title: title,
-                            note: note,
-                            assignedTo: human,
-                            rewardCoconuts: reward,
-                            dueAt: dueAt,
-                            emoji: emoji,
-                            by: currentHuman
-                        )
-                    },
-                    onDeleteTask: { task in
-                        commandExecutor.deleteTask(task, by: currentHuman)
-                    }
-                    )
+                    taskEditorPanel(editorContext)
                 } else {
                     ContentUnavailableView(
                         l.tr(zh: "任务不可用", en: "Task unavailable", de: "Aufgabe nicht verfügbar"),
@@ -98,6 +83,74 @@ extension FamilyCollaborationDashboardView {
         .presentationContentInteraction(.scrolls)
     }
 
+    private func taskEditorPanel(_ editorContext: FamilyCollaborationEditorContext) -> some View {
+        FamilyTaskPlanEditorDataContainer(planID: editorContext.task?.planId) { planConfiguration in
+            FamilyTaskEditorPanel(
+                context: editorContext,
+                humans: humans,
+                currentHuman: currentHuman,
+                pets: pets,
+                planConfiguration: planConfiguration,
+                onClose: dismissEditor,
+                onAssignReminder: { reminder, human, reward, note in
+                    commandExecutor.assignReminder(
+                        reminder,
+                        to: human,
+                        by: currentHuman,
+                        rewardCoconuts: reward,
+                        note: note
+                    )
+                },
+                onCreateTask: { title, note, human, reward, dueAt, emoji in
+                    commandExecutor.createTask(
+                        title: title,
+                        note: note,
+                        assignedTo: human,
+                        by: currentHuman,
+                        rewardCoconuts: reward,
+                        dueAt: dueAt,
+                        emoji: emoji
+                    )
+                },
+                onCreatePlan: { draft in
+                    await commandExecutor.createPlan(draft)
+                },
+                onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
+                    commandExecutor.updateTask(
+                        task,
+                        title: title,
+                        note: note,
+                        assignedTo: human,
+                        rewardCoconuts: reward,
+                        dueAt: dueAt,
+                        emoji: emoji,
+                        by: currentHuman
+                    )
+                },
+                onDeleteTask: { task in
+                    commandExecutor.deleteTask(task, by: currentHuman)
+                },
+                onUpdatePlan: { planID, nominalAt, draft in
+                    guard let currentHuman else { return false }
+                    return await commandExecutor.updateThisAndFuture(
+                        planID: planID,
+                        from: nominalAt,
+                        draft: draft,
+                        by: currentHuman
+                    )
+                },
+                onCancelPlan: { planID, nominalAt in
+                    guard let currentHuman else { return false }
+                    return await commandExecutor.cancelThisAndFuture(
+                        planID: planID,
+                        from: nominalAt,
+                        by: currentHuman
+                    )
+                }
+            )
+        }
+    }
+
     func editorTitle(for route: FamilyCollaborationEditorRoute) -> String {
         switch route {
         case .assignReminder:
@@ -117,11 +170,7 @@ extension FamilyCollaborationDashboardView {
             let hiddenOffset = maxHeight + bottomInset + 64
             let cornerRadius: CGFloat = 52
             let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            let editorContext = FamilyCollaborationEditorContext.resolve(
-                route: route,
-                reminders: pendingReminders,
-                tasks: familyTasks
-            )
+            let editorContext = authorizedEditorContext(for: route)
 
             ZStack(alignment: .bottom) {
                 collaborationInlineBackdrop
@@ -131,48 +180,7 @@ extension FamilyCollaborationDashboardView {
                 ZStack(alignment: .top) {
                     ScrollView(.vertical, showsIndicators: false) {
                         if let editorContext {
-                            FamilyTaskEditorPanel(
-                                context: editorContext,
-                                humans: humans,
-                                currentHuman: currentHuman,
-                                pets: pets,
-                                onClose: dismissEditor,
-                                onAssignReminder: { reminder, human, reward, note in
-                                    commandExecutor.assignReminder(
-                                        reminder,
-                                        to: human,
-                                        by: currentHuman,
-                                        rewardCoconuts: reward,
-                                        note: note
-                                    )
-                                },
-                                onCreateTask: { title, note, human, reward, dueAt, emoji in
-                                    commandExecutor.createTask(
-                                        title: title,
-                                        note: note,
-                                        assignedTo: human,
-                                        by: currentHuman,
-                                        rewardCoconuts: reward,
-                                        dueAt: dueAt,
-                                        emoji: emoji
-                                    )
-                                },
-                                onUpdateTask: { task, title, note, human, reward, dueAt, emoji in
-                                    commandExecutor.updateTask(
-                                        task,
-                                        title: title,
-                                        note: note,
-                                        assignedTo: human,
-                                        rewardCoconuts: reward,
-                                        dueAt: dueAt,
-                                        emoji: emoji,
-                                        by: currentHuman
-                                    )
-                                },
-                                onDeleteTask: { task in
-                                    commandExecutor.deleteTask(task, by: currentHuman)
-                                }
-                            )
+                            taskEditorPanel(editorContext)
                             .padding(.top, 32)
                             .padding(.bottom, 16)
                         }

@@ -18,6 +18,7 @@ enum AppHumanDetailSheetDestination: Hashable {
     case workout
     case workoutDashboard
     case metrics
+    case conditions
     case report
     case expenseQuick
     case expense
@@ -32,7 +33,7 @@ extension AppHumanDetailSheetDestination {
         case .basicInfo, .noteQuick, .note:
             true
         case .medicationQuick, .medication, .weightQuick, .weight, .workoutQuick, .workout,
-             .workoutDashboard, .metrics, .report, .expenseQuick, .expense, .wishlist:
+             .workoutDashboard, .metrics, .conditions, .report, .expenseQuick, .expense, .wishlist:
             false
         }
     }
@@ -172,7 +173,7 @@ struct AppHumanDetailSheetRouteContainer: View {
         } else {
             switch destination {
             case .basicInfo:
-                NavigationStack { HumanBasicInfoDetailView(human: human) }
+                NavigationStack { HumanBasicInfoDetailView(human: human, onClose: onDismiss) }
             case .medicationQuick:
                 QuickHumanMedicationSheet(
                     human: human,
@@ -204,18 +205,25 @@ struct AppHumanDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .workout:
-                HumanWorkoutSummaryView(human: human)
+                NavigationStack { HumanWorkoutSummaryView(human: human) }
             case .workoutDashboard:
-                HumanWorkoutSummaryView(human: human)
+                NavigationStack { HumanWorkoutSummaryView(human: human) }
             case .metrics:
                 NavigationStack { HumanHealthCheckupView(human: human) }
+            case .conditions:
+                NavigationStack {
+                    HumanHealthConditionsView(
+                        human: human,
+                        showsCloseButton: true,
+                        onClose: onDismiss
+                    )
+                }
             case .report:
-                HumanHealthReportView(human: human)
+                NavigationStack { HumanHealthReportView(human: human) }
             case .expenseQuick:
-                QuickHumanExpenseSheet(
-                    human: human,
-                    onDismiss: onDismiss
-                )
+                // Kept as a compatibility route for restored navigation state.
+                // Human expense creation is retired; this surface is payer history only.
+                NavigationStack { HumanExpenseDetailView(human: human) }
             case .expense:
                 NavigationStack { HumanExpenseDetailView(human: human) }
             case .wishlist:
@@ -252,6 +260,12 @@ private struct HumanAllFeaturesRouteData {
     @MainActor
     static func load(id: UUID, from context: ModelContext) -> HumanAllFeaturesRouteData {
         let humanKey = id.uuidString
+        let humanKeyLower = humanKey.lowercased()
+        let recentObservationStart = Calendar.current.date(
+            byAdding: .day,
+            value: -6,
+            to: Calendar.current.startOfDay(for: Date())
+        ) ?? Date()
         let human = fetchOne(
             FetchDescriptor<Human>(
                 predicate: #Predicate<Human> { $0.id == id }
@@ -261,7 +275,9 @@ private struct HumanAllFeaturesRouteData {
         )
         let allMeds = fetch(
             FetchDescriptor<HumanMedication>(
-                predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
+                predicate: #Predicate<HumanMedication> {
+                    $0.humanId == humanKey || $0.humanId == humanKeyLower
+                },
                 sortBy: [SortDescriptor(\.createdAt)]
             ),
             context: context,
@@ -269,19 +285,31 @@ private struct HumanAllFeaturesRouteData {
         )
         let allReports = fetch(
             FetchDescriptor<HumanHealthReport>(
-                predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
+                predicate: #Predicate<HumanHealthReport> {
+                    $0.humanId == humanKey || $0.humanId == humanKeyLower
+                },
                 sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
             ),
             context: context,
             name: "HumanHealthReport"
         )
-        let allExpenses = fetch(
-            FetchDescriptor<PetExpenseLog>(
-                predicate: #Predicate<PetExpenseLog> { $0.executorId == humanKey },
-                sortBy: [SortDescriptor(\.date, order: .reverse)]
-            ),
-            context: context,
-            name: "PetExpenseLog"
+        var expenseDescriptor = FetchDescriptor<PetExpenseLog>(
+            predicate: #Predicate<PetExpenseLog> { log in
+                log.executorId == humanKey ||
+                    log.executorId == humanKeyLower ||
+                    log.payerContributionsJSON.contains(humanKey) ||
+                    log.payerContributionsJSON.contains(humanKeyLower)
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        expenseDescriptor.fetchLimit = 20000
+        let allExpenses = ExpenseSummaryBuilder.paidBy(
+            id,
+            from: fetch(
+                expenseDescriptor,
+                context: context,
+                name: "PetExpenseLog"
+            )
         )
         let weightLogs = fetch(
             FetchDescriptor<HumanWeightLog>(
@@ -313,23 +341,76 @@ private struct HumanAllFeaturesRouteData {
             context: context,
             name: "HumanHealthMetricLog"
         )
+        let healthRows = loadRecentHealthRows(
+            humanKey: humanKey,
+            humanKeyLower: humanKeyLower,
+            recentObservationStart: recentObservationStart,
+            context: context
+        )
         return HumanAllFeaturesRouteData(
             human: human,
             allMeds: allMeds,
             allReports: allReports,
             allExpenses: allExpenses,
             summary: human.map {
-                HumanAllFeaturesActivitySummary.load(
+                let explicitlyResolvedProfileCategories = MemberProfileCompletenessReadService
+                    .explicitlyResolvedCategories(
+                        kind: .human,
+                        subjectID: $0.id,
+                        context: context
+                    )
+                return HumanAllFeaturesActivitySummary.load(
                     human: $0,
                     allMeds: allMeds,
                     allReports: allReports,
                     allExpenses: allExpenses,
                     weightLogs: weightLogs,
                     workoutLogs: workoutLogs,
-                    healthMetricLogs: healthMetricLogs
+                    healthMetricLogs: healthMetricLogs,
+                    healthConditions: healthRows.conditions,
+                    healthObservations: healthRows.observations,
+                    explicitlyResolvedProfileCategories: explicitlyResolvedProfileCategories
                 )
             } ?? .empty,
             hasLoaded: true
+        )
+    }
+
+    @MainActor
+    private static func loadRecentHealthRows(
+        humanKey: String,
+        humanKeyLower: String,
+        recentObservationStart: Date,
+        context: ModelContext
+    ) -> (conditions: [HumanHealthCondition], observations: [HumanHealthObservation]) {
+        var conditionDescriptor = FetchDescriptor<HumanHealthCondition>(
+            predicate: #Predicate<HumanHealthCondition> {
+                $0.humanId == humanKey || $0.humanId == humanKeyLower
+            },
+            sortBy: [SortDescriptor(\.updatedAt, order: .reverse)]
+        )
+        conditionDescriptor.fetchLimit = 64
+
+        var observationDescriptor = FetchDescriptor<HumanHealthObservation>(
+            predicate: #Predicate<HumanHealthObservation> {
+                ($0.humanId == humanKey || $0.humanId == humanKeyLower) &&
+                    $0.recordedAt >= recentObservationStart
+            },
+            sortBy: [SortDescriptor(\.recordedAt, order: .reverse)]
+        )
+        observationDescriptor.fetchLimit = 256
+
+        return (
+            conditions: fetch(
+                conditionDescriptor,
+                context: context,
+                name: "HumanHealthCondition"
+            ),
+            observations: fetch(
+                observationDescriptor,
+                context: context,
+                name: "HumanHealthObservation"
+            )
         )
     }
 }

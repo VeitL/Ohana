@@ -1,3 +1,4 @@
+import Foundation
 import SwiftData
 
 @MainActor
@@ -16,11 +17,28 @@ protocol GachaDrawing {
         ownedItems: [GachaOwnedItem]
     ) -> Bool
 
+    func guaranteeStatus(
+        humanId: String,
+        series: GachaSeriesEntry,
+        ownedItems: [GachaOwnedItem],
+        logs: [GachaDrawLog]
+    ) -> GachaGuaranteeStatus
+
+    func fundingPreview(human: Human, context: ModelContext) -> GachaFundingPreview
+    func stardustBalance(context: ModelContext) -> Int
+
     func draw(
         seriesId: String,
         human: Human?,
-        context: ModelContext
+        context: ModelContext,
+        approvedFunding: GachaFundingPreview?
     ) throws -> GachaDrawOutcome
+
+    func draw(
+        request: GachaDrawRequest,
+        human: Human?,
+        context: ModelContext
+    ) async throws -> GachaDrawOutcomeDTO
 }
 
 @MainActor
@@ -69,18 +87,87 @@ final class StaticGachaDrawer: GachaDrawing {
         )
     }
 
+    func guaranteeStatus(
+        humanId: String,
+        series: GachaSeriesEntry,
+        ownedItems: [GachaOwnedItem],
+        logs: [GachaDrawLog]
+    ) -> GachaGuaranteeStatus {
+        GachaDrawService.guaranteeStatus(
+            humanId: humanId,
+            series: series,
+            ownedItems: ownedItems,
+            logs: logs
+        )
+    }
+
+    func fundingPreview(human: Human, context: ModelContext) -> GachaFundingPreview {
+        GachaDrawService.fundingPreview(human: human, context: context)
+    }
+
+    func stardustBalance(context: ModelContext) -> Int {
+        GachaDrawService.stardustBalance(context: context)
+    }
+
     func draw(
         seriesId: String,
         human: Human?,
-        context: ModelContext
+        context: ModelContext,
+        approvedFunding: GachaFundingPreview? = nil
     ) throws -> GachaDrawOutcome {
-        try GachaDrawService.draw(
+        let outcome = try GachaDrawService.draw(
             seriesId: seriesId,
             human: human,
             context: context,
+            approvedFunding: approvedFunding,
             wallet: wallet,
             careLedger: careLedger,
             projectionManager: questManager
+        )
+        if let human {
+            publishDrawMutation(humanID: human.id, seriesID: seriesId, drawID: outcome.log.id)
+        }
+        return outcome
+    }
+
+    func draw(
+        request: GachaDrawRequest,
+        human: Human?,
+        context: ModelContext
+    ) async throws -> GachaDrawOutcomeDTO {
+        guard let human else { throw GachaDrawError.missingHuman }
+        guard request.oddsVersion == GachaDrawService.oddsVersion,
+              request.ownerHumanID == human.id else {
+            throw GachaDrawError.fundingChanged
+        }
+        let wasAlreadyPersisted = try GachaDrawService.hasPersistedDraw(
+            id: request.id,
+            context: context
+        )
+        let outcome = try GachaDrawService.draw(
+            seriesId: request.seriesID,
+            human: human,
+            context: context,
+            requestID: request.id,
+            approvedFunding: request.approvedFunding,
+            wallet: wallet,
+            careLedger: careLedger,
+            projectionManager: questManager
+        )
+        if !wasAlreadyPersisted {
+            publishDrawMutation(humanID: human.id, seriesID: request.seriesID, drawID: outcome.log.id)
+        }
+        return GachaDrawService.outcomeDTO(outcome)
+    }
+
+    private func publishDrawMutation(humanID: UUID, seriesID: String, drawID: UUID) {
+        questManager.revisions.publish(
+            DomainMutationResult(
+                command: .command("gacha", "draw", ["seriesID": seriesID]),
+                affectedEntityIDs: [humanID],
+                wroteBusinessFact: true,
+                note: "gacha.draw.\(drawID.uuidString)"
+            )
         )
     }
 }

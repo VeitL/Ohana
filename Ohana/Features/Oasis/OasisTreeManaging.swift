@@ -18,6 +18,14 @@ protocol OasisTreeManaging {
     func nextLevelThreshold(forTotalEnergy totalEnergy: Int) -> Int
     func canUseInjectionPackage(cost: Int, date: Date) -> Bool
     func applyPurchasedEnergyBoost(cost: Int, modelContext: ModelContext) -> Bool
+    func applyPurchasedEnergyBoost(
+        cost: Int,
+        injectedXP: Int,
+        purchaseID: UUID,
+        modelContext: ModelContext
+    ) -> Bool
+    func finalizePurchasedEnergyBoost(purchaseID: UUID, modelContext: ModelContext)
+    func reconcilePurchasedEnergyBoostMarkers(modelContext: ModelContext)
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant])
     func refreshEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant])
     @discardableResult
@@ -111,6 +119,31 @@ final class SharedOasisTreeManager: OasisTreeManaging {
 
     func applyPurchasedEnergyBoost(cost: Int, modelContext: ModelContext) -> Bool {
         manager.applyPurchasedEnergyBoost(cost: cost, modelContext: modelContext)
+    }
+
+    func applyPurchasedEnergyBoost(
+        cost: Int,
+        injectedXP: Int,
+        purchaseID: UUID,
+        modelContext: ModelContext
+    ) -> Bool {
+        manager.applyPurchasedEnergyBoost(
+            cost: cost,
+            injectedXP: injectedXP,
+            purchaseID: purchaseID,
+            modelContext: modelContext
+        )
+    }
+
+    func finalizePurchasedEnergyBoost(purchaseID: UUID, modelContext: ModelContext) {
+        manager.finalizePurchasedEnergyBoost(
+            purchaseID: purchaseID,
+            modelContext: modelContext
+        )
+    }
+
+    func reconcilePurchasedEnergyBoostMarkers(modelContext: ModelContext) {
+        manager.reconcilePurchasedEnergyBoostMarkers(modelContext: modelContext)
     }
 
     func refreshPreviewEnergy(modelContext: ModelContext, pets: [Pet], humans: [Human], plants: [Plant]) {

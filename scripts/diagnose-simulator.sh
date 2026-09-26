@@ -37,22 +37,25 @@ print_toolchain() {
 }
 
 print_simulator_app_state() {
-  section "Simulator app"
-  local simulator_app="/Applications/Xcode.app/Contents/Developer/Applications/Simulator.app"
-  local simulator_binary="${simulator_app}/Contents/MacOS/Simulator"
-  if [[ -x "${simulator_binary}" ]]; then
-    printf 'ok: %s\n' "${simulator_binary}"
-  else
-    printf 'missing executable: %s\n' "${simulator_binary}"
-  fi
+  section "Simulator frontend (optional)"
+  local developer_dir
+  developer_dir="$(xcode-select -p 2>/dev/null || true)"
+  local simulator_app
+  for simulator_app in \
+    "${developer_dir}/Applications/Simulator.app" \
+    "${developer_dir}/../Applications/Simulator.app"; do
+    if [[ -x "${simulator_app}/Contents/MacOS/Simulator" ]]; then
+      printf 'ok: %s\n' "${simulator_app}"
+      return
+    fi
+  done
+  printf 'No standalone Simulator.app in the selected Xcode; simctl device checks below remain authoritative.\n'
 }
 
 print_recovery_steps() {
   section "Recovery"
   cat <<'EOF'
-Run these from a normal macOS Terminal, not from a sandboxed Codex shell:
-  open /Applications/Xcode.app/Contents/Developer/Applications/Simulator.app
-  xcrun simctl shutdown all
+Check CoreSimulator from the selected Xcode:
   xcrun simctl list devices available
 
 If simctl still reports CoreSimulatorService, simdiskimaged, or connection invalid:
@@ -63,7 +66,7 @@ If simctl still reports CoreSimulatorService, simdiskimaged, or connection inval
 
 After simctl works, rerun:
   scripts/prepare-test-simulator.sh
-  scripts/test-simulator.sh <same -only-testing args>
+  scripts/xcode-test.sh --only-testing <same selector>
 EOF
 }
 

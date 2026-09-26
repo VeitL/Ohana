@@ -23,6 +23,40 @@ protocol MedicationReminderManaging {
     func undoDose(for medicationId: UUID)
     func scheduleMedicationReminders(for pet: Pet, context: ModelContext?)
     func scheduleHumanMedicationReminders(for human: Human, meds: [HumanMedication], context: ModelContext?)
+    func invalidateNotificationMutations()
+    func refreshScheduledMedicationReminders(
+        context: ModelContext,
+        hidingDetails: Bool
+    ) async -> MedicationNotificationPrivacyRefreshResult
+    func recoverMedicationNotificationPrivacyIfNeeded(
+        context: ModelContext
+    ) async -> MedicationNotificationPrivacyRefreshResult
+    func reconcileHumanMedicationRollingWindow(
+        context: ModelContext,
+        budget: OhanaBackgroundWorkBudget,
+        now: Date
+    ) async -> HumanMedicationReminderRollingRefreshResult
+}
+
+extension MedicationReminderManaging {
+    func invalidateNotificationMutations() {}
+
+    func recoverMedicationNotificationPrivacyIfNeeded(
+        context: ModelContext
+    ) async -> MedicationNotificationPrivacyRefreshResult {
+        await refreshScheduledMedicationReminders(
+            context: context,
+            hidingDetails: MedicationNotificationPrivacyStore.hidesMedicationDetails()
+        )
+    }
+
+    func reconcileHumanMedicationRollingWindow(
+        context _: ModelContext,
+        budget _: OhanaBackgroundWorkBudget,
+        now _: Date
+    ) async -> HumanMedicationReminderRollingRefreshResult {
+        .deferred
+    }
 }
 
 @MainActor

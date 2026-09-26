@@ -15,21 +15,23 @@ struct SettingsActiveHumanSwitchCommandResult: Equatable {
     var saveErrorDescription: String? = nil
 }
 
-struct SettingsCoconutBalanceCommandResult: Equatable {
-    let humanID: UUID?
-    let amount: Int
-    let legacyDelta: Int
-    var didApply: Bool = true
-    var saveErrorDescription: String? = nil
-}
+#if DEBUG
+    struct SettingsCoconutBalanceCommandResult: Equatable {
+        let humanID: UUID?
+        let amount: Int
+        let legacyDelta: Int
+        var didApply: Bool = true
+        var saveErrorDescription: String? = nil
+    }
 
-struct SettingsPetCoconutBalanceCommandResult: Equatable {
-    let petID: UUID
-    let amount: Int
-    let delta: Int
-    let didApply: Bool
-    var saveErrorDescription: String? = nil
-}
+    struct SettingsPetCoconutBalanceCommandResult: Equatable {
+        let petID: UUID
+        let amount: Int
+        let delta: Int
+        let didApply: Bool
+        var saveErrorDescription: String? = nil
+    }
+#endif
 
 enum SettingsCommandService {
     @MainActor
@@ -89,9 +91,10 @@ enum SettingsCommandService {
         )
     }
 
-    @discardableResult
-    @MainActor
-    static func applyCoconutBalanceTest(
+    #if DEBUG
+        @discardableResult
+        @MainActor
+        static func applyCoconutBalanceTest(
         amount rawAmount: Int,
         human: Human?,
         title _: String,
@@ -150,11 +153,11 @@ enum SettingsCommandService {
             legacyDelta: delta,
             didApply: true
         )
-    }
+        }
 
-    @discardableResult
-    @MainActor
-    static func applyPetCoconutBalanceTest(
+        @discardableResult
+        @MainActor
+        static func applyPetCoconutBalanceTest(
         amount rawAmount: Int,
         pet: Pet,
         actorName: String?,
@@ -196,7 +199,8 @@ enum SettingsCommandService {
             delta: delta,
             didApply: true
         )
-    }
+        }
+    #endif
 }
 
 @MainActor
@@ -272,8 +276,9 @@ struct SettingsCommandExecutor {
         return result
     }
 
-    @discardableResult
-    func applyCoconutBalanceTest(
+    #if DEBUG
+        @discardableResult
+        func applyCoconutBalanceTest(
         amount: Int,
         human: Human?,
         title: String,
@@ -296,10 +301,10 @@ struct SettingsCommandExecutor {
             revisions.publishSettingsCoconutBalance(result, note: note)
         }
         return result
-    }
+        }
 
-    @discardableResult
-    func applyPetCoconutBalanceTest(
+        @discardableResult
+        func applyPetCoconutBalanceTest(
         amount: Int,
         pet: Pet,
         actorName: String?,
@@ -312,5 +317,6 @@ struct SettingsCommandExecutor {
             context: context,
             wallet: wallet
         )
-    }
+        }
+    #endif
 }

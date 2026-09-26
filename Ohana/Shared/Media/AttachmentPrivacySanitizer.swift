@@ -11,7 +11,7 @@ import ImageIO
 import UIKit
 import UniformTypeIdentifiers
 
-nonisolated struct SanitizedAttachmentPayload: Equatable {
+nonisolated struct SanitizedAttachmentPayload: Equatable, Sendable {
     let data: Data
     let filename: String
     let isImage: Bool

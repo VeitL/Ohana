@@ -8,8 +8,9 @@
 import Foundation
 import SwiftData
 
-enum StarterGiftPolicy {
+nonisolated enum StarterGiftPolicy {
     static let giftAmount = 50
+    static let transactionKey = "starterGift:v3:\(CoconutAccountKey.islandReserve)"
 }
 
 nonisolated enum StarterGiftStorageKey {
@@ -32,7 +33,7 @@ enum StarterGiftService {
     enum Result: Equatable, Sendable {
         case alreadyHandled
         case markedExistingUser
-        case pendingFirstPet
+        case waitingForFirstHuman
         case readyToClaim(recipient: Recipient, amount: Int)
         case claimed(recipient: Recipient, amount: Int)
         case persistenceFailed
@@ -41,7 +42,7 @@ enum StarterGiftService {
             switch self {
             case .alreadyHandled, .claimed:
                 true
-            case .markedExistingUser, .pendingFirstPet, .readyToClaim, .persistenceFailed:
+            case .markedExistingUser, .waitingForFirstHuman, .readyToClaim, .persistenceFailed:
                 false
             }
         }
@@ -167,9 +168,12 @@ enum StarterGiftService {
             return .markedExistingUser
         }
 
-        guard firstActivePet(context: context) != nil else {
-            AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_pet", valueMS: 0)
-            return .pendingFirstPet
+        // Human-first is the current contract. A living Pet remains a narrow
+        // recovery path for an unfinished pre-Human legacy journey, but Plants
+        // and mode-specific state never qualify or duplicate this household grant.
+        guard firstActiveHuman(context: context) != nil || firstActivePet(context: context) != nil else {
+            AppPerformanceMonitor.shared.record("starter_gift_waiting_for_first_human", valueMS: 0)
+            return .waitingForFirstHuman
         }
 
         return .readyToClaim(recipient: .island, amount: giftAmount)
@@ -206,12 +210,51 @@ enum StarterGiftService {
         )
     }
 
+    /// Compatibility entry retained for existing Zen callers. Both shells now
+    /// share the exact Human-first eligibility and household transaction.
     @MainActor
-    static func markCeremonySeen(defaults: UserDefaults = .standard) {
+    static func evaluateZenEligibility(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        projectionManager: QuestManager? = nil
+    ) -> Result {
+        evaluateEligibility(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults,
+            wallet: providedWallet,
+            projectionManager: projectionManager
+        )
+    }
+
+    @MainActor
+    static func claimZenStarterGift(
+        context: ModelContext,
+        defaults: UserDefaults = .standard,
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        wallet providedWallet: CoconutWalletManaging? = nil,
+        projectionManager: QuestManager? = nil
+    ) -> Result {
+        claimStarterGift(
+            activeHumanID: nil,
+            context: context,
+            defaults: defaults,
+            careLedger: providedCareLedger,
+            wallet: providedWallet,
+            projectionManager: projectionManager
+        )
+    }
+
+    @MainActor
+    static func markCeremonySeen(
+        defaults: UserDefaults = .standard,
+        requestsOasisTabPrompt: Bool = true
+    ) {
         guard defaults.bool(forKey: StarterGiftStorageKey.claimed) else { return }
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
         defaults.set(false, forKey: StarterGiftStorageKey.ceremonyRequested)
-        defaults.set(true, forKey: StarterGiftStorageKey.oasisTabPromptPending)
+        defaults.set(requestsOasisTabPrompt, forKey: StarterGiftStorageKey.oasisTabPromptPending)
         AppPerformanceMonitor.shared.record("starter_ceremony_seen", valueMS: 0)
     }
 
@@ -225,7 +268,9 @@ enum StarterGiftService {
             return false
         }
         if defaults.bool(forKey: StarterGiftStorageKey.claimed) {
-            return defaults.bool(forKey: StarterGiftStorageKey.ceremonySeen)
+            // The committed household transaction is the unlock fact. The
+            // ceremony remains presentation-only and may finish later.
+            return true
         }
         // Users from before the starter journey have neither flag. Preserve
         // their already-visible Oasis instead of treating them as a new install.
@@ -288,7 +333,7 @@ enum StarterGiftService {
                         careLedgerEventId: ledger.id.uuidString,
                         metadataJSON: "{\"starterGift\":true,\"walletScope\":\"island\"}",
                         occurredAt: occurredAt,
-                        transactionKey: "starterGift:v3:\(CoconutAccountKey.islandReserve)"
+                        transactionKey: StarterGiftPolicy.transactionKey
                     )
                 ],
                 context: context,
@@ -486,14 +531,40 @@ enum StarterGiftService {
     }
 
     @MainActor
+    private static func firstActiveHuman(context: ModelContext) -> Human? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.passedAwayDate == nil
+            },
+            sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return fetchModelsOrLog(descriptor, context: context, operation: "fetch starter gift human").first
+    }
+
+    @MainActor
     private static func hasPersistedStarterGift(context: ModelContext) throws -> Bool {
-        var descriptor = FetchDescriptor<CareLedgerEvent>(
+        var careDescriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.actionType == "starterGift"
             }
         )
-        descriptor.fetchLimit = 1
-        return try !context.fetch(descriptor).isEmpty
+        careDescriptor.fetchLimit = 1
+        if try !context.fetch(careDescriptor).isEmpty {
+            return true
+        }
+
+        // The wallet transaction is the durable economic receipt. A crash or
+        // older recovery path may leave it present while the local defaults or
+        // paired CareLedger projection are missing; never mint a second gift.
+        let transactionKey = StarterGiftPolicy.transactionKey
+        var walletDescriptor = FetchDescriptor<CoconutLedgerEntry>(
+            predicate: #Predicate<CoconutLedgerEntry> { entry in
+                entry.transactionKey == transactionKey
+            }
+        )
+        walletDescriptor.fetchLimit = 1
+        return try !context.fetch(walletDescriptor).isEmpty
     }
 
     @MainActor

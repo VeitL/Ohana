@@ -399,6 +399,17 @@ struct IslandWealthDashboardContentView: View {
         let showsRank = SingleMemberFamilyShapePresentation.showsWealthRank(rowCount: rowCount)
         let isFirst = showsRank && rank == 1
         let isSelected = selectedCoconutActorId == row.entityId
+        let rankForeground: Color = {
+            guard showsRank else { return Color.ohanaPrimaryActionText }
+            switch rank {
+            case 1:
+                return Color.ohanaPrimaryActionText
+            case 2, 3:
+                return Color.arkInk
+            default:
+                return Color.ohanaSecondaryText
+            }
+        }()
         return Button {
             withAnimation(GoMotion.feedback) {
                 selectedCoconutActorId = isSelected ? nil : row.entityId
@@ -416,12 +427,12 @@ struct IslandWealthDashboardContentView: View {
                     if showsRank {
                         Text("\(rank)")
                             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(rank <= 3 ? Color.arkInk : Color.ohanaSecondaryText)
+                            .foregroundStyle(rankForeground)
                     } else {
                         Image(systemName: "checkmark.seal.fill") // a11y: allow decorative account badge; row text carries the accessible meaning
                             .accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 12, weight: .black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(rankForeground)
                     }
                 }
 

@@ -90,6 +90,24 @@ struct HumanRequirementCoordinatorTests {
         #expect(resolution == .ready)
     }
 
+    @Test func firstLivingHumanSkipsPassedAwayMembers() throws {
+        let container = try makeContainer()
+        let passedAway = Human(name: "Remembered")
+        passedAway.createdAt = Date(timeIntervalSince1970: 100)
+        passedAway.passedAwayDate = Date(timeIntervalSince1970: 200)
+        let living = Human(name: "Current")
+        living.createdAt = Date(timeIntervalSince1970: 300)
+        container.mainContext.insert(passedAway)
+        container.mainContext.insert(living)
+        try container.mainContext.save()
+
+        let humanID = HumanRequirementCoordinator.firstLivingHumanID(
+            context: container.mainContext
+        )
+
+        #expect(humanID == living.id)
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)

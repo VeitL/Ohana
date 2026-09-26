@@ -216,9 +216,6 @@ struct VaccinePassportView: View {
                     Text(l.tr(zh: "添加第一针疫苗", en: "Add first vaccine", de: "Erste Impfung hinzufügen"))
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "记录名称、日期和有效期", en: "Name, date, validity", de: "Name, Datum, Gültigkeit"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Image(systemName: "plus").accessibilityHidden(true)
@@ -533,7 +530,7 @@ struct AddVaccineSheet: View {
                             } label: {
                                 Text(suggestion)
                                     .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(vaccineName == suggestion ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .foregroundStyle(vaccineName == suggestion ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 12)
                                     .frame(height: 34)
                                     .background(vaccineName == suggestion ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -581,7 +578,7 @@ struct AddVaccineSheet: View {
                         } label: {
                             Text(hasExpiry ? l.tr(zh: "清除", en: "Clear", de: "Leeren") : l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
                                 .font(OhanaFont.caption(.black))
-                                .foregroundStyle(hasExpiry ? Color.ohanaPrimaryText : Color.arkInk)
+                                .foregroundStyle(hasExpiry ? Color.ohanaPrimaryText : Color.ohanaPrimaryActionText)
                                 .padding(.horizontal, 12)
                                 .frame(height: 32)
                                 .background(hasExpiry ? Color.ohanaCardSurfaceElevated : Color.goPrimary, in: Capsule())
@@ -595,7 +592,7 @@ struct AddVaccineSheet: View {
                             .datePickerStyle(.compact)
                             .tint(Color.goYellow)
                     } else {
-                        Text(l.tr(zh: "可选。没有有效期时只保存接种记录。", en: "Optional. Without an expiry date, only the vaccination record is saved.", de: "Optional. Ohne Ablaufdatum wird nur der Impfeintrag gespeichert."))
+                        Text(l.tr(zh: "未设置有效期", en: "No expiry date", de: "Kein Ablaufdatum"))
                             .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -615,7 +612,7 @@ struct AddVaccineSheet: View {
                     } label: {
                         Image(systemName: enableReminder ? "bell.fill" : "bell.slash.fill")
                             .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(enableReminder ? Color.arkInk : Color.ohanaSecondaryText)
+                            .foregroundStyle(enableReminder ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                             .frame(width: 44, height: 32)
                             .background(enableReminder ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
                     }
@@ -630,7 +627,7 @@ struct AddVaccineSheet: View {
                             } label: {
                                 Text(l.tr(zh: "\(days)天", en: "\(days)d", de: "\(days)T"))
                                     .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(reminderDaysBefore == days ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .foregroundStyle(reminderDaysBefore == days ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 34)
                                     .background(reminderDaysBefore == days ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -665,6 +662,7 @@ struct AddVaccineSheet: View {
                     countryCode: AppCountry.code,
                     maxFractionDigits: 2,
                     accent: Color.goPrimary,
+                    accentForeground: Color.ohanaPrimaryActionText,
                     step: 10,
                     valueFont: .system(size: 18, weight: .black, design: .rounded),
                     valueAlignment: .leading,
@@ -683,7 +681,7 @@ struct AddVaccineSheet: View {
             Button(action: save) {
                 Text(l.tr(zh: "保存疫苗记录", en: "Save Vaccine", de: "Impfung sichern"))
                     .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 52)
                     .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

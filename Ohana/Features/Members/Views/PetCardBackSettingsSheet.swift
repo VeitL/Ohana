@@ -21,6 +21,7 @@ struct PetCardBackSettingsSheet: View {
     @State private var showRainbowAlert = false
     @State private var rainbowDate = Date()
     @State private var showUndoPassingAlert = false
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     @State private var showClearConfirm = false
     @State private var showDeleteConfirm = false
@@ -43,8 +44,21 @@ struct PetCardBackSettingsSheet: View {
                     Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) { dismiss() }
                 }
             }
-            .sheet(isPresented: $showEditPet) { EditPetSheet(pet: pet) }
+            .sheet(isPresented: $showEditPet) {
+                NavigationStack {
+                    PetBasicInfoDetailView(
+                        pet: pet,
+                        startsEditing: true,
+                        onClose: { showEditPet = false }
+                    )
+                }
+                .ohanaSheetPagePresentation()
+            }
             .sheet(isPresented: $showSitterCard) { SitterCardPreviewSheet(pet: pet) }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
+                    .ohanaSheetPagePresentation()
+            }
             .alert(l.tr(zh: "确认标记离世", en: "Confirm Passing", de: "Abschied bestätigen"), isPresented: $showRainbowAlert) {
                 Button(l.tr(zh: "确认", en: "Confirm", de: "Bestätigen"), role: .destructive) {
                     markPetPassedAway()
@@ -91,8 +105,10 @@ struct PetCardBackSettingsSheet: View {
 
     private var petInfoSection: some View {
         Section(l.tr(zh: "宠物信息", en: "Pet Info", de: "Haustierinfos")) {
-            Button { showEditPet = true } label: {
-                Label(l.tr(zh: "编辑资料", en: "Edit Profile", de: "Profil bearbeiten"), systemImage: "pencil.circle.fill")
+            if !pet.hasPassedAway {
+                Button { showEditPet = true } label: {
+                    Label(l.tr(zh: "编辑资料", en: "Edit Profile", de: "Profil bearbeiten"), systemImage: "pencil.circle.fill")
+                }
             }
             Button { showSitterCard = true } label: {
                 Label(l.tr(zh: "寄养卡", en: "Sitter Card", de: "Sitter-Karte"), systemImage: "person.crop.rectangle.fill")
@@ -185,6 +201,11 @@ struct PetCardBackSettingsSheet: View {
                 pet,
                 note: "pet.cardBack.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

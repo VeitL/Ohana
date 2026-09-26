@@ -480,7 +480,8 @@ struct QuickWaterCommandTests {
             amountMl: 120,
             context: context,
             executorId: "human-1",
-            date: now
+            date: now,
+            dependencies: .live()
         )
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
         let careLedger = try context.fetch(FetchDescriptor<CareLedgerEvent>())

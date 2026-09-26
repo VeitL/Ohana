@@ -14,6 +14,8 @@ enum OasisUpgradeRewardService {
     static let maxCritterLevel = 12
     static let maxCritterAppearanceStage = 5
     static let critterXPPerLevel = 300
+    static let maxCritterStarLevel = OasisCompanionCurrency.maxStarLevel
+    static var activeGrowthCommandKeys: Set<String> = []
 
     static let lifecycleDay: TimeInterval = 86400
     static let lifecycleCareTick: TimeInterval = 21600

@@ -71,12 +71,29 @@ extension FamilyTaskService {
         ) else {
             return .rejected
         }
+        let priorUpdatedAt = task.updatedAt
+        let actor = human(id: humanId, context: context)
         DomainMemberFactWriter.mutateFamilyTask(plan: write, task: task, context: context) { task in
             task.completedAt = reminder.completedAt ?? Date()
             task.completedById = humanId
             task.completedByName = humanName(id: humanId, context: context)
             task.status = task.hasReward ? .pendingReview : .completed
             task.touch()
+        }
+        guard FamilyTaskActivityService.stage(
+            kind: task.hasReward ? .submittedForReview : .completed,
+            task: task,
+            actor: actor,
+            recipientHumanID: task.createdById,
+            idempotencyKey: FamilyTaskActivityService.transitionKey(
+                task: task,
+                action: task.hasReward ? "submittedForReview" : "completed",
+                priorUpdatedAt: priorUpdatedAt
+            ),
+            context: context
+        ) else {
+            context.rollback()
+            return .rejected
         }
         return .prepared
     }

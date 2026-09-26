@@ -80,7 +80,7 @@ enum PrivacyService {
     static func lockedMessage(for field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            "体重数据仅本人可见"
+            "身体指标、报告与健康状况仅本人可见"
         case .workout:
             "运动数据仅本人可见"
         case .medication:

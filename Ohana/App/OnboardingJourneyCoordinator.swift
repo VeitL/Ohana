@@ -37,9 +37,18 @@ nonisolated enum StarterGiftHomeProjectionPolicy {
             max(existingExpectation ?? 0, visibleBalanceBeforeRequest + amount)
         case .alreadyHandled:
             existingExpectation ?? visibleBalanceBeforeRequest
-        case .markedExistingUser, .pendingFirstPet, .readyToClaim, .persistenceFailed:
+        case .markedExistingUser, .waitingForFirstHuman, .readyToClaim, .persistenceFailed:
             nil
         }
+    }
+}
+
+nonisolated enum StarterGiftClaimPresentationPolicy {
+    static func isReady(
+        requiredEntityID: UUID?,
+        isRequiredEntitySnapshotReady: Bool
+    ) -> Bool {
+        requiredEntityID == nil || isRequiredEntitySnapshotReady
     }
 }
 
@@ -126,20 +135,22 @@ enum OnboardingJourneyCoordinator {
         if defaults.bool(forKey: StarterGiftStorageKey.pending) {
             // Upgrade recovery: an unfinished legacy journey with a Pet must
             // not be forced to create a Human before claiming its existing gift.
-            if hasActivePet(context: context) {
+            if !hasActiveHuman(context: context), hasActivePet(context: context) {
                 return .starterGiftReady(amount: StarterGiftService.giftAmount)
             }
             guard hasActiveHuman(context: context) else { return .needsHumanName }
 
-            switch initialPetChoice(defaults: defaults) {
-            case .createNow:
-                return .petCreation
-            case .deferred:
-                return .awaitingPet
-            case nil:
-                // Completing onboarding without a Pet is itself a defer action.
-                return hasOnboarded ? .awaitingPet : .petChoice
+            // Standard onboarding still offers the optional Pet decision before
+            // entering Home. It no longer controls gift eligibility.
+            if !hasOnboarded {
+                switch initialPetChoice(defaults: defaults) {
+                case .createNow:
+                    return .petCreation
+                case .deferred, nil:
+                    return .petChoice
+                }
             }
+            return .starterGiftReady(amount: StarterGiftService.giftAmount)
         }
 
         return .complete
@@ -268,6 +279,7 @@ enum OnboardingJourneyCoordinator {
     @MainActor
     static func resetForDebug(defaults: UserDefaults = .standard) {
         StarterGiftService.resetForDebug(defaults: defaults)
+        StarterPetSuggestionPolicy.reset(defaults: defaults)
         defaults.removeObject(forKey: Key.firstHumanID)
         defaults.removeObject(forKey: Key.initialPetChoice)
         defaults.removeObject(forKey: "ohanaStarterFirstCareCompletedV1")

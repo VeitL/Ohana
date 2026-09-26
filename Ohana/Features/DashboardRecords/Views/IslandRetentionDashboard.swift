@@ -16,6 +16,7 @@ struct IslandRetentionDashboardContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var careLedgerEvents: [CareLedgerEvent] = []
     @State private var archiveMetricsByPetId: [UUID: PetRetentionArchiveMetrics] = [:]
@@ -71,7 +72,6 @@ struct IslandRetentionDashboardContentView: View {
                 animateGrowth()
                 scheduleCareLedgerLoad()
             }
-            .onChange(of: selectedPetId) { _, _ in animateGrowth() }
             .onDisappear {
                 ledgerLoadTask?.cancel()
                 ledgerLoadTask = nil
@@ -332,10 +332,10 @@ struct IslandRetentionDashboardContentView: View {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(isSelected ? .black : .white)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(isSelected ? Color.goPrimary : Color.white.opacity(0.12), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            .background(isSelected ? Color.goPrimary : Color.goCardWhite.opacity(0.12), in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -355,8 +355,16 @@ struct IslandRetentionDashboardContentView: View {
     }
 
     private func animateGrowth() {
-        growProgress = 0
-        withAnimation(.spring(response: 0.7, dampingFraction: 0.82)) { // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+        guard growProgress < 1 else { return }
+        guard !reduceMotion else {
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                growProgress = 1
+            }
+            return
+        }
+        withAnimation(GoMotion.stateChange) {
             growProgress = 1
         }
     }

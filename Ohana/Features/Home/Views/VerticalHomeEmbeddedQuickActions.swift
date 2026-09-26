@@ -108,6 +108,45 @@ nonisolated enum VerticalHomeEmbeddedQuickActionHitAreaPolicy {
     }
 }
 
+nonisolated enum VerticalHomeQuickActionSecondaryMenuStyle {
+    static let editActionType = "secondary-menu-edit"
+    static let editSystemName = "square.and.pencil"
+    static let chartActionType = "secondary-menu-chart"
+    static let chartSystemName = "chart.line.uptrend.xyaxis"
+}
+
+private struct VerticalHomeQuickActionCellBoundsPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
+struct VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+nonisolated enum VerticalHomeQuickActionReorderPolicy {
+    /// The existing move command inserts at the target's original index.
+    /// Convert the system's "before" destination to that command's target ID.
+    static func moveTargetID(order: [String], fromID: String, before destinationID: String?) -> String? {
+        guard let fromIndex = order.firstIndex(of: fromID) else { return nil }
+        guard let destinationID else {
+            return order.last == fromID ? nil : order.last
+        }
+        guard let destinationIndex = order.firstIndex(of: destinationID),
+              destinationID != fromID else { return nil }
+        let targetIndex = fromIndex < destinationIndex ? destinationIndex - 1 : destinationIndex
+        let targetID = order[targetIndex]
+        return targetID == fromID ? nil : targetID
+    }
+}
+
 struct VerticalHomeEmbeddedQuickActions: View {
     let title: String
     let items: [VerticalHomeEmbeddedAction]
@@ -176,31 +215,17 @@ struct VerticalHomeEmbeddedQuickActions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
-                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
-                    actionCell(item, index: index)
-                        .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
-                }
-
-                if showsAddLauncher {
-                    addLauncherCell
-                        .transition(.opacity.combined(with: .scale(scale: 0.88, anchor: .center)))
-                        .zIndex(35)
-                }
-            }
-            .animation(GoMotion.selection, value: visibleItemsRevision)
-            .animation(GoMotion.selection, value: availableAddItemsRevision)
-            .onDrop(
-                of: [.plainText, .utf8PlainText],
-                delegate: VerticalHomeEmbeddedActionDropResetDelegate(
-                    isEnabled: isEditMode,
-                    draggingItemId: draggingItemId,
-                    lastDropTargetId: $lastDropTargetId
-                )
-            )
+            actionGrid
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        // Menus float below the dock cell. Give their semantic hit targets
+        // real layout space so the host card's hit-test bounds include them.
+        .padding(.bottom, openMenuHitTestOverflow)
+        .preference(
+            key: VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey.self,
+            value: openMenuHitTestOverflow
+        )
         .overlay(alignment: .bottom) {
             if isEditMode, showingAddPanel {
                 addOptionsPanel
@@ -219,8 +244,16 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .zIndex(120)
             }
         }
+        .overlayPreferenceValue(VerticalHomeQuickActionCellBoundsPreferenceKey.self) { anchors in
+            quickActionMenuOverlay(anchors: anchors)
+        }
         .onChange(of: visibleItemsRevision) { _, _ in
-            openActionId = nil
+            if let openActionId,
+               !visibleItems.contains(where: { item in
+                   item.id == openActionId && shouldOpenMenu(for: item)
+               }) {
+                self.openActionId = nil
+            }
             if visibleItems.count >= maxItems || availableAddItems.isEmpty {
                 showingAddPanel = false
             }
@@ -236,6 +269,88 @@ struct VerticalHomeEmbeddedQuickActions: View {
             }
         }
     }
+
+    @ViewBuilder
+    private var actionGrid: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            actionGridContent
+                .reorderContainer(for: VerticalHomeEmbeddedAction.self, isEnabled: isEditMode) { difference in
+                    applyNativeReorder(difference)
+                }
+        } else {
+            legacyDropGrid
+        }
+        #else
+        legacyDropGrid
+        #endif
+    }
+
+    private var legacyDropGrid: some View {
+        actionGridContent
+            .onDrop(
+                of: [.plainText, .utf8PlainText],
+                delegate: VerticalHomeEmbeddedActionDropResetDelegate(
+                    isEnabled: isEditMode,
+                    draggingItemId: draggingItemId,
+                    lastDropTargetId: $lastDropTargetId
+                )
+            )
+    }
+
+    private var actionGridContent: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
+            #if compiler(>=6.4)
+            if #available(iOS 27.0, *) {
+                ForEach(visibleItems) { item in
+                    let index = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
+                    actionCell(item, index: index)
+                        .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
+                }
+                .reorderable()
+            } else {
+                legacyActionCells
+            }
+            #else
+            legacyActionCells
+            #endif
+
+            if showsAddLauncher {
+                addLauncherCell
+                    .transition(.opacity.combined(with: .scale(scale: 0.88, anchor: .center)))
+                    .zIndex(35)
+            }
+        }
+        .animation(GoMotion.selection, value: visibleItemsRevision)
+        .animation(GoMotion.selection, value: availableAddItemsRevision)
+    }
+
+    private var legacyActionCells: some View {
+        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+            actionCell(item, index: index)
+                .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
+        }
+    }
+
+    #if compiler(>=6.4)
+    @available(iOS 27.0, *)
+    private func applyNativeReorder(
+        _ difference: ReorderDifference<String, ReorderableSingleCollectionIdentifier>
+    ) {
+        guard let fromID = difference.sources.first else { return }
+        let destinationID: String? = switch difference.destination.position {
+        case let .before(id): id
+        case .end: nil
+        }
+        guard let targetID = VerticalHomeQuickActionReorderPolicy.moveTargetID(
+            order: visibleItems.map(\.id),
+            fromID: fromID,
+            before: destinationID
+        ) else { return }
+        OhanaFeedback.light()
+        onMove(fromID, targetID)
+    }
+    #endif
 
     private var header: some View {
         HStack {
@@ -269,8 +384,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
     }
 
+    @ViewBuilder
     private func actionCell(_ item: VerticalHomeEmbeddedAction, index: Int) -> some View {
-        ZStack {
+        let cell = ZStack {
             Button {
                 performActionCellTap(item)
             } label: {
@@ -284,46 +400,54 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             ) // ui-v4: allow invisible quick-action hit surface so the full 72pt cell activates, including label/icon gaps.
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            .allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
             .accessibilityIdentifier("home-quick-action-\(item.actionType)")
             .highPriorityGesture(detailLongPressGesture(for: item))
+            // Apply hit-testing to the composed button, including its long-press
+            // recognizer, so it cannot intercept the overlapping inline menu.
+            .allowsHitTesting(!isEditMode && !hasOpenActionMenu)
 
-            if openActionId == item.id {
-                inlineMenu(item: item, detailAction: item.detailAction, index: index)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity
-                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
-                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
-                            removal: .opacity
-                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
-                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
-                        )
-                    )
-                    .zIndex(80)
+            #if compiler(>=6.4)
+            if isEditMode, #unavailable(iOS 27.0) {
+                editDragLayer(for: item)
             }
-
+            #else
             if isEditMode {
                 editDragLayer(for: item)
             }
+            #endif
         }
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .scaleEffect(isDragging(item) ? 1.035 : 1)
         .opacity(isDragging(item) ? 0.72 : 1)
         .rotationEffect(.degrees(editJiggleAngle(for: item)))
         .animation(editJiggleAnimation, value: jiggle)
         .animation(GoMotion.selection, value: activeDraggingItemId)
-        .animation(motion, value: openActionId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
                 removeButton(for: item)
             }
         }
-        .onDrop(
+        .anchorPreference(key: VerticalHomeQuickActionCellBoundsPreferenceKey.self, value: .bounds) {
+            [item.id: $0]
+        }
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            cell
+        } else {
+            legacyDropCell(cell, targetID: item.id)
+        }
+        #else
+        legacyDropCell(cell, targetID: item.id)
+        #endif
+    }
+
+    private func legacyDropCell(_ content: some View, targetID: String) -> some View {
+        content.onDrop(
             of: [.plainText, .utf8PlainText],
             delegate: VerticalHomeEmbeddedActionDropDelegate(
                 isEnabled: isEditMode,
-                targetId: item.id,
+                targetId: targetID,
                 draggingItemId: draggingItemId,
                 lastDropTargetId: $lastDropTargetId,
                 onMove: onMove
@@ -412,10 +536,12 @@ struct VerticalHomeEmbeddedQuickActions: View {
             if item.menuOptions.isEmpty {
                 if item.showsQuickButton {
                     inlineMenuButton(
-                        actionType: item.actionType,
-                        icon: item.isPrimaryDisabled ? "checkmark" : item.primaryIcon,
-                        tint: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.16) : Color.goPrimary,
-                        foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
+                        actionType: VerticalHomeQuickActionSecondaryMenuStyle.editActionType,
+                        icon: item.isPrimaryDisabled
+                            ? "checkmark"
+                            : VerticalHomeQuickActionSecondaryMenuStyle.editSystemName,
+                        tint: item.isPrimaryDisabled ? Color.ohanaControlFill : Color.goPrimary,
+                        foreground: item.isPrimaryDisabled ? Color.ohanaTertiaryText : Color.arkInk,
                         accessibility: item.quickAccessibilityLabel,
                         accessibilityIdentifier: "home-quick-action-menu-\(item.id)-quick",
                         isDisabled: item.isPrimaryDisabled,
@@ -441,10 +567,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
             if let detailAction {
                 inlineMenuButton(
-                    actionType: "\(item.actionType)-detail",
-                    icon: item.detailIcon,
-                    tint: Color.goCardWhite.opacity(0.16),
-                    foreground: Color.goCardWhite,
+                    actionType: VerticalHomeQuickActionSecondaryMenuStyle.chartActionType,
+                    icon: VerticalHomeQuickActionSecondaryMenuStyle.chartSystemName,
+                    tint: Color.ohanaControlFill,
+                    foreground: Color.ohanaPrimaryText,
                     accessibility: item.detailAccessibilityLabel,
                     accessibilityIdentifier: "home-quick-action-menu-\(item.id)-detail",
                     isDisabled: false,
@@ -453,14 +579,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 )
             }
         }
-        .padding(6)
-        .background(Color.arkInk.opacity(0.34), in: Capsule()) // ui-v4: allow embedded quick action submenu contrast on dark card gradient
+        .modifier(VerticalHomeQuickActionSecondaryMenuSurface())
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .fixedSize()
-        .offset(
-            x: menuOffsetX(index: index, buttonCount: buttonCount),
-            y: menuOffsetY(index: index)
-        )
     }
 
     private func shouldOpenMenu(for item: VerticalHomeEmbeddedAction) -> Bool {
@@ -777,8 +898,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
     }
 
-    private func opensMenuAbove(index: Int) -> Bool {
-        !forcesSubmenusBelow && index >= 4
+    private func opensMenuAbove(index _: Int) -> Bool {
+        // These docks sit along the bottom edge of the Home surface. When a
+        // caller permits upward menus, keep every submenu in the visible area;
+        // otherwise the first row's menu is clipped below the bottom tabs.
+        !forcesSubmenusBelow
     }
 
     private func menuTransitionAnchor(index: Int) -> UnitPoint {
@@ -882,6 +1006,49 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 }
 
+private extension VerticalHomeEmbeddedQuickActions {
+    var openMenuHitTestOverflow: CGFloat {
+        guard let openActionId,
+              let index = visibleItems.firstIndex(where: { $0.id == openActionId }),
+              let item = visibleItems.first(where: { $0.id == openActionId }),
+              shouldOpenMenu(for: item),
+              !opensMenuAbove(index: index) else {
+            return 0
+        }
+        return VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize + 8
+    }
+
+    @ViewBuilder
+    func quickActionMenuOverlay(anchors: [String: Anchor<CGRect>]) -> some View {
+        GeometryReader { proxy in
+            if let openActionId,
+               let index = visibleItems.firstIndex(where: { $0.id == openActionId }),
+               let item = visibleItems.first(where: { $0.id == openActionId }),
+               let anchor = anchors[openActionId],
+               shouldOpenMenu(for: item) {
+                let buttonCount = menuButtonCount(for: item)
+                inlineMenu(item: item, detailAction: item.detailAction, index: index)
+                    .position(
+                        x: proxy[anchor].midX + menuOffsetX(index: index, buttonCount: buttonCount),
+                        y: proxy[anchor].midY + menuOffsetY(index: index)
+                    )
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity
+                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
+                            removal: .opacity
+                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
+                        )
+                    )
+                    .animation(motion, value: openActionId)
+                    .zIndex(120)
+            }
+        }
+    }
+}
+
 private struct VerticalHomeEmbeddedActionDropResetDelegate: DropDelegate {
     let isEnabled: Bool
     let draggingItemId: Binding<String?>?
@@ -903,6 +1070,25 @@ private struct VerticalHomeEmbeddedActionDropResetDelegate: DropDelegate {
 
     func dropExited(info _: DropInfo) {
         lastDropTargetId = nil
+    }
+}
+
+private struct VerticalHomeQuickActionSecondaryMenuSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let surface = content.padding(6)
+        if #available(iOS 26.0, *), !reduceTransparency {
+            surface
+                .glassEffect(.regular, in: Capsule())
+        } else {
+            surface
+                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                }
+        }
     }
 }
 

@@ -38,6 +38,10 @@ struct PetHygieneDetailContentView: View {
         Color(hex: pet.safeThemeColorHex)
     }
 
+    private var themeActionForeground: Color {
+        OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText
+    }
+
     private var isDark: Bool { colorScheme == .dark }
     private var chromeAccent: Color { isDark ? Color.goPrimary : Color.goBlue }
     private var l: L10n { L10n(appLanguage) }
@@ -225,7 +229,8 @@ struct PetHygieneDetailContentView: View {
             PetHygieneActionHumanConfirmationSheet(
                 draft: draft,
                 humans: actionHumanOptions,
-                tint: themeColor
+                tint: themeColor,
+                tintForeground: themeActionForeground
             ) { executorID in
                 commitHygiene(draft.type, executorID: executorID)
             }
@@ -304,10 +309,12 @@ struct PetHygieneDetailContentView: View {
                     Text(headline)
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(attentionTypes.isEmpty ? l.tr(zh: "继续保持，下一次护理会自动提醒。", en: "Keep going. The next care item will remind you.", de: "Weiter so. Die nächste Pflege erinnert dich.") : attentionTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(attentionTypes.isEmpty ? .secondary : attentionTint.opacity(0.9))
-                        .lineLimit(2)
+                    if !attentionTypes.isEmpty {
+                        Text(attentionTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(attentionTint.opacity(0.9))
+                            .lineLimit(2)
+                    }
                 }
                 Spacer(minLength: 0)
             }
@@ -414,7 +421,7 @@ struct PetHygieneDetailContentView: View {
                     } else {
                         Text(l.tr(zh: "打卡", en: "Log", de: "Erfassen"))
                             .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goCardWhite)
+                            .foregroundStyle(themeActionForeground)
                             .padding(.horizontal, 10).padding(.vertical, 5)
                             .background(themeColor, in: Capsule())
                     }
@@ -529,9 +536,9 @@ struct PetHygieneDetailContentView: View {
     private func requestHygieneRecord(_ type: HygieneType, doneToday: Bool) {
         guard !doneToday else {
             singleUseNoticeMessage = l.tr(
-                zh: "\(pet.name) 今天已经记录过\(type.localizedLabel(l))了，这类护理一天记录一次就够了。",
-                en: "\(pet.name) already has \(type.localizedLabel(l)) logged today. Once per day is enough for this care type.",
-                de: "\(type.localizedLabel(l)) wurde für \(pet.name) heute schon erfasst. Einmal pro Tag reicht."
+                zh: "\(pet.name) 今天已记录\(type.localizedLabel(l))。",
+                en: "\(type.localizedLabel(l)) is already logged for \(pet.name) today.",
+                de: "\(type.localizedLabel(l)) ist heute bereits für \(pet.name) erfasst."
             )
             showSingleUseNotice = true
             UINotificationFeedbackGenerator().notificationOccurred(.warning)

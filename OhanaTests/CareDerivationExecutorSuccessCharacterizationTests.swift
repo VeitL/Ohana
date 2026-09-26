@@ -111,7 +111,10 @@ struct CareDerivationExecutorSuccessCharacterizationTests {
             pets: [pet],
             context: context,
             executorId: human.id.uuidString,
-            now: fixedDate(hour: 18)
+            now: fixedDate(hour: 18),
+            options: CalendarEventCompletionOptions(
+                economy: CareEventServiceDependencies.liveEconomy()
+            )
         )
 
         #expect(result.didChange)

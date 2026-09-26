@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MANIFEST="${OHANA_UI_TEST_SHARD_MANIFEST:-${SCRIPT_DIR}/ui-test-shards.tsv}"
 UI_TEST_ROOT="${REPO_ROOT}/OhanaUITests"
+SELECTOR_ENTRYPOINTS="${OHANA_UI_TEST_SELECTOR_ENTRYPOINTS:-${SCRIPT_DIR}/test-ui-release-smoke.sh}"
 
 if [[ ! -f "${MANIFEST}" ]]; then
   echo "UI test shard audit failed: manifest not found: ${MANIFEST}" >&2
@@ -20,8 +21,10 @@ trap cleanup EXIT
 SOURCE_SELECTORS="${TEMP_DIR}/source-selectors.txt"
 MANIFEST_SELECTORS="${TEMP_DIR}/manifest-selectors.txt"
 MANIFEST_SHARDS="${TEMP_DIR}/manifest-shards.txt"
+ENTRYPOINT_SELECTORS="${TEMP_DIR}/entrypoint-selectors.txt"
 : > "${MANIFEST_SELECTORS}"
 : > "${MANIFEST_SHARDS}"
+: > "${ENTRYPOINT_SELECTORS}"
 
 syntax_failed=0
 line_number=0
@@ -65,6 +68,19 @@ perl -ne '
   }
 ' "${UI_TEST_ROOT}"/*.swift > "${SOURCE_SELECTORS}"
 
+IFS=':' read -r -a selector_entrypoint_files <<< "${SELECTOR_ENTRYPOINTS}"
+for selector_entrypoint in "${selector_entrypoint_files[@]}"; do
+  if [[ ! -f "${selector_entrypoint}" ]]; then
+    echo "UI test shard audit failed: selector entrypoint not found: ${selector_entrypoint}" >&2
+    exit 2
+  fi
+  perl -ne '
+    while (m{(OhanaUITests/[A-Za-z_][A-Za-z0-9_]*/test[A-Za-z0-9_]+)}g) {
+      print "$1\n";
+    }
+  ' "${selector_entrypoint}" >> "${ENTRYPOINT_SELECTORS}"
+done
+
 if [[ ! -s "${SOURCE_SELECTORS}" ]]; then
   echo "UI test shard audit failed: no XCTest UI test methods were discovered." >&2
   exit 1
@@ -73,13 +89,19 @@ if [[ ! -s "${MANIFEST_SELECTORS}" ]]; then
   echo "UI test shard audit failed: the manifest contains no selectors." >&2
   exit 1
 fi
+if [[ ! -s "${ENTRYPOINT_SELECTORS}" ]]; then
+  echo "UI test shard audit failed: selector entrypoints contain no UI test selectors." >&2
+  exit 1
+fi
 
 sort "${SOURCE_SELECTORS}" -o "${SOURCE_SELECTORS}"
 sort "${MANIFEST_SELECTORS}" -o "${MANIFEST_SELECTORS}"
+sort -u "${ENTRYPOINT_SELECTORS}" -o "${ENTRYPOINT_SELECTORS}"
 
 duplicate_selectors="$(uniq -d "${MANIFEST_SELECTORS}")"
 missing_selectors="$(comm -23 "${SOURCE_SELECTORS}" "${MANIFEST_SELECTORS}")"
 stale_selectors="$(comm -13 "${SOURCE_SELECTORS}" "${MANIFEST_SELECTORS}")"
+stale_entrypoint_selectors="$(comm -23 "${ENTRYPOINT_SELECTORS}" "${SOURCE_SELECTORS}")"
 
 failed=0
 if [[ -n "${duplicate_selectors}" ]]; then
@@ -95,6 +117,11 @@ fi
 if [[ -n "${stale_selectors}" ]]; then
   echo "UI test shard audit failed: manifest selectors not found in source:" >&2
   printf '%s\n' "${stale_selectors}" | sed 's/^/  - /' >&2
+  failed=1
+fi
+if [[ -n "${stale_entrypoint_selectors}" ]]; then
+  echo "UI test shard audit failed: entrypoint selectors not found in source:" >&2
+  printf '%s\n' "${stale_entrypoint_selectors}" | sed 's/^/  - /' >&2
   failed=1
 fi
 if [[ "${failed}" != "0" ]]; then

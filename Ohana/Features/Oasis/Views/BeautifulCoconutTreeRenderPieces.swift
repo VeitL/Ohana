@@ -90,6 +90,391 @@ struct LeafShape: Shape {
     }
 }
 
+/// Keeps the native refraction passes for a mature crown in one compositor
+/// group. The illustration still falls back to the same tinted leaf artwork
+/// when visual effects or Reduce Transparency disable Liquid Glass.
+struct OasisLeafGlassContainer<Content: View>: View {
+    let isEnabled: Bool
+    private let content: Content
+
+    init(isEnabled: Bool, @ViewBuilder content: () -> Content) {
+        self.isEnabled = isEnabled
+        self.content = content()
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if #available(iOS 26.0, *), isEnabled {
+            GlassEffectContainer(spacing: 10) {
+                content
+            }
+        } else {
+            content
+        }
+    }
+}
+
+/// The original curved palm leaf with a restrained native Liquid Glass lens.
+/// The glass layer is decorative, so it never competes with the stage CTA.
+struct OasisPalmLeaf: View {
+    let tint: Color
+    let width: CGFloat
+    let height: CGFloat
+    var isBackLayer = false
+    var usesLiquidGlass = true
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    var body: some View {
+        if #available(iOS 26.0, *), usesLiquidGlass, !reduceTransparency {
+            leafArtwork
+                .shadow(color: Color.white.opacity(isBackLayer ? 0.06 : 0.16), radius: 3, x: -1, y: -1) // ui-v4: allow leaf specular edge
+                .glassEffect(
+                    .regular
+                        .tint(tint.opacity(isBackLayer ? 0.14 : 0.24))
+                        .interactive(false),
+                    in: LeafShape()
+                )
+        } else {
+            leafArtwork
+        }
+    }
+
+    private var leafArtwork: some View {
+        LeafShape()
+            .fill(
+                LinearGradient(
+                    colors: [
+                        tint.opacity(isBackLayer ? 0.62 : 0.96),
+                        tint.opacity(isBackLayer ? 0.42 : 0.76)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .overlay {
+                LeafShape()
+                    .stroke(
+                        Color.white.opacity(isBackLayer ? 0.05 : 0.14), // ui-v4: allow leaf illustration specular edge
+                        lineWidth: isBackLayer ? 0.6 : 0.9
+                    )
+            }
+            .frame(width: width, height: height)
+            .accessibilityHidden(true)
+    }
+}
+
+enum OasisTreeWindPhase: CaseIterable {
+    case resting
+    case catchesWind
+    case rebounds
+    case settles
+
+    var angle: Double {
+        switch self {
+        case .resting: 0
+        case .catchesWind: 3.8
+        case .rebounds: -2.1
+        case .settles: 0
+        }
+    }
+
+    var xOffset: CGFloat {
+        switch self {
+        case .resting: 0
+        case .catchesWind: 4
+        case .rebounds: -2
+        case .settles: 0
+        }
+    }
+
+    var animation: Animation {
+        switch self {
+        case .resting: GoMotion.quick
+        case .catchesWind: GoMotion.heroExpand
+        case .rebounds: GoMotion.page
+        case .settles: GoMotion.heroCollapse
+        }
+    }
+}
+
+enum OasisTreeChargePhase: CaseIterable {
+    case resting
+    case gathers
+    case surges
+    case settles
+
+    var scale: CGFloat {
+        switch self {
+        case .resting: 1
+        case .gathers: 0.985
+        case .surges: 1.052
+        case .settles: 1
+        }
+    }
+
+    var yOffset: CGFloat {
+        switch self {
+        case .resting: 0
+        case .gathers: 2
+        case .surges: -5
+        case .settles: 0
+        }
+    }
+
+    var brightness: Double {
+        switch self {
+        case .resting: 0
+        case .gathers: 0.05
+        case .surges: 0.22
+        case .settles: 0
+        }
+    }
+
+    var glowOpacity: Double {
+        switch self {
+        case .resting: 0
+        case .gathers: 0.22
+        case .surges: 0.58
+        case .settles: 0
+        }
+    }
+
+    var animation: Animation {
+        switch self {
+        case .resting: GoMotion.quick
+        case .gathers: GoMotion.quick
+        case .surges: GoMotion.zenCardColorReveal
+        case .settles: GoMotion.stateChange
+        }
+    }
+}
+
+private enum OasisEnergyPulsePhase: CaseIterable {
+    case resting
+    case gathers
+    case travels
+    case settles
+
+    var flarePosition: CGFloat {
+        switch self {
+        case .resting, .gathers: 0.04
+        case .travels: 0.92
+        case .settles: 1
+        }
+    }
+
+    var flareOpacity: Double {
+        switch self {
+        case .resting: 0
+        case .gathers: 0.76
+        case .travels: 1
+        case .settles: 0
+        }
+    }
+
+    var glowOpacity: Double {
+        switch self {
+        case .resting: 0.12
+        case .gathers: 0.52
+        case .travels: 0.82
+        case .settles: 0.18
+        }
+    }
+
+    var animation: Animation {
+        switch self {
+        case .resting: GoMotion.quick
+        case .gathers: GoMotion.quick
+        case .travels: GoMotion.zenCardColorReveal
+        case .settles: GoMotion.stateChange
+        }
+    }
+}
+
+/// Shared by the live and snapshot-only Oasis stages so energy gain reads as
+/// one clear, smooth event instead of a tiny width jump.
+struct OasisEnergyProgressBar: View {
+    let progress: Double
+    let pulseToken: Int
+    let allowsMotion: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var safeProgress: CGFloat {
+        CGFloat(min(max(progress.isFinite ? progress : 0, 0), 1))
+    }
+
+    @ViewBuilder
+    var body: some View {
+        if allowsMotion, !reduceMotion {
+            rail(phase: .resting)
+                .phaseAnimator(OasisEnergyPulsePhase.allCases, trigger: pulseToken) { _, phase in
+                    rail(phase: phase)
+                } animation: { phase in
+                    phase.animation
+                }
+        } else {
+            rail(phase: .resting)
+                .animation(GoMotion.reduced, value: safeProgress)
+        }
+    }
+
+    private func rail(phase: OasisEnergyPulsePhase) -> some View {
+        GeometryReader { proxy in
+            let trackWidth = max(0, proxy.size.width)
+            let rawFillWidth = trackWidth * safeProgress
+            let fillWidth = safeProgress > 0 ? min(trackWidth, max(12, rawFillWidth)) : 0
+            let flareTravel = max(0, fillWidth - 18)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.ohanaControlFill.opacity(colorScheme == .dark ? 0.92 : 0.72))
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(Color.ohanaGlassStroke.opacity(0.26), lineWidth: 0.7)
+                    }
+
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.goPrimary, Color.goTeal, Color(hex: "5EEAD4")],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: fillWidth)
+                    .overlay(alignment: .top) {
+                        Capsule()
+                            .fill(Color.white.opacity(colorScheme == .dark ? 0.38 : 0.52)) // ui-v4: allow energy rail specular highlight
+                            .frame(height: 3)
+                            .padding(.horizontal, 3)
+                            .padding(.top, 1.5)
+                    }
+                    .shadow( // ui-v4: allow finite, interaction-triggered Oasis energy glow
+                        color: Color.goTeal.opacity(phase.glowOpacity),
+                        radius: phase == .travels ? 9 : 5,
+                        x: 0,
+                        y: 0
+                    )
+                    .animation(GoMotion.heroExpand, value: safeProgress)
+
+                Circle()
+                    .fill(Color.white) // ui-v4: allow transient energy flare core
+                    .frame(width: 18, height: 18) // a11y: allow decorative transient energy flare
+                    .blur(radius: 2.2)
+                    .blendMode(.screen)
+                    .offset(x: flareTravel * phase.flarePosition)
+                    .opacity(fillWidth > 0 ? phase.flareOpacity : 0)
+            }
+            .clipShape(Capsule())
+        }
+        .frame(height: 12)
+        .accessibilityHidden(true)
+    }
+}
+
+private enum OasisEnergySurgePhase: CaseIterable {
+    case resting
+    case gathers
+    case rises
+    case dissolves
+
+    var height: CGFloat {
+        switch self {
+        case .resting: 34
+        case .gathers: 72
+        case .rises: 206
+        case .dissolves: 242
+        }
+    }
+
+    var width: CGFloat {
+        switch self {
+        case .resting: 3
+        case .gathers: 8
+        case .rises: 12
+        case .dissolves: 5
+        }
+    }
+
+    var opacity: Double {
+        switch self {
+        case .resting: 0
+        case .gathers: 0.68
+        case .rises: 0.96
+        case .dissolves: 0
+        }
+    }
+
+    var yOffset: CGFloat {
+        switch self {
+        case .resting: -20
+        case .gathers: -34
+        case .rises: -112
+        case .dissolves: -152
+        }
+    }
+
+    var animation: Animation {
+        switch self {
+        case .resting: GoMotion.quick
+        case .gathers: GoMotion.quick
+        case .rises: GoMotion.zenCardColorReveal
+        case .dissolves: GoMotion.stateChange
+        }
+    }
+}
+
+struct OasisTreeEnergySurgeView: View {
+    let pulseToken: Int
+    let color: Color
+    let allowsMotion: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @ViewBuilder
+    var body: some View {
+        if allowsMotion, !reduceMotion {
+            surge(phase: .resting)
+                .phaseAnimator(OasisEnergySurgePhase.allCases, trigger: pulseToken) { _, phase in
+                    surge(phase: phase)
+                } animation: { phase in
+                    phase.animation
+                }
+        }
+    }
+
+    private func surge(phase: OasisEnergySurgePhase) -> some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 0)
+            ZStack(alignment: .bottom) {
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [color.opacity(0), color.opacity(0.94), Color.goTeal.opacity(0.24)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                    .frame(width: phase.width, height: phase.height)
+                    .blur(radius: phase == .rises ? 4 : 7)
+
+                Circle()
+                    .fill(Color.white.opacity(0.92)) // ui-v4: allow transient energy beam core
+                    .frame(width: 18, height: 18) // a11y: allow decorative transient energy flare
+                    .blur(radius: 3)
+                    .offset(y: -max(0, phase.height - 18))
+            }
+            .opacity(phase.opacity)
+            .offset(y: phase.yOffset)
+        }
+        .blendMode(.screen)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct CoconutView: View {
     var isMax: Bool
 
@@ -295,6 +680,102 @@ struct StardustView: View {
         .onChange(of: allowsAmbientMotion) { _, shouldAnimate in
             animate = shouldAnimate
         }
+    }
+}
+
+/// Ground plane shared by the frozen and live Oasis tree stages. Keeping the
+/// island in the same local scene as the tree prevents the young tree from
+/// appearing to float above an unrelated decorative ellipse.
+struct OasisTreeIslandBase: View {
+    let level: Int
+    let progress: Double
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var safeLevel: Int { min(max(level, 0), 10) }
+    private var safeProgress: CGFloat { CGFloat(min(max(progress, 0), 1)) }
+    private var islandWidth: CGFloat {
+        min(262, 164 + CGFloat(safeLevel) * 8 + safeProgress * 10)
+    }
+    private var islandHeight: CGFloat {
+        min(58, 42 + CGFloat(safeLevel) * 1.4)
+    }
+    private var grassOpacity: Double {
+        safeLevel == 0 ? 0.24 : min(0.94, 0.54 + Double(safeLevel) * 0.045)
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Ellipse()
+                .fill(Color.arkInk.opacity(colorScheme == .light ? 0.12 : 0.34))
+                .frame(width: islandWidth * 0.86, height: islandHeight * 0.42)
+                .blur(radius: 5)
+                .offset(y: 8)
+
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: colorScheme == .light
+                            ? [Color(hex: "C99B62"), Color(hex: "9A6740"), Color(hex: "74472F")]
+                            : [Color(hex: "A96835"), Color(hex: "704226"), Color(hex: "42291D")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: islandWidth, height: islandHeight)
+
+            Ellipse()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.goPrimary.opacity(grassOpacity), Color.goTeal.opacity(grassOpacity * 0.72)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .frame(width: islandWidth * 0.91, height: islandHeight * 0.42)
+                .offset(y: -islandHeight * 0.25)
+
+            Ellipse()
+                .fill(Color(hex: "24150F").opacity(colorScheme == .light ? 0.26 : 0.58))
+                .frame(width: max(54, islandWidth * 0.30), height: 10)
+                .offset(y: -islandHeight * 0.27)
+
+            if safeLevel >= 3 {
+                HStack(spacing: max(22, islandWidth * 0.18)) {
+                    OasisIslandGrassTuft(tint: Color.goTeal, mirrors: false)
+                    OasisIslandGrassTuft(tint: Color.goPrimary, mirrors: true)
+                }
+                .offset(y: -islandHeight * 0.40)
+                .transition(.scale.combined(with: .opacity))
+            }
+        }
+        .frame(width: 280, height: 68, alignment: .bottom)
+        .animation(GoMotion.hero, value: safeLevel)
+        .animation(GoMotion.page, value: safeProgress)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+private struct OasisIslandGrassTuft: View {
+    let tint: Color
+    let mirrors: Bool
+
+    var body: some View {
+        HStack(spacing: -5) {
+            Capsule()
+                .fill(tint.opacity(0.86))
+                .frame(width: 6, height: 20) // a11y: allow decorative island grass; non-interactive and hidden with its parent illustration
+                .rotationEffect(.degrees(-28))
+            Capsule()
+                .fill(tint)
+                .frame(width: 7, height: 25) // a11y: allow decorative island grass; non-interactive and hidden with its parent illustration
+            Capsule()
+                .fill(tint.opacity(0.72))
+                .frame(width: 6, height: 18) // a11y: allow decorative island grass; non-interactive and hidden with its parent illustration
+                .rotationEffect(.degrees(30))
+        }
+        .scaleEffect(x: mirrors ? -1 : 1, y: 1)
     }
 }
 

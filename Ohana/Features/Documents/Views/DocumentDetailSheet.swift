@@ -279,7 +279,7 @@ struct DocumentDetailSheet: View {
             } label: {
                 Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
                     .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     .background(Color.goPrimary, in: Capsule())

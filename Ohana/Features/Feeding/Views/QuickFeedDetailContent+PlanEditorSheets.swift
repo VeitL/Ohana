@@ -4,7 +4,7 @@ import UIKit
 extension QuickFeedDetailContent {
     func planEditorSheet(_ kind: FeedRuleKind) -> some View {
         let tint = kind == .manualReminder ? Color.goPurple : Color.goTeal
-        let hasExistingPlan = !FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents).isEmpty
+        let hasExistingPlan = !currentPlanRuleSnapshots(kind).isEmpty
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -16,8 +16,8 @@ extension QuickFeedDetailContent {
                 compactNotice(
                     icon: kind.iconName,
                     text: kind == .manualReminder
-                        ? l.tr(zh: "到点提醒你确认打卡；每餐可单独设置干粮/湿粮和克数。", en: "Reminds you to confirm meals. Each meal can set food type and grams.", de: "Erinnert dich. Jede Mahlzeit hat Sorte und Gramm.")
-                        : l.tr(zh: "不提醒、不等待确认；App 打开或进入本页时会自动补记并扣余粮。", en: "No reminder or confirmation. The app backfills due meals and deducts stock.", de: "Keine Erinnerung. Fällige Mahlzeiten werden automatisch eingetragen."),
+                        ? l.tr(zh: "到点提醒，手动确认", en: "Reminder, then manual confirmation", de: "Erinnerung, dann manuell bestätigen")
+                        : l.tr(zh: "自动补记并扣余粮", en: "Auto-log and deduct stock", de: "Automatisch erfassen und Vorrat abziehen"),
                     tint: tint
                 )
                 if sameSpeciesFeedPets.count > 1 {

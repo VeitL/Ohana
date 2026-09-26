@@ -365,11 +365,13 @@ struct PetHygieneCommandExecutor {
     let revisions: DomainRevisionPublishing
     private let derivations: CareDerivationExecutor
     let reminderScheduling: ReminderSchedulingManaging
+    let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(),
+            personalAccessLevel: .personal,
             reminderScheduling: ReminderSchedulingManager()
         )
     }
@@ -378,6 +380,7 @@ struct PetHygieneCommandExecutor {
         self.init(
             context: context,
             revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            personalAccessLevel: .personal,
             reminderScheduling: ReminderSchedulingManager()
         )
     }
@@ -386,6 +389,7 @@ struct PetHygieneCommandExecutor {
         self.init(
             context: context,
             revisions: services.domainRevisions,
+            personalAccessLevel: services.commerce.hasPersonalEntitlement ? .personal : .free,
             reminderScheduling: services.reminderScheduling
         )
     }
@@ -393,11 +397,13 @@ struct PetHygieneCommandExecutor {
     init(
         context: ModelContext,
         revisions: DomainRevisionPublishing,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         reminderScheduling: ReminderSchedulingManaging
     ) {
         self.context = context
         self.revisions = revisions
         self.derivations = CareDerivationExecutor(revisions: revisions)
+        self.personalAccessLevel = personalAccessLevel
         self.reminderScheduling = reminderScheduling
     }
 
@@ -468,6 +474,28 @@ struct PetHygieneCommandExecutor {
             revisions.publishPetHygienePlan(result, note: note)
         }
         return result
+    }
+
+    @discardableResult
+    func createPlanEnforcingPersonalAccess(
+        pet: Pet,
+        type: HygieneType,
+        input: PetHygienePlanCommandInput,
+        scheduleNotification: Bool = true,
+        note: String
+    ) throws -> PetHygienePlanCommandResult {
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            addingActivePlanCount: 1
+        )
+        return createPlan(
+            pet: pet,
+            type: type,
+            input: input,
+            scheduleNotification: scheduleNotification,
+            note: note
+        )
     }
 
     private func deriveRecord(_ result: PetHygieneCheckInCommandResult, note: String) {

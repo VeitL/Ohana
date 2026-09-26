@@ -48,16 +48,6 @@ extension PlantDashboardView {
                 .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
 
-            Text(l.tr(
-                zh: "添加你的第一棵植物，开始记录浇水和施肥",
-                en: "Add your first plant and start tracking watering and fertilizing",
-                de: "Füge deine erste Pflanze hinzu und tracke Gießen und Düngen"
-            ))
-            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .multilineTextAlignment(.center)
-            .padding(.horizontal, 40)
-
             Button {
                 showingAddPlant = true
             } label: {
@@ -67,7 +57,7 @@ extension PlantDashboardView {
                     Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
                         .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 28)
                 .padding(.vertical, 14)
                 .background(Color.goPrimary, in: Capsule())
@@ -94,7 +84,7 @@ extension PlantDashboardView {
                 } label: {
                     Text(l.tr(zh: "全部浇水", en: "Water all", de: "Alle gießen"))
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
                         .background(Color.goPrimary, in: Capsule())
@@ -138,7 +128,7 @@ extension PlantDashboardView {
             } label: {
                 Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 12, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(Color.goTeal, in: Circle())
                     .accessibilityHidden(true)
@@ -159,19 +149,11 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(isSearchingPlants
-                        ? l.tr(zh: "没有匹配的植物", en: "No matching plants", de: "Keine passenden Pflanzen")
-                        : l.tr(zh: "当前筛选没有植物", en: "No plants in this filter", de: "Keine Pflanzen in diesem Filter"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(isSearchingPlants
-                        ? l.tr(zh: "换个名字、品种或房间试试", en: "Try another name, species, or room", de: "Anderen Namen, Art oder Raum versuchen")
-                        : l.tr(zh: "清空筛选即可回到完整植物列表", en: "Clear filters to return to the full plant list", de: "Filter leeren, um alle Pflanzen zu sehen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
-                }
+                Text(isSearchingPlants
+                    ? l.tr(zh: "没有匹配的植物", en: "No matching plants", de: "Keine passenden Pflanzen")
+                    : l.tr(zh: "当前筛选没有植物", en: "No plants in this filter", de: "Keine Pflanzen in diesem Filter"))
+                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(Color.ohanaPrimaryText)
             }
 
             Button {
@@ -179,7 +161,7 @@ extension PlantDashboardView {
             } label: {
                 Text(l.tr(zh: "显示全部植物", en: "Show all plants", de: "Alle Pflanzen anzeigen"))
                     .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)
                     .background(Color.goPrimary, in: Capsule())

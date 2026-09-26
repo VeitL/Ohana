@@ -157,19 +157,27 @@ extension HumanDetailView {
     }
 
     // MARK: - Actions
-    func deleteHumanAndReturnHome() {
+    func deleteHumanAndReturnHome(
+        completion: @escaping (HumanDeletionPresentationOutcome) -> Void
+    ) {
+        guard !isDeleting else {
+            completion(.failed(message: HumanDeletionPresentationCopy.failureMessage(l: l)))
+            return
+        }
+        isDeleting = true
         let activeHumanID = activeHumanIdStr
         let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
-        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
+        OhanaFeedback.medium()
+        commandQueue.enqueue(command) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
                 human,
                 activeHumanID: activeHumanID,
                 note: "human.detail.delete"
             )
             guard result.didPersist else {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                isDeleting = false
+                OhanaFeedback.error()
+                completion(.failed(message: HumanDeletionPresentationCopy.failureMessage(for: result, l: l)))
                 return
             }
             if case .pending = result.attachmentCleanup {
@@ -188,6 +196,12 @@ extension HumanDetailView {
                     requiresAccountSwitch: result.requiresAccountSwitch
                 )
             )
+            isDeleting = false
+            OhanaFeedback.success()
+            completion(.deleted)
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+                dismiss()
+            }
         }
     }
 
@@ -220,6 +234,11 @@ extension HumanDetailView {
                 human,
                 note: "human.detail.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

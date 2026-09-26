@@ -401,6 +401,125 @@ struct ReminderActionCoordinatorTests {
         #expect(medicationReminders.scheduledPetIDs == [pet.id])
     }
 
+    @Test func replayedPetMedicationNotificationDoesNotRepeatFactsOrEffects() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let revisions = SharedDomainRevisionPublisher(center: ReadModelRevisionCenter())
+        let medicationReminders = FakeMedicationReminderManager()
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: revisions)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "狗")
+        let scheduledAt = Date(timeIntervalSince1970: floor(Date().addingTimeInterval(-60).timeIntervalSince1970))
+        let medication = PetMedication(
+            name: "Apoquel",
+            frequency: .daily,
+            startDate: scheduledAt.addingTimeInterval(-86400),
+            remainingAmount: 3,
+            pet: pet
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(medication)
+        try context.save()
+        let payload: [AnyHashable: Any] = [
+            "action": "COMPLETE",
+            "medicationId": medication.id.uuidString,
+            "petId": pet.id.uuidString,
+            "scheduledAt": scheduledAt.timeIntervalSince1970,
+            "doseIndex": 0
+        ]
+
+        let first = ReminderActionCoordinator.handle(
+            userInfo: payload,
+            currentActiveHumanId: human.id.uuidString,
+            context: context,
+            questManager: questManager,
+            medicationReminders: medicationReminders,
+            domainRevisions: revisions
+        )
+        let firstEvents = try context.fetch(FetchDescriptor<Event>()).filter {
+            $0.eventType == EventType.petMedicationDose.rawValue
+        }
+        let firstLedgerCount = try context.fetch(FetchDescriptor<CareLedgerEvent>()).count
+        let firstRewardCount = try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).count
+        let reopenedContext = ModelContext(container)
+        let replay = ReminderActionCoordinator.handle(
+            userInfo: payload,
+            currentActiveHumanId: human.id.uuidString,
+            context: reopenedContext,
+            questManager: questManager,
+            medicationReminders: medicationReminders,
+            domainRevisions: revisions
+        )
+
+        #expect(first == .completed)
+        #expect(replay == .skipped)
+        #expect(firstEvents.count == 1)
+        #expect(firstEvents.first?.startDate == scheduledAt)
+        #expect(try reopenedContext.fetch(FetchDescriptor<Event>()).count(where: {
+            $0.eventType == EventType.petMedicationDose.rawValue
+        }) == 1)
+        #expect(try reopenedContext.fetch(FetchDescriptor<CareLedgerEvent>()).count == firstLedgerCount)
+        #expect(try reopenedContext.fetch(FetchDescriptor<CoconutLedgerEntry>()).count == firstRewardCount)
+        #expect(medication.remainingAmount == 2)
+        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
+    }
+
+    @Test func manualDoseAlreadyFulfillsSingleDailyNotificationOccurrence() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let revisions = SharedDomainRevisionPublisher(center: ReadModelRevisionCenter())
+        let medicationReminders = FakeMedicationReminderManager()
+        let questManager = QuestManager(wallet: SwiftDataCoconutWalletManager(), revisions: revisions)
+        let human = Human(name: "Guan")
+        let pet = Pet(name: "Momo", species: "狗")
+        let medication = PetMedication(
+            name: "Apoquel",
+            frequency: .daily,
+            startDate: Date().addingTimeInterval(-86400),
+            remainingAmount: 3,
+            pet: pet
+        )
+        context.insert(human)
+        context.insert(pet)
+        context.insert(medication)
+        try context.save()
+        let manual = PetMedicationCommandExecutor(
+            context: context,
+            revisions: revisions,
+            questManager: questManager,
+            medicationReminders: medicationReminders
+        ).recordDose(
+            medication: medication,
+            pet: pet,
+            awardCoconut: false,
+            executorId: human.id.uuidString,
+            note: "test.manual"
+        )
+        let notification = ReminderActionCoordinator.handle(
+            userInfo: [
+                "action": "COMPLETE",
+                "medicationId": medication.id.uuidString,
+                "petId": pet.id.uuidString,
+                "scheduledAt": Date().addingTimeInterval(-60).timeIntervalSince1970,
+                "doseIndex": 0
+            ],
+            currentActiveHumanId: human.id.uuidString,
+            context: context,
+            questManager: questManager,
+            medicationReminders: medicationReminders,
+            domainRevisions: revisions
+        )
+
+        #expect(manual.didRecord)
+        #expect(notification == .skipped)
+        #expect(medication.remainingAmount == 2)
+        #expect(try context.fetch(FetchDescriptor<Event>()).count(where: {
+            $0.eventType == EventType.petMedicationDose.rawValue
+        }) == 1)
+        #expect(medicationReminders.recordedMedicationIDs == [medication.id])
+    }
+
     private func makeContainer() throws -> ModelContainer {
         let schema = Schema(ArkSchemaV64.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
@@ -433,6 +552,13 @@ private final class FakeMedicationReminderManager: MedicationReminderManaging {
     }
 
     func scheduleHumanMedicationReminders(for _: Human, meds _: [HumanMedication], context _: ModelContext?) {}
+
+    func refreshScheduledMedicationReminders(
+        context _: ModelContext,
+        hidingDetails _: Bool
+    ) async -> MedicationNotificationPrivacyRefreshResult {
+        .unavailable
+    }
 }
 
 @MainActor

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Ohana
 
@@ -176,6 +177,78 @@ struct AppWorkloadPolicyTests {
         )
         #expect(!criticalBudget.hasWorkCapacity)
         #expect(criticalBudget.isDeferred)
+    }
+
+    @Test func foregroundResumeMakesDeferredHomeAvatarPreloadEligibleAgain() {
+        let policy = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        let signature = "same-home-media"
+
+        policy.updateScenePhase(.background)
+        let deferred = HomeAvatarPreloadTaskKey(
+            signature: signature,
+            canRun: policy.backgroundWorkBudget(
+                operation: "home_first_screen_avatars",
+                requestedItemCount: 1
+            ).hasWorkCapacity
+        )
+        #expect(!deferred.canRun)
+
+        policy.updateScenePhase(.active)
+        let resumed = HomeAvatarPreloadTaskKey(
+            signature: signature,
+            canRun: policy.backgroundWorkBudget(
+                operation: "home_first_screen_avatars",
+                requestedItemCount: 1
+            ).hasWorkCapacity
+        )
+        #expect(resumed.canRun)
+        #expect(resumed != deferred)
+    }
+
+    @Test func systemSurfaceBudgetsFollowCentralRuntimePolicy() {
+        let normal = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        #expect(
+            normal.walkLiveActivityUpdateBudget() == OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 50,
+                maximumUpdateInterval: 30,
+                allowsAutomaticUpdates: true
+            )
+        )
+        #expect(normal.systemSurfaceSnapshotDebounceMilliseconds() == 350)
+
+        let lowPower = AppWorkloadPolicy(
+            lowPowerModeProvider: { true },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        #expect(
+            lowPower.walkLiveActivityUpdateBudget() == OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 100,
+                maximumUpdateInterval: 90,
+                allowsAutomaticUpdates: true
+            )
+        )
+        #expect(lowPower.systemSurfaceSnapshotDebounceMilliseconds() == 1200)
+
+        let critical = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .critical }
+        )
+        #expect(!critical.walkLiveActivityUpdateBudget().allowsAutomaticUpdates)
+        #expect(critical.systemSurfaceSnapshotDebounceMilliseconds() == 2500)
     }
 }
 

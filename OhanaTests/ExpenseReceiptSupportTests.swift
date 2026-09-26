@@ -124,6 +124,143 @@ struct ExpenseReceiptSupportTests {
         #expect(abs((categories.first?.pct ?? 0) - 0.7) < 0.001)
     }
 
+    @Test func expenseSummaryBuilderAttributesOnlyCoPayerShareToHumanTotals() throws {
+        let primaryPayerID = UUID()
+        let coPayerID = UUID()
+        let contributions = [
+            ExpensePayerContribution(humanID: primaryPayerID, minorUnits: 6000),
+            ExpensePayerContribution(humanID: coPayerID, minorUnits: 4000)
+        ]
+        let expense = PetExpenseLog(
+            date: date(2026, 3, 4),
+            amount: 100,
+            category: .medical,
+            note: "Shared clinic bill",
+            executorId: primaryPayerID.uuidString,
+            payerContributionsJSON: ExpensePayerContributionPolicy.encode(contributions)
+        )
+
+        let paidByCoPayer = ExpenseSummaryBuilder.paidBy(coPayerID, from: [expense])
+        let coPayerSlices = ExpenseSummaryBuilder.summarySlices(
+            from: paidByCoPayer,
+            attributedTo: coPayerID.uuidString
+        )
+        let coPayerTotals = ExpenseSummaryBuilder.totals(from: coPayerSlices)
+
+        #expect(paidByCoPayer.map(\.id) == [expense.id])
+        #expect(ExpenseSummaryBuilder.amountPaid(by: primaryPayerID, for: expense) == 60)
+        #expect(ExpenseSummaryBuilder.amountPaid(by: coPayerID, for: expense) == 40)
+        #expect(coPayerSlices.map(\.amount) == [40])
+        #expect(coPayerSlices.first?.executorId == coPayerID.uuidString)
+        #expect(coPayerTotals.spent == 40)
+        #expect(coPayerTotals.net == 40)
+        #expect(coPayerTotals.recordCount == 1)
+        #expect(coPayerTotals.spendCount == 1)
+    }
+
+    @Test func householdExpensePayerProjectionKeepsSixAndEightSeparate() {
+        let firstPayerID = UUID()
+        let secondPayerID = UUID()
+        let expense = PetExpenseLog(
+            date: date(2026, 3, 6),
+            amount: 14,
+            category: .food,
+            note: "Shared food",
+            executorId: firstPayerID.uuidString,
+            payerContributionsJSON: ExpensePayerContributionPolicy.encode([
+                ExpensePayerContribution(humanID: firstPayerID, minorUnits: 600),
+                ExpensePayerContribution(humanID: secondPayerID, minorUnits: 800)
+            ])
+        )
+
+        let slices = ExpenseSummaryBuilder.payerContributionSlices(from: [expense])
+        let amountByPayer = Dictionary(uniqueKeysWithValues: slices.compactMap { slice in
+            slice.executorId.map { ($0, slice.amount) }
+        })
+
+        #expect(slices.count == 2)
+        #expect(amountByPayer[firstPayerID.uuidString] == 6)
+        #expect(amountByPayer[secondPayerID.uuidString] == 8)
+        #expect(slices.reduce(0) { $0 + $1.amount } == 14)
+    }
+
+    @Test func expenseChartBucketsKeepCalendarIdentityAcrossRefreshesAndValueChanges() {
+        let now = date(2026, 8, 9)
+        let recordDate = date(2026, 8, 2)
+        let firstRecord = ExpenseSummarySlice(
+            date: recordDate,
+            amount: 6,
+            expenseCategory: .food,
+            executorId: nil,
+            expensePetID: nil
+        )
+        let updatedRecord = ExpenseSummarySlice(
+            date: recordDate,
+            amount: 8,
+            expenseCategory: .food,
+            executorId: nil,
+            expensePetID: nil
+        )
+
+        let initial = makeExpenseBuckets(
+            from: [firstRecord],
+            range: .year,
+            now: now,
+            calendar: gregorianCalendar,
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+        let repeated = makeExpenseBuckets(
+            from: [firstRecord],
+            range: .year,
+            now: now,
+            calendar: gregorianCalendar,
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+        let updated = makeExpenseBuckets(
+            from: [updatedRecord],
+            range: .year,
+            now: now,
+            calendar: gregorianCalendar,
+            locale: Locale(identifier: "en_US_POSIX")
+        )
+
+        #expect(initial == repeated)
+        #expect(initial.map(\.id) == updated.map(\.id))
+        #expect(Set(initial.map(\.id)).count == initial.count)
+        #expect(initial != updated)
+    }
+
+    @Test func expenseSummaryBuilderTreatsCorruptStructuredSnapshotAsUnknownWithoutDroppingAmount() {
+        let legacyExecutorID = UUID()
+        let expense = PetExpenseLog(
+            date: date(2026, 3, 5),
+            amount: 100,
+            category: .medical,
+            note: "Corrupt split",
+            executorId: legacyExecutorID.uuidString,
+            payerContributionsJSON: "{not-json"
+        )
+
+        let shares = ExpenseSummaryBuilder.payerShares(for: expense)
+        let paidByLegacyExecutor = ExpenseSummaryBuilder.paidBy(legacyExecutorID, from: [expense])
+        let allSlices = ExpenseSummaryBuilder.summarySlices(from: [expense])
+        let legacyExecutorSlices = ExpenseSummaryBuilder.summarySlices(
+            from: [expense],
+            attributedTo: legacyExecutorID.uuidString
+        )
+        let totals = ExpenseSummaryBuilder.totals(from: allSlices)
+
+        #expect(shares == [ExpensePayerShare(humanID: nil, amount: 100)])
+        #expect(paidByLegacyExecutor.isEmpty)
+        #expect(legacyExecutorSlices.isEmpty)
+        #expect(allSlices.map(\.amount) == [100])
+        #expect(allSlices.first?.hasStructuredPayerSnapshot == true)
+        #expect(allSlices.first?.payerContributions.isEmpty == true)
+        #expect(totals.spent == 100)
+        #expect(totals.net == 100)
+        #expect(totals.recordCount == 1)
+    }
+
     @Test func receiptDocumentStoresAttachmentsAndHidesMetadata() {
         let draft = ExpenseReceiptDocumentBuilder.makeDraft(
             title: "Vet receipt",

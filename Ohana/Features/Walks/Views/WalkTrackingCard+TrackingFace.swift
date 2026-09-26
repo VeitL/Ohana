@@ -259,7 +259,7 @@ extension WalkTrackingCard {
             } label: {
                 Text(l.tr(zh: "继续", en: "Resume", de: "Fortsetzen"))
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(minHeight: 36)
                     .padding(.horizontal, 12)
                     .background(Color.goPrimary, in: Capsule())

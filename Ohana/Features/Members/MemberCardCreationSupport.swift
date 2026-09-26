@@ -230,6 +230,27 @@ nonisolated enum PetCreationThemePolicy {
         coatColor: String
     ) -> String {
         let speciesKey = Pet.canonicalSpeciesKey(species)
+        let normalizedCoat = coatColor.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let coatHex = coatThemeHex(
+            species: speciesKey,
+            breed: breed,
+            coatColor: normalizedCoat
+        ) {
+            return OhanaThemeColorPolicy.normalizedMemberThemeHex(
+                coatHex,
+                fallback: OhanaThemeColorPolicy.petFallbackHex
+            )
+        }
+
+        if !normalizedCoat.isEmpty {
+            return stablePaletteHex(
+                name: name,
+                speciesKey: speciesKey,
+                breed: breed,
+                coatColor: normalizedCoat
+            )
+        }
+
         if let suggested = PetBreedDatabase.breeds(for: speciesKey)
             .first(where: { $0.name == breed })?
             .suggestedThemeHex {
@@ -239,6 +260,37 @@ nonisolated enum PetCreationThemePolicy {
             )
         }
 
+        return stablePaletteHex(
+            name: name,
+            speciesKey: speciesKey,
+            breed: breed,
+            coatColor: ""
+        )
+    }
+
+    private static func coatThemeHex(
+        species: String,
+        breed: String,
+        coatColor: String
+    ) -> String? {
+        guard !coatColor.isEmpty else { return nil }
+        let catalogColors = PetAvatarAssetCatalog.coatColors(species: species, breed: breed) ?? []
+        if let match = catalogColors.first(where: { $0.name == coatColor }) {
+            return match.hex
+        }
+        return PetBreedDatabase.breeds(for: species)
+            .first(where: { $0.name == breed })?
+            .coatColors
+            .first(where: { $0.name == coatColor })?
+            .hex
+    }
+
+    private static func stablePaletteHex(
+        name: String,
+        speciesKey: String,
+        breed: String,
+        coatColor: String
+    ) -> String {
         let options = palettes[speciesKey] ?? palettes["other"] ?? [OhanaThemeColorPolicy.petFallbackHex]
         let seed = [name, speciesKey, breed, coatColor]
             .joined(separator: "|")
@@ -402,7 +454,7 @@ enum MemberCreationStep: String, Identifiable, Hashable {
         case .human:
             [.basicInfo, .avatar, .theme]
         case .pet:
-            [.petName, .petIdentity, .petPersonality, .avatar]
+            [.petName, .petIdentity, .petAppearance, .petPersonality, .avatar]
         }
     }
 

@@ -227,7 +227,14 @@ extension CalendarTaskCompletionSyncService {
         if text.contains("换水") || text.contains("water change") { return .waterChange }
         if text.contains("滤") || text.contains("filter") { return .filterClean }
         if text.contains("猫砂") || text.contains("铲") || event.eventType == EventType.litterBox.rawValue { return .litter }
-        if text.contains("喂水") || text.contains("喝水") || text.contains("饮水") || text.contains("drink") { return .watering }
+        if text.contains("喂水") ||
+            text.contains("喝水") ||
+            text.contains("饮水") ||
+            text.contains("drink") ||
+            text.contains("water refill") ||
+            text.contains("wasser auffüllen") {
+            return .watering
+        }
         if event.eventType == EventType.foodChange.rawValue || text.contains("喂") || text.contains("feed") || text.contains("吃") { return .feeding }
         if text.contains("逗") || text.contains("陪玩") || text.contains("play") { return .play }
         return nil

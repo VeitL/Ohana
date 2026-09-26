@@ -9,17 +9,17 @@ import Foundation
 
 enum OnlineFeature: String, CaseIterable, Sendable {
     case onlineCollaboration
+    case guardianSafety
 }
 
 enum OnlineFeatureGate {
     nonisolated static func allows(_ feature: OnlineFeature) -> Bool {
-        guard AppCapabilityProfile.shipsCloudFamilyCapabilities else {
-            return false
-        }
-
         switch feature {
         case .onlineCollaboration:
-            return false
+            AppCapabilityProfile.shipsCloudFamilyCapabilities && false
+        case .guardianSafety:
+            AppCapabilityProfile.shipsGuardianSafetyCapabilities &&
+                GuardianSafetyConfiguration.current != nil
         }
     }
 }

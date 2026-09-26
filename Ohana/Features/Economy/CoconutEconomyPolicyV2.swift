@@ -429,7 +429,8 @@ enum EconomyDailyBudgetStore {
         date: Date = Date(),
         context: ModelContext? = nil,
         save: Bool = true,
-        writeDefaults: Bool = true
+        writeDefaults: Bool = true,
+        metadataJSONOverride: String? = nil
     ) {
         let household = normalizedUserKey(householdKey)
         let member = normalizedUserKey(memberKey)
@@ -458,7 +459,8 @@ enum EconomyDailyBudgetStore {
             careObjectKeys: objects,
             date: date,
             context: context,
-            save: save
+            save: save,
+            metadataJSONOverride: metadataJSONOverride
         )
         if shouldWriteDefaultsAfterSave && didPersistUsage {
             writeUsageDefaults()
@@ -761,14 +763,15 @@ enum EconomyDailyBudgetStore {
         careObjectKeys: [String],
         date: Date,
         context: ModelContext?,
-        save: Bool
+        save: Bool,
+        metadataJSONOverride: String?
     ) -> Bool {
         guard result.growthXP > 0 || result.totalCoconuts > 0 || result.luckyCoconuts > 0,
               let context else { return true }
 
         let day = dayKey(for: date)
         let now = Date()
-        let metadataJSON = result.metadataJSON
+        let metadataJSON = metadataJSONOverride ?? result.metadataJSON
         context.insert(
             EconomyBudgetUsageEvent(
                 dayKey: day,

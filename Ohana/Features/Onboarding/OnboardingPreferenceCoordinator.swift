@@ -420,14 +420,39 @@ final class OnboardingPreferenceCoordinator {
     }
 
     var countryMenuOptions: [OnboardingPlaceOption] {
-        OnboardingPlaceCatalog.countryOptions
+        sortedPlaceOptions(OnboardingPlaceCatalog.countryOptions)
     }
 
     var cityMenuOptions: [OnboardingPlaceOption] {
         guard !usesCustomCountry, !selectedCountryCode.isEmpty else {
             return [OnboardingPlaceCatalog.customOption]
         }
-        return OnboardingPlaceCatalog.cityOptions(for: selectedCountryCode)
+        return sortedPlaceOptions(
+            OnboardingPlaceCatalog.cityOptions(for: selectedCountryCode)
+        )
+    }
+
+    private func sortedPlaceOptions(
+        _ options: [OnboardingPlaceOption]
+    ) -> [OnboardingPlaceOption] {
+        let languageCode = AppLanguage.code
+        let locale = Locale(
+            identifier: AppLanguage.option(for: languageCode).localeIdentifier
+        )
+        return options.sorted { lhs, rhs in
+            if lhs.isCustom != rhs.isCustom {
+                return !lhs.isCustom
+            }
+            let result = lhs.title(languageCode: languageCode).compare(
+                rhs.title(languageCode: languageCode),
+                options: [.caseInsensitive, .numeric],
+                locale: locale
+            )
+            if result == .orderedSame {
+                return lhs.id < rhs.id
+            }
+            return result == .orderedAscending
+        }
     }
 
     func countryDisplayName(languageCode: String) -> String {
@@ -664,7 +689,11 @@ final class OnboardingPreferenceCoordinator {
 
 private extension OnboardingPreferenceCoordinator {
     static var usesUITestDefaultsFromLaunchArguments: Bool {
-        ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+        #if DEBUG
+            ProcessInfo.processInfo.arguments.contains("-OHANA_UI_TESTS")
+        #else
+            false
+        #endif
     }
 }
 

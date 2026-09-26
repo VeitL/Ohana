@@ -467,6 +467,7 @@ final class AutomaticBackupService: AutomaticBackupManaging {
     private let fileStore: AutomaticBackupFileStoring
     private let now: () -> Date
     private let resetExportCancellationWaitNanoseconds: UInt64
+    private var settleShopPurchases: ((ModelContext) -> Void)?
     private var generation: UInt64 = 0
     private var activeRunID: UUID?
     private var activeRunPhase: RunPhase?
@@ -506,6 +507,10 @@ final class AutomaticBackupService: AutomaticBackupManaging {
 
     func markReminderShown(now: Date = Date()) {
         statusStore.markReminderShown(now: now)
+    }
+
+    func registerShopPurchaseSettlement(_ settlement: @escaping (ModelContext) -> Void) {
+        settleShopPurchases = settlement
     }
 
     func runIfDue(container: ModelContainer, trigger: AutomaticBackupTrigger) async -> AutomaticBackupRunResult {
@@ -589,6 +594,7 @@ final class AutomaticBackupService: AutomaticBackupManaging {
         runGeneration: UInt64
     ) async -> AutomaticBackupRunResult {
         do {
+            settleShopPurchases?(container.mainContext)
             let packageURL = try await exporter.exportBackupPackage(container: container)
             guard checkpoint(runID: runID, generation: runGeneration) else {
                 return .skipped(.cancelledByReset)

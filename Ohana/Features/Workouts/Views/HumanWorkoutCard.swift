@@ -47,6 +47,7 @@ struct HumanWorkoutCard: View {
                 .padding(.horizontal, 16).padding(.vertical, 12)
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("human-detail-workout-action")
 
             GoDashedDivider().padding(.horizontal, 16)
 
@@ -81,8 +82,10 @@ struct HumanWorkoutCard: View {
             AddWorkoutSheet(human: human)
         }
         .sheet(isPresented: $showWorkoutHistory) {
-            HumanWorkoutSummaryView(human: human)
-                .ohanaSheetPagePresentation() // ui-v4: keep legacy workout-card detail entry on the same long sheet page host.
+            NavigationStack {
+                HumanWorkoutSummaryView(human: human)
+            }
+            .ohanaSheetPagePresentation() // ui-v4: keep legacy workout-card detail entry on the same long sheet page host.
         }
     }
 
@@ -151,7 +154,7 @@ struct HumanWorkoutCard: View {
                     if isHealthKit {
                         Text(l.tr(zh: "健康", en: "Health", de: "Health"))
                             .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
                             .background(Color.goPrimary, in: Capsule())
@@ -268,9 +271,9 @@ struct AddWorkoutSheet: View {
 
                         // 时长/距离/卡路里
                         VStack(spacing: 12) {
-                            workoutField(icon: "timer", label: l.tr(zh: "时长（分钟）", en: "Duration (min)", de: "Dauer (Min.)"), placeholder: "0", text: $durationStr, color: .goPrimary, step: 5)
-                            workoutField(icon: "map", label: l.tr(zh: "距离（公里，可选）", en: "Distance (km, optional)", de: "Distanz (km, optional)"), placeholder: "0.0", text: $distanceStr, color: .goCardCyan, step: 0.5)
-                            workoutField(icon: "flame", label: l.tr(zh: "卡路里（可选）", en: "Calories (optional)", de: "Kalorien (optional)"), placeholder: "0", text: $caloriesStr, color: .goOrange, step: 5)
+                            workoutField(icon: "timer", label: l.tr(zh: "时长（分钟）", en: "Duration (min)", de: "Dauer (Min.)"), placeholder: "0", text: $durationStr, color: .goPrimary, colorForeground: .ohanaPrimaryActionText, step: 5)
+                            workoutField(icon: "map", label: l.tr(zh: "距离（公里，可选）", en: "Distance (km, optional)", de: "Distanz (km, optional)"), placeholder: "0.0", text: $distanceStr, color: .goCardCyan, colorForeground: .arkInk, step: 0.5)
+                            workoutField(icon: "flame", label: l.tr(zh: "卡路里（可选）", en: "Calories (optional)", de: "Kalorien (optional)"), placeholder: "0", text: $caloriesStr, color: .goOrange, colorForeground: .arkInk, step: 5)
                         }
                         .padding(16).goIslandModuleCard(cornerRadius: OhanaRadius.input)
 
@@ -390,7 +393,15 @@ struct AddWorkoutSheet: View {
         return l.tr(zh: "\(human.name) 的\(title)", en: "\(title) for \(human.name)", de: "\(title) für \(human.name)")
     }
 
-    private func workoutField(icon: String, label: String, placeholder: String, text: Binding<String>, color: Color, step: Double) -> some View {
+    private func workoutField(
+        icon: String,
+        label: String,
+        placeholder: String,
+        text: Binding<String>,
+        color: Color,
+        colorForeground: Color,
+        step: Double
+    ) -> some View {
         let allowsDecimal = placeholder.contains(".")
         return HStack(spacing: 10) {
             Image(systemName: icon)
@@ -406,6 +417,7 @@ struct AddWorkoutSheet: View {
                 placeholder: placeholder,
                 maxFractionDigits: allowsDecimal ? 1 : 0,
                 accent: color,
+                accentForeground: colorForeground,
                 step: step,
                 valueFont: OhanaFont.callout(.bold),
                 valueAlignment: .trailing,
@@ -488,6 +500,7 @@ struct HumanWorkoutHistoryView: View {
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     @State private var showAddSheet = false
+    @State private var pendingDeletionLog: HumanWorkoutLog?
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
@@ -557,7 +570,7 @@ struct HumanWorkoutHistoryView: View {
                             Text(l.tr(zh: "添加运动", en: "Add Workout", de: "Training hinzufügen"))
                                 .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 28).padding(.vertical, 14)
                         .background(Color.goPrimary, in: Capsule())
                     }
@@ -584,6 +597,27 @@ struct HumanWorkoutHistoryView: View {
             .sheet(isPresented: $showAddSheet) {
                 AddWorkoutSheet(human: human)
                     .ohanaSheetPagePresentation() // ui-v4: allow complex workout editor uses full-height system sheet
+            }
+            .confirmationDialog(
+                l.tr(zh: "删除这条手动运动记录？", en: "Delete this manual workout?", de: "Dieses manuelle Training löschen?"),
+                isPresented: deletionConfirmationIsPresented,
+                titleVisibility: .visible
+            ) {
+                Button(l.tr(zh: "删除记录", en: "Delete Record", de: "Eintrag löschen"), role: .destructive) {
+                    guard let log = pendingDeletionLog else { return }
+                    pendingDeletionLog = nil
+                    deleteLog(log)
+                }
+                .accessibilityIdentifier("human-workout-confirm-delete-action")
+                Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
+                    pendingDeletionLog = nil
+                }
+            } message: {
+                Text(l.tr(
+                    zh: "删除后无法撤销。",
+                    en: "This cannot be undone.",
+                    de: "Dies kann nicht rückgängig gemacht werden."
+                ))
             }
         }
     }
@@ -663,16 +697,7 @@ struct HumanWorkoutHistoryView: View {
                             }
                         }
                         Button {
-                            let command = DomainCommand.humanWorkoutDelete(humanID: human.id, recordID: log.id)
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            commandQueue.enqueue(command) {
-                                HumanCareCommandExecutor(context: modelContext, services: appServices).deleteWorkout(
-                                    log,
-                                    human: human,
-                                    command: command,
-                                    note: "human.workout.delete"
-                                )
-                            }
+                            pendingDeletionLog = log
                         } label: {
                             Image(systemName: "trash").accessibilityHidden(true)
                                 .font(OhanaFont.caption())
@@ -688,6 +713,30 @@ struct HumanWorkoutHistoryView: View {
             }
             .goIslandModuleCard(cornerRadius: OhanaRadius.input)
             .padding(.horizontal, 16)
+        }
+    }
+
+    private var deletionConfirmationIsPresented: Binding<Bool> {
+        Binding(
+            get: { pendingDeletionLog != nil },
+            set: { isPresented in
+                if !isPresented {
+                    pendingDeletionLog = nil
+                }
+            }
+        )
+    }
+
+    private func deleteLog(_ log: HumanWorkoutLog) {
+        let command = DomainCommand.humanWorkoutDelete(humanID: human.id, recordID: log.id)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        commandQueue.enqueue(command) {
+            HumanCareCommandExecutor(context: modelContext, services: appServices).deleteWorkout(
+                log,
+                human: human,
+                command: command,
+                note: "human.workout.delete"
+            )
         }
     }
 }

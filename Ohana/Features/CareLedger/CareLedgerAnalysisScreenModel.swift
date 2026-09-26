@@ -8,30 +8,46 @@
 import Foundation
 import Observation
 
-enum CareLedgerRangeFilter: CaseIterable {
+nonisolated enum CareLedgerRangeFilter: CaseIterable, Hashable, Sendable {
     case week
     case month
+    case days90
+    case year
     case all
 
+    @MainActor
     func title(l: L10n) -> String {
         switch self {
         case .week:
-            l.tr(zh: "本周", en: "This week", de: "Diese Woche")
+            l.tr(zh: "7 天", en: "7 days", de: "7 Tage")
         case .month:
-            l.tr(zh: "本月", en: "This month", de: "Dieser Monat")
+            l.tr(zh: "30 天", en: "30 days", de: "30 Tage")
+        case .days90:
+            l.tr(zh: "90 天", en: "90 days", de: "90 Tage")
+        case .year:
+            l.tr(zh: "1 年", en: "1 year", de: "1 Jahr")
         case .all:
             l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
 
+    var requiresPersonal: Bool {
+        self == .days90 || self == .year || self == .all
+    }
+
     var cutoff: Date? {
+        dayCount.flatMap {
+            Calendar.current.date(byAdding: .day, value: -($0 - 1), to: Calendar.current.startOfDay(for: Date()))
+        }
+    }
+
+    var dayCount: Int? {
         switch self {
-        case .week:
-            Calendar.current.date(byAdding: .day, value: -7, to: Date())
-        case .month:
-            Calendar.current.date(byAdding: .month, value: -1, to: Date())
-        case .all:
-            nil
+        case .week: 7
+        case .month: 30
+        case .days90: 90
+        case .year: 365
+        case .all: nil
         }
     }
 
@@ -41,8 +57,12 @@ enum CareLedgerRangeFilter: CaseIterable {
             7
         case .month:
             30
+        case .days90:
+            90
+        case .year:
+            365
         case .all:
-            14
+            365
         }
     }
 }
@@ -51,27 +71,30 @@ enum CareLedgerRangeFilter: CaseIterable {
 final class CareLedgerAnalysisScreenModel {
     var selectedRange: CareLedgerRangeFilter = .week
     var selectedKind: CareLedgerEventKind?
+    var selectedSubjectKey: String?
 
-    private var ledgerEvents: [CareLedgerEvent] = []
-    private var pets: [Pet] = []
-    private var humans: [Human] = []
+    private var ledgerEvents: [CareLedgerAnalysisEventSnapshot] = []
+    private var subjects: [CareLedgerAnalysisSubjectSnapshot] = []
 
     func applyQuerySnapshot(
-        ledgerEvents: [CareLedgerEvent],
-        pets: [Pet],
-        humans: [Human]
+        ledgerEvents: [CareLedgerAnalysisEventSnapshot],
+        subjects: [CareLedgerAnalysisSubjectSnapshot] = []
     ) {
         self.ledgerEvents = ledgerEvents
-        self.pets = pets
-        self.humans = humans
+        self.subjects = subjects
     }
 
-    var filteredEvents: [CareLedgerEvent] {
+    var availableSubjects: [CareLedgerAnalysisSubjectSnapshot] {
+        subjects
+    }
+
+    var filteredEvents: [CareLedgerAnalysisEventSnapshot] {
         let cutoff = selectedRange.cutoff
         return ledgerEvents.filter { event in
             let inRange = cutoff.map { event.occurredAt >= $0 } ?? true
-            let matchesKind = selectedKind.map { event.eventKindEnum == $0 } ?? true
-            return inRange && matchesKind
+            let matchesKind = selectedKind.map { eventKind(for: event) == $0 } ?? true
+            let matchesSubject = selectedSubjectKey.map { subjectKey(for: event) == $0 } ?? true
+            return inRange && matchesKind && matchesSubject
         }
     }
 
@@ -92,7 +115,7 @@ final class CareLedgerAnalysisScreenModel {
     }
 
     var kindStats: [(CareLedgerEventKind, Int)] {
-        let grouped = Dictionary(grouping: operationRepresentatives(in: filteredEvents), by: \.eventKindEnum)
+        let grouped = Dictionary(grouping: operationRepresentatives(in: filteredEvents), by: eventKind(for:))
         return grouped.map { ($0.key, $0.value.count) }.sorted { $0.1 > $1.1 }
     }
 
@@ -144,11 +167,14 @@ final class CareLedgerAnalysisScreenModel {
         guard let id, !id.isEmpty else {
             return l.tr(zh: "系统/未指定", en: "System/unspecified", de: "System/nicht festgelegt")
         }
+        if let name = subjects.first(where: { $0.kind == kind && $0.subjectID == id })?.name {
+            return name
+        }
         if kind == CareLedgerActorKind.human.rawValue {
-            return humans.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie")
+            return l.tr(zh: "家人", en: "Family", de: "Familie")
         }
         if kind == CareLedgerActorKind.pet.rawValue {
-            return pets.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "宠物", en: "Pet", de: "Haustier")
+            return l.tr(zh: "宠物", en: "Pet", de: "Haustier")
         }
         if kind == CareLedgerActorKind.plant.rawValue {
             return l.tr(zh: "植物", en: "Plant", de: "Pflanze")
@@ -160,11 +186,14 @@ final class CareLedgerAnalysisScreenModel {
         guard let id, !id.isEmpty else {
             return l.tr(zh: "全家", en: "Household", de: "Haushalt")
         }
+        if let name = subjects.first(where: { $0.kind == kind && $0.subjectID == id })?.name {
+            return name
+        }
         if kind == CareLedgerSubjectKind.pet.rawValue {
-            return pets.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "宠物", en: "Pet", de: "Haustier")
+            return l.tr(zh: "宠物", en: "Pet", de: "Haustier")
         }
         if kind == CareLedgerSubjectKind.human.rawValue {
-            return humans.first { $0.id.uuidString == id }?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie")
+            return l.tr(zh: "家人", en: "Family", de: "Familie")
         }
         if kind == CareLedgerSubjectKind.plant.rawValue {
             return l.tr(zh: "植物", en: "Plant", de: "Pflanze")
@@ -179,7 +208,9 @@ final class CareLedgerAnalysisScreenModel {
         return "\(calendar.component(.day, from: date))"
     }
 
-    private func operationRepresentatives(in events: [CareLedgerEvent]) -> [CareLedgerEvent] {
+    private func operationRepresentatives(
+        in events: [CareLedgerAnalysisEventSnapshot]
+    ) -> [CareLedgerAnalysisEventSnapshot] {
         Dictionary(grouping: events, by: operationKey(for:))
             .values
             .compactMap { group in
@@ -187,7 +218,7 @@ final class CareLedgerAnalysisScreenModel {
             }
     }
 
-    private func operationKey(for event: CareLedgerEvent) -> String {
+    private func operationKey(for event: CareLedgerAnalysisEventSnapshot) -> String {
         let metadata = event.metadataJSON
         let transactionKey = CareLedgerMetadata.stringValue(
             named: CareLedgerMetadata.careTransactionId,
@@ -203,9 +234,18 @@ final class CareLedgerAnalysisScreenModel {
         return "\(transactionKey):\(event.eventKind):\(event.actionType)"
     }
 
-    private func coverageKey(for event: CareLedgerEvent) -> String {
+    private func coverageKey(for event: CareLedgerAnalysisEventSnapshot) -> String {
         let subjectKey = event.subjectId.map { "\(event.subjectKind):\($0)" }
             ?? "event:\(event.id.uuidString)"
         return "\(operationKey(for: event)):\(subjectKey)"
+    }
+
+    private func subjectKey(for event: CareLedgerAnalysisEventSnapshot) -> String {
+        guard let id = event.subjectId, !id.isEmpty else { return "household" }
+        return "\(event.subjectKind):\(id)"
+    }
+
+    private func eventKind(for event: CareLedgerAnalysisEventSnapshot) -> CareLedgerEventKind {
+        CareLedgerEventKind(rawValue: event.eventKind) ?? .unknown
     }
 }

@@ -15,49 +15,26 @@ struct SettingsView: View {
     let homePets: [SettingsPetSnapshot]?
     let homeHumans: [SettingsHumanSnapshot]?
     let isRouteDataLoaded: Bool
+    let routeLoadErrorMessage: String?
+    let onRetryRouteData: (() -> Void)?
+    let experienceMode: AppExperienceMode
+    let zenOwnerHumanID: String
+    let onRequestExperienceModeChange: ((AppExperienceMode) -> Void)?
+    let onRequestZenOwnerChange: ((UUID) -> Void)?
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
     @Environment(\.colorScheme) var colorScheme
     @Environment(AppServices.self) var appServices
     @AppStorage("appLanguage") var appLanguage = "zh"
-    @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
-    @AppStorage(AppMeasurementSystem.storageKey) var appMeasurementSystem = AppMeasurementSystem.fallbackCode
-    @AppStorage(AppCurrency.storageKey) var appCurrency = AppCurrency.fallbackCode
     @AppStorage("appThemePreference") var appThemePreference: String = "dark"
-    @AppStorage("appBackgroundStyle") var appBackgroundStyle: String = AppBackgroundStyle.goIsland.rawValue
-    @AppStorage(AppPerformanceMode.powerSavingKey) var powerSavingMode = false
-    @AppStorage(AppPerformanceMode.reducedVisualEffectsKey) var reducedVisualEffectsMode = false
-    @AppStorage(AppPrivacySnapshotProtectionStore.hideSnapshotKey) var hideAppSwitcherSnapshot = AppPrivacySnapshotProtectionStore.defaultHideSnapshot
-    @AppStorage(MemberGateBiometricAuthStore.enabledKey) var enableMemberGateBiometrics = MemberGateBiometricAuthStore.defaultEnabled
-    @AppStorage(MedicationNotificationPrivacyStore.hidePetDetailsKey) var hidePetMedicationNotificationDetails = false
-    @AppStorage("ohana_has_onboarded") var hasOnboarded = false
     @AppStorage("currentActiveHumanId") var currentActiveHumanId = ""
     @AppStorage(HomeCardVisibility.hiddenPetIDsKey) var hiddenHomePetIDsRaw = ""
     @AppStorage("goFocusHomeCardOrder.v1") var homeCardOrderRaw = ""
     @AppStorage(CloudSyncEngineRuntime.sharedZoneAccessRevokedDefaultsKey) var hasCloudSyncSharedZoneAccessRevokedNotice = false
     @AppStorage(CloudSyncEngineRuntime.retryAttemptDefaultsKey) var cloudSyncRetryAttempt = 0
     @AppStorage(CloudSyncEngineRuntime.nextRetryAtDefaultsKey) var cloudSyncNextRetryAtReferenceDate: Double = 0
-    @State var showingAppResetAlert = false
-    @State var appResetErrorMessage: String? = nil
-    // TASK 1：JSON 备份
-    @State var exportedJSONURL: URL? = nil
-    @State var isExporting = false
-    @State var isImporting = false
-    @State var automaticBackupStatus = AutomaticBackupStatusStore().snapshot()
-    @State var isRunningAutomaticBackup = false
-    @State var isRetryingAutomaticBackupCleanup = false
-    @State var isRemovingLegacyAutomaticBackup = false
-    @State var automaticBackupCleanupError: String? = nil
-    @State var backupEncryptionEnabled = false
-    @State var backupPassword = ""
-    @State var backupPasswordConfirmation = ""
-    @State var showingBackupSavePicker = false
-    @State var showingImportPicker = false
-    @State var importError: String? = nil
-    @State var showingImportSuccess = false
-    @State var showingImportErrorAlert = false
-    @State var showingBackgroundPicker = false
+    @State var showingPersonalPlan = false
     @State var showingPetManagement = false
     @State var quickSwitchHuman: SettingsHumanSnapshot? = nil
     @State var householdSharePresentation: CloudSyncHouseholdSharePresentation? = nil
@@ -66,30 +43,36 @@ struct SettingsView: View {
     @State var isRetryingCloudSyncNow = false
     @State var householdSyncStatusMessage: String? = nil
     @State var householdSyncErrorMessage: String? = nil
-    @State var areDataSectionsMounted = false
-    @State var dataSectionsMountTask: Task<Void, Never>?
-    @State var biometricGateAvailability = MemberGateBiometricAvailability.unavailable
-    @State var showingCoconutBalanceTest = false
-    @State var showingReminderObservability = false
-    @State var showingUISpecShowcase = false
-    @State var showingFamilyWeeklyReportDebug = false
-    @State var showAdvancedNotificationSettings = false
-    @State var notificationPreferenceRevision = 0
-    @State var languageSelectionCode = AppLanguage.code
-    @State var languageCommitTask: Task<Void, Never>?
-    @State var isLanguageCommitInFlight = false
+    #if DEBUG
+        @State var showingCoconutBalanceTest = false
+        @State var showingReminderObservability = false
+        @State var showingUISpecShowcase = false
+        @State var showingFamilyWeeklyReportDebug = false
+    #endif
 
     init(
         homeHouseholds: [SettingsHouseholdSnapshot]? = nil,
         homePets: [SettingsPetSnapshot]? = nil,
         homeHumans: [SettingsHumanSnapshot]? = nil,
         isRouteDataLoaded: Bool = true,
+        routeLoadErrorMessage: String? = nil,
+        onRetryRouteData: (() -> Void)? = nil,
+        experienceMode: AppExperienceMode = .standard,
+        zenOwnerHumanID: String = "",
+        onRequestExperienceModeChange: ((AppExperienceMode) -> Void)? = nil,
+        onRequestZenOwnerChange: ((UUID) -> Void)? = nil,
         onClose: (() -> Void)? = nil
     ) {
         self.homeHouseholds = homeHouseholds
         self.homePets = homePets
         self.homeHumans = homeHumans
         self.isRouteDataLoaded = isRouteDataLoaded
+        self.routeLoadErrorMessage = routeLoadErrorMessage
+        self.onRetryRouteData = onRetryRouteData
+        self.experienceMode = experienceMode
+        self.zenOwnerHumanID = zenOwnerHumanID
+        self.onRequestExperienceModeChange = onRequestExperienceModeChange
+        self.onRequestZenOwnerChange = onRequestZenOwnerChange
         self.onClose = onClose
     }
 
@@ -119,18 +102,6 @@ struct SettingsView: View {
 
     var accentColor: Color { Color.goPrimary }
     var l: L10n { L10n(appLanguage) }
-    var selectedCountry: AppCountry.Option {
-        AppCountry.option(for: appCountry)
-    }
-
-    var selectedMeasurementSystem: AppMeasurementSystem.Option {
-        AppMeasurementSystem.option(for: appMeasurementSystem)
-    }
-
-    var selectedCurrency: AppCurrency.Option {
-        AppCurrency.supported.first { $0.code == AppCurrency.normalize(appCurrency) } ?? AppCurrency.supported[0]
-    }
-
     var body: some View {
         settingsSharingPresentationContent
     }
@@ -149,9 +120,33 @@ struct SettingsView: View {
             .toolbar {
                 settingsToolbarContent
             }
+            .navigationDestination(for: SettingsDestination.self) { destination in
+                settingsDestinationContent(destination)
+            }
         }
         .preferredColorScheme(preferredScheme)
         .accessibilityIdentifier("settings-screen")
+    }
+
+    private func settingsDestinationContent(_ destination: SettingsDestination) -> AnyView {
+        switch destination {
+        case .regionAndLanguage:
+            AnyView(SettingsRegionLanguagePage(
+                appLanguage: appLanguage,
+                onCommitLanguage: { appLanguage = $0 },
+                onClose: closeSettings
+            ))
+        case .appearanceAndPerformance:
+            AnyView(SettingsAppearancePerformancePage(onClose: closeSettings))
+        case .notifications:
+            AnyView(SettingsNotificationsPage(experienceMode: experienceMode, onClose: closeSettings))
+        case .privacyAndSecurity:
+            AnyView(SettingsPrivacySecurityPage(onClose: closeSettings))
+        case .dataAndBackup:
+            AnyView(SettingsBackupPage(onClose: closeSettings))
+        case .about:
+            AnyView(SettingsAboutPage(onClose: closeSettings))
+        }
     }
 
     /// Settings owns many independent presentations. A single modifier chain
@@ -161,74 +156,17 @@ struct SettingsView: View {
     /// low-frequency route boundary that caps metadata depth without changing
     /// the individual controls or their state ownership.
     private var settingsAlertContent: AnyView {
-        AnyView(
-            settingsRootContent
-        .alert(l.tr(zh: "重置 App", en: "Reset App", de: "App zurucksetzen"), isPresented: $showingAppResetAlert) {
-            Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
-            Button(l.tr(zh: "重置", en: "Reset", de: "Zurucksetzen"), role: .destructive) {
-                resetApp()
-            }
-        } message: {
-            Text(l.tr(
-                zh: "此操作将删除 App 内的成员、记录、提醒、任务、奖励和本地自定义内容，无法恢复。重置后会从引导页面重新开始。",
-                en: "This deletes members, logs, reminders, tasks, rewards, and local custom content. It cannot be undone. After reset, Ohana starts from onboarding.",
-                de: "Dies loscht Mitglieder, Eintrage, Erinnerungen, Aufgaben, Belohnungen und lokale Anpassungen. Das kann nicht ruckgangig gemacht werden. Danach startet Ohana im Onboarding."
-            ))
-        }
-        .alert(l.tr(zh: "重置失败", en: "Reset Failed", de: "Zurucksetzen fehlgeschlagen"), isPresented: Binding(
-            get: { appResetErrorMessage != nil },
-            set: { if !$0 { appResetErrorMessage = nil } }
-        )) {
-            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {
-                appResetErrorMessage = nil
-            }
-        } message: {
-            Text(appResetErrorMessage ?? l.tr(zh: "未知错误", en: "Unknown error", de: "Unbekannter Fehler"))
-        }
-        .alert(l.tr(
-            zh: "iCloud 备份需要处理",
-            en: "iCloud Backup Needs Attention",
-            de: "iCloud-Backup braucht Aufmerksamkeit"
-        ), isPresented: Binding(
-            get: { automaticBackupCleanupError != nil },
-            set: { if !$0 { automaticBackupCleanupError = nil } }
-        )) {
-            Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {
-                automaticBackupCleanupError = nil
-            }
-        } message: {
-            Text(automaticBackupCleanupError ?? l.tr(
-                zh: "请在数据备份中重试删除旧的自动备份。",
-                en: "Retry removing the previous automatic backup in Data Backup.",
-                de: "Versuche in Datensicherung erneut, das vorherige automatische Backup zu entfernen."
-            ))
-        }
-        )
+        AnyView(settingsRootContent)
     }
 
     private var settingsLifecycleContent: AnyView {
         AnyView(
             settingsAlertContent
         .onAppear {
-            syncStoredRegionalDefaultsIfNeeded()
-            syncLanguageSelectionFromStorage()
-            refreshBiometricGateAvailability()
-            scheduleDataSectionsMount()
             reconcileCurrentActiveHumanSelection()
-        }
-        .onDisappear {
-            dataSectionsMountTask?.cancel()
-            languageCommitTask?.cancel()
-            languageCommitTask = nil
-        }
-        .onChange(of: appLanguage) { _, _ in
-            syncLanguageSelectionFromStorage()
         }
         .onChange(of: isRouteDataLoaded) { _, hasLoaded in
             guard hasLoaded else { return }
-            dataSectionsMountTask?.cancel()
-            dataSectionsMountTask = nil
-            areDataSectionsMounted = true
             reconcileCurrentActiveHumanSelection()
         }
         .onChange(of: homeHumans) { _, _ in
@@ -240,9 +178,9 @@ struct SettingsView: View {
     private var settingsPrimaryPresentationContent: AnyView {
         AnyView(
             settingsLifecycleContent
-        .sheet(isPresented: $showingBackgroundPicker) {
-            AppBackgroundPickerSheet()
-                .ohanaSheetPagePresentation() // ui-v4: allow background picker is a long visual chooser
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
         }
         .sheet(isPresented: $showingPetManagement) {
             SettingsPetManagementSheet(pets: homePets ?? [])
@@ -251,77 +189,83 @@ struct SettingsView: View {
         )
     }
 
-    private var settingsDeveloperPresentationContent: AnyView {
-        AnyView(
-            settingsPrimaryPresentationContent
-        .sheet(isPresented: $showingCoconutBalanceTest) {
-            NavigationStack {
-                CoconutBalanceTestView()
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer balance console as long sheet
-        }
-        .sheet(isPresented: $showingReminderObservability) {
-            NavigationStack {
-                ReminderObservabilityView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button {
-                                showingReminderObservability = false
-                            } label: {
-                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
-                            }
-                            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                            .accessibilityIdentifier("reminder-observability-close-action")
-                        }
+    #if DEBUG
+        private var settingsDeveloperPresentationContent: AnyView {
+            AnyView(
+                settingsPrimaryPresentationContent
+                .sheet(isPresented: $showingCoconutBalanceTest) {
+                    NavigationStack {
+                        CoconutBalanceTestView()
                     }
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer balance console as long sheet
+                }
+                .sheet(isPresented: $showingReminderObservability) {
+                    NavigationStack {
+                        ReminderObservabilityView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button {
+                                        showingReminderObservability = false
+                                    } label: {
+                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
+                                    }
+                                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                                    .accessibilityIdentifier("reminder-observability-close-action")
+                                }
+                            }
+                    }
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
+                }
+            )
         }
-        )
-    }
 
-    private var settingsUISpecPresentationContent: AnyView {
-        #if DEBUG
+        private var settingsUISpecPresentationContent: AnyView {
             AnyView(
                 settingsDeveloperPresentationContent
                 .sheet(isPresented: $showingUISpecShowcase) {
-                NavigationStack {
-                    OhanaUISpecShowcaseView()
-                }
-                .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
-            }
-            )
-        #else
-            settingsDeveloperPresentationContent
-        #endif
-    }
-
-    private var settingsReportingPresentationContent: AnyView {
-        AnyView(
-            settingsUISpecPresentationContent
-        .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
-            NavigationStack {
-                FamilyWeeklyReportDashboardView()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button {
-                                showingFamilyWeeklyReportDebug = false
-                            } label: {
-                                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
-                            }
-                            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                            .accessibilityIdentifier("family-weekly-report-debug-close-action")
-                        }
+                    NavigationStack {
+                        OhanaUISpecShowcaseView()
                     }
-            }
-            .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer UI specification console as long sheet
+                }
+            )
         }
-        )
+
+        private var settingsReportingPresentationContent: AnyView {
+            AnyView(
+                settingsUISpecPresentationContent
+                .sheet(isPresented: $showingFamilyWeeklyReportDebug) {
+                    NavigationStack {
+                        FamilyWeeklyReportDashboardView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button {
+                                        showingFamilyWeeklyReportDebug = false
+                                    } label: {
+                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
+                                    }
+                                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+                                    .accessibilityIdentifier("family-weekly-report-debug-close-action")
+                                }
+                            }
+                    }
+                    .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet
+                }
+            )
+        }
+    #endif
+
+    private var settingsPreSharingPresentationContent: AnyView {
+        #if DEBUG
+            settingsReportingPresentationContent
+        #else
+            settingsPrimaryPresentationContent
+        #endif
     }
 
     private var settingsSharingPresentationContent: AnyView {
         AnyView(
-            settingsReportingPresentationContent
+            settingsPreSharingPresentationContent
         .sheet(item: $quickSwitchHuman) { human in
             HumanQuickSwitchPasscodeSheet(human: human) {
                 switchActiveHuman(to: human, emitSuccessFeedback: false)

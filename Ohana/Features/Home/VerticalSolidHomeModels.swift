@@ -59,6 +59,7 @@ nonisolated struct VerticalSolidHomePlantSnapshot: Identifiable, Equatable, Send
     let roomName: String
     let avatarImageSignature: String
     let avatarImageAssetName: String?
+    let isArchived: Bool
     let needsCare: Bool
     let hasDueWatering: Bool
     let hasDueFertilizing: Bool
@@ -89,6 +90,8 @@ nonisolated struct VerticalSolidHomeSnapshot: @unchecked Sendable {
     var firstPetEmptyState: VerticalSolidHomeFirstPetEmptyState?
     var plants: [VerticalSolidHomePlantSnapshot] = []
     var heroPreparationRevision = ""
+    var hasMoreMembers = false
+    var hasMorePlants = false
 
     static let empty = VerticalSolidHomeSnapshot()
 }

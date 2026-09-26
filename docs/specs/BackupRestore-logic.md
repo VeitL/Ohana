@@ -111,6 +111,24 @@ reimbursement in the insurance category. Zero, NaN, infinity, unmarked negative
 expenses, and expense sessions without a valid amount fail preflight; direct
 rehydrate writers enforce the same rule as defense in depth.
 
+BR-014. Restricted backup schema v33 retains the V32 `PresenceCheckIn`, fixed
+status, `PresenceParticipationPeriod`, and `PresenceRewardReceipt` payloads and
+adds permanent achievement facts. Schemas v31 and v32 remain decodable. Restore
+upserts these facts without executing check-in/reward commands, so it can never
+mint coconuts. App experience mode, owner binding, reminder times, grace settings,
+legacy `SafetyContact` names/numbers and message templates remain device-local.
+Family guardian accounts, tokens, device endpoints, relationships, incidents,
+policy projections, and sync outbox records are excluded from backup, manual
+export, logs and current CloudSync; restore cannot recreate an invitation or
+trigger a guardian notification.
+
+BR-015. Restricted backup schema v34 adds the optional, versioned payer
+contribution snapshot for each pet expense. Its amounts use integer minor units,
+must exactly equal the expense total, and may reference each Human at most once.
+Older backups without the snapshot remain decodable and attribute the full amount
+to the legacy primary payer. Restore rejects malformed, non-conserving, duplicate,
+or dangling known-payer contributions before mutating the live store.
+
 ## Validation
 
 Required launch evidence:
@@ -134,6 +152,10 @@ Required launch evidence:
 - Fault injection at every restore phase, transaction-save failure,
   cancellation, and repeated-restore idempotency with original-store,
   UserDefaults, and notification assertions.
+- v31/v32/v33/v34 presence, achievement, and expense-contribution compatibility; repeated upsert
+  idempotency, restore-without-reward, and explicit proof that legacy contacts,
+  phone numbers, templates, mode settings, guardian projections, account/device
+  tokens, and guardian outbox records are absent.
 
 Do not close a backup/restore item with only a successful build. Data safety
 requires projection, import, error, and wipe-restore evidence.

@@ -28,7 +28,7 @@ extension QuickFeedDetailContent {
                 reminderEnabled: draftStore.stockReminderEnabled,
                 reminderAdvanceDays: draftStore.stockReminderAdvanceDays,
                 executorId: selectedActionExecutorId,
-                allEvents: allEvents,
+                allEvents: latestAllEvents(),
                 recordToUpdate: draftStore.editingFoodRecord,
                 previousExpenseId: previousExpenseId,
                 expenseAmount: expenseAmount,
@@ -73,7 +73,7 @@ extension QuickFeedDetailContent {
                 pet: pet,
                 enabled: draftStore.stockReminderEnabled,
                 advanceDays: draftStore.stockReminderAdvanceDays,
-                allEvents: allEvents
+                allEvents: latestAllEvents()
             )
             scheduleStockReminders(result.stockReminders)
             triggerToast(l.tr(zh: "余粮提醒已更新", en: "Stock reminder updated", de: "Vorratserinnerung aktualisiert"), tint: stockTint)
@@ -93,7 +93,7 @@ extension QuickFeedDetailContent {
                 pet: pet,
                 record: record,
                 remainingGrams: grams,
-                allEvents: allEvents
+                allEvents: latestAllEvents()
             )
             reloadFeedSnapshots()
             prepareStockCorrectionText()
@@ -139,7 +139,7 @@ extension QuickFeedDetailContent {
                 grams: grams,
                 date: draftStore.editFeedLogDate,
                 pet: pet,
-                allEvents: allEvents
+                allEvents: latestAllEvents()
             )
             reloadFeedSnapshots()
             scheduleStockReminders(result.stockReminders)
@@ -160,7 +160,7 @@ extension QuickFeedDetailContent {
             let result = try commandExecutor.deleteLog(
                 log,
                 pet: pet,
-                allEvents: allEvents
+                allEvents: latestAllEvents()
             )
             if draftStore.editingFeedLogId == id { draftStore.editingFeedLogId = nil }
             reloadFeedSnapshots()
@@ -176,7 +176,7 @@ extension QuickFeedDetailContent {
             let result = try commandExecutor.deleteFoodRecord(
                 record,
                 pet: pet,
-                allEvents: allEvents
+                allEvents: latestAllEvents()
             )
             if draftStore.editingFoodRecord?.id == record.id { draftStore.editingFoodRecord = nil }
             reloadFeedSnapshots()

@@ -397,6 +397,53 @@ struct OhanaTests {
     }
 
     @MainActor
+    @Test func oasisTreePreservesZenPresenceGrowthWhenEstablishingLegacyBaseline() async throws {
+        OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+        UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+        OasisTreePreferenceStore.clearLedgerEnergyCache()
+        defer {
+            OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
+            UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXPScaleVersion")
+            OasisTreePreferenceStore.clearLedgerEnergyCache()
+        }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(CareLedgerEvent(
+            actorKind: .human,
+            actorId: "legacy-human",
+            subjectKind: .pet,
+            subjectId: "legacy-pet",
+            eventKind: .care,
+            actionType: "feeding",
+            metadataJSON: "{\"economyVersion\":2,\"growthXP\":500}"
+        ))
+        for (actionType, growthXP) in [
+            (PresenceTreeGrowthPolicy.ownerDailyActionType, PresenceTreeGrowthPolicy.ownerDailyGrowthXP),
+            (PresenceTreeGrowthPolicy.dailyStatusActionType, PresenceTreeGrowthPolicy.dailyStatusGrowthXP)
+        ] {
+            context.insert(CareLedgerEvent(
+                actorKind: .human,
+                actorId: "zen-owner",
+                subjectKind: .household,
+                eventKind: .milestone,
+                actionType: actionType,
+                metadataJSON: "{\"economyVersion\":3,\"growthXP\":\(growthXP),\"careGrowthBaselineExempt\":true}"
+            ))
+        }
+        try context.save()
+
+        let manager = OasisTreeManager()
+        manager.refreshPreviewEnergy(modelContext: context, pets: [], humans: [])
+
+        #expect(OasisTreePreferenceStore.careGrowthBaseline() == 500)
+        #expect(manager.careGrowthEnergy == PresenceTreeGrowthPolicy.dailyGrowthXPCap)
+        #expect(manager.totalEnergy == PresenceTreeGrowthPolicy.dailyGrowthXPCap)
+        #expect(manager.treeLevel == .lv0)
+    }
+
+    @MainActor
     @Test func oasisLegacyActivityBaselineDoesNotAdvanceTreeLevel() async throws {
         OasisTreePreferenceStore.resetCareGrowthProjectionForTesting()
         UserDefaults.standard.removeObject(forKey: "oasis_v2LegacyBaselineXP")
@@ -1939,8 +1986,10 @@ struct OhanaTests {
     @Test func reminderSchedulingServiceSkipsPastDueAndWritesLedger() async throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
-        let event = Event(title: "过期提醒", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo")
+        let event = Event(title: "过期提醒", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let reminder = Reminder(event: event, scheduledAt: Date().addingTimeInterval(-60))
+        context.insert(pet)
         context.insert(event)
         context.insert(reminder)
 
@@ -2701,8 +2750,10 @@ struct OhanaTests {
         let missingResult = await ReminderSchedulingService.scheduleIfNeeded(reminder: orphan, context: context)
         #expect(missingResult == .missingEvent)
 
-        let event = Event(title: "喂水", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: UUID().uuidString)
+        let pet = Pet(name: "Momo")
+        let event = Event(title: "喂水", relatedEntityType: EntityKind.pet.rawValue, relatedEntityId: pet.id.uuidString)
         let duplicate = Reminder(event: event, scheduledAt: Date().addingTimeInterval(3600))
+        context.insert(pet)
         context.insert(event)
         context.insert(duplicate)
         let duplicateResult = await ReminderSchedulingService.scheduleIfNeeded(
@@ -5091,7 +5142,7 @@ struct OhanaTests {
     }
 
     @MainActor
-    @Test func islandQuestEnginePrioritizesFirstPetWhenNoActivePets() async throws {
+    @Test func islandQuestEngineDoesNotTurnOptionalFirstPetIntoAProgressQuest() async throws {
         let human = Human(name: "Li")
         let completedIntroProgress = TodayFocusQuestProgress(
             isPetWizardCompleted: true,
@@ -5106,9 +5157,7 @@ struct OhanaTests {
             questProgress: completedIntroProgress
         )
 
-        #expect(quests.first?.id == IslandQuestEngine.oasisPetWizardQuestId)
-        #expect(quests.first?.emoji == "🐾")
-        #expect(quests.first?.isCompleted == false)
+        #expect(!quests.contains { $0.id == IslandQuestEngine.oasisPetWizardQuestId })
 
         let refreshed = TodayFocusService.refreshedQuests(
             quests,
@@ -5120,8 +5169,7 @@ struct OhanaTests {
             questProgress: completedIntroProgress
         )
 
-        #expect(refreshed.first?.id == IslandQuestEngine.oasisPetWizardQuestId)
-        #expect(refreshed.first?.isCompleted == false)
+        #expect(!refreshed.contains { $0.id == IslandQuestEngine.oasisPetWizardQuestId })
     }
 
     @MainActor

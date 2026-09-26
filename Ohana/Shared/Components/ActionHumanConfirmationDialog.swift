@@ -41,11 +41,10 @@ private struct ActionHumanConfirmationDialogModifier: ViewModifier {
                 }
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {
-                draft = nil
+                self.draft = nil
             }
         } message: {
-            if let draft,
-               let preferred = draft.humans.first(where: { $0.id == draft.preferredHumanID }) {
+            if let draft, let preferred = draft.humans.first(where: { $0.id == draft.preferredHumanID }) {
                 Text(l.tr(
                     zh: "默认记为 \(displayName(preferred)) 完成，也可以临时选择其他成员。",
                     en: "Defaults to \(displayName(preferred)). You can choose someone else for this action.",

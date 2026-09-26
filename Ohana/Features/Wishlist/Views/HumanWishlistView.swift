@@ -20,6 +20,7 @@ struct HumanWishlistContentView: View {
     @State private var showAddSheet = false
     @State private var showConfetti = false
     @State private var newTitle = ""
+    @FocusState private var isNewTitleFocused: Bool
     @State private var newCost = 10
     @State private var redeemingItemIDs: Set<UUID> = []
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -216,10 +217,6 @@ struct HumanWishlistContentView: View {
             Text(l.tr(zh: "还没有心愿", en: "No wishes yet", de: "Noch keine Wünsche"))
                 .font(OhanaFont.headline(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(l.tr(zh: "许下你想要的礼物\n让家人帮你兑换！", en: "Add a gift you want\nand let family help redeem it.", de: "Speichere ein Geschenk\nund lass die Familie beim Einlösen helfen."))
-                .font(OhanaFont.callout())
-                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                .multilineTextAlignment(.center)
         }
     }
 
@@ -249,6 +246,9 @@ struct HumanWishlistContentView: View {
                 TextField(l.tr(zh: "心愿内容（例如：新耳机）", en: "Wish item, e.g. new headphones", de: "Wunsch, z. B. neue Kopfhörer"), text: $newTitle) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
+                    .focused($isNewTitleFocused)
+                    .submitLabel(.done)
+                    .onSubmit { isNewTitleFocused = false }
                     .accessibilityIdentifier("add-human-wishlist-title-input")
             }
                     .padding(.horizontal, 16).padding(.vertical, 14)
@@ -292,7 +292,7 @@ struct HumanWishlistContentView: View {
                 } label: {
                     Text(l.tr(zh: "保存心愿", en: "Save Wish", de: "Wunsch speichern"))
                         .font(OhanaFont.headline(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(newTitle.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity).padding(.vertical, 18)
                         .background(newTitle.isEmpty ? Color.goPrimary.opacity(0.4) : Color.goPrimary,
                                     in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))

@@ -221,7 +221,7 @@ struct FocusWalletCardView: View {
 
     private var electronicPetNeedsCare: Bool {
         switch electronicPetState {
-        case .healthy, .dead:
+        case .healthy, .sleeping, .dead:
             false
         case .needsCare, .atRisk, .sick, .critical:
             true
@@ -232,7 +232,7 @@ struct FocusWalletCardView: View {
         switch electronicPetState {
         case .healthy:
             Color.goPrimary
-        case .dead:
+        case .dead, .sleeping:
             Color.ohanaTertiaryText
         case .needsCare, .atRisk, .sick, .critical:
             Color.goRed
@@ -631,7 +631,7 @@ struct FocusWalletCardView: View {
                 if showsCardTextBadges, card.streak > 1 {
                     Text(l.tr(zh: "🔥 \(card.streak)天连续", en: "🔥 \(card.streak)-day streak", de: "🔥 \(card.streak)-Tage-Serie"))
                         .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 9).padding(.vertical, 4)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -659,7 +659,7 @@ struct FocusWalletCardView: View {
             if showsCardTextBadges, let title = equippedTitleBadge {
                 Text(title)
                     .font(.system(size: OhanaHeroGeometry.lerp(9, 11, progress: progress), weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .lineLimit(1)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -765,7 +765,7 @@ struct FocusWalletCardView: View {
             if showsCardTextBadges, let title = equippedTitleBadge {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .lineLimit(1)
                     .padding(.horizontal, 7)
                     .padding(.vertical, 3)

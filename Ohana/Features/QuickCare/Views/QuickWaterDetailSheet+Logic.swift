@@ -50,30 +50,48 @@ extension QuickWaterDetailSheet {
     }
 
     func saveWaterChangePlanToCalendar(toast: String) {
-        let reminders = commandExecutor.saveWaterChangePlan(
-            pet: pet,
-            allEvents: allEvents,
-            intervalDays: waterIntervalDays,
-            reminderOn: waterReminderOn,
-            cycleAnchor: waterChangeAnchorDate
-        )
-        scheduleCarePlanReminders(reminders)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showSaveConfirmation(toast)
+        do {
+            let reminders = try commandExecutor.saveWaterChangePlanEnforcingPersonalAccess(
+                pet: pet,
+                allEvents: latestAllEvents(),
+                intervalDays: waterIntervalDays,
+                reminderOn: waterReminderOn,
+                cycleAnchor: waterChangeAnchorDate
+            )
+            scheduleCarePlanReminders(reminders)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            showSaveConfirmation(toast)
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        } catch {
+            handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_water_change"))
+        }
     }
 
     func syncFilterPlan(showToast: Bool) {
-        let reminders = commandExecutor.syncFilterPlan(
-            pet: pet,
-            allEvents: allEvents,
-            cleanIntervalDays: filterCleanIntervalDays,
-            replaceIntervalDays: filterReplaceIntervalDays,
-            reminderOn: filterReminderOn
-        )
-        scheduleCarePlanReminders(reminders)
-        if showToast {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(filterReminderOn ? l.tr(zh: "已保存滤芯提醒", en: "Filter reminder saved", de: "Filtererinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+        do {
+            let reminders = try commandExecutor.syncFilterPlanEnforcingPersonalAccess(
+                pet: pet,
+                allEvents: latestAllEvents(),
+                cleanIntervalDays: filterCleanIntervalDays,
+                replaceIntervalDays: filterReplaceIntervalDays,
+                reminderOn: filterReminderOn
+            )
+            scheduleCarePlanReminders(reminders)
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showSaveConfirmation(filterReminderOn ? l.tr(zh: "已保存滤芯提醒", en: "Filter reminder saved", de: "Filtererinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            }
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            }
+        } catch {
+            if showToast {
+                handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_filter"))
+            }
         }
     }
 
@@ -296,6 +314,11 @@ extension QuickWaterDetailSheet {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             setActiveWaterMode(.reminder)
             showSaveConfirmation(result.targetCount > 1 ? localizedSharedWaterPlanSaved(result.targetCount) : l.tr(zh: "已保存喂水计划", en: "Water plan saved", de: "Trinkplan gespeichert"))
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            optimisticWaterPlanEvents = []
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds, syncModeAfterRefresh: true)
         } catch {
             optimisticWaterPlanEvents = []
             handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_drink"))
@@ -706,6 +729,9 @@ extension QuickWaterDetailSheet {
         triggerWaterChangeFeedback()
         showSaveConfirmation(l.tr(zh: "已记录换水", en: "Water change logged", de: "Wasserwechsel eingetragen"))
         onRecordChanged?()
+        if let denial = result.personalDenial {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        }
     }
 
     func doFilterClean() {
@@ -738,6 +764,9 @@ extension QuickWaterDetailSheet {
         triggerFilterFeedback()
         showSaveConfirmation(l.tr(zh: "滤芯已清洗", en: "Filter cleaned", de: "Filter gereinigt"))
         onRecordChanged?()
+        if let denial = result.personalDenial {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        }
     }
 
     func validateActionHumanSelection() -> Bool {

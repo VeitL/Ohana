@@ -641,13 +641,13 @@ final class Pet {
         let speciesName = localizedSpeciesName(species, l: l)
         let trimmedBreed = breed.trimmingCharacters(in: .whitespacesAndNewlines)
         if !speciesName.isEmpty, !trimmedBreed.isEmpty {
-            return "\(speciesName) · \(trimmedBreed)"
+            return "\(speciesName) · \(l.resourceName(trimmedBreed))"
         }
         if !speciesName.isEmpty {
             return speciesName
         }
         if !trimmedBreed.isEmpty {
-            return trimmedBreed
+            return l.resourceName(trimmedBreed)
         }
         return ""
     }
