@@ -64,15 +64,16 @@ extension MemberCardCreationContentView {
         let currentKey = draft.species.isEmpty ? "" : Pet.canonicalSpeciesKey(draft.species)
         guard currentKey != nextKey else { return }
 
-        withAnimation(GoMotion.selection) {
-            draft.species = species
-            draft.isCustomSpecies = nextKey == "other"
-            draft.customSpecies = ""
-            draft.breed = ""
-            draft.customBreed = ""
-            draft.isCustomBreed = false
-            draft.coatColor = ""
-        }
+        // Switching the native bordered style while animating this state can
+        // leave both button representations in the iOS 26 accessibility tree.
+        // Commit the selection immediately so the grid has one stable control.
+        draft.species = species
+        draft.isCustomSpecies = nextKey == "other"
+        draft.customSpecies = ""
+        draft.breed = ""
+        draft.customBreed = ""
+        draft.isCustomBreed = false
+        draft.coatColor = ""
         UISelectionFeedbackGenerator().selectionChanged()
     }
 

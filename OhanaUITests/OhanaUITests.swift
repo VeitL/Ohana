@@ -5451,7 +5451,8 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 8) { creationPrimary.isEnabled })
         tapWhenHittable(creationPrimary, timeout: 8)
 
-        let otherSpecies = app.buttons["member-pet-species-option-other"]
+        let otherSpeciesButtons = app.buttons.matching(identifier: "member-pet-species-option-other")
+        let otherSpecies = otherSpeciesButtons.firstMatch
         XCTAssertTrue(
             otherSpecies.waitForExistence(timeout: 8),
             "The current Species grid did not expose its Other selector."
@@ -5462,8 +5463,8 @@ final class OhanaUITests: XCTestCase {
             "The Other Species accessibility button did not become tappable after scrolling."
         )
         XCTAssertTrue(
-            waitUntil(timeout: 4) { otherSpecies.isSelected },
-            "Selecting Other Species did not update its selected accessibility state."
+            waitUntil(timeout: 4) { otherSpeciesButtons.count == 1 && otherSpecies.isSelected },
+            "Selecting Other Species did not leave one selected accessibility button."
         )
 
         let customSpecies = app.textFields["member-pet-custom-species-input"]
@@ -8585,7 +8586,10 @@ final class OhanaUITests: XCTestCase {
             },
             "Human delete action did not enable after entering the exact name."
         )
-        tapWhenHittable(finalDelete, timeout: 8)
+        // Submit through the focused field's semantic Done action. A tap on
+        // Delete while the keyboard is presented can dismiss focus without
+        // invoking the button on iOS 27.
+        nameInput.typeText("\n")
 
         let ownerHomeCard = app.buttons["home-card-human-\(ownerName)"]
         let deletedHomeCard = app.buttons["home-card-human-\(deletedHumanName)"]
@@ -10533,7 +10537,16 @@ final class OhanaUITests: XCTestCase {
             )
         }
         if createPetNow.exists {
-            tapWhenHittable(createPetNow, timeout: 8)
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    !humanNameField.exists && createPetNow.exists && createPetNow.isHittable
+                },
+                "The Human-to-Pet choice transition did not settle before selecting Pet creation."
+            )
+            XCTAssertTrue(
+                tapWhenSemanticallyHittable(createPetNow, timeout: 8),
+                "The Pet creation choice did not become semantically tappable."
+            )
         }
 
         let didReachMemberCreation = waitUntil(timeout: 12) {
