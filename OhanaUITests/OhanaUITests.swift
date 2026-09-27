@@ -14133,7 +14133,7 @@ final class OhanaUITests: XCTestCase {
     ) {
         XCTAssertTrue(
             UITestInteraction.tap(element, timeout: timeout),
-            "Element did not become stable and semantically tappable.",
+            "Element did not become enabled and semantically tappable.",
             file: file, line: line
         )
     }

@@ -15,7 +15,9 @@ enum UITestInteraction {
 
     @MainActor
     static func tap(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        guard stableFrame(of: element, timeout: timeout, requiresHittable: true) != nil else {
+        // Semantic taps resolve their own hit point. Requiring two extra frame
+        // snapshots can exhaust the deadline on CI before a ready control is tapped.
+        guard wait(timeout: timeout, condition: { element.exists && element.isEnabled && element.isHittable }) else {
             recordFailure("Semantic tap target did not become ready", element: element)
             return false
         }
