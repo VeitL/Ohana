@@ -10,6 +10,11 @@ final class PlantRoomStackUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    override func tearDown() async throws {
+        guard let testRun, testRun.totalFailureCount > 0 else { return }
+        await MainActor.run { UITestInteraction.captureFailureSnapshot() }
+    }
+
     @MainActor
     func testRoomStacksOpenIntoTheExistingPlantDeck() {
         let app = XCUIApplication()
@@ -152,12 +157,7 @@ final class PlantRoomStackUITests: XCTestCase {
 
     @MainActor
     private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            if condition() { return true }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-        } while Date() < deadline
-        return condition()
+        UITestInteraction.wait(timeout: timeout, condition: condition)
     }
 
     @MainActor

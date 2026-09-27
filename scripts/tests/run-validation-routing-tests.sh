@@ -24,6 +24,10 @@ fail() {
 }
 
 default_output="$(scripts/dev-check-changed.sh --dry-run "$ui_fixture")"
+if command -v swiftlint >/dev/null 2>&1; then
+  grep -qF "+ swiftlint lint --strict --force-exclude $ui_fixture" <<<"$default_output" || \
+    fail "changed Swift must run the strict SwiftLint gate before runtime validation"
+fi
 grep -qF "+ swiftformat --lint $ui_fixture" <<<"$default_output" || \
   fail "dev-check default lane must lint formatting without rewriting source"
 if grep -qF "Release data safety contract audit" <<<"$default_output"; then
@@ -99,6 +103,17 @@ grep -qF "Release data safety contract audit for affected persistence/privacy fi
 
 if rg -q 'scripts/audit-[a-z0-9-]+\.sh' scripts/module-exit-gate.sh; then
   fail "module-exit-gate must delegate static checks instead of re-running audits"
+fi
+
+if command -v swiftlint >/dev/null 2>&1; then
+  printf '\nfunc diagnosticFixture() { print("diagnostic") }\n' >> "$ui_fixture"
+  set +e
+  lint_output="$(scripts/dev-check-changed.sh "$ui_fixture" 2>&1)"
+  lint_status=$?
+  set -e
+  [[ "$lint_status" -ne 0 ]] || fail "changed-file checks accepted a forbidden diagnostic print"
+  grep -qF 'no_print_in_app' <<<"$lint_output" || \
+    fail "the strict lint failure must identify the forbidden diagnostic print"
 fi
 
 release_ci_audits=(

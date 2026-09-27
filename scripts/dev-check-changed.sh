@@ -228,6 +228,11 @@ if [[ ${#ui_test_shard_files[@]} -gt 0 ]]; then
 fi
 
 if [[ ${#swift_files[@]} -gt 0 ]]; then
+  if command -v swiftlint >/dev/null 2>&1; then
+    run "strict SwiftLint for touched Swift files" swiftlint lint --strict --force-exclude "${swift_files[@]}"
+  else
+    echo "dev-check: swiftlint not found; skipping SwiftLint (required in CI)."
+  fi
   if command -v swiftformat >/dev/null 2>&1; then
     if [[ "$fix_format" == "1" ]]; then
       run "swiftformat fix for explicitly selected Swift files" swiftformat "${swift_files[@]}"

@@ -165,6 +165,7 @@ extension PetBasicInfoDetailView {
                     .accessibilityIdentifier("pet-basic-info-notes-input")
             }
         }
+        .ohanaKeyboardDismissToolbar()
         .scrollContentBackground(.hidden)
         .tint(profileEditAccent)
         .background(OhanaAppBackground())

@@ -315,6 +315,7 @@ struct AddWorkoutSheet: View {
             .navigationTitle(l.tr(zh: "添加运动记录", en: "Add Workout", de: "Training hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
             .accessibilityIdentifier("add-human-workout-sheet")
+            .ohanaKeyboardDismissToolbar()
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }

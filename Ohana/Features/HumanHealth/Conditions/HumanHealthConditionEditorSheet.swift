@@ -249,6 +249,7 @@ struct HumanHealthConditionEditorSheet: View {
                     }
                 }
             }
+            .ohanaKeyboardDismissToolbar()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

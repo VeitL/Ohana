@@ -19,8 +19,9 @@ final class OhanaUITests: XCTestCase {
         // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    override func tearDown() async throws {
+        guard let testRun, testRun.totalFailureCount > 0 else { return }
+        await MainActor.run { UITestInteraction.captureFailureSnapshot() }
     }
 
     @MainActor
@@ -1716,8 +1717,18 @@ final class OhanaUITests: XCTestCase {
         let homeDatePicker = app.descendants(matching: .any)[
             "task-center-pet-profile-inline-home-date"
         ]
+        func recordHomeDateState(_ phase: String) {
+            recordDiagnosticEvidence("Pet reviewed home-date \(phase):\n\(app.debugDescription)")
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "Pet reviewed home-date \(phase)"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        recordHomeDateState("before enabling")
+        let didRevealHomeDate = enableToggle(inlineHomeDateToggle, revealing: homeDatePicker, in: app)
+        recordHomeDateState("after enabling result=\(didRevealHomeDate)")
         XCTAssertTrue(
-            enableToggle(inlineHomeDateToggle, revealing: homeDatePicker, in: app),
+            didRevealHomeDate,
             "Enabling the home date did not reveal its date picker."
         )
         tapGuidedJourneyControlAfterSemanticScroll(saveLifeStage, in: app)
@@ -2930,7 +2941,7 @@ final class OhanaUITests: XCTestCase {
             "The second relaunch duplicated or lost the identity reward."
         )
         tapWhenHittable(tasksTab, timeout: 8)
-        selectTaskCenterTab(tasksTab, route: taskCenter, in: app)
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12), "Selecting Tasks did not expose the Task Center route.")
         XCTAssertTrue(
             app.buttons[
                 "task-center-system-action-confirmPetPreventiveCare-household-starter-v1-healthProtection"
@@ -6921,18 +6932,12 @@ final class OhanaUITests: XCTestCase {
         primaryAction.press(forDuration: 0.6)
         let allFeatures = app.buttons["home-all-features-action"]
         XCTAssertTrue(
-            tapWhenFrameReady(allFeatures, timeout: 8),
+            tapStableNativeMenuButton(allFeatures, in: app, timeout: 8),
             "Long-pressing Home did not produce a frame-ready All Features action."
         )
 
         let functionMenuRoot = app.descendants(matching: .any)["function-menu-root"]
-        var didOpenFunctionMenu = functionMenuRoot.waitForExistence(timeout: 4)
-        if !didOpenFunctionMenu,
-           allFeatures.exists,
-           hasVisibleFrame(allFeatures, in: app) {
-            _ = tapWhenFrameReady(allFeatures, timeout: 3)
-            didOpenFunctionMenu = functionMenuRoot.waitForExistence(timeout: 12)
-        }
+        let didOpenFunctionMenu = functionMenuRoot.waitForExistence(timeout: 16)
         XCTAssertTrue(
             didOpenFunctionMenu,
             "All Features did not open the function-center root."
@@ -9337,13 +9342,6 @@ final class OhanaUITests: XCTestCase {
         scrollToElement(limeGlow, in: app, maxSwipes: 4)
         XCTAssertTrue(limeGlow.waitForExistence(timeout: 12), "Coconut Shop did not expose the Lime Glow pet effect item.")
         tapWhenHittable(limeGlow, timeout: 8)
-        if !app.descendants(matching: .any)["coconut-shop-purchase-popup-fx_lime_glow"].waitForExistence(timeout: 2) {
-            XCTAssertTrue(
-                tapWhenSemanticallyHittable(limeGlow, timeout: 5),
-                "Coconut Shop Lime Glow item did not become semantically tappable for a retry."
-            )
-        }
-
         XCTAssertTrue(
             app.descendants(matching: .any)["coconut-shop-purchase-popup-fx_lime_glow"].waitForExistence(timeout: 8),
             "Tapping Lime Glow did not open the purchase confirmation popup."
@@ -9434,8 +9432,8 @@ final class OhanaUITests: XCTestCase {
         openPetBasicInfoEditMode(in: app)
         enterPetBasicInfoNote(cancelledNote, in: app)
         discardPetBasicInfoChanges(in: app)
-        XCTAssertFalse(
-            app.textFields["pet-basic-info-notes-input"].waitForExistence(timeout: 3),
+        XCTAssertTrue(
+            waitUntil(timeout: 3) { !app.textFields["pet-basic-info-notes-input"].exists },
             "Cancelling pet basic info edit left the edit note field visible."
         )
         XCTAssertFalse(
@@ -10005,15 +10003,6 @@ final class OhanaUITests: XCTestCase {
         )
         tapWhenHittable(action, timeout: 8)
 
-        // A freshly erased Simulator can occasionally drop the first
-        // synthesized tap while its rendering pipelines are still warming.
-        // The selection action is idempotent while this picker remains on
-        // screen, so verify the handoff and retry its center once if needed.
-        if !waitUntil(timeout: 2, condition: { !selection.exists }),
-           action.exists,
-           action.isEnabled {
-            action.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
         XCTAssertTrue(
             waitUntil(timeout: 8) { !selection.exists },
             "The requested initial Ohana experience did not open: \(mode)"
@@ -11698,9 +11687,8 @@ final class OhanaUITests: XCTestCase {
             "Human health report hospital Done action did not dismiss the keyboard."
         )
         typeText(summary, intoTextView: "add-human-health-report-summary-input", in: app)
-        // TextEditor Return inserts a newline instead of resigning focus. A
-        // visible keyboard is not a save precondition; scroll the real save
-        // action into view and submit through the product UI below.
+        // TextEditor Return inserts a newline; the keyboard toolbar ends
+        // editing without changing the draft or submitting the report.
         dismissKeyboardIfPresent(in: app)
         let saveAction = app.buttons["add-human-health-report-save-action"]
         scrollToElement(saveAction, in: app, maxSwipes: 8)
@@ -11710,11 +11698,7 @@ final class OhanaUITests: XCTestCase {
             },
             "Human health report save action did not enter the visible viewport."
         )
-        if saveAction.isHittable {
-            saveAction.tap()
-        } else {
-            saveAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        tapWhenHittable(saveAction, timeout: 8)
         assertAnyMarkerExists([hospital], in: app, timeout: 18, context: "human health report save")
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
@@ -11796,8 +11780,11 @@ final class OhanaUITests: XCTestCase {
             "Human health metric log actions did not expose a delete action."
         )
         XCTAssertTrue(
-            tapWhenSemanticallyHittable(deleteAction, timeout: 8),
-            "Human health metric delete menu item did not become semantically tappable."
+            // XCTest can reject this native menu item's activation point even
+            // while its enabled, visible frame is stable. Resolve the named
+            // menu item through the same frame-based path as other native menus.
+            tapStableNativeMenuButton(deleteAction, in: app, timeout: 8),
+            "Human health metric delete menu item did not stabilize in its native menu."
         )
         let confirmDelete = app.buttons["Delete Log"]
         XCTAssertTrue(
@@ -12045,13 +12032,10 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func ensureHomeSurfaceVisible(in app: XCUIApplication, humanName: String) {
         let homeTab = app.buttons["home-tab-home"]
-        if homeTab.waitForExistence(timeout: 8) {
-            if homeTab.isHittable {
-                tapWhenHittable(homeTab, timeout: 5)
-            } else {
-                _ = tapWhenFrameReady(homeTab, timeout: 5)
-            }
+        if isPetFeatureRouteOverlayVisible(in: app) || isHumanFeatureRouteOverlayVisible(in: app) {
+            closeCurrentSheetToHome(in: app, humanName: humanName)
         }
+        tapWhenHittable(homeTab, timeout: 8)
 
         let humanCard = app.buttons["home-card-human-\(humanName)"]
         let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
@@ -12067,23 +12051,6 @@ final class OhanaUITests: XCTestCase {
                     app.buttons["home-add-first-pet-action"].exists)
         }
         XCTAssertTrue(didReachHome, "Home surface did not become visible before human route testing.")
-    }
-
-    @MainActor
-    private func selectTaskCenterTab(_ tab: XCUIElement, route: XCUIElement, in app: XCUIApplication) {
-        for attempt in 0 ..< 2 {
-            if route.exists { return }
-            if tab.isSelected, attempt == 0 {
-                let homeTab = app.buttons["home-tab-home"]
-                if homeTab.exists, homeTab.isEnabled, homeTab.isHittable {
-                    homeTab.tap()
-                    _ = waitUntil(timeout: 4) { homeTab.isSelected }
-                }
-            }
-            tapWhenHittable(tab, timeout: 8)
-            if waitUntil(timeout: 12, condition: { route.exists }) { return }
-        }
-        XCTAssertTrue(route.exists, "Selecting Tasks did not expose the Task Center route.")
     }
 
     @MainActor
@@ -13114,43 +13081,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func clearTextField(_ textField: XCUIElement, in app: XCUIApplication) {
-        XCTAssertTrue(waitForFrameReady(textField, timeout: 8), "Text field was not frame-ready for clearing.")
-        let selectAllControls = [
-            app.buttons["Select All"].firstMatch,
-            app.menuItems["Select All"].firstMatch,
-            app.buttons["全选"].firstMatch,
-            app.menuItems["全选"].firstMatch,
-            app.buttons["Alle auswählen"].firstMatch,
-            app.menuItems["Alle auswählen"].firstMatch
-        ]
-
-        for _ in 0 ..< 3 {
-            tapWhenHittable(textField, timeout: 8)
-            let currentValue = (textField.value as? String) ?? ""
-            if isEmptyTextFieldValue(currentValue) { return }
-
-            // UIKit exposes Select All through the edit menu. Use that
-            // semantic control first; triple-tap is a native fallback rather
-            // than a coordinate guess when a menu is transiently unavailable.
-            textField.press(forDuration: 0.8)
-            let didSelectAll = selectAllControls.contains { control in
-                tapWhenSemanticallyHittable(control, timeout: 2)
-            }
-            if !didSelectAll {
-                textField.tap(withNumberOfTaps: 3, numberOfTouches: 1)
-            }
-            textField.typeText(XCUIKeyboardKey.delete.rawValue)
-            _ = waitUntil(timeout: 1) {
-                isEmptyTextFieldValue((textField.value as? String) ?? "")
-            }
-
-            if !isEmptyTextFieldValue((textField.value as? String) ?? "") {
-                textField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: currentValue.count + 4))
-            }
-        }
-
-        let finalValue = (textField.value as? String) ?? ""
-        XCTAssertTrue(isEmptyTextFieldValue(finalValue), "Text field still contained text after clear attempts. Actual: \(finalValue)")
+        XCTAssertTrue(
+            UITestInteraction.clearTextField(textField, in: app),
+            "Text field must be empty before replacement: \(textField.identifier)."
+        )
     }
 
     private func isEmptyTextFieldValue(_ value: String) -> Bool {
@@ -13176,9 +13110,7 @@ final class OhanaUITests: XCTestCase {
     private func openCalendarTab(in app: XCUIApplication, petName: String) {
         closeCurrentPetRouteIfNeeded(in: app)
         let homeTab = app.buttons["home-tab-home"]
-        if homeTab.exists {
-            _ = tapWhenFrameReady(homeTab, timeout: 5)
-        }
+        tapWhenHittable(homeTab, timeout: 8)
         collapseExpandedPetCardIfNeeded(in: app)
 
         let petCard = app.buttons["home-card-pet-\(petName)"]
@@ -13292,12 +13224,7 @@ final class OhanaUITests: XCTestCase {
                 let refreshedChip = app.buttons["add-event-related-pet-\(linkedPetName)"]
                 return refreshedChip.exists && refreshedChip.isSelected
             }
-            var didSelect = waitUntil(timeout: 4, condition: didSelectRelatedPet)
-            if !didSelect {
-                scrollTowardElement(petChip, in: app, maxSwipes: 4)
-                _ = tapWhenFrameReady(petChip, timeout: 4)
-                didSelect = waitUntil(timeout: 8, condition: didSelectRelatedPet)
-            }
+            let didSelect = waitUntil(timeout: 8, condition: didSelectRelatedPet)
             XCTAssertTrue(
                 didSelect,
                 "Calendar related-entity selection did not return \(linkedPetName) to the editor."
@@ -13315,20 +13242,10 @@ final class OhanaUITests: XCTestCase {
                 reminderToggle.waitForExistence(timeout: 8),
                 "Calendar add-event sheet did not expose the reminder toggle."
             )
-            for _ in 0 ..< 6 where !reminderToggle.isHittable {
-                app.swipeUp()
-                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            }
-            if isToggleOn(reminderToggle) {
-                tapWhenHittable(reminderToggle, timeout: 8)
-                if !waitUntil(timeout: 2, condition: { !self.isToggleOn(reminderToggle) }) {
-                    _ = tapWhenSemanticallyHittable(reminderToggle, timeout: 2)
-                }
-                XCTAssertTrue(
-                    waitUntil(timeout: 4) { !isToggleOn(reminderToggle) },
-                    "Calendar reminder stayed enabled for a Simulator-only persistence test. Actual: \(String(describing: reminderToggle.value))"
-                )
-            }
+            XCTAssertTrue(
+                UITestInteraction.setToggle(reminderToggle, enabled: false, timeout: 8),
+                "Calendar reminder did not reach Off for a Simulator-only persistence test."
+            )
         }
         tapFirstHittableButton(identifier: "add-event-navigation-save-action", in: app, timeout: 8, context: "calendar event save")
         XCTAssertTrue(
@@ -13343,36 +13260,17 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func tapCalendarAddEventAction(in app: XCUIApplication) {
         closeCurrentPetRouteIfNeeded(in: app)
-        let calendarAddEventAction = app.buttons["calendar-add-event-action"]
-        if calendarAddEventAction.exists && calendarAddEventAction.isEnabled && calendarAddEventAction.isHittable {
-            tapWhenHittable(calendarAddEventAction, timeout: 5)
+        var action: XCUIElement?
+        let ready = waitUntil(timeout: 8) {
+            action = firstHittableButton(identifier: "calendar-add-event-action", in: app)
+                ?? firstHittableButton(identifier: "home-primary-action", in: app)
+            return action != nil
+        }
+        guard ready, let action else {
+            XCTFail("Calendar add-event action did not become ready after closing the current route.")
             return
         }
-
-        let addEventAction = app.buttons["home-primary-action"]
-        let didBecomeHittable = waitUntil(timeout: 8) {
-            addEventAction.exists && addEventAction.isEnabled && addEventAction.isHittable
-        }
-        if didBecomeHittable {
-            addEventAction.tap()
-            return
-        }
-
-        closeCurrentPetRouteIfNeeded(in: app)
-        let didBecomeHittableAfterClosingRoute = waitUntil(timeout: 4) {
-            addEventAction.exists && addEventAction.isEnabled && addEventAction.isHittable
-        }
-        if didBecomeHittableAfterClosingRoute {
-            addEventAction.tap()
-            return
-        }
-
-        let elementValue = addEventAction.value.map { String(describing: $0) } ?? "nil"
-        XCTAssertTrue(
-            addEventAction.exists && addEventAction.isEnabled,
-            "Calendar add-event action was not ready: \(addEventAction) exists=\(addEventAction.exists) enabled=\(addEventAction.isEnabled) hittable=\(addEventAction.isHittable) frame=\(addEventAction.frame) label=\(addEventAction.label) value=\(elementValue)"
-        )
-        addEventAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        tapWhenHittable(action, timeout: 5)
     }
 
     @MainActor
@@ -13543,21 +13441,16 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func scrollToElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
-        for _ in 0 ..< maxSwipes where !element.exists || !hasVisibleFrame(element, in: app) {
-            swipeUpInPrimaryScrollArea(in: app)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        }
+        scrollTowardElement(element, in: app, maxSwipes: maxSwipes)
     }
 
     @MainActor
     private func scrollTowardElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
-        for _ in 0 ..< maxSwipes where !element.exists || !hasVisibleFrame(element, in: app) {
-            if element.exists, element.frame.midY < app.frame.midY {
-                app.swipeDown()
-            } else {
-                swipeUpInPrimaryScrollArea(in: app)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        for _ in 0 ..< maxSwipes {
+            if hasSafelyTappableFrame(element, in: app) { return }
+            if app.keyboards.firstMatch.exists { dismissKeyboardIfPresent(in: app) }
+            let towardEarlierContent = element.exists && element.frame.midY < app.frame.midY
+            swipeInPrimaryScrollArea(in: app, towardEarlierContent: towardEarlierContent)
         }
     }
 
@@ -13605,11 +13498,6 @@ final class OhanaUITests: XCTestCase {
             tapWhenSemanticallyHittable(disclosure, timeout: 8),
             "Life & data management did not expand."
         )
-        if !waitUntil(timeout: 2, condition: {
-            markAction.exists || undoAction.exists || deleteAction.exists
-        }) {
-            _ = tapWhenSemanticallyHittable(disclosure, timeout: 2)
-        }
         scrollTowardElement(deleteAction, in: app, maxSwipes: 6)
         XCTAssertTrue(
             waitUntil(timeout: 8) {
@@ -13621,23 +13509,24 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func swipeUpInPrimaryScrollArea(in app: XCUIApplication) {
-        let starterJourney = app.scrollViews["task-center-starter-journey-scroll"]
-        if visibleFrame(of: starterJourney, in: app) != nil {
-            dragUp(in: starterJourney)
-            return
-        }
-        let taskCenter = app.scrollViews["task-center-scroll-view"]
-        if visibleFrame(of: taskCenter, in: app) != nil {
-            dragUp(in: taskCenter)
-            return
-        }
-        let calendarList = app.descendants(matching: .any)["calendar-list-scroll-view"]
-        if visibleFrame(of: calendarList, in: app) != nil {
-            dragUp(in: calendarList)
-        } else if let scrollView = largestVisibleScrollView(in: app) {
-            dragUp(in: scrollView)
+        swipeInPrimaryScrollArea(in: app, towardEarlierContent: false)
+    }
+
+    @MainActor
+    private func swipeInPrimaryScrollArea(in app: XCUIApplication, towardEarlierContent: Bool) {
+        let knownScrollViews = [
+            app.scrollViews["task-center-starter-journey-scroll"],
+            app.scrollViews["task-center-scroll-view"],
+            app.descendants(matching: .any)["calendar-list-scroll-view"]
+        ]
+        let scrollView = knownScrollViews.first {
+            visibleFrame(of: $0, in: app) != nil && $0.isHittable
+        } ?? largestVisibleScrollView(in: app)
+        let surface = scrollView ?? app
+        if towardEarlierContent {
+            surface.swipeDown()
         } else {
-            app.swipeUp()
+            surface.swipeUp()
         }
     }
 
@@ -13665,7 +13554,7 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< scrollViews.count {
             let candidate = scrollViews.element(boundBy: index)
-            guard let frame = visibleFrame(of: candidate, in: app) else { continue }
+            guard let frame = visibleFrame(of: candidate, in: app), candidate.isHittable else { continue }
             let area = frame.width * frame.height
             if area > bestArea {
                 bestArea = area
@@ -13834,15 +13723,12 @@ final class OhanaUITests: XCTestCase {
     }
 
     private func isPetFeatureRouteOverlayVisible(in app: XCUIApplication) -> Bool {
-        livePetRouteIdentifiers().contains { identifier in
-            app.descendants(matching: .any)[identifier].exists
-        } || [
-            "feature-hub-daily-food",
-            "feature-hub-daily-potty",
-            "feature-hub-health-health"
-        ].contains { identifier in
-            app.buttons[identifier].exists
-        }
+        containsAnyElement(in: app, identifiers: livePetRouteIdentifiers()) ||
+            app.buttons.matching(NSPredicate(format: "identifier IN %@", [
+                "feature-hub-daily-food",
+                "feature-hub-daily-potty",
+                "feature-hub-health-health"
+            ])).firstMatch.exists
     }
 
     @MainActor
@@ -13868,10 +13754,6 @@ final class OhanaUITests: XCTestCase {
             close.tap()
             return
         }
-        if let close = firstFrameReadyButton(labels: ["Close", "Done", "关闭", "完成", "Schließen", "Fertig"], in: app) {
-            close.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            return
-        }
         if let back = firstHittableButton(labels: ["Back", "返回", "Zurück"], in: app) {
             back.tap()
             return
@@ -13886,7 +13768,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     private func isHumanFeatureRouteOverlayVisible(in app: XCUIApplication) -> Bool {
-        [
+        containsAnyElement(in: app, identifiers: [
             "add-human-workout-sheet",
             "generic-weight-entry-sheet-human",
             "human-detail-screen",
@@ -13911,9 +13793,7 @@ final class OhanaUITests: XCTestCase {
             "quick-human-medication-sheet",
             "quick-human-workout-sheet",
             "quick-human-note-sheet"
-        ].contains { identifier in
-            app.descendants(matching: .any)[identifier].exists
-        }
+        ])
     }
 
     private func assertAnyMarkerExists(_ markers: [String], in app: XCUIApplication, timeout: TimeInterval, context: String) {
@@ -13986,10 +13866,9 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(didShowNameField, missingFieldMessage)
 
-        nameField.tap()
+        tapWhenHittable(nameField, timeout: 8)
         nameField.typeText(name)
-        nameField.typeText("\n")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
 
         tapThroughMemberCreationSteps(
             in: app,
@@ -14014,15 +13893,7 @@ final class OhanaUITests: XCTestCase {
                 !hasCreationControl &&
                 !hasHandoff
         }
-        var didLeaveCreation = waitUntil(timeout: 8, condition: didFinishCreation)
-        if !didLeaveCreation,
-           creationPrimary.exists,
-           creationPrimary.isEnabled,
-           isMemberCreationFinalActionLabel(creationPrimary.label),
-           hasVisibleFrame(creationPrimary, in: app) {
-            _ = tapWhenFrameReady(creationPrimary, timeout: 3)
-            didLeaveCreation = waitUntil(timeout: 22, condition: didFinishCreation)
-        }
+        let didLeaveCreation = waitUntil(timeout: 30, condition: didFinishCreation)
         XCTAssertTrue(didLeaveCreation, completionMessage)
     }
 
@@ -14073,35 +13944,19 @@ final class OhanaUITests: XCTestCase {
             ["afghan hound", "阿富汗猎犬", "Afghanischer Windhund"]
         }
 
-        for _ in 0 ..< 3 {
-            tapGuidedJourneyControlAfterSemanticScroll(breedMenu, in: app)
-
-            let didExposeOption = waitUntil(timeout: 8) {
-                breedOptionLabels.contains { app.buttons[$0].exists }
-            }
-            guard didExposeOption else { continue }
-            guard tapNativeMenuOption(
-                optionLabels: breedOptionLabels,
-                in: app
-            ) else {
-                continue
-            }
-
-            let didApplySelection = waitUntil(timeout: 4) {
+        tapGuidedJourneyControlAfterSemanticScroll(breedMenu, in: app)
+        XCTAssertTrue(
+            tapNativeMenuOption(optionLabels: breedOptionLabels, in: app),
+            "Pet creation did not expose a selectable breed option."
+        )
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
                 hasSelectedBreed() ||
                     (breedMenu.exists && breedMenu.label != placeholderLabel) ||
                     (selectionWasRequired && creationPrimary.exists && creationPrimary.isEnabled)
-            }
-            if didApplySelection {
-                return
-            }
-        }
-
-        if waitUntil(timeout: 4, condition: hasSelectedBreed) {
-            return
-        }
-
-        XCTFail("Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)")
+            },
+            "Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)"
+        )
     }
 
     @MainActor
@@ -14109,27 +13964,17 @@ final class OhanaUITests: XCTestCase {
         optionLabels: [String],
         in app: XCUIApplication
     ) -> Bool {
-        for _ in 0 ..< 3 {
-            var targetOption: XCUIElement?
-            let didFindOption = waitUntil(timeout: 8) {
-                targetOption = firstFrameReadyButton(labels: optionLabels, in: app)
-                return targetOption != nil
-            }
-            guard didFindOption, let targetOption else { continue }
-            guard tapStableNativeMenuButton(targetOption, in: app, timeout: 4) else {
-                continue
-            }
-            if waitUntil(timeout: 2, condition: { !targetOption.exists }) {
-                return true
-            }
-        }
-        return false
+        var target: XCUIElement?
+        guard waitUntil(timeout: 8, condition: {
+            target = firstFrameReadyButton(labels: optionLabels, in: app)
+            return target != nil
+        }), let target, tapStableNativeMenuButton(target, in: app, timeout: 4) else { return false }
+        return waitUntil(timeout: 4) { !target.exists }
     }
 
     private func containsAnyElement(in app: XCUIApplication, identifiers: [String]) -> Bool {
-        identifiers.contains { identifier in
-            app.descendants(matching: .any)[identifier].exists
-        }
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier IN %@", identifiers)).firstMatch.exists
     }
 
     private func containsAnyText(in app: XCUIApplication, texts: [String]) -> Bool {
@@ -14156,11 +14001,7 @@ final class OhanaUITests: XCTestCase {
             },
             "Text field did not become visible: \(identifier)"
         )
-        if target.isHittable {
-            target.tap()
-        } else {
-            target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        tapWhenHittable(target, timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 4) { app.keyboards.firstMatch.exists },
             "Text field did not receive keyboard focus: \(identifier)"
@@ -14184,11 +14025,7 @@ final class OhanaUITests: XCTestCase {
             },
             "Text view did not become visible: \(identifier)"
         )
-        if target.isHittable {
-            target.tap()
-        } else {
-            target.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        tapWhenHittable(target, timeout: 8)
         XCTAssertTrue(
             waitUntil(timeout: 4) { app.keyboards.firstMatch.exists },
             "Text view did not receive keyboard focus: \(identifier)"
@@ -14197,36 +14034,17 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func dismissKeyboardIfPresent(in app: XCUIApplication, returnKeyIsSafe: Bool = false) {
-        if app.keyboards.firstMatch.exists {
-            let profileEditorDone = app.buttons["task-center-pet-profile-inline-keyboard-done"]
-            if profileEditorDone.exists && profileEditorDone.isEnabled && profileEditorDone.isHittable {
-                profileEditorDone.tap()
-                _ = waitUntil(timeout: 3) { !app.keyboards.firstMatch.exists }
-                return
-            }
-            let doneLabels = ["Done", "done", "完成", "Fertig", "隐藏键盘", "Hide keyboard"]
-            if let done = doneLabels
-                .map({ app.keyboards.buttons[$0].firstMatch })
-                .first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
-                done.tap()
-                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-                return
-            }
-            if returnKeyIsSafe {
-                let returnLabels = ["return", "Return", "换行"]
-                if let returnKey = returnLabels
-                    .map({ app.keyboards.buttons[$0].firstMatch })
-                    .first(where: { $0.exists && $0.isEnabled && $0.isHittable }) {
-                    returnKey.tap()
-                    if waitUntil(timeout: 2, condition: { !app.keyboards.firstMatch.exists }) {
-                        return
-                    }
-                }
-            }
-            app.swipeDown()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
+    private func dismissKeyboardIfPresent(
+        in app: XCUIApplication,
+        returnKeyIsSafe: Bool = false,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(
+            UITestInteraction.dismissKeyboard(in: app, returnKeyIsSafe: returnKeyIsSafe),
+            "Keyboard dismissal must complete before continuing the editor journey.",
+            file: file, line: line
+        )
     }
 
     @MainActor
@@ -14238,12 +14056,11 @@ final class OhanaUITests: XCTestCase {
         let creationPrimary = app.buttons["member-creation-primary-action"]
         XCTAssertTrue(creationPrimary.waitForExistence(timeout: 8), "Member creation primary action did not appear.")
 
-        var didTapFinalSave = false
+        let progress = app.descendants(matching: .any)["member-creation-step-progress"]
         for _ in 0 ..< 8 {
-            guard creationPrimary.exists else {
-                didTapFinalSave = true
-                break
-            }
+            XCTAssertTrue(progress.waitForExistence(timeout: 8), "Member creation did not expose its current step.")
+            let previousStep = progress.value as? String
+            XCTAssertNotNil(previousStep, "Member creation step must expose a readable progress value.")
             if let starterPetWeight {
                 fillStarterPetWeightIfNeeded(
                     in: app,
@@ -14259,33 +14076,18 @@ final class OhanaUITests: XCTestCase {
             if app.buttons["member-pet-coat-picker"].exists {
                 selectMemberCreationPetAppearance(in: app)
             }
-            let actionLabel = creationPrimary.label
-            let didBecomeReadyOrLeave = waitUntil(timeout: 8) {
-                guard creationPrimary.exists else { return true }
-                guard creationPrimary.isEnabled else { return false }
-                let frame = creationPrimary.frame
-                return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
-            }
-            XCTAssertTrue(
-                didBecomeReadyOrLeave,
-                "Member creation primary action did not become enabled with a stable touch frame."
-            )
-            guard creationPrimary.exists else {
-                didTapFinalSave = true
-                break
-            }
+            let isFinalSave = isMemberCreationFinalActionLabel(creationPrimary.label)
             tapGuidedJourneyControlAfterSemanticScroll(creationPrimary, in: app)
-            if isMemberCreationFinalActionLabel(actionLabel) {
-                didTapFinalSave = true
-                break
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
-            if !creationPrimary.exists {
-                didTapFinalSave = true
-                break
-            }
+            if isFinalSave { return }
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    guard progress.exists, let currentStep = progress.value as? String else { return false }
+                    return currentStep != previousStep
+                },
+                "Member creation did not advance after one Next action. Previous step: \(previousStep ?? "unreadable")"
+            )
         }
-        XCTAssertTrue(didTapFinalSave, "Member creation did not reach the final save action.")
+        XCTFail("Member creation did not reach the final save action.")
     }
 
     @MainActor
@@ -14293,20 +14095,13 @@ final class OhanaUITests: XCTestCase {
         let creationPrimary = app.buttons["member-creation-primary-action"]
         if creationPrimary.isEnabled { return }
 
-        let boyIdentifier = "member-gender-boy"
-        for _ in 0 ..< 3 {
-            let boy = app.buttons[boyIdentifier]
-            scrollTowardElement(boy, in: app, maxSwipes: 4)
-            let didTapGender = tapWhenSemanticallyHittable(boy, timeout: 3) ||
-                tapStableNativeMenuButton(boy, in: app, timeout: 2)
-            guard didTapGender else { continue }
-            if waitUntil(timeout: 4, condition: {
-                creationPrimary.exists && creationPrimary.isEnabled
-            }) {
-                return
-            }
-        }
-        XCTFail("Required Pet sex selection did not enable the next creation step.")
+        let boy = app.buttons["member-gender-boy"]
+        scrollTowardElement(boy, in: app, maxSwipes: 4)
+        tapWhenHittable(boy, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) { creationPrimary.exists && creationPrimary.isEnabled },
+            "Required Pet sex selection did not enable the next creation step."
+        )
     }
 
     private func isMemberCreationFinalActionLabel(_ label: String) -> Bool {
@@ -14326,33 +14121,21 @@ final class OhanaUITests: XCTestCase {
         _ element: XCUIElement,
         timeout: TimeInterval
     ) -> Bool {
-        let didBecomeHittable = waitUntil(timeout: timeout) {
-            element.exists && element.isEnabled && element.isHittable
-        }
-        guard didBecomeHittable else { return false }
-        element.tap()
-        return true
+        UITestInteraction.tap(element, timeout: timeout)
     }
 
     @MainActor
-    private func tapWhenHittable(_ element: XCUIElement, timeout: TimeInterval) {
-        let didBecomeHittable = waitUntil(timeout: timeout) {
-            element.exists && element.isEnabled && element.isHittable
-        }
-        if didBecomeHittable {
-            element.tap()
-            return
-        }
-
-        let didBecomeFrameReady = waitForFrameReady(element, timeout: 1)
-        let elementValue = element.value.map { String(describing: $0) } ?? "nil"
-        guard didBecomeFrameReady else {
-            XCTFail(
-                "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
-            )
-            return
-        }
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    private func tapWhenHittable(
+        _ element: XCUIElement,
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(
+            UITestInteraction.tap(element, timeout: timeout),
+            "Element did not become stable and semantically tappable.",
+            file: file, line: line
+        )
     }
 
     @MainActor
@@ -14372,7 +14155,6 @@ final class OhanaUITests: XCTestCase {
         // action before searching for the control.
         if app.keyboards.firstMatch.exists {
             dismissKeyboardIfPresent(in: app)
-            _ = waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists }
         }
         guard waitUntil(timeout: 8, condition: { app.state == .runningForeground }) else {
             XCTFail("Guided journey app did not return to the foreground before tapping.", file: file, line: line)
@@ -14395,16 +14177,15 @@ final class OhanaUITests: XCTestCase {
                currentElement.isEnabled,
                currentElement.isHittable,
                hasSafelyTappableFrame(currentElement, in: app),
-               tapStableNativeMenuButton(currentElement, in: app, timeout: 2) {
+               tapWhenSemanticallyHittable(currentElement, timeout: 2) {
                 return
             }
             guard app.state == .runningForeground else { continue }
             if currentElement.exists, currentElement.frame.midY < app.frame.midY {
-                app.swipeDown()
+                swipeInPrimaryScrollArea(in: app, towardEarlierContent: true)
             } else {
                 swipeUpInPrimaryScrollArea(in: app)
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
 
         let currentElement = element
@@ -14412,7 +14193,7 @@ final class OhanaUITests: XCTestCase {
             currentElement.isEnabled &&
             currentElement.isHittable &&
             hasSafelyTappableFrame(currentElement, in: app) &&
-            tapStableNativeMenuButton(currentElement, in: app, timeout: 2)
+            tapWhenSemanticallyHittable(currentElement, timeout: 2)
         XCTAssertTrue(
             didTapFinalVisibleElement,
             "Guided journey control did not become semantically tappable after scrolling: \(currentElement)",
@@ -14517,21 +14298,12 @@ final class OhanaUITests: XCTestCase {
         identifier: String,
         in app: XCUIApplication
     ) -> Bool {
-        for _ in 0 ..< 3 {
-            var target: XCUIElement?
-            let didFindTarget = waitUntil(timeout: 8) {
-                target = firstFrameReadyButton(identifier: identifier, in: app)
-                return target != nil
-            }
-            guard didFindTarget, let target else { continue }
-            guard tapStableNativeMenuButton(target, in: app, timeout: 4) else {
-                continue
-            }
-            if waitUntil(timeout: 2, condition: { !target.exists }) {
-                return true
-            }
-        }
-        return false
+        var target: XCUIElement?
+        guard waitUntil(timeout: 8, condition: {
+            target = firstFrameReadyButton(identifier: identifier, in: app)
+            return target != nil
+        }), let target, tapStableNativeMenuButton(target, in: app, timeout: 4) else { return false }
+        return waitUntil(timeout: 4) { !target.exists }
     }
 
     @MainActor
@@ -14541,96 +14313,27 @@ final class OhanaUITests: XCTestCase {
         timeout: TimeInterval,
         usesPointerClick: Bool = true
     ) -> Bool {
-        var previousFrame: CGRect?
-        var latestUsableFrame: CGRect?
-        var stableFrame: CGRect?
-        var consecutiveStableSamples = 0
-        _ = waitUntil(timeout: timeout) {
-            guard app.state == .runningForeground,
-                  button.exists,
-                  button.isEnabled else { return false }
-            let frame = button.frame
-            let visibleFrame = frame.intersection(app.frame)
-            guard self.isFiniteFrame(frame),
-                  frame.width > 1,
-                  frame.height > 1,
-                  !visibleFrame.isNull,
-                  visibleFrame.width > 1,
-                  visibleFrame.height > 1 else {
-                previousFrame = nil
-                consecutiveStableSamples = 0
-                return false
-            }
-            latestUsableFrame = frame
-            if let previousFrame,
-               self.framesApproximatelyEqual(previousFrame, frame) {
-                consecutiveStableSamples += 1
-            } else {
-                consecutiveStableSamples = 0
-            }
-            previousFrame = frame
-            guard consecutiveStableSamples >= 1 else { return false }
-            stableFrame = frame
-            return true
-        }
-        guard app.state == .runningForeground,
-              let targetFrame = stableFrame ?? latestUsableFrame else { return false }
-
-        let screenFrame = app.frame
-        guard isFiniteFrame(screenFrame),
-              screenFrame.width > 1,
-              screenFrame.height > 1 else {
-            return false
-        }
-        let normalizedX = (targetFrame.midX - screenFrame.minX) / screenFrame.width
-        let normalizedY = (targetFrame.midY - screenFrame.minY) / screenFrame.height
-        guard normalizedX.isFinite,
-              normalizedY.isFinite,
-              (0 ... 1).contains(normalizedX),
-              (0 ... 1).contains(normalizedY) else {
-            return false
-        }
-        let coordinate = app.coordinate(
-            withNormalizedOffset: CGVector(dx: normalizedX, dy: normalizedY)
-        )
-        if usesPointerClick, XCUIDevice.shared.supportsPointerInteraction {
-            coordinate.click()
-        } else {
-            coordinate.tap()
-        }
-        return true
-    }
-
-    private func framesApproximatelyEqual(
-        _ lhs: CGRect,
-        _ rhs: CGRect,
-        tolerance: CGFloat = 0.75
-    ) -> Bool {
-        abs(lhs.minX - rhs.minX) <= tolerance &&
-            abs(lhs.minY - rhs.minY) <= tolerance &&
-            abs(lhs.width - rhs.width) <= tolerance &&
-            abs(lhs.height - rhs.height) <= tolerance
+        UITestInteraction.tapFrame(button, in: app, timeout: timeout, usesPointerClick: usesPointerClick)
     }
 
     @MainActor
     private func tapFirstHittableButton(identifier: String, in app: XCUIApplication, timeout: TimeInterval, context: String) {
-        var didTap = waitUntil(timeout: timeout) {
-            guard let button = firstHittableButton(identifier: identifier, in: app) else {
-                return false
+        var button: XCUIElement?
+        if !waitUntil(timeout: timeout, condition: {
+            button = firstHittableButton(identifier: identifier, in: app)
+            return button != nil
+        }) {
+            scrollTowardElement(app.buttons.matching(identifier: identifier).firstMatch, in: app, maxSwipes: 4)
+            _ = waitUntil(timeout: timeout) {
+                button = firstHittableButton(identifier: identifier, in: app)
+                return button != nil
             }
-            button.tap()
-            return true
         }
-        if !didTap {
-            let firstMatch = app.buttons.matching(identifier: identifier).firstMatch
-            scrollTowardElement(firstMatch, in: app, maxSwipes: 4)
-            didTap = tapWhenFrameReady(firstMatch, timeout: 2)
+        guard let button else {
+            XCTFail("No visible button \(identifier) became available for \(context).")
+            return
         }
-        let matchCount = app.buttons.matching(identifier: identifier).count
-        XCTAssertTrue(
-            didTap,
-            "No visible button \(identifier) became available for \(context). matches=\(matchCount)"
-        )
+        tapWhenHittable(button, timeout: timeout)
     }
 
     @MainActor
@@ -14663,14 +14366,7 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func tapWhenFrameReady(_ element: XCUIElement, offset: CGVector, timeout: TimeInterval) -> Bool {
-        let didBecomeFrameReady = waitUntil(timeout: timeout) {
-            guard element.exists, element.isEnabled else { return false }
-            let frame = element.frame
-            return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
-        }
-        guard didBecomeFrameReady else { return false }
-        element.coordinate(withNormalizedOffset: offset).tap()
-        return true
+        UITestInteraction.tapFrame(element, offset: offset, timeout: timeout)
     }
 
     @MainActor
@@ -14688,30 +14384,18 @@ final class OhanaUITests: XCTestCase {
         )
         let initialLabel = finishGift.label
 
-        for attempt in 0 ..< 2 {
-            finishGift.tap()
-            let didRespond = waitUntil(timeout: 3) {
+        tapWhenHittable(finishGift, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
                 oasisTab.exists ||
-                    coconutBalance.label != "Coconut balance 0" ||
+                    (coconutBalance.exists && coconutBalance.label != "Coconut balance 0") ||
                     !finishGift.exists ||
                     !finishGift.isEnabled ||
                     finishGift.label != initialLabel ||
                     claimError.exists
-            }
-            if didRespond { return }
-
-            if attempt == 0 {
-                RunLoop.current.run(until: Date().addingTimeInterval(0.35))
-                XCTAssertTrue(
-                    waitUntil(timeout: 3) {
-                        finishGift.exists && finishGift.isEnabled && finishGift.isHittable
-                    },
-                    "The starter gift confirmation disappeared without beginning or completing the claim."
-                )
-            }
-        }
-
-        XCTFail("The resumed starter gift confirmation ignored two stable taps without changing state.")
+            },
+            "The resumed starter gift confirmation did not respond to one stable tap."
+        )
     }
 
     private func isFiniteFrame(_ frame: CGRect) -> Bool {
@@ -14723,11 +14407,14 @@ final class OhanaUITests: XCTestCase {
             frame.midY.isFinite
     }
 
+    @MainActor
     private func isToggleOn(_ element: XCUIElement) -> Bool {
-        let value = String(describing: element.value ?? "")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        return ["1", "true", "on", "yes", "enabled", "selected"].contains(value)
+        guard let state = UITestInteraction.toggleState(element) else {
+            UITestInteraction.recordFailure("Expected a readable switch state", element: element)
+            XCTFail("Switch state was unknown; it cannot be treated as Off.")
+            return false
+        }
+        return state
     }
 
     @MainActor
@@ -14736,26 +14423,7 @@ final class OhanaUITests: XCTestCase {
         revealing picker: XCUIElement,
         in app: XCUIApplication
     ) -> Bool {
-        if picker.exists {
-            return true
-        }
-        guard toggle.waitForExistence(timeout: 8) else {
-            return false
-        }
-        scrollTowardElement(toggle, in: app, maxSwipes: 8)
-        let nestedSwitch = toggle.descendants(matching: .switch).firstMatch
-        let actionTarget = nestedSwitch.exists ? nestedSwitch : toggle
-        guard actionTarget.exists && actionTarget.isEnabled else { return false }
-        if !isToggleOn(actionTarget) {
-            guard tapWhenSemanticallyHittable(actionTarget, timeout: 4) else {
-                return false
-            }
-        }
-        guard waitUntil(timeout: 5, condition: {
-            picker.exists || self.isToggleOn(actionTarget)
-        }) else {
-            return false
-        }
+        guard setToggle(toggle, enabled: true, in: app) else { return false }
         if !picker.exists {
             scrollTowardElement(picker, in: app, maxSwipes: 4)
         }
@@ -14768,71 +14436,9 @@ final class OhanaUITests: XCTestCase {
         enabled expectedState: Bool,
         in app: XCUIApplication
     ) -> Bool {
-        if app.state != .runningForeground {
-            app.activate()
-        }
-        guard waitUntil(timeout: 8, condition: { app.state == .runningForeground }) else {
-            return false
-        }
-
-        let identifier = toggle.identifier
-        let refreshedToggle = {
-            guard !identifier.isEmpty else { return toggle }
-            return app.descendants(matching: .any)
-                .matching(identifier: identifier)
-                .firstMatch
-        }
-        let refreshedControl = {
-            let currentToggle = refreshedToggle()
-            let nestedSwitch = currentToggle.descendants(matching: .switch).firstMatch
-            return currentToggle.elementType == .switch || !nestedSwitch.exists
-                ? currentToggle
-                : nestedSwitch
-        }
-        guard waitUntil(timeout: 8, condition: { refreshedToggle().exists }) else {
-            return false
-        }
-
-        for _ in 0 ... 6 {
-            let control = refreshedControl()
-            if hasSafelyTappableFrame(control, in: app) {
-                break
-            }
-            if control.exists, control.frame.midY < app.frame.midY {
-                app.swipeDown()
-            } else {
-                swipeUpInPrimaryScrollArea(in: app)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        }
-
-        let hasExpectedState = {
-            self.isToggleOn(refreshedControl()) == expectedState
-        }
-        if hasExpectedState() {
-            return true
-        }
-
-        for _ in 0 ..< 2 {
-            if app.state != .runningForeground {
-                app.activate()
-                guard waitUntil(timeout: 8, condition: { app.state == .runningForeground }) else {
-                    continue
-                }
-            }
-            let control = refreshedControl()
-            guard control.exists,
-                  control.isEnabled,
-                  hasSafelyTappableFrame(control, in: app) else {
-                continue
-            }
-            guard control.isHittable else { continue }
-            control.tap()
-            if waitUntil(timeout: 3, condition: hasExpectedState) {
-                return true
-            }
-        }
-        return hasExpectedState()
+        guard toggle.waitForExistence(timeout: 8) else { return false }
+        scrollTowardElement(toggle, in: app, maxSwipes: 6)
+        return UITestInteraction.setToggle(toggle, enabled: expectedState, timeout: 5)
     }
 
     private func accessibilityText(for element: XCUIElement) -> String {
@@ -14841,12 +14447,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return true }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        return condition()
+        UITestInteraction.wait(timeout: timeout, condition: condition)
     }
 
     private struct PetFeatureHubRouteExpectation {

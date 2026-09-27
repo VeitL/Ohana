@@ -294,6 +294,7 @@ struct HumanHealthObservationEditorSheet: View {
                     }
                 }
             }
+            .ohanaKeyboardDismissToolbar()
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

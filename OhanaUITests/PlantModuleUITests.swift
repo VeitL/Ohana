@@ -10,6 +10,11 @@ final class PlantModuleUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    override func tearDown() async throws {
+        guard let testRun, testRun.totalFailureCount > 0 else { return }
+        await MainActor.run { UITestInteraction.captureFailureSnapshot() }
+    }
+
     @MainActor
     func testPlantModuleUnlockCreateCareReminderCalendarAndDelete() throws {
         let app = launchEnglishApp(
@@ -1764,11 +1769,11 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 10), "Text field did not appear: \(identifier)")
         scrollToElement(field, in: app, maxSwipes: 8)
         scrollElementAboveKeyboardIfNeeded(field, in: app)
-        XCTAssertTrue(tapWhenFrameReady(field, timeout: 8), "Text field did not become tappable: \(identifier)")
-        if !(waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2)) {
-            _ = tapWhenFrameReady(field, timeout: 1)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
+        XCTAssertTrue(UITestInteraction.tap(field, timeout: 8), "Text field did not become tappable: \(identifier)")
+        XCTAssertTrue(
+            app.keyboards.firstMatch.waitForExistence(timeout: 4),
+            "Text field did not receive keyboard focus: \(identifier)"
+        )
         field.typeText(text)
         XCTAssertTrue(waitForTextField(field, toContain: text, timeout: 4), "Text field did not accept typed text: \(identifier)")
     }
@@ -1779,48 +1784,15 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 10), "Text field did not appear: \(identifier)")
         scrollToElement(field, in: app, maxSwipes: 8)
         scrollElementAboveKeyboardIfNeeded(field, in: app)
-        XCTAssertTrue(tapWhenFrameReady(field, timeout: 8), "Text field did not become tappable: \(identifier)")
-        if !(waitForKeyboardFocus(on: field, timeout: 2) || app.keyboards.firstMatch.waitForExistence(timeout: 2)) {
-            _ = tapWhenFrameReady(field, timeout: 1)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        field.press(forDuration: 0.8)
-        let selectAllButton = app.buttons["Select All"]
-        let selectAllMenuItem = app.menuItems["Select All"]
-        if tapWhenFrameReady(selectAllButton, timeout: 2) {
-            // Selection is ready for replacement.
-        } else if tapWhenFrameReady(selectAllMenuItem, timeout: 2) {
-            // Selection is ready for replacement.
-        } else {
-            field.tap(withNumberOfTaps: 3, numberOfTouches: 1)
-        }
+        XCTAssertTrue(
+            UITestInteraction.clearTextField(field, in: app),
+            "Text field must be empty before replacement: \(identifier)"
+        )
         field.typeText(text)
         XCTAssertTrue(
             waitUntil(timeout: 4) { String(describing: field.value ?? "") == text },
             "Text field did not accept the exact replacement text: \(identifier) value=\(String(describing: field.value ?? ""))"
         )
-    }
-
-    @MainActor
-    private func dismissKeyboardIfPresent(in app: XCUIApplication) {
-        guard app.keyboards.firstMatch.exists else { return }
-
-        let returnKeyTitles = [
-            "Done", "Return", "Search", "Go", "OK",
-            "Hide keyboard", "隐藏键盘", "Tastatur ausblenden"
-        ]
-        if let key = returnKeyTitles
-            .map({ app.keyboards.buttons[$0] })
-            .first(where: { $0.exists && $0.isHittable }) {
-            key.tap()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
-
-        if app.keyboards.firstMatch.exists {
-            let keyboard = app.keyboards.firstMatch
-            keyboard.swipeDown()
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-        }
     }
 
     @MainActor
@@ -1924,12 +1896,6 @@ final class PlantModuleUITests: XCTestCase {
         }
     }
 
-    private func waitForKeyboardFocus(on element: XCUIElement, timeout: TimeInterval) -> Bool {
-        waitUntil(timeout: timeout) {
-            element.value(forKey: "hasKeyboardFocus") as? Bool == true
-        }
-    }
-
     private func waitForTextField(_ element: XCUIElement, toContain text: String, timeout: TimeInterval) -> Bool {
         waitUntil(timeout: timeout) {
             let currentValue = String(describing: element.value ?? "")
@@ -1996,31 +1962,21 @@ final class PlantModuleUITests: XCTestCase {
     @MainActor
     @discardableResult
     private func tapWhenFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        let didBecomeFrameReady = waitForFrameReady(element, timeout: timeout)
-        guard didBecomeFrameReady, isFiniteFrame(element.frame) else { return false }
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        return true
+        UITestInteraction.tapFrame(element, timeout: timeout)
     }
 
     @MainActor
-    private func tapWhenHittable(_ element: XCUIElement, timeout: TimeInterval) {
-        let didBecomeHittable = waitUntil(timeout: timeout) {
-            element.exists && element.isEnabled && element.isHittable
-        }
-        if didBecomeHittable {
-            element.tap()
-            return
-        }
-
-        let didBecomeFrameReady = waitForFrameReady(element, timeout: 1)
-        let elementValue = element.value.map { String(describing: $0) } ?? "nil"
-        guard didBecomeFrameReady else {
-            XCTFail(
-                "Element did not become hittable or frame-ready: \(element) exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
-            )
-            return
-        }
-        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+    private func tapWhenHittable(
+        _ element: XCUIElement,
+        timeout: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(
+            UITestInteraction.tap(element, timeout: timeout),
+            "Element did not become stable and semantically tappable.",
+            file: file, line: line
+        )
     }
 
     private func waitForFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
@@ -2185,12 +2141,7 @@ final class PlantModuleUITests: XCTestCase {
     }
 
     private func waitUntil(timeout: TimeInterval, condition: () -> Bool) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if condition() { return true }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        }
-        return condition()
+        UITestInteraction.wait(timeout: timeout, condition: condition)
     }
 
     private func isFiniteFrame(_ frame: CGRect) -> Bool {

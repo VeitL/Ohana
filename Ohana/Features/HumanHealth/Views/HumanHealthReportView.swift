@@ -871,6 +871,13 @@ struct AddHumanHealthReportSheet: View {
     }
 
     var body: some View {
+        NavigationStack {
+            editorContent
+                .toolbar(.hidden, for: .navigationBar)
+        }
+    }
+
+    private var editorContent: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
 
@@ -1124,6 +1131,7 @@ struct AddHumanHealthReportSheet: View {
                 }
             }
         }
+        .ohanaKeyboardDismissToolbar()
         .onAppear { loadEditing() }
         .onDisappear {
             commandQueue.cancelAll()

@@ -683,6 +683,7 @@ private extension HumanBasicInfoDetailContentView {
         .scrollContentBackground(.hidden)
         .background(OhanaAppBackground())
         .scrollDismissesKeyboard(.interactively)
+        .ohanaKeyboardDismissToolbar()
     }
 }
 

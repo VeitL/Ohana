@@ -135,6 +135,7 @@ struct MemberCreationStepIndicator: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(currentStep.title(kind: kind, l: l))
         .accessibilityValue("\(currentIndex + 1) / \(steps.count)")
+        .accessibilityIdentifier("member-creation-step-progress")
     }
 }
 
