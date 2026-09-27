@@ -125,6 +125,9 @@ final class AppExperienceController {
         pendingSwitchTask = nil
         apply(selectedMode)
         requiresInitialSelection = false
+        #if DEBUG
+            OhanaUITestTouchTrace.record("initialModeAction mode=\(mode.rawValue) requiresInitialSelection=\(requiresInitialSelection)")
+        #endif
     }
 
     /// Settings first dismisses its route, then asks the long-lived root to

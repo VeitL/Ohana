@@ -38,6 +38,7 @@ struct OhanaApp: App {
 
     init() {
         #if DEBUG
+            OhanaUITestTouchTrace.installIfRequested()
             if OhanaUITestLaunchOptions.disablesAnimations {
                 UIView.setAnimationsEnabled(false)
             }

@@ -167,7 +167,11 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testDeferredFirstPetTaskPersistsAcrossRelaunchWithoutUnsavedDraft() throws {
-        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        )
         let humanName = "Codex Relaunch Deferred Human"
         let abandonedDraftName = "Codex Relaunch Abandoned Pet"
         createOnboardingHuman(named: humanName, in: app)
