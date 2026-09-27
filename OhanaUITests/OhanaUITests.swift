@@ -5375,15 +5375,15 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(boy, timeout: 8)
         let coatPicker = app.buttons["member-pet-coat-picker"]
         tapWhenHittable(coatPicker, timeout: 8)
-        let coatSkipLabels = ["Skip for now", "暂不设置", "Vorerst überspringen"]
         XCTAssertTrue(
-            waitUntil(timeout: 8) { self.firstHittableButton(labels: coatSkipLabels, in: app) != nil },
+            waitUntil(timeout: 8) {
+                self.firstFrameReadyButton(identifier: "member-pet-coat-skip", in: app) != nil
+            },
             "The explicit Coat skip action did not appear."
         )
-        guard let coatSkip = firstHittableButton(labels: coatSkipLabels, in: app) else {
-            return XCTFail("The explicit Coat skip action was not semantically tappable.")
+        guard tapNativeMenuButton(identifier: "member-pet-coat-skip", in: app) else {
+            return XCTFail("The explicit Coat skip action was not tappable.")
         }
-        coatSkip.tap()
         XCTAssertTrue(
             waitUntil(timeout: 8) { creationPrimary.isEnabled },
             "Explicitly skipping Coat did not preserve the valid required Sex answer."
@@ -9861,7 +9861,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testCoconutBalanceButtonOpensAndClosesLedgerFromHome() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        )
         createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
