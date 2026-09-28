@@ -380,6 +380,9 @@ struct CrewRosterOverlay: View {
     }
 
     private func addRosterEntity(_ type: EntityType) {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("crewAddAction type=\(type.rawValue)")
+        #endif
         OhanaFeedback.light()
         if let onAddEntity {
             onAddEntity(type)

@@ -1572,7 +1572,10 @@ final class OhanaUITests: XCTestCase {
         let app = launchEnglishApp(
             seedMemberCardBaseline: true,
             enableProductionOverlays: true,
-            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"]
+            extraLaunchArguments: [
+                "-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE",
+                "-OHANA_UI_TEST_TRACE_TOUCHES"
+            ]
         )
         let homeTab = app.buttons["home-tab-home"]
         let tasksTab = app.buttons["home-tab-calendar"]
@@ -6781,7 +6784,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testHumanSettingsInlineSwitcherHidesLocalPrivacyControls() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        )
         let ownerName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
         let viewerName = createAdditionalHumanFromCrewRoster(in: app, homeHumanName: ownerName)
@@ -8733,7 +8739,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        )
         let ownerName = createFirstHuman(from: app)
         XCTAssertTrue(
             tapWhenSemanticallyHittable(app.buttons["onboarding-defer-pet"], timeout: 8),
@@ -13031,13 +13040,13 @@ final class OhanaUITests: XCTestCase {
             identifier: "home-quick-action-allFeatures",
             in: app
         ) {
-            return currentQuickAction
+            return currentQuickAction.element
         }
         if let legacyExpandedShortcut = firstFrameReadyButton(
             identifier: "home-expanded-shortcut-allFeatures",
             in: app
         ) {
-            return legacyExpandedShortcut
+            return legacyExpandedShortcut.element
         }
         return app.buttons["home-quick-action-allFeatures"]
     }
@@ -14233,15 +14242,18 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func firstFrameReadyButton(identifier: String, in app: XCUIApplication) -> XCUIElement? {
+    private func firstFrameReadyButton(identifier: String, in app: XCUIApplication) -> (element: XCUIElement, frame: CGRect)? {
         let matches = app.buttons.matching(identifier: identifier)
         let count = matches.count
         guard count > 0 else { return nil }
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            if button.exists, button.isEnabled, hasVisibleFrame(button, in: app) {
-                return button
+            guard button.exists, button.isEnabled else { continue }
+            let frame = button.frame
+            if UITestInteraction.isUsable(frame),
+               app.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) {
+                return (button, frame)
             }
         }
         return nil
@@ -14305,12 +14317,19 @@ final class OhanaUITests: XCTestCase {
         identifier: String,
         in app: XCUIApplication
     ) -> Bool {
-        var target: XCUIElement?
+        var ready: (element: XCUIElement, frame: CGRect)?
         guard waitUntil(timeout: 8, condition: {
-            target = firstFrameReadyButton(identifier: identifier, in: app)
-            return target != nil
-        }), let target, tapStableNativeMenuButton(target, in: app, timeout: 4) else { return false }
-        return waitUntil(timeout: 4) { !target.exists }
+            ready = firstFrameReadyButton(identifier: identifier, in: app)
+            return ready != nil
+        }), let ready,
+        UITestInteraction.tapFrame(
+            ready.element,
+            in: app,
+            timeout: 4,
+            usesPointerClick: true,
+            validatedFrame: ready.frame
+        ) else { return false }
+        return waitUntil(timeout: 4) { !ready.element.exists }
     }
 
     @MainActor

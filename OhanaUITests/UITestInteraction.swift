@@ -33,11 +33,13 @@ enum UITestInteraction {
         in app: XCUIApplication? = nil,
         offset: CGVector = CGVector(dx: 0.5, dy: 0.5),
         timeout: TimeInterval,
-        usesPointerClick: Bool = false
+        usesPointerClick: Bool = false,
+        validatedFrame: CGRect? = nil
     ) -> Bool {
         guard offset.dx.isFinite, offset.dy.isFinite,
               (0 ... 1).contains(offset.dx), (0 ... 1).contains(offset.dy),
-              let frame = stableFrame(of: element, in: app, timeout: timeout) else {
+              let frame = validatedFrame ?? stableFrame(of: element, in: app, timeout: timeout),
+              isUsable(frame) else {
             recordFailure("Frame tap target did not stabilize", element: element)
             return false
         }

@@ -297,8 +297,16 @@ struct TaskCenterPetProfileInlineEditor: View {
                 .accessibilityIdentifier("task-center-pet-profile-inline-birthday")
             }
 
+            #if DEBUG
             Toggle(TaskCenterPetProfileInlineCopy.homeDate(l), isOn: $hasHomeDate)
                 .accessibilityIdentifier("task-center-pet-profile-inline-home-date-toggle")
+                .onChange(of: hasHomeDate) { _, isOn in
+                    OhanaUITestTouchTrace.record("petProfileHomeDateToggle changed=\(isOn)")
+                }
+            #else
+            Toggle(TaskCenterPetProfileInlineCopy.homeDate(l), isOn: $hasHomeDate)
+                .accessibilityIdentifier("task-center-pet-profile-inline-home-date-toggle")
+            #endif
             if hasHomeDate {
                 DatePicker(
                     TaskCenterPetProfileInlineCopy.homeDate(l),
