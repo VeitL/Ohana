@@ -14492,20 +14492,10 @@ final class OhanaUITests: XCTestCase {
         in app: XCUIApplication
     ) -> Bool {
         let button = app.buttons.matching(identifier: identifier).firstMatch
-        guard let frame = UITestInteraction.stableFrame(of: button, in: app, timeout: 8) else {
-            UITestInteraction.recordFailure("Native menu action did not expose a stable frame", element: button)
-            return false
-        }
-        guard UITestInteraction.tapFrame(
-            button,
-            in: app,
-            timeout: 4,
-            usesPointerClick: true,
-            validatedFrame: frame
-        ) else { return false }
+        guard UITestInteraction.tap(button, timeout: 8) else { return false }
         let dismissed = waitUntil(timeout: 4) { !button.exists }
         if !dismissed {
-            UITestInteraction.recordFailure("Native menu action remained after one coordinate tap", element: button)
+            UITestInteraction.recordFailure("Native menu action remained after one semantic tap", element: button)
         }
         return dismissed
     }
