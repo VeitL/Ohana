@@ -38,12 +38,27 @@ private extension UIWindow {
     @objc dynamic func ohana_observeTouchEvent(_ event: UIEvent) {
         // Capture the hit-test and touch-recipient paths before UIKit updates
         // the event, then dispatch the original event exactly once.
-        let samples = (event.allTouches ?? []).compactMap { touch in
-            guard touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled else { return nil }
+        var samples: [(
+            touch: UITouch,
+            phase: String,
+            timestamp: TimeInterval,
+            point: CGPoint,
+            recipientPath: String,
+            hitTestPath: String
+        )] = []
+        for touch in event.allTouches ?? [] {
+            guard touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled else { continue }
             let point = touch.location(in: self)
             let recipientPath = ohana_viewPath(touch.view)
             let hitTestPath = ohana_viewPath(hitTest(point, with: event))
-            return (touch, touch.phase.rawValue, touch.timestamp, point, recipientPath, hitTestPath)
+            samples.append((
+                touch,
+                String(describing: touch.phase.rawValue),
+                touch.timestamp,
+                point,
+                recipientPath,
+                hitTestPath
+            ))
         }
         ohana_observeTouchEvent(event)
         for (touch, phase, timestamp, point, recipientPath, hitTestPath) in samples {
