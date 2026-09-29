@@ -14429,16 +14429,22 @@ final class OhanaUITests: XCTestCase {
         return firstHittableButton(labels: labels, in: app)
     }
 
-    private func firstFrameReadyButton(labels: [String], in app: XCUIApplication) -> XCUIElement? {
+    @MainActor
+    private func firstFrameReadyButton(
+        labels: [String],
+        in app: XCUIApplication
+    ) -> (element: XCUIElement, frame: CGRect)? {
         let matches = app.buttons.matching(NSPredicate(format: "label IN %@", labels))
         let count = matches.count
         guard count > 0 else { return nil }
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            guard let snapshot = try? button.snapshot(), snapshot.isEnabled,
-                  UITestInteraction.visibleFrame(for: snapshot.frame, in: app.frame) != nil else { continue }
-            return button
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
+            let frame = snapshot.frame
+            guard let visibleFrame = UITestInteraction.visibleFrame(for: frame, in: app.frame),
+                  visibleFrame.contains(CGPoint(x: frame.midX, y: frame.midY)) else { continue }
+            return (button, frame)
         }
         return nil
     }
