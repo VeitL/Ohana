@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <crew|home-date|home-date-control> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <crew|crew-long|home-date|home-date-long|home-date-control> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -28,6 +28,11 @@ case "${scenario}" in
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuOpensHumanCreation
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithAnimationsOpensHumanCreation
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithoutTouchTraceOpensHumanCreation
+      OhanaUITests/OhanaUITests/testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch
+    )
+    ;;
+  crew-long)
+    selectors=(
       OhanaUITests/OhanaUITests/testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch
     )
     ;;

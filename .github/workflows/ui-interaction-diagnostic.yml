@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, crew, home-date, home-date-long, home-date-control]
+        options: [all, crew, crew-long, home-date, home-date-long, home-date-control]
         default: all
 
 concurrency:
@@ -27,6 +27,7 @@ jobs:
         scenario: >-
           ${{ fromJSON(
             inputs.scenario == 'crew' && '["crew"]' ||
+            inputs.scenario == 'crew-long' && '["crew-long"]' ||
             inputs.scenario == 'home-date' && '["home-date"]' ||
             inputs.scenario == 'home-date-long' && '["home-date-long"]' ||
             inputs.scenario == 'home-date-control' && '["home-date-control"]' ||
