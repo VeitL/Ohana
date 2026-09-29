@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control]
+        options: [all, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -32,6 +32,7 @@ jobs:
             inputs.scenario == 'home-date' && '["home-date"]' ||
             inputs.scenario == 'home-date-long' && '["home-date-long"]' ||
             inputs.scenario == 'home-date-control' && '["home-date-control"]' ||
+            inputs.scenario == 'zen-private' && '["zen-private"]' ||
             '["crew","home-date","home-date-control"]'
           ) }}
     runs-on: macos-26

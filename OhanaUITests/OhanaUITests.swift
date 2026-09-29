@@ -614,23 +614,29 @@ final class OhanaUITests: XCTestCase {
         )
         let relaunchedOwnerCard = app.buttons[ownerCard.identifier]
         XCTAssertTrue(relaunchedOwnerCard.waitForExistence(timeout: 12))
+        var relaunchedValue = ""
+        var relaunchedBalance: Int?
         XCTAssertTrue(
             waitUntil(timeout: 12) {
-                let value = relaunchedOwnerCard.value as? String ?? ""
-                return value.contains("Neutral status background")
-                    && Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label)) == balanceAfterCheckIn
+                relaunchedValue = relaunchedOwnerCard.value as? String ?? ""
+                relaunchedBalance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+                return relaunchedValue.contains("Neutral status background")
+                    && relaunchedBalance == balanceAfterCheckIn
             },
             "Relaunch lost the owner check-in or changed its reward."
         )
-        recordDiagnosticEvidence("Zen repeat activation before: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
+        recordDiagnosticEvidence("Zen repeat activation before: value=\(relaunchedValue), balance=\(String(describing: relaunchedBalance))")
         tapWhenHittable(relaunchedOwnerCard, timeout: 8)
-        recordDiagnosticEvidence("Zen repeat activation after: value=\(accessibilityText(for: relaunchedOwnerCard)), balance=\(app.buttons["zen-toolbar-coconut-log"].label)")
+        var repeatedValue = ""
+        var repeatedBalance: Int?
+        let repeatedActivationPreservedState = waitUntil(timeout: 4) {
+            repeatedValue = relaunchedOwnerCard.value as? String ?? ""
+            repeatedBalance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
+            return repeatedValue.contains("Neutral status background") && repeatedBalance == balanceAfterCheckIn
+        }
+        recordDiagnosticEvidence("Zen repeat activation after: value=\(repeatedValue), balance=\(String(describing: repeatedBalance))")
         XCTAssertTrue(
-            waitUntil(timeout: 4) {
-                let value = relaunchedOwnerCard.value as? String ?? ""
-                let balance = Int(self.numericLabel(app.buttons["zen-toolbar-coconut-log"].label))
-                return value.contains("Neutral status background") && balance == balanceAfterCheckIn
-            },
+            repeatedActivationPreservedState,
             "A repeated owner-card tap created a score or changed the check-in reward."
         )
 
