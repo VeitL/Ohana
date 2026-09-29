@@ -60,6 +60,13 @@ alpha	OhanaUITests/FixtureTests/testAlphaOne
 alpha	OhanaUITests/FixtureTests/testAlphaTwo
 beta	OhanaUITests/FixtureTests/testBeta
 EOF
+cat > "${fixture_repo}/scripts/ui-interaction-diagnostics.txt" <<'EOF'
+# No diagnostic selectors in this release-receipt fixture.
+EOF
+cat > "${fixture_repo}/scripts/test-ui-interaction-diagnostic.sh" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
 cat > "${fixture_repo}/scripts/audit-ui-test-shards.sh" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail

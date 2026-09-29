@@ -194,7 +194,12 @@ enum UITestInteraction {
 
     @MainActor
     static func dismissKeyboard(in app: XCUIApplication, returnKeyIsSafe: Bool = false) -> Bool {
-        guard app.keyboards.firstMatch.exists else { return true }
+        let keyboard = app.keyboards.firstMatch
+        guard keyboard.exists else { return true }
+        // iOS can retain a focused keyboard in AX after sliding it entirely
+        // below the window. Its keys still exist, but none can be tapped.
+        let keyboardFrame = keyboard.frame
+        if isUsable(keyboardFrame), !keyboardFrame.intersects(app.frame) { return true }
         let actionIDs = [
             "ohana-keyboard-dismiss-action",
             "task-center-pet-profile-inline-keyboard-done",
@@ -203,10 +208,17 @@ enum UITestInteraction {
         let labels = ["Done", "done", "完成", "Fertig", "Hide keyboard", "隐藏键盘", "Tastatur ausblenden"] +
             (returnKeyIsSafe ? ["return", "Return", "换行"] : [])
         var action: XCUIElement?
+        var actionFrame: CGRect?
         var isToolbarAction = false
         guard wait(timeout: 4, condition: {
             action = actionIDs.map { app.buttons[$0].firstMatch }
-                .first { $0.exists && $0.isEnabled && isUsable($0.frame) }
+                .first {
+                    guard $0.exists, $0.isEnabled else { return false }
+                    let frame = $0.frame
+                    guard isUsable(frame) else { return false }
+                    actionFrame = frame
+                    return true
+                }
             isToolbarAction = action != nil
             if action == nil {
                 action = labels.map { app.keyboards.buttons[$0].firstMatch }
@@ -221,7 +233,7 @@ enum UITestInteraction {
         // frame for a visible, enabled Done button. Scope this frame path to
         // known toolbar identifiers; ordinary keyboard keys stay semantic.
         let sent = isToolbarAction
-            ? tapFrame(action, in: app, timeout: 4)
+            ? tapFrame(action, in: app, timeout: 4, validatedFrame: actionFrame)
             : tap(action, timeout: 4)
         guard sent else { return false }
         let dismissed = wait(timeout: 4) { !app.keyboards.firstMatch.exists }

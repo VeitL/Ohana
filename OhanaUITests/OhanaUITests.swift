@@ -1401,6 +1401,71 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testDiagnosticPetHomeDateRevealsPicker() throws {
+        runDiagnosticPetHomeDate(extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"])
+    }
+
+    @MainActor
+    func testDiagnosticPetHomeDateWithAnimationsRevealsPicker() throws {
+        runDiagnosticPetHomeDate(extraLaunchArguments: [
+            "-OHANA_UI_TEST_TRACE_TOUCHES", "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
+        ])
+    }
+
+    @MainActor
+    func testDiagnosticPetHomeDateWithoutTouchTraceRevealsPicker() throws {
+        runDiagnosticPetHomeDate(extraLaunchArguments: [])
+    }
+
+    @MainActor
+    func testDiagnosticPetHomeDateWithoutPreToggleAXRevealsPicker() throws {
+        runDiagnosticPetHomeDate(
+            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"],
+            capturePreToggleEvidence: false
+        )
+    }
+
+    @MainActor
+    private func runDiagnosticPetHomeDate(
+        extraLaunchArguments: [String],
+        capturePreToggleEvidence: Bool = true
+    ) {
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            enableProductionOverlays: true,
+            extraLaunchArguments: extraLaunchArguments
+        )
+        createOnboardingHuman(named: "Diagnostic Date Human", in: app)
+        completeFirstDayStarterFunnel(in: app, petName: "Diagnostic Date Pet")
+
+        XCTAssertTrue(tapWhenSemanticallyHittable(app.buttons["home-tab-calendar"], timeout: 8))
+        let task = app.buttons[
+            "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
+        ]
+        XCTAssertTrue(task.waitForExistence(timeout: 12))
+        XCTAssertTrue(tapWhenSemanticallyHittable(task, timeout: 8))
+        let lifeStage = app.buttons["task-center-starter-journey-open-petLifeStage"]
+        XCTAssertTrue(lifeStage.waitForExistence(timeout: 8))
+        tapGuidedJourneyControlAfterSemanticScroll(lifeStage, in: app)
+        let editor = app.descendants(matching: .any)["task-center-pet-profile-inline-editor-petLifeStage"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12))
+
+        let toggle = app.switches["task-center-pet-profile-inline-home-date-toggle"]
+        let picker = app.descendants(matching: .any)["task-center-pet-profile-inline-home-date"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 8))
+        XCTAssertFalse(isToggleOn(toggle), "A new Pet unexpectedly starts with a home date.")
+        if capturePreToggleEvidence {
+            recordDiagnosticEvidence("Diagnostic Home Date before input:\n\(app.debugDescription)")
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "Diagnostic Home Date before input"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+        XCTAssertTrue(enableToggle(toggle, revealing: picker, in: app), "Home Date did not reveal its date picker.")
+        XCTAssertTrue(isToggleOn(toggle), "Home Date did not stay enabled after the input.")
+    }
+
+    @MainActor
     func testPetProfileBodyNotApplicablePersonalityPrivateAndDailyReviewedCompletesAnyThree() throws {
         let app = launchEnglishApp(
             seedMemberCardBaseline: true,
@@ -6811,6 +6876,52 @@ final class OhanaUITests: XCTestCase {
         XCTAssertFalse(app.buttons["human-account-security-active-action"].exists)
         XCTAssertFalse(app.buttons["human-account-privacy-all-private-action"].exists)
         XCTAssertFalse(app.buttons["human-account-privacy-all-open-action"].exists)
+    }
+
+    @MainActor
+    func testDiagnosticCrewMenuOpensHumanCreation() throws {
+        runDiagnosticCrewMenu(extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"])
+    }
+
+    @MainActor
+    func testDiagnosticCrewMenuWithAnimationsOpensHumanCreation() throws {
+        runDiagnosticCrewMenu(extraLaunchArguments: [
+            "-OHANA_UI_TEST_TRACE_TOUCHES", "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
+        ])
+    }
+
+    @MainActor
+    func testDiagnosticCrewMenuWithoutTouchTraceOpensHumanCreation() throws {
+        runDiagnosticCrewMenu(extraLaunchArguments: [])
+    }
+
+    @MainActor
+    private func runDiagnosticCrewMenu(extraLaunchArguments: [String]) {
+        let app = launchEnglishApp(
+            seedHumanBaseline: false,
+            enableProductionOverlays: true,
+            extraLaunchArguments: extraLaunchArguments
+        )
+        let humanName = "Diagnostic Crew Human"
+        createOnboardingHuman(named: humanName, in: app)
+        let deferPet = app.buttons["onboarding-defer-pet"]
+        XCTAssertTrue(deferPet.waitForExistence(timeout: 12))
+        XCTAssertTrue(tapWhenSemanticallyHittable(deferPet, timeout: 8))
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        let crew = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(crew.waitForExistence(timeout: 12))
+        XCTAssertTrue(tapWhenSemanticallyHittable(crew, timeout: 8))
+        let addMember = app.buttons["crew-roster-primary-action"]
+        XCTAssertTrue(addMember.waitForExistence(timeout: 12))
+        XCTAssertTrue(tapWhenSemanticallyHittable(addMember, timeout: 8))
+        let humanOption = app.buttons["crew-roster-add-human-action"]
+        XCTAssertTrue(humanOption.waitForExistence(timeout: 8))
+        XCTAssertTrue(tapNativeMenuButton(identifier: "crew-roster-add-human-action", in: app))
+        XCTAssertTrue(
+            app.textFields["member-name-input"].waitForExistence(timeout: 12),
+            "Choosing Human in the Crew menu did not open its creation page."
+        )
     }
 
     @MainActor
@@ -12634,7 +12745,15 @@ final class OhanaUITests: XCTestCase {
     private func openPetHealthDetailFromHome(in app: XCUIApplication, petName: String, humanName: String) {
         openPetFeatureHubFromHome(in: app, petName: petName, humanName: humanName)
         let healthTile = app.buttons["feature-hub-health-health"]
-        scrollToElement(healthTile, in: app, maxSwipes: 6)
+        let featureHubScroll = app.scrollViews["feature-hub-scroll"]
+        guard featureHubScroll.waitForExistence(timeout: 12) else {
+            XCTFail("Pet feature hub did not expose its scroll container.")
+            return
+        }
+        for _ in 0 ..< 6 {
+            if hasSafelyTappableFrame(healthTile, in: app) { break }
+            featureHubScroll.swipeUp()
+        }
         XCTAssertTrue(
             healthTile.waitForExistence(timeout: 12),
             "Pet feature hub did not expose the health tile."

@@ -1,0 +1,88 @@
+name: UI Interaction Diagnostic
+
+# Manual, non-release evidence. These two focused jobs compare a short real-UI
+# journey with its existing control and long journey on the same pinned stack.
+# The 132-case release manifest and its acceptance gate remain unchanged.
+on:
+  workflow_dispatch:
+  # GitHub exposes a new manual workflow only after its file reaches default.
+  # Bootstrap this branch's first targeted run when the workflow itself lands.
+  push:
+    branches: [agent/fix-water-refill-care-fact]
+    paths: [.github/workflows/ui-interaction-diagnostic.yml]
+
+concurrency:
+  group: ui-interaction-diagnostic-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  diagnostic:
+    name: Diagnostic ${{ matrix.scenario }} (Xcode 26.6 / iOS 26.5)
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [crew, home-date]
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      COPYFILE_DISABLE: 1
+      OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.6 and prepare disposable Tests Simulator
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.6.app
+          xcodebuild -version
+          mkdir -p .build
+          printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
+          scripts/prepare-test-simulator.sh
+      - name: Run focused governed UI diagnostics
+        run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
+      - name: Record diagnostic receipt
+        if: always()
+        env:
+          DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}
+        run: |
+          python3 - <<'PY'
+          import glob
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          scenario = os.environ['DIAGNOSTIC_SCENARIO']
+          result_root = Path(os.environ['RUNNER_TEMP']) / 'OhanaLocalBuild'
+          bundles = sorted(glob.glob(str(result_root / '*' / 'TestResults' / 'failed' / '*.xcresult')))
+          bundles += sorted(glob.glob(str(result_root / '*' / 'TestResults' / 'success' / '*.xcresult')))
+          receipt = {
+              'kind': 'focused-ui-diagnostic-not-release-acceptance',
+              'scenario': scenario,
+              'revision': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'bundles': [],
+          }
+          for bundle in bundles:
+              try:
+                  raw = subprocess.check_output([
+                      'xcrun', 'xcresulttool', 'get', 'test-results', 'summary',
+                      '--path', bundle, '--compact',
+                  ])
+                  summary = json.loads(raw)
+              except (subprocess.CalledProcessError, json.JSONDecodeError) as error:
+                  summary = {'extractionError': str(error)}
+              receipt['bundles'].append({'path': bundle, 'summary': summary})
+          target = Path(os.environ['RUNNER_TEMP']) / f'ui-interaction-{scenario}-diagnostic.json'
+          target.write_text(json.dumps(receipt, indent=2) + '\n')
+          print(target)
+          PY
+      - name: Upload diagnostic receipt and full xcresult attachments
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-interaction-${{ matrix.scenario }}-diagnostic
+          path: |
+            ${{ runner.temp }}/ui-interaction-${{ matrix.scenario }}-diagnostic.json
+            ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
+            ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/success/*.xcresult
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7

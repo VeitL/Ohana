@@ -135,6 +135,8 @@ NIGHTLY_SOURCE_PATHS=(
   OhanaWidgets
   Resources
   scripts/audit-ui-test-shards.sh
+  scripts/ui-interaction-diagnostics.txt
+  scripts/test-ui-interaction-diagnostic.sh
   scripts/ui-test-shards.tsv
   scripts/test-ui-nightly.sh
   scripts/test-ui-shard.sh

@@ -146,6 +146,7 @@ struct FeatureHubScaffold<Header: View, Content: View>: View {
                 .padding(.top, 18)
                 .padding(.bottom, 34)
             }
+            .accessibilityIdentifier("feature-hub-scroll")
         }
     }
 }
