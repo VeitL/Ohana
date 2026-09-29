@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, crew, crew-long, home-date, home-date-long, home-date-control]
+        options: [all, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control]
         default: all
 
 concurrency:
@@ -28,6 +28,7 @@ jobs:
           ${{ fromJSON(
             inputs.scenario == 'crew' && '["crew"]' ||
             inputs.scenario == 'crew-long' && '["crew-long"]' ||
+            inputs.scenario == 'crew-onboarding' && '["crew-onboarding"]' ||
             inputs.scenario == 'home-date' && '["home-date"]' ||
             inputs.scenario == 'home-date-long' && '["home-date-long"]' ||
             inputs.scenario == 'home-date-control' && '["home-date-control"]' ||
@@ -54,7 +55,7 @@ jobs:
           OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ matrix.scenario == 'home-date-control' && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
       - name: Export received-touch and control-state log
-        if: always() && (matrix.scenario == 'crew' || matrix.scenario == 'home-date-control')
+        if: always() && (matrix.scenario == 'crew' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
         env:
           RUNNER_TEMP: ${{ runner.temp }}
           DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}

@@ -6909,6 +6909,40 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testDiagnosticCrewMenuAfterRealOnboardingOpensHumanCreation() throws {
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: [
+                "-OHANA_UI_TEST_TRACE_TOUCHES", "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
+            ]
+        )
+        let homeHumanName = createFirstHuman(from: app)
+        XCTAssertTrue(
+            tapWhenSemanticallyHittable(app.buttons["onboarding-defer-pet"], timeout: 8),
+            "The optional first-pet step did not expose its semantic defer action."
+        )
+        ensureHomeSurfaceVisible(in: app, humanName: homeHumanName)
+
+        // Match the original deletion journey's second Home readiness pass.
+        ensureHomeSurfaceVisible(in: app, humanName: homeHumanName)
+        let crewButton = app.buttons["home-crew-roster-action"]
+        XCTAssertTrue(crewButton.waitForExistence(timeout: 12), "Home crew roster action did not appear.")
+        XCTAssertTrue(tapWhenSemanticallyHittable(crewButton, timeout: 8))
+
+        let addMember = app.buttons["crew-roster-primary-action"]
+        XCTAssertTrue(addMember.waitForExistence(timeout: 12), "Crew roster did not expose add member.")
+        XCTAssertTrue(tapWhenSemanticallyHittable(addMember, timeout: 8))
+
+        let humanOption = app.buttons["crew-roster-add-human-action"]
+        XCTAssertTrue(humanOption.waitForExistence(timeout: 8), "Crew add menu did not expose Human crew.")
+        XCTAssertTrue(tapNativeMenuButton(identifier: "crew-roster-add-human-action", in: app))
+        XCTAssertTrue(
+            app.textFields["member-name-input"].waitForExistence(timeout: 12),
+            "Choosing Human after real onboarding did not open its creation page."
+        )
+    }
+
+    @MainActor
     func testDiagnosticCrewMenuWithoutTouchTraceOpensHumanCreation() throws {
         runDiagnosticCrewMenu(extraLaunchArguments: [])
     }
