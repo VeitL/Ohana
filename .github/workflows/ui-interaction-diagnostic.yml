@@ -1,10 +1,18 @@
 name: UI Interaction Diagnostic
 
-# Manual, non-release evidence. These two focused jobs compare a short real-UI
-# journey with its existing control and long journey on the same pinned stack.
+# Manual, non-release evidence. Focused scenarios compare real-UI journeys on a
+# pinned stack and retain full result bundles. The Home Date control scenario
+# opts into passive state-change logging without intercepting input delivery.
 # The 132-case release manifest and its acceptance gate remain unchanged.
 on:
   workflow_dispatch:
+    inputs:
+      scenario:
+        description: Focused diagnostic set to run on the disposable Tests Simulator
+        required: true
+        type: choice
+        options: [all, crew, home-date, home-date-control]
+        default: all
   # GitHub exposes a new manual workflow only after its file reaches default.
   # Bootstrap this branch's first targeted run when the workflow itself lands.
   push:
@@ -18,10 +26,15 @@ concurrency:
 jobs:
   diagnostic:
     name: Diagnostic ${{ matrix.scenario }} (Xcode 26.6 / iOS 26.5)
+    if: >-
+      (github.event_name == 'push' &&
+      (matrix.scenario == 'crew' || matrix.scenario == 'home-date-control')) ||
+      inputs.scenario == 'all' ||
+      inputs.scenario == matrix.scenario
     strategy:
       fail-fast: false
       matrix:
-        scenario: [crew, home-date]
+        scenario: [crew, home-date, home-date-control]
     runs-on: macos-26
     timeout-minutes: 120
     env:
@@ -40,7 +53,51 @@ jobs:
       - name: Run focused governed UI diagnostics
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+          OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ matrix.scenario == 'home-date-control' && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
+      - name: Export passive HomeDate state-change log
+        if: always() && matrix.scenario == 'home-date-control'
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          devices = json.loads(subprocess.check_output(
+              ['xcrun', 'simctl', 'list', 'devices', 'available', '--json'], text=True
+          ))
+          matches = [
+              device for runtime_devices in devices['devices'].values()
+              for device in runtime_devices
+              if device.get('name') == 'iPhone 17 Tests'
+          ]
+          target = Path(os.environ['RUNNER_TEMP']) / 'ui-interaction-home-date-control-app.log'
+          if len(matches) != 1:
+              target.write_text(f'Could not identify one Tests Simulator: {len(matches)} matches.\n')
+              raise SystemExit(0)
+          simulator = matches[0]
+          simulator_id = simulator['udid']
+          state = simulator.get('state')
+          if state == 'Shutdown':
+              subprocess.run(['xcrun', 'simctl', 'boot', simulator_id], check=True)
+          elif state != 'Booted':
+              target.write_text(f'Tests Simulator is not ready for log export: {state}\n')
+              raise SystemExit(0)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', simulator_id, '-b'], check=True)
+          predicate = 'subsystem == "com.guanchen.li.Ohana" AND category == "UITestTouchTrace"'
+          with target.open('w') as output:
+              completed = subprocess.run([
+                  'xcrun', 'simctl', 'spawn', simulator_id, 'log', 'show',
+                  '--last', '3h', '--style', 'compact', '--predicate', predicate,
+              ], stdout=output, stderr=subprocess.STDOUT)
+          print(f'Exported simulator app log: {target}; exit={completed.returncode}')
+          shutdown = subprocess.run(['xcrun', 'simctl', 'shutdown', simulator_id])
+          if shutdown.returncode:
+              print(f'Could not shut down Tests Simulator (exit {shutdown.returncode}).')
+          PY
       - name: Record diagnostic receipt
         if: always()
         env:
@@ -86,6 +143,7 @@ jobs:
             ${{ runner.temp }}/ui-interaction-${{ matrix.scenario }}-diagnostic.json
             ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
             ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/success/*.xcresult
+            ${{ runner.temp }}/ui-interaction-home-date-control-app.log
           if-no-files-found: warn
           compression-level: 0
           retention-days: 7

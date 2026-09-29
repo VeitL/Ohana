@@ -15,9 +15,11 @@ enum UITestInteraction {
 
     @MainActor
     static func tap(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        // Semantic taps resolve their own hit point. Requiring two extra frame
-        // snapshots can exhaust the deadline on CI before a ready control is tapped.
-        guard wait(timeout: timeout, condition: { element.exists && element.isEnabled && element.isHittable }) else {
+        // XCTest's hit test already rejects missing/off-screen elements. Avoid a
+        // frame query and its extra AX round trips for ordinary controls.
+        guard wait(timeout: timeout, condition: {
+            element.isHittable && element.isEnabled
+        }) else {
             recordFailure("Semantic tap target did not become ready", element: element)
             return false
         }
@@ -25,8 +27,9 @@ enum UITestInteraction {
         return true
     }
 
-    /// Explicit frame interaction for native menus whose AX activation point
-    /// cannot be queried. Never use this as an implicit semantic-tap fallback.
+    /// Explicit coordinate path for documented XCTest activation gaps: native
+    /// menus, clipped keyboard/text-selection controls, and transformed Home
+    /// quick-action targets. Never use it as a semantic-tap fallback.
     @MainActor
     static func tapFrame(
         _ element: XCUIElement,
@@ -59,6 +62,8 @@ enum UITestInteraction {
         return true
     }
 
+    /// Returns geometry only for the current observation. Callers must obtain a
+    /// fresh frame after scrolling, keyboard changes, or route transitions.
     @MainActor
     static func stableFrame(
         of element: XCUIElement,
@@ -70,11 +75,11 @@ enum UITestInteraction {
         var result: CGRect?
         let ready = wait(timeout: timeout) {
             guard app.map({ $0.state == .runningForeground }) ?? true,
-                  element.exists, element.isEnabled else {
+                  let snapshot = try? element.snapshot(), snapshot.isEnabled else {
                 previousFrame = nil
                 return false
             }
-            let frame = element.frame
+            let frame = snapshot.frame
             guard isUsable(frame),
                   app.map({ $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) }) ?? true,
                   !requiresHittable || element.isHittable else {
@@ -108,9 +113,10 @@ enum UITestInteraction {
 
     @MainActor
     static func toggleState(_ element: XCUIElement) -> Bool? {
-        guard element.exists else { return nil }
-        let control = switchControl(element)
-        let raw = String(describing: control.value ?? "")
+        let nestedSwitch = element.descendants(matching: .switch).firstMatch
+        let snapshot = (try? nestedSwitch.snapshot()) ?? (try? element.snapshot())
+        guard let value = snapshot?.value else { return nil }
+        let raw = String(describing: value)
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return switch raw {
         case "1", "true", "on", "yes", "enabled", "selected": true
@@ -121,8 +127,11 @@ enum UITestInteraction {
 
     @MainActor
     static func setToggle(_ element: XCUIElement, enabled: Bool, timeout: TimeInterval) -> Bool {
-        guard wait(timeout: timeout, condition: { toggleState(element) != nil }),
-              let initial = toggleState(element) else {
+        var initial: Bool?
+        guard wait(timeout: timeout, condition: {
+            initial = toggleState(element)
+            return initial != nil
+        }), let initial else {
             recordFailure("Switch has no readable state", element: element)
             return false
         }
@@ -130,8 +139,28 @@ enum UITestInteraction {
         guard tap(switchControl(element), timeout: timeout) else { return false }
         // A second tap could undo a delayed first transition. Observe the one
         // requested action and let an unchanged state fail the journey.
-        let changed = wait(timeout: timeout) { toggleState(element) == enabled }
-        if !changed { recordFailure("Switch did not reach requested state after one tap", element: element) }
+        func label(_ state: Bool?) -> String {
+            guard let state else { return "unreadable" }
+            return state ? "on" : "off"
+        }
+        var observedStates = [label(initial)]
+        let changed = wait(timeout: timeout) {
+            let state = toggleState(element)
+            let current = label(state)
+            if observedStates.last != current { observedStates.append(current) }
+            return state == enabled
+        }
+        if !changed {
+            XCTContext.runActivity(named: "One-tap switch state observation") { activity in
+                let attachment = XCTAttachment(
+                    string: "initial=\(label(initial)); expected=\(label(enabled)); observed=\(observedStates.joined(separator: " → "))"
+                )
+                attachment.name = "Switch state after one tap"
+                attachment.lifetime = .keepAlways
+                activity.add(attachment)
+            }
+            recordFailure("Switch did not reach requested state after one tap", element: element)
+        }
         return changed
     }
 
@@ -213,8 +242,8 @@ enum UITestInteraction {
         guard wait(timeout: 4, condition: {
             action = actionIDs.map { app.buttons[$0].firstMatch }
                 .first {
-                    guard $0.exists, $0.isEnabled else { return false }
-                    let frame = $0.frame
+                    guard let snapshot = try? $0.snapshot(), snapshot.isEnabled else { return false }
+                    let frame = snapshot.frame
                     guard isUsable(frame) else { return false }
                     actionFrame = frame
                     return true

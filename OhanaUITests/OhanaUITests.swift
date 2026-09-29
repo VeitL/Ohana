@@ -1370,9 +1370,11 @@ final class OhanaUITests: XCTestCase {
 
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-open-petLifeStage"], in: app)
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
-        let homeDateToggle = app.switches["task-center-pet-profile-inline-home-date-toggle"]
+        let homeDateToggle = editor.descendants(matching: .switch)[
+            "task-center-pet-profile-inline-home-date-toggle"
+        ]
         scrollToElement(homeDateToggle, in: app, maxSwipes: 6)
-        let homeDatePicker = app.descendants(matching: .any)["task-center-pet-profile-inline-home-date"]
+        let homeDatePicker = editor.descendants(matching: .any)["task-center-pet-profile-inline-home-date"]
         XCTAssertTrue(
             enableToggle(homeDateToggle, revealing: homeDatePicker, in: app),
             "Enabling the home date did not reveal its date picker."
@@ -1413,8 +1415,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testDiagnosticPetHomeDateWithoutTouchTraceRevealsPicker() throws {
+    func testDiagnosticPetHomeDateBaselineWithoutTouchTraceRevealsPicker() throws {
         runDiagnosticPetHomeDate(extraLaunchArguments: [])
+    }
+
+    @MainActor
+    func testDiagnosticPetHomeDateWithPassiveControlStateTraceRevealsPicker() throws {
+        runDiagnosticPetHomeDate(extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_CONTROL_STATE"])
     }
 
     @MainActor
@@ -1432,26 +1439,28 @@ final class OhanaUITests: XCTestCase {
     ) {
         let app = launchEnglishApp(
             seedHumanBaseline: false,
+            seedMemberCardBaseline: true,
             enableProductionOverlays: true,
-            extraLaunchArguments: extraLaunchArguments
+            extraLaunchArguments: ["-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE"] + extraLaunchArguments
         )
-        createOnboardingHuman(named: "Diagnostic Date Human", in: app)
-        completeFirstDayStarterFunnel(in: app, petName: "Diagnostic Date Pet")
-
-        XCTAssertTrue(tapWhenSemanticallyHittable(app.buttons["home-tab-calendar"], timeout: 8))
+        let tasksTab = app.buttons["home-tab-calendar"]
+        XCTAssertTrue(tasksTab.waitForExistence(timeout: 20), "The sparse Pet baseline did not reach the app shell.")
+        XCTAssertTrue(tapWhenSemanticallyHittable(tasksTab, timeout: 8))
+        let taskCenter = app.descendants(matching: .any)["task-center-route"]
+        XCTAssertTrue(taskCenter.waitForExistence(timeout: 12), "The sparse Pet profile journey did not reach Tasks.")
         let task = app.buttons[
             "task-center-system-action-completeFirstPetProfile-household-starter-v1-petProfile"
         ]
-        XCTAssertTrue(task.waitForExistence(timeout: 12))
+        XCTAssertTrue(task.waitForExistence(timeout: 12), "The seeded Pet profile task did not appear in Tasks.")
         XCTAssertTrue(tapWhenSemanticallyHittable(task, timeout: 8))
         let lifeStage = app.buttons["task-center-starter-journey-open-petLifeStage"]
-        XCTAssertTrue(lifeStage.waitForExistence(timeout: 8))
+        XCTAssertTrue(lifeStage.waitForExistence(timeout: 8), "The Pet profile task did not expose its life-stage editor.")
         tapGuidedJourneyControlAfterSemanticScroll(lifeStage, in: app)
         let editor = app.descendants(matching: .any)["task-center-pet-profile-inline-editor-petLifeStage"]
         XCTAssertTrue(editor.waitForExistence(timeout: 12))
 
-        let toggle = app.switches["task-center-pet-profile-inline-home-date-toggle"]
-        let picker = app.descendants(matching: .any)["task-center-pet-profile-inline-home-date"]
+        let toggle = editor.descendants(matching: .switch)["task-center-pet-profile-inline-home-date-toggle"]
+        let picker = editor.descendants(matching: .any)["task-center-pet-profile-inline-home-date"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 8))
         XCTAssertFalse(isToggleOn(toggle), "A new Pet unexpectedly starts with a home date.")
         if capturePreToggleEvidence {
@@ -1671,8 +1680,12 @@ final class OhanaUITests: XCTestCase {
         let lifeStageEditor = app.descendants(matching: .any)[
             "task-center-pet-profile-inline-editor-petLifeStage"
         ]
-        let inlineBirthdayToggle = app.switches["task-center-pet-profile-inline-birthday-toggle"]
-        let inlineHomeDateToggle = app.switches["task-center-pet-profile-inline-home-date-toggle"]
+        let inlineBirthdayToggle = lifeStageEditor.descendants(matching: .switch)[
+            "task-center-pet-profile-inline-birthday-toggle"
+        ]
+        let inlineHomeDateToggle = lifeStageEditor.descendants(matching: .switch)[
+            "task-center-pet-profile-inline-home-date-toggle"
+        ]
         let saveLifeStage = app.buttons["task-center-pet-profile-inline-save-petLifeStage"]
         let savedLifeStage = app.descendants(matching: .any)[
             "task-center-pet-profile-inline-saved-petLifeStage"
@@ -1786,7 +1799,7 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(inlineHomeDateToggle.waitForExistence(timeout: 8))
         XCTAssertFalse(isToggleOn(inlineBirthdayToggle), "Reviewing Life Stage fabricated a birthday before editing.")
         XCTAssertFalse(isToggleOn(inlineHomeDateToggle), "Reviewing Life Stage fabricated a home date before editing.")
-        let homeDatePicker = app.descendants(matching: .any)[
+        let homeDatePicker = lifeStageEditor.descendants(matching: .any)[
             "task-center-pet-profile-inline-home-date"
         ]
         func recordHomeDateState(_ phase: String) {
@@ -5301,6 +5314,8 @@ final class OhanaUITests: XCTestCase {
             "Holding the differently rotated Human card did not save its centered default score."
         )
 
+        // This point is the visible quick-check zone within the perspective-
+        // transformed card; do not replace it with a generic card-center tap.
         let quickTapCoordinate = petCard.coordinate(
             withNormalizedOffset: CGVector(dx: 0.50, dy: 0.62)
         )
@@ -5586,7 +5601,7 @@ final class OhanaUITests: XCTestCase {
             "Selecting a custom Species did not expose the Breed selector."
         )
         XCTAssertTrue(
-            tapStableNativeMenuButton(breedPicker, in: app, timeout: 4),
+            tapStableCoordinateTarget(breedPicker, in: app, timeout: 4),
             "The custom Species Breed menu did not stabilize for selection."
         )
 
@@ -5603,7 +5618,7 @@ final class OhanaUITests: XCTestCase {
             "The current Breed menu did not expose its Other selector."
         )
         XCTAssertTrue(
-            tapStableNativeMenuButton(otherBreed, in: app, timeout: 4),
+            tapStableCoordinateTarget(otherBreed, in: app, timeout: 4),
             "The Other Breed menu action did not stabilize for selection."
         )
 
@@ -6899,18 +6914,14 @@ final class OhanaUITests: XCTestCase {
     private func runDiagnosticCrewMenu(extraLaunchArguments: [String]) {
         let app = launchEnglishApp(
             seedHumanBaseline: false,
+            seedMemberCardBaseline: true,
             enableProductionOverlays: true,
             extraLaunchArguments: extraLaunchArguments
         )
-        let humanName = "Diagnostic Crew Human"
-        createOnboardingHuman(named: humanName, in: app)
-        let deferPet = app.buttons["onboarding-defer-pet"]
-        XCTAssertTrue(deferPet.waitForExistence(timeout: 12))
-        XCTAssertTrue(tapWhenSemanticallyHittable(deferPet, timeout: 8))
-        ensureHomeSurfaceVisible(in: app, humanName: humanName)
-
+        let home = app.buttons["home-tab-home"]
         let crew = app.buttons["home-crew-roster-action"]
-        XCTAssertTrue(crew.waitForExistence(timeout: 12))
+        XCTAssertTrue(home.waitForExistence(timeout: 20), "The seeded Human baseline did not reach Home.")
+        XCTAssertTrue(crew.waitForExistence(timeout: 12), "Home did not expose the Crew menu entry.")
         XCTAssertTrue(tapWhenSemanticallyHittable(crew, timeout: 8))
         let addMember = app.buttons["crew-roster-primary-action"]
         XCTAssertTrue(addMember.waitForExistence(timeout: 12))
@@ -7053,7 +7064,7 @@ final class OhanaUITests: XCTestCase {
         primaryAction.press(forDuration: 0.6)
         let allFeatures = app.buttons["home-all-features-action"]
         XCTAssertTrue(
-            tapStableNativeMenuButton(allFeatures, in: app, timeout: 8),
+            tapStableCoordinateTarget(allFeatures, in: app, timeout: 8),
             "Long-pressing Home did not produce a frame-ready All Features action."
         )
 
@@ -7246,8 +7257,8 @@ final class OhanaUITests: XCTestCase {
         let humanCard = app.buttons["home-card-human-\(humanName)"]
         XCTAssertTrue(humanCard.waitForExistence(timeout: 14), "Home human card did not appear before expansion.")
         XCTAssertTrue(
-            tapWhenFrameReady(humanCard, timeout: 8),
-            "Home human card did not expose a stable touch frame before expansion."
+            tapWhenSemanticallyHittable(humanCard, timeout: 8),
+            "Home human card did not become semantically tappable before expansion."
         )
 
         XCTAssertTrue(
@@ -7538,8 +7549,8 @@ final class OhanaUITests: XCTestCase {
         let unlockAction = app.buttons["pet-bond-vault-unlock-card_border"]
         scrollToElement(unlockAction, in: app, maxSwipes: 4)
         XCTAssertTrue(
-            tapWhenFrameReady(unlockAction, timeout: 8),
-            "Long-session Pet Bond Vault unlock action was not frame-ready."
+            tapWhenSemanticallyHittable(unlockAction, timeout: 8),
+            "Long-session Pet Bond Vault unlock action was not semantically tappable."
         )
         XCTAssertTrue(
             waitUntil(timeout: 12) { numericLabel(balance.label) == "920" },
@@ -9265,7 +9276,7 @@ final class OhanaUITests: XCTestCase {
 
         let rosterAction = app.buttons["home-crew-roster-action"]
         XCTAssertTrue(
-            tapWhenFrameReady(rosterAction, timeout: 8),
+            tapWhenSemanticallyHittable(rosterAction, timeout: 8),
             "Home member roster action did not become tappable after memorial pet return."
         )
         XCTAssertTrue(
@@ -9418,10 +9429,9 @@ final class OhanaUITests: XCTestCase {
         let unlockAction = app.buttons["pet-bond-vault-unlock-card_border"]
         scrollToElement(unlockAction, in: app, maxSwipes: 4)
         XCTAssertTrue(
-            waitForFrameReady(unlockAction, timeout: 8),
-            "Pet Bond Vault card-border unlock action was not frame-ready for the unlock tap."
+            tapWhenSemanticallyHittable(unlockAction, timeout: 8),
+            "Pet Bond Vault card-border unlock action was not semantically tappable."
         )
-        unlockAction.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
 
         let didSpend = waitUntil(timeout: 12) {
             numericLabel(balance.label) == "920"
@@ -9698,7 +9708,7 @@ final class OhanaUITests: XCTestCase {
 
         let titleField = app.textFields["add-event-title-input"]
         XCTAssertTrue(titleField.waitForExistence(timeout: 10), "Calendar add-event sheet did not expose title input.")
-        XCTAssertTrue(tapWhenFrameReady(titleField, timeout: 8), "Calendar event title input was not frame-ready.")
+        XCTAssertTrue(tapWhenSemanticallyHittable(titleField, timeout: 8), "Calendar event title input was not semantically tappable.")
 
         let keyboard = app.keyboards.firstMatch
         XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "System keyboard did not appear after focusing the event title.")
@@ -9991,8 +10001,8 @@ final class OhanaUITests: XCTestCase {
         let coconutBalance = app.buttons["home-coconut-action"]
         XCTAssertTrue(coconutBalance.waitForExistence(timeout: 20), "Home coconut balance action did not appear.")
         XCTAssertTrue(
-            tapWhenFrameReady(coconutBalance, timeout: 8),
-            "Home coconut balance action did not expose a stable touch frame."
+            tapWhenSemanticallyHittable(coconutBalance, timeout: 8),
+            "Home coconut balance action did not become semantically tappable."
         )
 
         let coconutTitle = app.staticTexts["Coconut History"]
@@ -10659,7 +10669,7 @@ final class OhanaUITests: XCTestCase {
         )
         let homeTab = app.buttons["home-tab-home"]
         XCTAssertTrue(
-            tapWhenFrameReady(homeTab, timeout: 8),
+            tapWhenSemanticallyHittable(homeTab, timeout: 8),
             "The Home tab was not reachable before the starter gift."
         )
         XCTAssertTrue(
@@ -10673,20 +10683,20 @@ final class OhanaUITests: XCTestCase {
             "The first Pet card was missing from Home before the starter gift appeared."
         )
         XCTAssertTrue(
-            tapWhenFrameReady(app.buttons["home-tab-calendar"], timeout: 8),
+            tapWhenSemanticallyHittable(app.buttons["home-tab-calendar"], timeout: 8),
             "Tasks was not reachable again to claim the starter gift."
         )
         finishRequiredStarterGift(in: app)
 
         let oasisTab = app.buttons["home-tab-oasis"]
         XCTAssertTrue(oasisTab.waitForExistence(timeout: 8), "Oasis did not unlock after the starter gift was claimed.")
-        XCTAssertTrue(tapWhenFrameReady(oasisTab, timeout: 8), "Oasis tab was not frame-ready after the starter reward.")
+        XCTAssertTrue(tapWhenSemanticallyHittable(oasisTab, timeout: 8), "Oasis tab was not semantically tappable after the starter reward.")
         XCTAssertTrue(app.otherElements["oasis-screen"].waitForExistence(timeout: 20), "The D17 flow did not show the Oasis seed surface.")
         let level = app.descendants(matching: .any)["oasis-tree-level-control"]
         XCTAssertTrue(level.waitForExistence(timeout: 12), "The Oasis seed level was not visible.")
         XCTAssertTrue(level.label.contains("level 0"), "The first Oasis surface was not the Lv0 seed state: \(level.label)")
         XCTAssertTrue(
-            tapWhenFrameReady(homeTab, timeout: 8),
+            tapWhenSemanticallyHittable(homeTab, timeout: 8),
             "Home was not reachable after checking the Oasis seed state."
         )
         XCTAssertTrue(
@@ -10696,7 +10706,7 @@ final class OhanaUITests: XCTestCase {
             "Human-first onboarding did not retain its Human profile on Home."
         )
         XCTAssertTrue(
-            tapWhenFrameReady(oasisTab, timeout: 8),
+            tapWhenSemanticallyHittable(oasisTab, timeout: 8),
             "Oasis was not reachable again after verifying the retained Home cards."
         )
         XCTAssertTrue(
@@ -10769,7 +10779,7 @@ final class OhanaUITests: XCTestCase {
         let taskClaim = app.buttons["task-center-system-action-claimStarterGift-system-journey-claim-starter-gift"]
         if !taskClaim.exists {
             XCTAssertTrue(
-                tapWhenFrameReady(app.buttons["home-tab-calendar"], timeout: 8),
+                tapWhenSemanticallyHittable(app.buttons["home-tab-calendar"], timeout: 8),
                 "Tasks was not reachable to claim the first-pet reward."
             )
         }
@@ -10838,8 +10848,8 @@ final class OhanaUITests: XCTestCase {
         let oasisTab = app.buttons["home-tab-oasis"]
         XCTAssertTrue(oasisTab.waitForExistence(timeout: 20), "Oasis tab did not appear after member setup.")
         XCTAssertTrue(
-            tapWhenFrameReady(oasisTab, timeout: 8),
-            "Oasis tab existed but did not become frame-ready after member setup."
+            tapWhenSemanticallyHittable(oasisTab, timeout: 8),
+            "Oasis tab existed but did not become semantically tappable after member setup."
         )
 
         let oasisScreen = app.otherElements["oasis-screen"]
@@ -10864,8 +10874,8 @@ final class OhanaUITests: XCTestCase {
         )
         for attempt in 1 ... 4 {
             XCTAssertTrue(
-                tapWhenFrameReady(injectEnergy, timeout: 8),
-                "Starter energy action existed but did not become frame-ready for injection \(attempt)."
+                tapWhenSemanticallyHittable(injectEnergy, timeout: 8),
+                "Starter energy action existed but did not become semantically tappable for injection \(attempt)."
             )
             let reachedEarly = waitUntil(timeout: 0.8) {
                 app.descendants(matching: .any)["oasis-tree-level-control"].label.contains("level 1")
@@ -10874,8 +10884,8 @@ final class OhanaUITests: XCTestCase {
         }
 
         XCTAssertTrue(
-            tapWhenFrameReady(injectEnergy, timeout: 8),
-            "Starter energy action existed but did not become frame-ready for the final injection."
+            tapWhenSemanticallyHittable(injectEnergy, timeout: 8),
+            "Starter energy action existed but did not become semantically tappable for the final injection."
         )
 
         let didReachLevelOne = waitUntil(timeout: 20) {
@@ -10890,7 +10900,7 @@ final class OhanaUITests: XCTestCase {
         guard oasisScreen.exists else { return }
         let homeTab = app.buttons["home-tab-home"]
         XCTAssertTrue(homeTab.waitForExistence(timeout: 8), "Oasis did not expose the Home tab.")
-        XCTAssertTrue(tapWhenFrameReady(homeTab, timeout: 8), "The Home tab was not frame-ready from Oasis.")
+        XCTAssertTrue(tapWhenSemanticallyHittable(homeTab, timeout: 8), "The Home tab was not semantically tappable from Oasis.")
         XCTAssertTrue(
             waitUntil(timeout: 12) { !oasisScreen.exists && app.buttons["home-crew-roster-action"].exists },
             "Switching from Oasis did not return to the Home member surface."
@@ -11228,8 +11238,8 @@ final class OhanaUITests: XCTestCase {
         let shopTool = app.buttons["oasis-bento-shop"]
         XCTAssertTrue(shopTool.waitForExistence(timeout: 14), "Oasis did not expose the Coconut Shop entry.")
         XCTAssertTrue(
-            tapWhenFrameReady(shopTool, timeout: 8),
-            "Oasis Coconut Shop entry existed but was not frame-ready."
+            tapWhenSemanticallyHittable(shopTool, timeout: 8),
+            "Oasis Coconut Shop entry existed but was not semantically tappable."
         )
 
         XCTAssertTrue(
@@ -11343,7 +11353,7 @@ final class OhanaUITests: XCTestCase {
 
         let detailAction = app.buttons["home-expanded-detail-human"]
         XCTAssertTrue(
-            tapStableNativeMenuButton(
+            tapStableCoordinateTarget(
                 detailAction,
                 in: app,
                 timeout: 4,
@@ -11553,7 +11563,7 @@ final class OhanaUITests: XCTestCase {
         let humanCard = app.buttons["home-card-human-\(humanName)"]
         let humanCardByLabel = app.buttons.matching(NSPredicate(format: "label == %@", humanName)).firstMatch
         let targetCard = humanCard.exists ? humanCard : humanCardByLabel
-        guard tapWhenFrameReady(targetCard, timeout: 5) else { return }
+        guard tapWhenSemanticallyHittable(targetCard, timeout: 5) else { return }
 
         _ = waitUntil(timeout: 8) {
                 !app.buttons["home-expanded-detail-human"].exists &&
@@ -11910,7 +11920,7 @@ final class OhanaUITests: XCTestCase {
             // XCTest can reject this native menu item's activation point even
             // while its enabled, visible frame is stable. Resolve the named
             // menu item through the same frame-based path as other native menus.
-            tapStableNativeMenuButton(deleteAction, in: app, timeout: 8),
+            tapStableCoordinateTarget(deleteAction, in: app, timeout: 8),
             "Human health metric delete menu item did not stabilize in its native menu."
         )
         let confirmDelete = app.buttons["Delete Log"]
@@ -12348,8 +12358,8 @@ final class OhanaUITests: XCTestCase {
 
         let action = app.buttons["home-quick-action-\(actionType)"]
         XCTAssertTrue(
-            tapWhenFrameReady(action, timeout: 8),
-            "Pet home quick action did not have a tappable frame: \(actionType)"
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Pet home quick action did not become semantically tappable: \(actionType)"
         )
 
         let detailAction = homeQuickActionMenuButton(in: app, actionType: actionType, suffix: "detail")
@@ -12382,8 +12392,8 @@ final class OhanaUITests: XCTestCase {
 
         let action = app.buttons["home-quick-action-\(actionType)"]
         XCTAssertTrue(
-            tapWhenFrameReady(action, timeout: 8),
-            "Pet home quick action did not have a tappable frame: \(actionType)"
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Pet home quick action did not become semantically tappable: \(actionType)"
         )
 
         let menuAction = homeQuickActionMenuButton(in: app, actionType: actionType, suffix: "quick")
@@ -12465,7 +12475,7 @@ final class OhanaUITests: XCTestCase {
             attachment.lifetime = .keepAlways
             activity.add(attachment)
         }
-        return tapStableNativeMenuButton(button, in: app, timeout: 4, usesPointerClick: false)
+        return tapStableCoordinateTarget(button, in: app, timeout: 4, usesPointerClick: false)
     }
 
     @MainActor
@@ -12581,8 +12591,8 @@ final class OhanaUITests: XCTestCase {
 
         let action = app.buttons["home-quick-action-water"]
         XCTAssertTrue(
-            tapWhenFrameReady(action, timeout: 8),
-            "Pet home water quick action did not have a tappable frame."
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Pet home water quick action did not become semantically tappable."
         )
 
         let detailAction = homeQuickActionMenuButton(in: app, actionType: "water", suffix: "detail")
@@ -12604,8 +12614,8 @@ final class OhanaUITests: XCTestCase {
 
         let action = app.buttons["home-quick-action-walk"]
         XCTAssertTrue(
-            tapWhenFrameReady(action, timeout: 8),
-            "Pet home walk quick action did not expose a stable touch frame."
+            tapWhenSemanticallyHittable(action, timeout: 8),
+            "Pet home walk quick action did not become semantically tappable."
         )
         let quickStart = homeQuickActionMenuButton(in: app, actionType: "walk", suffix: "quick")
         if quickStart.waitForExistence(timeout: 3) {
@@ -12641,7 +12651,7 @@ final class OhanaUITests: XCTestCase {
         } else {
             let bubble = app.descendants(matching: .any)["global-walk-bubble"]
             XCTAssertTrue(
-                tapWhenFrameReady(bubble, timeout: 12),
+                tapWhenSemanticallyHittable(bubble, timeout: 12),
                 "Started walk did not expose a tappable global walk fallback bubble."
             )
             let globalStop = app.buttons["global-walk-stop-action"]
@@ -12792,7 +12802,7 @@ final class OhanaUITests: XCTestCase {
             let targetCard = petCard.exists ? petCard : fallbackPetCard
             if targetCard.exists {
                 scrollTowardElement(targetCard, in: app, maxSwipes: 2)
-                _ = tapWhenFrameReady(targetCard, timeout: 8)
+                _ = tapWhenSemanticallyHittable(targetCard, timeout: 8)
             }
             if waitUntil(timeout: 3, condition: { petAllFeaturesShortcutExists(in: app) }) {
                 break
@@ -12808,8 +12818,8 @@ final class OhanaUITests: XCTestCase {
         )
         let allFeaturesShortcut = petAllFeaturesShortcut(in: app)
         XCTAssertTrue(
-            tapWhenFrameReady(allFeaturesShortcut, timeout: 8),
-            "Expanded pet card All Features shortcut did not expose a stable touch frame."
+            tapWhenSemanticallyHittable(allFeaturesShortcut, timeout: 8),
+            "Expanded pet card All Features shortcut did not become semantically tappable."
         )
 
         XCTAssertTrue(
@@ -12827,8 +12837,8 @@ final class OhanaUITests: XCTestCase {
                primaryAction.isEnabled,
                !primaryAction.isHittable {
                 XCTAssertTrue(
-                    tapWhenFrameReady(primaryAction, timeout: 8),
-                    "Manual feeding primary action was not frame-ready."
+                    tapWhenSemanticallyHittable(primaryAction, timeout: 8),
+                    "Manual feeding primary action did not become semantically tappable."
                 )
             } else {
                 tapWhenHittable(primaryAction, timeout: 8)
@@ -12980,8 +12990,8 @@ final class OhanaUITests: XCTestCase {
             return
         }
         XCTAssertTrue(
-            tapWhenFrameReady(close, timeout: 8),
-            "Feed detail close action was not frame-ready."
+            tapWhenSemanticallyHittable(close, timeout: 8),
+            "Feed detail close action did not become semantically tappable."
         )
 
         let didReturnHome = waitForFrameReady(app.buttons["home-quick-action-feed"], timeout: 15)
@@ -13012,8 +13022,8 @@ final class OhanaUITests: XCTestCase {
                primaryAction.isEnabled,
                !primaryAction.isHittable {
                 XCTAssertTrue(
-                    tapWhenFrameReady(primaryAction, timeout: 8),
-                    "Quick Feed primary action was not frame-ready for the home quick check-in."
+                    tapWhenSemanticallyHittable(primaryAction, timeout: 8),
+                    "Quick Feed primary action did not become semantically tappable for the home quick check-in."
                 )
             } else {
                 tapWhenHittable(primaryAction, timeout: 8)
@@ -13062,7 +13072,7 @@ final class OhanaUITests: XCTestCase {
     private func tapHomeFeedQuickAction(in app: XCUIApplication, timeout: TimeInterval) {
         let feedAction = app.buttons["home-quick-action-feed"]
         XCTAssertTrue(
-            tapWhenFrameReady(feedAction, timeout: timeout),
+            tapWhenSemanticallyHittable(feedAction, timeout: timeout),
             "Home Feed quick action did not become tappable."
         )
     }
@@ -13079,8 +13089,8 @@ final class OhanaUITests: XCTestCase {
             )
             let targetCard = petCard.exists ? petCard : fallbackPetCard
             XCTAssertTrue(
-                tapWhenFrameReady(targetCard, timeout: 8),
-                "Pet home card did not expose a stable touch frame before opening basic info."
+                tapWhenSemanticallyHittable(targetCard, timeout: 8),
+                "Pet home card did not become semantically tappable before opening basic info."
             )
         }
 
@@ -13089,8 +13099,8 @@ final class OhanaUITests: XCTestCase {
             "Expanded pet card did not expose the current profile entry."
         )
         XCTAssertTrue(
-            tapWhenFrameReady(detailAction, timeout: 8),
-            "Expanded pet profile entry did not expose a stable touch frame."
+            tapWhenSemanticallyHittable(detailAction, timeout: 8),
+            "Expanded pet profile entry did not become semantically tappable."
         )
 
         let basicInfoScreen = app.descendants(matching: .any)["pet-basic-info-screen"]
@@ -13101,7 +13111,7 @@ final class OhanaUITests: XCTestCase {
     private func openPetBasicInfoFromCrewRoster(in app: XCUIApplication, petName: String) {
         let rosterAction = app.buttons["home-crew-roster-action"]
         XCTAssertTrue(
-            tapWhenFrameReady(rosterAction, timeout: 8),
+            tapWhenSemanticallyHittable(rosterAction, timeout: 8),
             "Home member roster action did not become tappable for memorial profile readback."
         )
         XCTAssertTrue(
@@ -14103,7 +14113,7 @@ final class OhanaUITests: XCTestCase {
         guard waitUntil(timeout: 8, condition: {
             target = firstFrameReadyButton(labels: optionLabels, in: app)
             return target != nil
-        }), let target, tapStableNativeMenuButton(target, in: app, timeout: 4) else { return false }
+        }), let target, tapStableCoordinateTarget(target, in: app, timeout: 4) else { return false }
         return waitUntil(timeout: 4) { !target.exists }
     }
 
@@ -14308,13 +14318,7 @@ final class OhanaUITests: XCTestCase {
             // from a not-yet-visible element can make XCTest throw before the
             // scroll attempt that would reveal it.
             let currentElement = element
-            if currentElement.exists,
-               currentElement.isEnabled,
-               currentElement.isHittable,
-               hasSafelyTappableFrame(currentElement, in: app),
-               tapWhenSemanticallyHittable(currentElement, timeout: 2) {
-                return
-            }
+            if tapWhenSemanticallyHittable(currentElement, timeout: 2) { return }
             guard app.state == .runningForeground else { continue }
             if currentElement.exists, currentElement.frame.midY < app.frame.midY {
                 swipeInPrimaryScrollArea(in: app, towardEarlierContent: true)
@@ -14324,11 +14328,7 @@ final class OhanaUITests: XCTestCase {
         }
 
         let currentElement = element
-        let didTapFinalVisibleElement = currentElement.exists &&
-            currentElement.isEnabled &&
-            currentElement.isHittable &&
-            hasSafelyTappableFrame(currentElement, in: app) &&
-            tapWhenSemanticallyHittable(currentElement, timeout: 2)
+        let didTapFinalVisibleElement = tapWhenSemanticallyHittable(currentElement, timeout: 2)
         XCTAssertTrue(
             didTapFinalVisibleElement,
             "Guided journey control did not become semantically tappable after scrolling: \(currentElement)",
@@ -14345,7 +14345,14 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            if button.exists, button.isEnabled, hasVisibleFrame(button, in: app), button.isHittable {
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
+            let frame = snapshot.frame
+            let visibleFrame = frame.intersection(app.frame)
+            if UITestInteraction.isUsable(frame),
+               !visibleFrame.isNull,
+               visibleFrame.width > 1,
+               visibleFrame.height > 1,
+               button.isHittable {
                 return button
             }
         }
@@ -14368,8 +14375,8 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            guard button.exists, button.isEnabled else { continue }
-            let frame = button.frame
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
+            let frame = snapshot.frame
             if UITestInteraction.isUsable(frame),
                app.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) {
                 return (button, frame)
@@ -14386,7 +14393,14 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            if button.exists, button.isEnabled, hasVisibleFrame(button, in: app), button.isHittable {
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
+            let frame = snapshot.frame
+            let visibleFrame = frame.intersection(app.frame)
+            if UITestInteraction.isUsable(frame),
+               !visibleFrame.isNull,
+               visibleFrame.width > 1,
+               visibleFrame.height > 1,
+               button.isHittable {
                 return button
             }
         }
@@ -14416,8 +14430,8 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            guard button.exists, button.isEnabled else { continue }
-            let frame = button.frame
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
+            let frame = snapshot.frame
             let visibleFrame = frame.intersection(app.frame)
             if frame.width > 1,
                frame.height > 1,
@@ -14451,8 +14465,10 @@ final class OhanaUITests: XCTestCase {
         return waitUntil(timeout: 4) { !ready.element.exists }
     }
 
+    /// Coordinate-only path for native menu items and identified actions whose
+    /// semantic activation point does not match the visible target.
     @MainActor
-    private func tapStableNativeMenuButton(
+    private func tapStableCoordinateTarget(
         _ button: XCUIElement,
         in app: XCUIApplication,
         timeout: TimeInterval,
@@ -14496,22 +14512,12 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(didTap, "No alert button became available for \(context): \(labels.joined(separator: ", "))")
     }
 
-    @MainActor
-    private func tapWhenFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        tapWhenFrameReady(element, offset: CGVector(dx: 0.5, dy: 0.5), timeout: timeout)
-    }
-
     private func waitForFrameReady(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
         waitUntil(timeout: timeout) {
-            guard element.exists, element.isEnabled else { return false }
-            let frame = element.frame
+            guard let snapshot = try? element.snapshot(), snapshot.isEnabled else { return false }
+            let frame = snapshot.frame
             return frame.width > 1 && frame.height > 1 && isFiniteFrame(frame)
         }
-    }
-
-    @MainActor
-    private func tapWhenFrameReady(_ element: XCUIElement, offset: CGVector, timeout: TimeInterval) -> Bool {
-        UITestInteraction.tapFrame(element, offset: offset, timeout: timeout)
     }
 
     @MainActor

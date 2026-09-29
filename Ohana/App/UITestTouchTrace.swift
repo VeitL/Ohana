@@ -7,44 +7,65 @@ import UIKit
 @MainActor
 enum OhanaUITestTouchTrace {
     private static let logger = Logger(subsystem: "com.guanchen.li.Ohana", category: "UITestTouchTrace")
-    private static var installed = false
+    private static var touchObservationInstalled = false
+    private static var controlStateObservationEnabled = false
 
     static func installIfRequested() {
         let arguments = ProcessInfo.processInfo.arguments
-        guard !installed,
-              arguments.contains("-OHANA_UI_TESTS"),
-              arguments.contains("-OHANA_UI_TEST_TRACE_TOUCHES"),
-              let original = class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))),
-              let observation = class_getInstanceMethod(UIWindow.self, #selector(UIWindow.ohana_observeTouchEvent(_:))) else {
-            return
+        guard arguments.contains("-OHANA_UI_TESTS") else { return }
+
+        if arguments.contains("-OHANA_UI_TEST_TRACE_TOUCHES"), !touchObservationInstalled,
+           let original = class_getInstanceMethod(UIWindow.self, #selector(UIWindow.sendEvent(_:))),
+           let observation = class_getInstanceMethod(UIWindow.self, #selector(UIWindow.ohana_observeTouchEvent(_:))) {
+            method_exchangeImplementations(original, observation)
+            touchObservationInstalled = true
+            logger.notice("Received-touch observation installed")
         }
-        method_exchangeImplementations(original, observation)
-        installed = true
-        logger.notice("Received-touch observation installed")
+
+        if arguments.contains("-OHANA_UI_TEST_TRACE_CONTROL_STATE"), !controlStateObservationEnabled {
+            controlStateObservationEnabled = true
+            logger.notice("Control-state observation enabled")
+        }
     }
 
     static func record(_ message: String) {
-        guard installed else { return }
+        guard touchObservationInstalled || controlStateObservationEnabled else { return }
         logger.notice("\(message, privacy: .public)")
     }
 }
 
 private extension UIWindow {
     @objc dynamic func ohana_observeTouchEvent(_ event: UIEvent) {
-        // Capture values before UIKit can update them, but dispatch the original
-        // event exactly once before formatting or logging the observation.
-        let samples = (event.allTouches ?? []).compactMap { touch -> (UITouch, Int, TimeInterval, CGPoint)? in
+        // Capture the hit-test and touch-recipient paths before UIKit updates
+        // the event, then dispatch the original event exactly once.
+        let samples = (event.allTouches ?? []).compactMap { touch in
             guard touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled else { return nil }
-            return (touch, touch.phase.rawValue, touch.timestamp, touch.location(in: self))
+            let point = touch.location(in: self)
+            let recipientPath = ohana_viewPath(touch.view)
+            let hitTestPath = ohana_viewPath(hitTest(point, with: event))
+            return (touch, touch.phase.rawValue, touch.timestamp, point, recipientPath, hitTestPath)
         }
         ohana_observeTouchEvent(event)
-        for (touch, phase, timestamp, point) in samples {
+        for (touch, phase, timestamp, point, recipientPath, hitTestPath) in samples {
             let receiver = touch.view.map { String(describing: type(of: $0)) } ?? "nil"
             OhanaUITestTouchTrace.record(
                 "touch=\(ObjectIdentifier(touch)) phase=\(phase) timestamp=\(timestamp) "
-                    + "point=\(point) window=\(ObjectIdentifier(self)) receiver=\(receiver)"
+                    + "point=\(point) window=\(ObjectIdentifier(self)) receiverAfter=\(receiver) "
+                    + "recipientPathBefore=\(recipientPath) hitTestPathBefore=\(hitTestPath)"
             )
         }
+    }
+
+    func ohana_viewPath(_ view: UIView?) -> String {
+        var nodes: [String] = []
+        var current = view
+        while let node = current {
+            let identifier = node.accessibilityIdentifier ?? ""
+            let controlState = (node as? UISwitch).map { " isOn=\($0.isOn)" } ?? ""
+            nodes.append("\(type(of: node))[id=\(identifier)]\(controlState)")
+            current = node.superview
+        }
+        return nodes.joined(separator: " < ")
     }
 }
 #endif

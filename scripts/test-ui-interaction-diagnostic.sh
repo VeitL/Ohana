@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <crew|home-date> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <crew|home-date|home-date-control> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -28,18 +28,22 @@ case "${scenario}" in
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuOpensHumanCreation
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithAnimationsOpensHumanCreation
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithoutTouchTraceOpensHumanCreation
-      OhanaUITests/OhanaUITests/testHumanSettingsInlineSwitcherHidesLocalPrivacyControls
-      OhanaUITests/OhanaUITests/testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch
     )
     ;;
   home-date)
     selectors=(
       OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateRevealsPicker
       OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateWithAnimationsRevealsPicker
-      OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateWithoutTouchTraceRevealsPicker
+      OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateBaselineWithoutTouchTraceRevealsPicker
       OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateWithoutPreToggleAXRevealsPicker
       OhanaUITests/OhanaUITests/testPetProfileEditorCancelCloseAndDateSaveCompletesLifeStage
       OhanaUITests/OhanaUITests/testPetProfileReviewedThenRealAnswersPersistAcrossRelaunch
+    )
+    ;;
+  home-date-control)
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateBaselineWithoutTouchTraceRevealsPicker
+      OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateWithPassiveControlStateTraceRevealsPicker
     )
     ;;
   *)
