@@ -105,6 +105,40 @@ enum UITestInteraction {
             frame.width > 1 && frame.height > 1
     }
 
+    struct VisibleFrameObservation {
+        let frame: CGRect
+        let visibleFrame: CGRect
+    }
+
+    @MainActor
+    static func visibleFrameObservation(
+        of element: XCUIElement,
+        in app: XCUIApplication,
+        minimumVisibleSize: CGFloat = 1
+    ) -> VisibleFrameObservation? {
+        guard let snapshot = try? element.snapshot(),
+              let visibleFrame = visibleFrame(
+                  for: snapshot.frame,
+                  in: app.frame,
+                  minimumVisibleSize: minimumVisibleSize
+              ) else { return nil }
+        return VisibleFrameObservation(frame: snapshot.frame, visibleFrame: visibleFrame)
+    }
+
+    static func visibleFrame(
+        for frame: CGRect,
+        in windowFrame: CGRect,
+        minimumVisibleSize: CGFloat = 1
+    ) -> CGRect? {
+        guard minimumVisibleSize.isFinite, minimumVisibleSize > 0,
+              isUsable(frame), isUsable(windowFrame) else { return nil }
+        let visibleFrame = frame.intersection(windowFrame)
+        guard !visibleFrame.isNull,
+              visibleFrame.width > minimumVisibleSize,
+              visibleFrame.height > minimumVisibleSize else { return nil }
+        return visibleFrame
+    }
+
     @MainActor
     static func switchControl(_ element: XCUIElement) -> XCUIElement {
         let nested = element.descendants(matching: .switch).firstMatch
@@ -224,11 +258,9 @@ enum UITestInteraction {
     @MainActor
     static func dismissKeyboard(in app: XCUIApplication, returnKeyIsSafe: Bool = false) -> Bool {
         let keyboard = app.keyboards.firstMatch
-        guard keyboard.exists else { return true }
         // iOS can retain a focused keyboard in AX after sliding it entirely
         // below the window. Its keys still exist, but none can be tapped.
-        let keyboardFrame = keyboard.frame
-        if isUsable(keyboardFrame), !keyboardFrame.intersects(app.frame) { return true }
+        if isKeyboardDismissed(keyboard, in: app) { return true }
         let actionIDs = [
             "ohana-keyboard-dismiss-action",
             "task-center-pet-profile-inline-keyboard-done",
@@ -265,9 +297,16 @@ enum UITestInteraction {
             ? tapFrame(action, in: app, timeout: 4, validatedFrame: actionFrame)
             : tap(action, timeout: 4)
         guard sent else { return false }
-        let dismissed = wait(timeout: 4) { !app.keyboards.firstMatch.exists }
+        let dismissed = wait(timeout: 4) { isKeyboardDismissed(keyboard, in: app) }
         if !dismissed { recordFailure("Keyboard stayed visible after dismissal", element: action) }
         return dismissed
+    }
+
+    @MainActor
+    private static func isKeyboardDismissed(_ keyboard: XCUIElement, in app: XCUIApplication) -> Bool {
+        guard keyboard.exists else { return true }
+        let frame = keyboard.frame
+        return isUsable(frame) && !frame.intersects(app.frame)
     }
 
     @MainActor

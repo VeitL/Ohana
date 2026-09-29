@@ -13,11 +13,6 @@ on:
         type: choice
         options: [all, crew, home-date, home-date-control]
         default: all
-  # GitHub exposes a new manual workflow only after its file reaches default.
-  # Bootstrap this branch's first targeted run when the workflow itself lands.
-  push:
-    branches: [agent/fix-water-refill-care-fact]
-    paths: [.github/workflows/ui-interaction-diagnostic.yml]
 
 concurrency:
   group: ui-interaction-diagnostic-${{ github.ref }}
@@ -31,7 +26,6 @@ jobs:
       matrix:
         scenario: >-
           ${{ fromJSON(
-            github.event_name == 'push' && '["crew","home-date-control"]' ||
             inputs.scenario == 'crew' && '["crew"]' ||
             inputs.scenario == 'home-date' && '["home-date"]' ||
             inputs.scenario == 'home-date-control' && '["home-date-control"]' ||
@@ -57,10 +51,11 @@ jobs:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
           OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ matrix.scenario == 'home-date-control' && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
-      - name: Export passive HomeDate state-change log
-        if: always() && matrix.scenario == 'home-date-control'
+      - name: Export received-touch and control-state log
+        if: always() && (matrix.scenario == 'crew' || matrix.scenario == 'home-date-control')
         env:
           RUNNER_TEMP: ${{ runner.temp }}
+          DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}
         run: |
           python3 - <<'PY'
           import json
@@ -76,7 +71,8 @@ jobs:
               for device in runtime_devices
               if device.get('name') == 'iPhone 17 Tests'
           ]
-          target = Path(os.environ['RUNNER_TEMP']) / 'ui-interaction-home-date-control-app.log'
+          scenario = os.environ['DIAGNOSTIC_SCENARIO']
+          target = Path(os.environ['RUNNER_TEMP']) / f'ui-interaction-{scenario}-app.log'
           if len(matches) != 1:
               target.write_text(f'Could not identify one Tests Simulator: {len(matches)} matches.\n')
               raise SystemExit(0)
@@ -145,7 +141,7 @@ jobs:
             ${{ runner.temp }}/ui-interaction-${{ matrix.scenario }}-diagnostic.json
             ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
             ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/success/*.xcresult
-            ${{ runner.temp }}/ui-interaction-home-date-control-app.log
+            ${{ runner.temp }}/ui-interaction-*-app.log
           if-no-files-found: warn
           compression-level: 0
           retention-days: 7

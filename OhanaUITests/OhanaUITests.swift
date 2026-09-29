@@ -8863,7 +8863,11 @@ final class OhanaUITests: XCTestCase {
     func testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch() throws {
         let app = launchEnglishApp(
             enableProductionOverlays: true,
-            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+            // The Xcode 26.6 / iOS 26.5 native-menu comparison exposed a
+            // stable Human option only when UIKit animations were enabled.
+            extraLaunchArguments: [
+                "-OHANA_UI_TEST_TRACE_TOUCHES", "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
+            ]
         )
         let ownerName = createFirstHuman(from: app)
         XCTAssertTrue(
@@ -13662,7 +13666,7 @@ final class OhanaUITests: XCTestCase {
         let knownScrollViews = [
             app.scrollViews["task-center-starter-journey-scroll"],
             app.scrollViews["task-center-scroll-view"],
-            app.descendants(matching: .any)["calendar-list-scroll-view"]
+            app.scrollViews["calendar-list-scroll-view"]
         ]
         let scrollView = knownScrollViews.first {
             visibleFrame(of: $0, in: app) != nil && $0.isHittable
@@ -13710,29 +13714,25 @@ final class OhanaUITests: XCTestCase {
         return bestElement
     }
 
+    @MainActor
     private func visibleFrame(of element: XCUIElement, in app: XCUIApplication) -> CGRect? {
-        guard element.exists else { return nil }
-        let frame = element.frame
-        guard isFiniteFrame(frame), frame.width > 44, frame.height > 44 else { return nil }
-        let visibleFrame = frame.intersection(app.frame)
-        guard !visibleFrame.isNull, visibleFrame.width > 44, visibleFrame.height > 44 else { return nil }
-        return visibleFrame
+        UITestInteraction.visibleFrameObservation(
+            of: element,
+            in: app,
+            minimumVisibleSize: 44
+        )?.visibleFrame
     }
 
+    @MainActor
     private func hasVisibleFrame(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
-        guard element.exists else { return false }
-        let frame = element.frame
-        guard isFiniteFrame(frame), frame.width > 1, frame.height > 1 else { return false }
-        let visibleFrame = frame.intersection(app.frame)
-        return !visibleFrame.isNull && visibleFrame.width > 1 && visibleFrame.height > 1
+        UITestInteraction.visibleFrameObservation(of: element, in: app) != nil
     }
 
+    @MainActor
     private func hasSafelyTappableFrame(_ element: XCUIElement, in app: XCUIApplication) -> Bool {
-        guard element.exists else { return false }
-        let frame = element.frame
-        guard isFiniteFrame(frame), frame.width > 1, frame.height > 1 else { return false }
-        let visibleFrame = frame.intersection(app.frame)
-        guard !visibleFrame.isNull else { return false }
+        guard let observation = UITestInteraction.visibleFrameObservation(of: element, in: app) else { return false }
+        let frame = observation.frame
+        let visibleFrame = observation.visibleFrame
         let center = CGPoint(x: frame.midX, y: frame.midY)
         return visibleFrame.contains(center) &&
             visibleFrame.width >= min(frame.width, 20) &&
@@ -13855,6 +13855,7 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(didReturnHome, "Closing the human profile did not return to Home.")
     }
 
+    @MainActor
     private func isHumanRouteAtHome(in app: XCUIApplication, humanName _: String) -> Bool {
         let homeTab = app.buttons["home-tab-home"]
         return app.state == .runningForeground &&
@@ -14109,12 +14110,18 @@ final class OhanaUITests: XCTestCase {
         optionLabels: [String],
         in app: XCUIApplication
     ) -> Bool {
-        var target: XCUIElement?
+        var target: (element: XCUIElement, frame: CGRect)?
         guard waitUntil(timeout: 8, condition: {
             target = firstFrameReadyButton(labels: optionLabels, in: app)
             return target != nil
-        }), let target, tapStableCoordinateTarget(target, in: app, timeout: 4) else { return false }
-        return waitUntil(timeout: 4) { !target.exists }
+        }), let target,
+        tapStableCoordinateTarget(
+            target.element,
+            in: app,
+            timeout: 4,
+            validatedFrame: target.frame
+        ) else { return false }
+        return waitUntil(timeout: 4) { !target.element.exists }
     }
 
     private func containsAnyElement(in app: XCUIApplication, identifiers: [String]) -> Bool {
@@ -14377,10 +14384,9 @@ final class OhanaUITests: XCTestCase {
             let button = matches.element(boundBy: index)
             guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
             let frame = snapshot.frame
-            if UITestInteraction.isUsable(frame),
-               app.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) {
-                return (button, frame)
-            }
+            guard let visibleFrame = UITestInteraction.visibleFrame(for: frame, in: app.frame),
+                  visibleFrame.contains(CGPoint(x: frame.midX, y: frame.midY)) else { continue }
+            return (button, frame)
         }
         return nil
     }
@@ -14430,17 +14436,9 @@ final class OhanaUITests: XCTestCase {
 
         for index in 0 ..< count {
             let button = matches.element(boundBy: index)
-            guard let snapshot = try? button.snapshot(), snapshot.isEnabled else { continue }
-            let frame = snapshot.frame
-            let visibleFrame = frame.intersection(app.frame)
-            if frame.width > 1,
-               frame.height > 1,
-               isFiniteFrame(frame),
-               !visibleFrame.isNull,
-               visibleFrame.width > 1,
-               visibleFrame.height > 1 {
-                return button
-            }
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled,
+                  UITestInteraction.visibleFrame(for: snapshot.frame, in: app.frame) != nil else { continue }
+            return button
         }
         return nil
     }
@@ -14450,19 +14448,23 @@ final class OhanaUITests: XCTestCase {
         identifier: String,
         in app: XCUIApplication
     ) -> Bool {
-        var ready: (element: XCUIElement, frame: CGRect)?
-        guard waitUntil(timeout: 8, condition: {
-            ready = firstFrameReadyButton(identifier: identifier, in: app)
-            return ready != nil
-        }), let ready,
-        UITestInteraction.tapFrame(
-            ready.element,
+        let button = app.buttons.matching(identifier: identifier).firstMatch
+        guard let frame = UITestInteraction.stableFrame(of: button, in: app, timeout: 8) else {
+            UITestInteraction.recordFailure("Native menu action did not expose a stable frame", element: button)
+            return false
+        }
+        guard UITestInteraction.tapFrame(
+            button,
             in: app,
             timeout: 4,
             usesPointerClick: true,
-            validatedFrame: ready.frame
+            validatedFrame: frame
         ) else { return false }
-        return waitUntil(timeout: 4) { !ready.element.exists }
+        let dismissed = waitUntil(timeout: 4) { !button.exists }
+        if !dismissed {
+            UITestInteraction.recordFailure("Native menu action remained after one coordinate tap", element: button)
+        }
+        return dismissed
     }
 
     /// Coordinate-only path for native menu items and identified actions whose
@@ -14472,9 +14474,16 @@ final class OhanaUITests: XCTestCase {
         _ button: XCUIElement,
         in app: XCUIApplication,
         timeout: TimeInterval,
-        usesPointerClick: Bool = true
+        usesPointerClick: Bool = true,
+        validatedFrame: CGRect? = nil
     ) -> Bool {
-        UITestInteraction.tapFrame(button, in: app, timeout: timeout, usesPointerClick: usesPointerClick)
+        UITestInteraction.tapFrame(
+            button,
+            in: app,
+            timeout: timeout,
+            usesPointerClick: usesPointerClick,
+            validatedFrame: validatedFrame
+        )
     }
 
     @MainActor

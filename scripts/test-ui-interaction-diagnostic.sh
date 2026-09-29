@@ -28,6 +28,7 @@ case "${scenario}" in
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuOpensHumanCreation
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithAnimationsOpensHumanCreation
       OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithoutTouchTraceOpensHumanCreation
+      OhanaUITests/OhanaUITests/testDeletingActiveHumanRequiresAccountSwitchAndPersistsAcrossRelaunch
     )
     ;;
   home-date)
