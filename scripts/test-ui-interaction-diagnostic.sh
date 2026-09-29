@@ -41,6 +41,11 @@ case "${scenario}" in
       OhanaUITests/OhanaUITests/testPetProfileReviewedThenRealAnswersPersistAcrossRelaunch
     )
     ;;
+  home-date-long)
+    selectors=(
+      OhanaUITests/OhanaUITests/testPetProfileEditorCancelCloseAndDateSaveCompletesLifeStage
+    )
+    ;;
   home-date-control)
     selectors=(
       OhanaUITests/OhanaUITests/testDiagnosticPetHomeDateBaselineWithoutTouchTraceRevealsPicker

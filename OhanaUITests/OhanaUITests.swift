@@ -1322,7 +1322,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetProfileEditorCancelCloseAndDateSaveCompletesLifeStage() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
         _ = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
