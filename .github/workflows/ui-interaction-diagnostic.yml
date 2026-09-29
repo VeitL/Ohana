@@ -26,15 +26,17 @@ concurrency:
 jobs:
   diagnostic:
     name: Diagnostic ${{ matrix.scenario }} (Xcode 26.6 / iOS 26.5)
-    if: >-
-      (github.event_name == 'push' &&
-      (matrix.scenario == 'crew' || matrix.scenario == 'home-date-control')) ||
-      inputs.scenario == 'all' ||
-      inputs.scenario == matrix.scenario
     strategy:
       fail-fast: false
       matrix:
-        scenario: [crew, home-date, home-date-control]
+        scenario: >-
+          ${{ fromJSON(
+            github.event_name == 'push' && '["crew","home-date-control"]' ||
+            inputs.scenario == 'crew' && '["crew"]' ||
+            inputs.scenario == 'home-date' && '["home-date"]' ||
+            inputs.scenario == 'home-date-control' && '["home-date-control"]' ||
+            '["crew","home-date","home-date-control"]'
+          ) }}
     runs-on: macos-26
     timeout-minutes: 120
     env:
