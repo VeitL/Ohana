@@ -26,10 +26,11 @@ jobs:
     timeout-minutes: 120
     env:
       COPYFILE_DISABLE: 1
-      OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
     steps:
       - uses: actions/checkout@v4
       - name: Select Xcode 26.6 and prepare disposable Tests Simulator
+        env:
+          OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
         run: |
           sudo xcode-select -s /Applications/Xcode_26.6.app
           xcodebuild -version
@@ -37,6 +38,8 @@ jobs:
           printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
           scripts/prepare-test-simulator.sh
       - name: Run focused governed UI diagnostics
+        env:
+          OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
       - name: Record diagnostic receipt
         if: always()
