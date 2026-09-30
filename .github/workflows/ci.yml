@@ -288,7 +288,8 @@ jobs:
           retention-days: 7
 
   # Full UI evidence runs nightly or when an RC is dispatched manually. The
-  # governed shard wrapper stops on the first failure and writes one receipt.
+  # governed shard wrapper collects every shard once and writes one receipt.
+  # Any failed or unexecuted selector still fails the final acceptance gate.
   ui-regression:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
@@ -312,7 +313,7 @@ jobs:
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
           OHANA_UI_NIGHTLY_RECEIPT_PATH: ${{ runner.temp }}/ohana-ui-nightly.json
-        run: scripts/test-ui-nightly.sh
+        run: scripts/test-ui-nightly.sh --continue-after-failure
       - name: Upload UI run receipt
         if: always()
         uses: actions/upload-artifact@v4

@@ -11,12 +11,14 @@ AUDIT_SCRIPT="${SCRIPT_DIR}/audit-ui-test-shards.sh"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/test-ui-nightly.sh [--print]
+  scripts/test-ui-nightly.sh [--continue-after-failure] [--print]
 
 Runs every manifest shard sequentially through its normal governed
 build-then-test lifecycle. The fixed cache keeps those builds incremental, and
-the script stops at the first failed shard so a broken Simulator session cannot
-contaminate later evidence. A source-frozen, atomic JSON receipt is written
+the default stops at the first failed shard. --continue-after-failure collects
+all shards once, retains enough failed bundles for the complete plan, and
+returns failure after the last shard. Frozen-source and storage safeguards
+still apply to every shard. A source-frozen, atomic JSON receipt is written
 under the shared TestResults evidence/receipts directory for every attempted
 run, including failures. Managed xcresults keep their existing bounded
 retention policy; this wrapper creates no DerivedData or timestamp log lane.
@@ -28,8 +30,13 @@ USAGE
 }
 
 print_only=0
+continue_after_failure=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --continue-after-failure)
+      continue_after_failure=1
+      shift
+      ;;
     --print)
       print_only=1
       shift
@@ -103,6 +110,8 @@ RUN_ID="$(python3 -c 'import uuid; print(uuid.uuid4())')"
 RUN_STARTED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 RUN_STARTED_EPOCH="$(date -u +%s)"
 COMPLETED_SHARDS=0
+FAILED_SHARDS=0
+NIGHTLY_EXIT_STATUS=0
 PLANNED_TESTS=0
 PLANNED_SHARDS=0
 SOURCE_REVISION=""
@@ -668,7 +677,8 @@ write_receipt() {
     "${FROZEN_SIMULATOR_OS}" \
     "${SHARD_RECORDS_DIR}" \
     "${OHANA_TEST_FAILURE_RETENTION_COUNT}" \
-    "${OHANA_TEST_FAILURE_RETENTION_DAYS}" <<'PY'
+    "${OHANA_TEST_FAILURE_RETENTION_DAYS}" \
+    "${continue_after_failure}" <<'PY'
 import json
 import os
 import pathlib
@@ -713,6 +723,7 @@ import tempfile
     shard_dir_raw,
     failure_retention_count_raw,
     failure_retention_days_raw,
+    continue_after_failure_raw,
 ) = sys.argv[1:]
 
 receipt_path = pathlib.Path(receipt_raw)
@@ -767,11 +778,12 @@ document = {
     "schema": "ohana.ui-nightly-receipt.v1",
     "receiptId": receipt_id,
     "command": {
-        "argv": ["scripts/test-ui-nightly.sh"],
-        "display": f"SCHEME={scheme} scripts/test-ui-nightly.sh",
+        "argv": ["scripts/test-ui-nightly.sh"] + (["--continue-after-failure"] if continue_after_failure_raw == "1" else []),
+        "display": f"SCHEME={scheme} scripts/test-ui-nightly.sh" + (" --continue-after-failure" if continue_after_failure_raw == "1" else ""),
         "workingDirectory": repo_root,
         "scheme": scheme,
         "testAction": "sequential-build-then-test-per-shard",
+        "failurePolicy": "collect-all-shards" if continue_after_failure_raw == "1" else "stop-after-failed-shard",
     },
     "startedAt": started_at,
     "startedAtEpoch": int(started_epoch_raw),
@@ -950,6 +962,19 @@ if ! base_snapshot_matches_frozen; then
   exit 75
 fi
 prepare_plan
+if [[ "${continue_after_failure}" == "1" ]]; then
+  # A complete run may fail in every shard. Keep each bundle available until
+  # the final receipt and CI upload; the shared seven-day expiry still applies.
+  if [[ ! "${OHANA_TEST_FAILURE_RETENTION_COUNT}" =~ ^[0-9]+$ || ${#OHANA_TEST_FAILURE_RETENTION_COUNT} -gt 3 ]]; then
+    RUN_FAILURE_REASON="invalid failed-result retention count"
+    echo "Failure retention count must be a bounded integer." >&2
+    exit 2
+  fi
+  if ((10#${OHANA_TEST_FAILURE_RETENTION_COUNT} < PLANNED_SHARDS)); then
+    OHANA_TEST_FAILURE_RETENTION_COUNT="${PLANNED_SHARDS}"
+  fi
+  export OHANA_TEST_FAILURE_RETENTION_COUNT
+fi
 build_current_contract
 freeze_contract
 write_receipt 0
@@ -1002,20 +1027,32 @@ while IFS= read -r shard; do
   fi
 
   shard_result="$(shard_record_result "${RUN_TEMP}/shards/${shard}.json")"
+  COMPLETED_SHARDS=$((COMPLETED_SHARDS + 1))
   if [[ "${shard_result}" != "passed" ]]; then
-    RUN_FAILURE_REASON="shard ${shard} failed execution or count integrity"
-    write_receipt "${shard_status}"
-    echo "Nightly UI tests stopped after ${COMPLETED_SHARDS}/${PLANNED_SHARDS} completed shard(s); failed shard: ${shard}." >&2
-    echo "Inspect the managed failure result and run scripts/xcode-storage-audit.sh before retrying a repeated failure." >&2
-    if [[ "${shard_status}" == "0" ]]; then
-      exit 65
+    FAILED_SHARDS=$((FAILED_SHARDS + 1))
+    if [[ "${NIGHTLY_EXIT_STATUS}" == "0" ]]; then
+      NIGHTLY_EXIT_STATUS="${shard_status}"
+      [[ "${NIGHTLY_EXIT_STATUS}" != "0" ]] || NIGHTLY_EXIT_STATUS=65
     fi
-    exit "${shard_status}"
+    RUN_FAILURE_REASON="${FAILED_SHARDS} shard(s) failed execution or count integrity"
+    write_receipt "${NIGHTLY_EXIT_STATUS}"
+    echo "UI failed shard: ${shard}. Its result and missing selectors remain in the receipt." >&2
+    if [[ "${continue_after_failure}" != "1" ]]; then
+      echo "Nightly UI tests stopped after ${COMPLETED_SHARDS}/${PLANNED_SHARDS} completed shard(s)." >&2
+      exit "${NIGHTLY_EXIT_STATUS}"
+    fi
+    echo "Continuing the remaining UI shards without retrying ${shard}." >&2
   fi
 
-  COMPLETED_SHARDS=$((COMPLETED_SHARDS + 1))
-  write_receipt 0
+  write_receipt "${NIGHTLY_EXIT_STATUS}"
 done < "${SHARD_ORDER_FILE}"
+
+if [[ "${FAILED_SHARDS}" != "0" ]]; then
+  RUN_RESULT="failed"
+  RUN_FAILURE_REASON="${FAILED_SHARDS} of ${PLANNED_SHARDS} shards failed execution or count integrity"
+  echo "Nightly UI collection finished: ${COMPLETED_SHARDS}/${PLANNED_SHARDS} shards attempted, ${FAILED_SHARDS} failed shard(s)." >&2
+  exit "${NIGHTLY_EXIT_STATUS}"
+fi
 
 RUN_RESULT="passed"
 RUN_FAILURE_REASON=""

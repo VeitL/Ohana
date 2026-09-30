@@ -82,6 +82,11 @@ if [[ "${1:-}" == "--print" ]]; then
   exit 0
 fi
 printf 'Managed result bundle: /fixture/staging/%s.xcresult\n' "${selected_shard}"
+printf 'Fixture failure retention count: %s\n' "${OHANA_TEST_FAILURE_RETENTION_COUNT:-unset}"
+if [[ "${FAKE_UI_NIGHTLY_INFRA_SHARD:-}" == "${selected_shard}" ]]; then
+  printf 'Preserved failed xcresult: /fixture/failed/%s.xcresult\n' "${selected_shard}"
+  exit 70
+fi
 failed=0
 while IFS=$'\t' read -r shard selector; do
   [[ "${shard}" == "${selected_shard}" ]] || continue
@@ -184,6 +189,11 @@ nightly_log="${fixture_root}/nightly.log"
 run_nightly() {
   local receipt_path="$1"
   shift
+  local nightly_args=("${fixture_repo}/scripts/test-ui-nightly.sh")
+  if [[ "${1:-}" == "--continue-after-failure" ]]; then
+    nightly_args+=("$1")
+    shift
+  fi
   env \
     PATH="${fake_bin}:${PATH}" \
     HOME="${fake_home}" \
@@ -197,7 +207,7 @@ run_nightly() {
     FAKE_UI_NIGHTLY_REPO="${fixture_repo}" \
     FAKE_UI_NIGHTLY_LOG="${nightly_log}" \
     "$@" \
-    "${fixture_repo}/scripts/test-ui-nightly.sh"
+    "${nightly_args[@]}"
 }
 
 success_receipt="${fixture_root}/receipts/success.json"
@@ -332,6 +342,63 @@ then
   fail "failure receipt was missing or incorrect"
 fi
 
+collection_receipt="${fixture_root}/receipts/collection.json"
+: > "${nightly_log}"
+set +e
+collection_output="$(run_nightly "${collection_receipt}" --continue-after-failure FAKE_UI_NIGHTLY_FAIL_SHARD=alpha OHANA_TEST_FAILURE_RETENTION_COUNT=1 2>&1)"
+collection_status=$?
+set -e
+[[ "${collection_status}" == "17" ]] || fail "collection lost the original failed shard status: ${collection_status}"
+[[ "$(cat "${nightly_log}")" == $'alpha\nbeta' ]] || fail "collection did not run every shard once after a failure"
+grep -qF 'Fixture failure retention count: 2' <<< "${collection_output}" || fail "collection did not retain enough failed bundles for its plan"
+if ! python3 - "${collection_receipt}" <<'PY'
+import json
+import pathlib
+import sys
+
+receipt = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert receipt["result"]["status"] == "failed"
+assert receipt["result"]["exitCode"] == 17
+assert receipt["result"]["integritySatisfied"] is False
+assert receipt["command"]["failurePolicy"] == "collect-all-shards"
+assert receipt["command"]["argv"] == ["scripts/test-ui-nightly.sh", "--continue-after-failure"]
+assert receipt["summary"]["executed"] == 3
+assert receipt["summary"]["passed"] == 2
+assert receipt["summary"]["failures"] == 1
+assert receipt["summary"]["recordedShards"] == receipt["summary"]["completedShards"] == 2
+assert [item["result"] for item in receipt["shards"]] == ["failed", "passed"]
+assert receipt["shards"][0]["xcresult"]["retainedPath"] == "/fixture/failed/alpha.xcresult"
+PY
+then
+  fail "collection did not preserve failure while recording later passing evidence"
+fi
+
+infrastructure_receipt="${fixture_root}/receipts/collection-infrastructure.json"
+: > "${nightly_log}"
+set +e
+infrastructure_output="$(run_nightly "${infrastructure_receipt}" --continue-after-failure FAKE_UI_NIGHTLY_INFRA_SHARD=alpha 2>&1)"
+infrastructure_status=$?
+set -e
+[[ "${infrastructure_status}" == "70" ]] || fail "collection lost its infrastructure failure status"
+[[ "$(cat "${nightly_log}")" == $'alpha\nbeta' ]] || fail "collection did not attempt later shards after infrastructure failure"
+if ! python3 - "${infrastructure_receipt}" <<'PY'
+import json
+import pathlib
+import sys
+
+receipt = json.loads(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert receipt["result"]["status"] == "failed"
+assert receipt["result"]["integritySatisfied"] is False
+assert receipt["summary"]["executed"] == 1
+assert receipt["summary"]["infrastructureFailures"] == 1
+assert receipt["summary"]["recordedShards"] == 2
+assert len(receipt["shards"][0]["missingSelectors"]) == 2
+assert receipt["shards"][1]["passed"] == 1
+PY
+then
+  fail "collection conflated infrastructure/missing tests with passed evidence"
+fi
+
 skip_receipt="${fixture_root}/receipts/skip.json"
 : > "${nightly_log}"
 set +e
@@ -357,11 +424,12 @@ fi
 source_receipt="${fixture_root}/receipts/source-mutation.json"
 : > "${nightly_log}"
 set +e
-source_output="$(run_nightly "${source_receipt}" FAKE_UI_NIGHTLY_MUTATE_SOURCE_SHARD=alpha 2>&1)"
+source_output="$(run_nightly "${source_receipt}" --continue-after-failure FAKE_UI_NIGHTLY_MUTATE_SOURCE_SHARD=alpha 2>&1)"
 source_status=$?
 set -e
 [[ "${source_status}" == "75" ]] || \
   fail "source mutation did not invalidate Nightly evidence: ${source_status}"
+[[ "$(cat "${nightly_log}")" == "alpha" ]] || fail "collection continued after frozen source changed"
 grep -qF 'source/toolchain snapshot changed at after shard alpha' <<< "${source_output}" || \
   fail "source mutation failure was not explained"
 if ! python3 - "${source_receipt}" <<'PY'
