@@ -6576,7 +6576,9 @@ final class OhanaUITests: XCTestCase {
         scrollTowardElement(observationRows.firstMatch, in: app, maxSwipes: 8)
         tapWhenHittable(observationRows.firstMatch, timeout: 8)
         let deleteObservation = app.buttons["human-condition-observation-delete-action"]
-        scrollToElement(deleteObservation, in: app, maxSwipes: 8)
+        let observationEditor = app.descendants(matching: .any)["human-condition-status-entry-sheet"]
+        let observationForm = observationEditor.collectionViews.firstMatch
+        scrollTowardElement(deleteObservation, in: app, maxSwipes: 8, scrollArea: observationForm)
         tapWhenHittable(deleteObservation, timeout: 8)
         let confirmObservationDelete = app.alerts.firstMatch.buttons
             .matching(identifier: "human-condition-observation-delete-confirm-action")
@@ -11014,14 +11016,7 @@ final class OhanaUITests: XCTestCase {
             "Settings form did not become interactive before category navigation."
         )
         let category = app.buttons[identifier]
-        for _ in 0 ..< 8 {
-            if category.exists, category.isHittable { break }
-            if category.exists, category.frame.midY < form.frame.midY {
-                form.swipeDown()
-            } else {
-                form.swipeUp()
-            }
-        }
+        scrollTowardElement(category, in: app, maxSwipes: 8, scrollArea: form)
         XCTAssertTrue(category.waitForExistence(timeout: 12), "Settings category \(identifier) did not appear.")
         XCTAssertTrue(
             tapWhenSemanticallyHittable(category, timeout: 8),
@@ -13644,12 +13639,25 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func scrollTowardElement(_ element: XCUIElement, in app: XCUIApplication, maxSwipes: Int = 8) {
+    private func scrollTowardElement(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        maxSwipes: Int = 8,
+        scrollArea: XCUIElement? = nil
+    ) {
+        if let scrollArea {
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    scrollArea.exists && scrollArea.isHittable && visibleFrame(of: scrollArea, in: app) != nil
+                },
+                "The current page did not expose its interactive scroll container."
+            )
+        }
         for _ in 0 ..< maxSwipes {
             if hasSafelyTappableFrame(element, in: app) { return }
             if app.keyboards.firstMatch.exists { dismissKeyboardIfPresent(in: app) }
             let towardEarlierContent = element.exists && element.frame.midY < app.frame.midY
-            swipeInPrimaryScrollArea(in: app, towardEarlierContent: towardEarlierContent)
+            swipeInPrimaryScrollArea(in: app, towardEarlierContent: towardEarlierContent, scrollArea: scrollArea)
         }
     }
 
@@ -13712,16 +13720,19 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func swipeInPrimaryScrollArea(in app: XCUIApplication, towardEarlierContent: Bool) {
+    private func swipeInPrimaryScrollArea(
+        in app: XCUIApplication,
+        towardEarlierContent: Bool,
+        scrollArea: XCUIElement? = nil
+    ) {
         let knownScrollViews = [
             app.scrollViews["task-center-starter-journey-scroll"],
             app.scrollViews["task-center-scroll-view"],
             app.scrollViews["calendar-list-scroll-view"]
         ]
-        let scrollView = knownScrollViews.first {
+        let surface = scrollArea ?? knownScrollViews.first {
             visibleFrame(of: $0, in: app) != nil && $0.isHittable
-        } ?? largestVisibleScrollView(in: app)
-        let surface = scrollView ?? app
+        } ?? largestVisibleScrollView(in: app) ?? app
         if towardEarlierContent {
             surface.swipeDown()
         } else {

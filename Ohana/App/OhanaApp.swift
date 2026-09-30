@@ -39,9 +39,8 @@ struct OhanaApp: App {
     init() {
         #if DEBUG
             OhanaUITestTouchTrace.installIfRequested()
-            if OhanaUITestLaunchOptions.disablesAnimations {
-                UIView.setAnimationsEnabled(false)
-            }
+            // AppWorkloadPolicy owns optional UI-test motion suppression.
+            // Keep UIKit's native control and presentation lifecycle intact.
         #endif
         AppCountry.ensureInitialized()
         BackgroundTaskCoordinator.registerTasks(

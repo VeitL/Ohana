@@ -242,7 +242,12 @@ enum UITestInteraction {
 
     @MainActor
     private static func revealTextFieldAboveKeyboard(_ field: XCUIElement, in app: XCUIApplication) -> Bool {
-        guard let frame = stableFrame(of: field, in: app, timeout: 4, requiresHittable: true) else { return false }
+        // Keyboard focus can place the field under its accessory toolbar.
+        // Observe geometry before revealing it; require hittability afterward.
+        guard let frame = stableFrame(of: field, in: app, timeout: 4) else {
+            recordFailure("Focused text field has no usable reveal geometry", element: field)
+            return false
+        }
         var keyboardTop = app.keyboards.firstMatch.frame.minY
         for identifier in ["ohana-keyboard-dismiss-action", "task-center-pet-profile-inline-keyboard-done", "add-event-keyboard-dismiss-action"] {
             let toolbar = app.toolbars.containing(.button, identifier: identifier).firstMatch

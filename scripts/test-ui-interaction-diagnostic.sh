@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <historical-failures|regression-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,15 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  current-failures)
+    # Original failed journeys; this focused set is not 132-case acceptance.
+    selectors=(
+      OhanaUITests/OhanaUITests/testFamilyWeeklyReportOpensFromDebugSettingsWithoutCompetitionCopy
+      OhanaUITests/OhanaUITests/testSettingsLanguageSelectionSurvivesImmediateCloseAndRelaunch
+      OhanaUITests/OhanaUITests/testZenFreshInstallCreatesOnlyAHumanAndOpensTheThreeTabShell
+      OhanaUITests/OhanaUITests/testHumanHealthConditionsCreateObservationEditDeleteAndPersistAcrossRelaunch
+    )
+    ;;
   keyboard-dismissal)
     # Original journeys cover native keyboard Done and the clipped toolbar Done.
     selectors=(
