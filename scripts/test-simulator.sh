@@ -350,6 +350,13 @@ sanitize_derived_data_products
 run_xcodebuild_action() {
   local action="$1"
   local include_result_bundle="$2"
+  if [[ "${action}" == "test-without-building" && "${SCHEME}" == "OhanaUITests" ]]; then
+    # The destination is already Tests-only and the project lock is held.
+    # Explicitly finish system startup before asking XCTest to create its
+    # automation session; implicit launch can overlap Simulator initialization.
+    echo "Waiting for the Tests Simulator to finish system startup..."
+    xcrun simctl bootstatus "${resolved_test_udid}" -b || return $?
+  fi
   local xcodebuild_args=(
     -project Ohana.xcodeproj
     -scheme "${SCHEME}"
