@@ -14,11 +14,22 @@ enum UITestInteraction {
     }
 
     @MainActor
-    static func tap(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
-        // XCTest's hit test already rejects missing/off-screen elements. Avoid a
-        // frame query and its extra AX round trips for ordinary controls.
+    static func tap(
+        _ element: XCUIElement,
+        in app: XCUIApplication? = nil,
+        timeout: TimeInterval
+    ) -> Bool {
+        let application = app ?? XCUIApplication()
+        // iOS 27 can report an off-screen lazy Menu as hittable. Observe its
+        // enabled state and geometry together, then leave input to XCTest.
+        // A rejected target lets the caller reveal it through normal scrolling.
         guard wait(timeout: timeout, condition: {
-            element.isHittable && element.isEnabled
+            guard let snapshot = try? element.snapshot(), snapshot.isEnabled,
+                  let visibleFrame = visibleFrame(for: snapshot.frame, in: application.frame),
+                  visibleFrame.contains(CGPoint(x: snapshot.frame.midX, y: snapshot.frame.midY)) else {
+                return false
+            }
+            return element.isHittable
         }) else {
             recordFailure("Semantic tap target did not become ready", element: element)
             return false

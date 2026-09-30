@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, historical-failures, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
+        options: [all, historical-failures, regression-failures, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -28,6 +28,7 @@ jobs:
           ${{ fromJSON(
             inputs.scenario == 'crew' && '["crew"]' ||
             inputs.scenario == 'historical-failures' && '["historical-failures"]' ||
+            inputs.scenario == 'regression-failures' && '["regression-failures"]' ||
             inputs.scenario == 'crew-long' && '["crew-long"]' ||
             inputs.scenario == 'crew-onboarding' && '["crew-onboarding"]' ||
             inputs.scenario == 'home-date' && '["home-date"]' ||
@@ -57,7 +58,7 @@ jobs:
           OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ matrix.scenario == 'home-date-control' && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
       - name: Export received-touch and control-state log
-        if: always() && (matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
+        if: always() && (matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
         env:
           RUNNER_TEMP: ${{ runner.temp }}
           DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}

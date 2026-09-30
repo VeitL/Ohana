@@ -7105,9 +7105,8 @@ final class OhanaUITests: XCTestCase {
         let primaryAction = app.buttons["home-primary-action"]
         XCTAssertTrue(primaryAction.waitForExistence(timeout: 12))
         primaryAction.press(forDuration: 0.6)
-        let allFeatures = app.buttons["home-all-features-action"]
         XCTAssertTrue(
-            tapStableCoordinateTarget(allFeatures, in: app, timeout: 8),
+            tapNativeMenuButton(identifier: "home-all-features-action", in: app),
             "Long-pressing Home did not produce a frame-ready All Features action."
         )
 
