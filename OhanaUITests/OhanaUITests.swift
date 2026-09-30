@@ -1657,6 +1657,7 @@ final class OhanaUITests: XCTestCase {
             enableProductionOverlays: true,
             extraLaunchArguments: [
                 "-OHANA_UI_TEST_SEED_SPARSE_PET_PROFILE_BASELINE",
+                "-OHANA_UI_TEST_ENABLE_ANIMATIONS",
                 "-OHANA_UI_TEST_TRACE_TOUCHES"
             ]
         )
@@ -6244,7 +6245,12 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testHumanModuleRoutesOpenFromCurrentUI() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        // This journey uses native breed-menu input; keep UIKit's normal
+        // animation lifecycle, as in the production app.
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
         let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
@@ -6875,7 +6881,9 @@ final class OhanaUITests: XCTestCase {
     func testHumanSettingsInlineSwitcherHidesLocalPrivacyControls() throws {
         let app = launchEnglishApp(
             enableProductionOverlays: true,
-            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+            extraLaunchArguments: [
+                "-OHANA_UI_TEST_ENABLE_ANIMATIONS", "-OHANA_UI_TEST_TRACE_TOUCHES"
+            ]
         )
         let ownerName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)

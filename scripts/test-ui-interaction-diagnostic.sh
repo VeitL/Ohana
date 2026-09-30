@@ -54,6 +54,8 @@ case "${scenario}" in
     )
     if [[ "${scenario}" == "regression-failures" ]]; then
       selectors+=(
+        OhanaUITests/OhanaUITests/testHumanModuleRoutesOpenFromCurrentUI
+        OhanaUITests/OhanaUITests/testHumanSettingsInlineSwitcherHidesLocalPrivacyControls
         OhanaUITests/OhanaUITests/testHouseholdInsightsKeepAllSixTabsVisibleAtLevelSix
         OhanaUITests/OhanaUITests/testImportedLabFactsStayReadableAndEditableAfterDowngradeToFree
         OhanaUITests/OhanaUITests/testHumanOnlyHouseholdOpensUnifiedAchievementsFromAllFeatures
