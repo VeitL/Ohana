@@ -268,10 +268,9 @@ enum UITestInteraction {
 
     @MainActor
     static func dismissKeyboard(in app: XCUIApplication, returnKeyIsSafe: Bool = false) -> Bool {
-        let keyboard = app.keyboards.firstMatch
         // iOS can retain a focused keyboard in AX after sliding it entirely
         // below the window. Its keys still exist, but none can be tapped.
-        if isKeyboardDismissed(keyboard, in: app) { return true }
+        if isKeyboardDismissed(in: app) { return true }
         let actionIDs = [
             "ohana-keyboard-dismiss-action",
             "task-center-pet-profile-inline-keyboard-done",
@@ -308,16 +307,25 @@ enum UITestInteraction {
             ? tapFrame(action, in: app, timeout: 4, validatedFrame: actionFrame)
             : tap(action, timeout: 4)
         guard sent else { return false }
-        let dismissed = wait(timeout: 4) { isKeyboardDismissed(keyboard, in: app) }
+        let dismissed = wait(timeout: 4) { isKeyboardDismissed(in: app) }
         if !dismissed { recordFailure("Keyboard stayed visible after dismissal", element: action) }
         return dismissed
     }
 
     @MainActor
-    private static func isKeyboardDismissed(_ keyboard: XCUIElement, in app: XCUIApplication) -> Bool {
-        guard keyboard.exists else { return true }
-        let frame = keyboard.frame
-        return isUsable(frame) && !frame.intersects(app.frame)
+    private static func isKeyboardDismissed(in app: XCUIApplication) -> Bool {
+        // Done can remove the keyboard between separate exists/frame queries.
+        // Observe presence and geometry from one application snapshot instead.
+        // An unreadable snapshot must never count as successful dismissal.
+        guard let snapshot = try? app.snapshot(), isUsable(snapshot.frame) else { return false }
+        var remaining = snapshot.children
+        while let element = remaining.popLast() {
+            if element.elementType == .keyboard {
+                guard isUsable(element.frame), !element.frame.intersects(snapshot.frame) else { return false }
+            }
+            remaining.append(contentsOf: element.children)
+        }
+        return true
     }
 
     @MainActor
