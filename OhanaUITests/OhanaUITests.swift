@@ -14498,7 +14498,22 @@ final class OhanaUITests: XCTestCase {
         in app: XCUIApplication
     ) -> Bool {
         let button = app.buttons.matching(identifier: identifier).firstMatch
-        guard UITestInteraction.tap(button, timeout: 8) else { return false }
+        // The iOS 26.5 native menu can expose an enabled, visible row while
+        // isHittable stays false. Let XCTest's semantic tap resolve its hit
+        // point instead of rejecting the action before any input is sent.
+        let ready = waitUntil(timeout: 8) {
+            guard let snapshot = try? button.snapshot(), snapshot.isEnabled,
+                  let visibleFrame = UITestInteraction.visibleFrame(
+                      for: snapshot.frame,
+                      in: app.frame
+                  ) else { return false }
+            return visibleFrame.contains(CGPoint(x: snapshot.frame.midX, y: snapshot.frame.midY))
+        }
+        guard ready else {
+            UITestInteraction.recordFailure("Native menu item did not become visible and enabled", element: button)
+            return false
+        }
+        button.tap()
         let dismissed = waitUntil(timeout: 4) { !button.exists }
         if !dismissed {
             UITestInteraction.recordFailure("Native menu action remained after one semantic tap", element: button)
