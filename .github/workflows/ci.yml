@@ -65,6 +65,10 @@ jobs:
         run: scripts/tests/run-ci-policy-tests.sh
       - name: UI test shard completeness
         run: scripts/audit-ui-test-shards.sh
+      - name: UI collection and aggregate self-tests
+        run: |
+          scripts/tests/run-ui-nightly-receipt-tests.sh
+          python3 scripts/tests/run-ui-nightly-aggregate-tests.py
       - name: Release test-surface audit (whole repo, strict)
         run: scripts/audit-release-test-surface.sh --all
       # Full-scope strict gates for UI V4 + accessibility + smoothness +
@@ -287,13 +291,34 @@ jobs:
           path: ${{ runner.temp }}/TestResults-*.xcresult
           retention-days: 7
 
-  # Full UI evidence runs nightly or when an RC is dispatched manually. The
-  # governed shard wrapper collects every shard once and writes one receipt.
-  # Any failed or unexecuted selector still fails the final acceptance gate.
-  ui-regression:
+  # Independent runners avoid the measured six-hour serial-job limit. Each
+  # original selector runs once; a failed group never cancels another group.
+  ui-regression-plan:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install manifest audit dependency
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep
+      - name: Derive matrix from audited UI manifest
+        id: plan
+        run: |
+          scripts/audit-ui-test-shards.sh
+          printf 'matrix=%s\n' "$(python3 scripts/aggregate-ui-nightly-receipts.py --matrix)" >> "$GITHUB_OUTPUT"
+
+  ui-regression-shards:
+    needs: ui-regression-plan
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.ui-regression-plan.outputs.matrix) }}
     env:
       COPYFILE_DISABLE: 1
     steps:
@@ -309,25 +334,63 @@ jobs:
           mkdir -p .build
           printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
           scripts/prepare-test-simulator.sh
-      - name: Audit UI coverage and run every shard
+      - name: Run one audited group through the governed entrypoint
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
-          OHANA_UI_NIGHTLY_RECEIPT_PATH: ${{ runner.temp }}/ohana-ui-nightly.json
-        run: scripts/test-ui-nightly.sh --continue-after-failure
-      - name: Upload UI run receipt
+          OHANA_UI_NIGHTLY_RECEIPT_PATH: ${{ runner.temp }}/ohana-ui-nightly-${{ matrix.shard }}.json
+          UI_SHARD: ${{ matrix.shard }}
+        run: |
+          set -o pipefail
+          scripts/test-ui-nightly.sh --continue-after-failure --shard "$UI_SHARD" 2>&1 | tee "$RUNNER_TEMP/ui-nightly-${UI_SHARD}.log"
+      - name: Upload group receipt and complete terminal log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-nightly-receipt-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/ohana-ui-nightly-${{ matrix.shard }}.json
+            ${{ runner.temp }}/ui-nightly-${{ matrix.shard }}.log
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload failed UI test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-failure-results-${{ matrix.shard }}
+          path: ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
+          if-no-files-found: warn
+          compression-level: 0
+          retention-days: 7
+
+  # Always summarize all groups, even when a runner failed or timed out. Missing
+  # receipts, skipped cases, mixed sources and any failure keep this gate red.
+  ui-regression:
+    needs: [ui-regression-plan, ui-regression-shards]
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download every available group receipt and log
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: ui-nightly-receipt-*
+          path: ${{ runner.temp }}/ui-receipts
+          merge-multiple: true
+      - name: Verify every original selector and report all failures
+        env:
+          UI_REVISION: ${{ github.sha }}
+          UI_JOBS_RESULT: ${{ needs.ui-regression-shards.result }}
+        run: |
+          python3 scripts/aggregate-ui-nightly-receipts.py \
+            --evidence "$RUNNER_TEMP/ui-receipts" \
+            --revision "$UI_REVISION" --jobs-result "$UI_JOBS_RESULT" \
+            --output "$RUNNER_TEMP/ohana-ui-nightly.json"
+      - name: Upload complete UI summary
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ui-nightly-receipt
           path: ${{ runner.temp }}/ohana-ui-nightly.json
-          if-no-files-found: warn
-          retention-days: 7
-      - name: Upload failed UI test results
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ui-failure-results
-          path: ${{ runner.temp }}/OhanaLocalBuild/*/TestResults/failed/*.xcresult
-          if-no-files-found: warn
-          compression-level: 0
+          if-no-files-found: error
           retention-days: 7

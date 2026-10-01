@@ -153,7 +153,7 @@ EOF
 cat > "${fake_bin}/xcodebuild" <<'EOF'
 #!/usr/bin/env bash
 if [[ "$*" == "-version" ]]; then
-  printf 'Xcode 26.4\nBuild version 17F100\n'
+  printf 'Xcode 26.6\nBuild version 17F113\n'
   exit 0
 fi
 exit 64
@@ -190,10 +190,14 @@ run_nightly() {
   local receipt_path="$1"
   shift
   local nightly_args=("${fixture_repo}/scripts/test-ui-nightly.sh")
-  if [[ "${1:-}" == "--continue-after-failure" ]]; then
+  while [[ "${1:-}" == --* ]]; do
     nightly_args+=("$1")
+    if [[ "$1" == "--shard" && $# -gt 1 ]]; then
+      nightly_args+=("$2")
+      shift
+    fi
     shift
-  fi
+  done
   env \
     PATH="${fake_bin}:${PATH}" \
     HOME="${fake_home}" \
@@ -372,6 +376,69 @@ PY
 then
   fail "collection did not preserve failure while recording later passing evidence"
 fi
+
+selected_receipt="${fixture_root}/receipts/selected.json"
+: > "${nightly_log}"
+set +e
+selected_output="$(run_nightly "${selected_receipt}" --continue-after-failure --shard beta 2>&1)"
+selected_status=$?
+set -e
+[[ "${selected_status}" == "0" ]] || fail "selected shard failed: ${selected_output}"
+[[ "$(cat "${nightly_log}")" == "beta" ]] || fail "selected shard ran another group"
+if ! python3 - "${selected_receipt}" <<'PY'
+import json, sys
+receipt = json.load(open(sys.argv[1]))
+assert receipt["command"]["selectedShard"] == "beta"
+assert receipt["command"]["argv"] == ["scripts/test-ui-nightly.sh", "--continue-after-failure", "--shard", "beta"]
+assert receipt["plan"] == {"tests": 1, "shards": 1, "derivedFromAuditedManifest": True}
+assert receipt["summary"]["planned"] == receipt["summary"]["executed"] == 1
+assert receipt["buildContract"]["fields"]["planned_tests"] == "1"
+assert receipt["result"]["integritySatisfied"] is True
+PY
+then
+  fail "selected-shard receipt claimed the complete manifest"
+fi
+
+# Exercise the aggregate against receipts actually emitted by this wrapper,
+# not only hand-built JSON. Separate runner identities/contracts are allowed.
+aggregate_evidence="${fixture_root}/aggregate-evidence"
+mkdir -p "${aggregate_evidence}"
+cp "${selected_receipt}" "${aggregate_evidence}/ohana-ui-nightly-beta.json"
+printf '%s\n' "${selected_output}" > "${aggregate_evidence}/ui-nightly-beta.log"
+set +e
+selected_failure_output="$(run_nightly "${aggregate_evidence}/ohana-ui-nightly-alpha.json" --continue-after-failure --shard alpha FAKE_UI_NIGHTLY_FAIL_SHARD=alpha 2>&1)"
+selected_failure_status=$?
+set -e
+printf '%s\n' "${selected_failure_output}" > "${aggregate_evidence}/ui-nightly-alpha.log"
+[[ "${selected_failure_status}" == "17" ]] || fail "selected failed group lost its exit status"
+set +e
+aggregate_output="$(python3 "${repo_root}/scripts/aggregate-ui-nightly-receipts.py" --manifest "${manifest}" --evidence "${aggregate_evidence}" --revision "$(git -C "${fixture_repo}" rev-parse HEAD)" --output "${fixture_root}/aggregate.json" 2>&1)"
+aggregate_status=$?
+set -e
+[[ "${aggregate_status}" == "65" ]] || fail "aggregate hid a selected failed group: ${aggregate_output}"
+if ! python3 - "${fixture_root}/aggregate.json" <<'PY'
+import json, sys
+receipt = json.load(open(sys.argv[1]))
+assert receipt["evidenceErrors"] == []
+assert receipt["summary"]["executed"] == 3
+assert receipt["summary"]["passed"] == 2
+assert receipt["summary"]["failures"] == 1
+assert receipt["summary"]["notRun"] == 0
+assert receipt["result"]["fullAcceptanceSatisfied"] is False
+PY
+then
+  fail "aggregate rejected genuine wrapper receipts or obscured outcomes: ${aggregate_output}"
+fi
+
+for invalid_args in '--shard unknown' '--shard ../alpha' '--shard alpha --shard beta' '--shard'; do
+  : > "${nightly_log}"
+  read -r -a invalid_options <<< "${invalid_args}"
+  set +e
+  invalid_output="$(run_nightly "${fixture_root}/receipts/invalid.json" "${invalid_options[@]}" 2>&1)"
+  invalid_status=$?
+  set -e
+  [[ "${invalid_status}" == "2" && ! -s "${nightly_log}" ]] || fail "invalid shard reached a test: ${invalid_args}: ${invalid_output}"
+done
 
 infrastructure_receipt="${fixture_root}/receipts/collection-infrastructure.json"
 : > "${nightly_log}"

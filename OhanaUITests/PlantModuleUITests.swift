@@ -650,21 +650,11 @@ final class PlantModuleUITests: XCTestCase {
         let plantsTab = app.buttons["home-tab-plants"]
         XCTAssertTrue(plantsTab.waitForExistence(timeout: 14), "Plants tab did not appear after the Life Tree reached Lv4.")
         dismissGrowthUnlockPopupIfPresent(in: app)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.45))
 
         let plantsPage = app.descendants(matching: .any)["home-plants-page"]
-        for _ in 0 ..< 3 {
-            if plantsPage.exists { return }
-            if plantsTab.exists, plantsTab.isEnabled, plantsTab.isHittable {
-                plantsTab.tap()
-            } else {
-                XCTAssertTrue(tapWhenSemanticallyHittable(plantsTab, timeout: 6), "Plants tab existed after Lv4 but did not become semantically tappable.")
-            }
-            if plantsPage.waitForExistence(timeout: 5) { return }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
-        }
-
-        XCTAssertTrue(plantsPage.waitForExistence(timeout: 6), "Home plants page did not appear.")
+        if plantsPage.exists { return }
+        tapWhenHittable(plantsTab, timeout: 8)
+        XCTAssertTrue(plantsPage.waitForExistence(timeout: 8), "Home plants page did not appear after one Plants tab action.")
     }
 
     @MainActor
@@ -1639,8 +1629,7 @@ final class PlantModuleUITests: XCTestCase {
         XCTAssertTrue(waitUntil(timeout: 12) { nameField.exists && nameField.isHittable }, missingFieldMessage)
         nameField.tap()
         nameField.typeText(name)
-        nameField.typeText("\n")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        XCTAssertTrue(UITestInteraction.dismissKeyboard(in: app, returnKeyIsSafe: true), "Member name keyboard did not dismiss.")
 
         tapThroughMemberCreationSteps(in: app, starterPetWeight: starterPetWeight)
 
@@ -1661,12 +1650,11 @@ final class PlantModuleUITests: XCTestCase {
     private func tapThroughMemberCreationSteps(in app: XCUIApplication, starterPetWeight: String? = nil) {
         let creationPrimary = app.buttons["member-creation-primary-action"]
         XCTAssertTrue(creationPrimary.waitForExistence(timeout: 8), "Member creation primary action did not appear.")
-        var didTapFinalSave = false
+        let progress = app.descendants(matching: .any)["member-creation-step-progress"]
         for _ in 0 ..< 8 {
-            guard creationPrimary.exists else {
-                didTapFinalSave = true
-                break
-            }
+            XCTAssertTrue(progress.waitForExistence(timeout: 8), "Member creation did not expose its current step.")
+            let previousStep = progress.value as? String
+            XCTAssertNotNil(previousStep, "Member creation step must expose a readable progress value.")
             if let starterPetWeight {
                 fillStarterPetWeightIfNeeded(in: app, value: starterPetWeight, waitForInput: !creationPrimary.isEnabled)
             }
@@ -1676,16 +1664,17 @@ final class PlantModuleUITests: XCTestCase {
             let actionLabel = creationPrimary.label
             tapWhenHittable(creationPrimary, timeout: 8)
             if actionLabel.contains("Join Island") || actionLabel.contains("加入岛屿") || actionLabel.contains("Insel beitreten") {
-                didTapFinalSave = true
-                break
+                return
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
-            if !creationPrimary.exists {
-                didTapFinalSave = true
-                break
-            }
+            XCTAssertTrue(
+                waitUntil(timeout: 8) {
+                    guard progress.exists, let currentStep = progress.value as? String else { return false }
+                    return currentStep != previousStep
+                },
+                "Member creation did not advance after one Next action. Previous step: \(previousStep ?? "unreadable")"
+            )
         }
-        XCTAssertTrue(didTapFinalSave, "Member creation did not reach the final save action.")
+        XCTFail("Member creation did not reach the final save action.")
     }
 
     @MainActor
@@ -1696,32 +1685,25 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func selectFirstPetBreedIfPresent(in app: XCUIApplication) {
-        let breedMenu = app.buttons
-            .matching(NSPredicate(format: "label CONTAINS[c] %@ OR label CONTAINS %@ OR label CONTAINS %@", "Breed", "品种", "Rasse"))
-            .firstMatch
+        let breedMenu = app.buttons["member-pet-breed-picker"]
         guard breedMenu.waitForExistence(timeout: 4) else { return } // 人类创建无品种菜单
         let placeholderLabel = breedMenu.label
         let creationPrimary = app.buttons["member-creation-primary-action"]
         if creationPrimary.isEnabled { return }
         let selectionWasRequired = creationPrimary.exists && !creationPrimary.isEnabled
 
-        for _ in 0 ..< 3 {
-            guard tapWhenSemanticallyHittable(breedMenu, timeout: 8) else { continue }
-            let breedMenuList = app.collectionViews.firstMatch
-            guard breedMenuList.waitForExistence(timeout: 6) else { continue }
-            let option = breedMenuList.cells.element(boundBy: 0).buttons.firstMatch
-            guard option.waitForExistence(timeout: 6) else { continue }
-            guard tapWhenSemanticallyHittable(option, timeout: 8) else { continue }
-
-            if waitUntil(timeout: 4, condition: {
+        tapWhenHittable(breedMenu, timeout: 8)
+        let option = app.collectionViews.buttons.matching(
+            NSPredicate(format: "label IN %@", ["afghan hound", "阿富汗猎犬", "Afghanischer Windhund"])
+        ).firstMatch
+        tapWhenHittable(option, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
                 (breedMenu.exists && breedMenu.label != placeholderLabel) ||
                     (selectionWasRequired && creationPrimary.exists && creationPrimary.isEnabled)
-            }) {
-                return
-            }
-        }
-
-        XCTFail("Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)")
+            },
+            "Pet creation breed selection did not apply after one menu input. Current menu label: \(breedMenu.label)"
+        )
     }
 
     @MainActor
@@ -1934,16 +1916,13 @@ final class PlantModuleUITests: XCTestCase {
 
     @MainActor
     private func dismissGrowthUnlockPopupIfPresent(in app: XCUIApplication) {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
         let popup = app.descendants(matching: .any)["growth-unlock-popup"]
-        guard popup.exists else { return }
+        guard popup.waitForExistence(timeout: 2) else { return }
 
         let later = app.buttons["growth-unlock-later-action"]
         let close = app.buttons["growth-unlock-close-action"]
-        XCTAssertTrue(
-            tapWhenSemanticallyHittable(later, timeout: 4) || tapWhenSemanticallyHittable(close, timeout: 4),
-            "Growth unlock popup did not expose a semantic Later or Close action."
-        )
+        let dismissal = later.exists ? later : close
+        tapWhenHittable(dismissal, timeout: 4)
         XCTAssertTrue(
             waitUntil(timeout: 5) { !popup.exists },
             "Growth unlock popup did not close after tapping its semantic dismissal action."
@@ -1978,9 +1957,9 @@ final class PlantModuleUITests: XCTestCase {
         }
     }
 
+    @MainActor
     private func elementDebugState(_ element: XCUIElement) -> String {
-        let elementValue = element.value.map { String(describing: $0) } ?? "nil"
-        return "exists=\(element.exists) enabled=\(element.isEnabled) hittable=\(element.isHittable) frame=\(element.frame) label=\(element.label) value=\(elementValue)"
+        UITestInteraction.snapshotDescription(of: element)
     }
 
     private func waitForTapFrame(_ element: XCUIElement, in app: XCUIApplication, timeout: TimeInterval) -> Bool {

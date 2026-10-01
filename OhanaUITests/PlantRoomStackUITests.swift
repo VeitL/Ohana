@@ -16,7 +16,7 @@ final class PlantRoomStackUITests: XCTestCase {
     }
 
     @MainActor
-    func testRoomStacksOpenIntoTheExistingPlantDeck() {
+    func testRoomStacksOpenIntoTheExistingPlantDeck() throws {
         let app = XCUIApplication()
         app.launchArguments = [
             "-AppleLanguages", "(en)",
@@ -60,6 +60,8 @@ final class PlantRoomStackUITests: XCTestCase {
 
         let overview = app.descendants(matching: .any)["home-plants-room-stack-overview"]
         XCTAssertTrue(overview.waitForExistence(timeout: 12), "Room card-stack overview did not appear.")
+        let overviewScroll = app.scrollViews.containing(.any, identifier: "home-plants-room-stack-overview").firstMatch
+        let initialViewport = try observeViewport(overviewScroll, in: app)
 
         let initialRoomStackIdentifiers = [
             "home-plants-room-stack-living-room",
@@ -70,7 +72,13 @@ final class PlantRoomStackUITests: XCTestCase {
         for identifier in initialRoomStackIdentifiers {
             let stack = app.buttons[identifier]
             XCTAssertTrue(stack.waitForExistence(timeout: 8), "Room card stack \(identifier) did not appear.")
-            XCTAssertTrue(stack.isHittable, "Four room stacks should fit in the initial viewport. \(identifier) was clipped.")
+            XCTAssertTrue(
+                initialViewport.elements.contains {
+                    $0.identifier == identifier && isVisible($0, in: initialViewport.frame, fullyContained: true)
+                },
+                "Four room stacks should fit in the initial viewport. \(identifier) was clipped."
+            )
+            XCTAssertTrue(stack.isHittable, "Initial room stack \(identifier) did not expose an activation point.")
         }
         keepScreenshot(named: "plant-room-stacks-six-room-top", app: app)
 
@@ -80,19 +88,24 @@ final class PlantRoomStackUITests: XCTestCase {
         ])
         var seenRoomStacks = Set<String>()
         for _ in 0 ..< 6 {
-            for identifier in roomStackIdentifiers {
-                let stack = app.buttons[identifier]
-                if stack.exists, stack.isHittable {
-                    seenRoomStacks.insert(identifier)
-                }
+            let observation = try observeViewport(overviewScroll, in: app)
+            for element in observation.elements where roomStackIdentifiers.contains(element.identifier) && isVisible(element, in: observation.frame) {
+                seenRoomStacks.insert(element.identifier)
             }
             if seenRoomStacks == roomStackIdentifiers { break }
-            app.swipeUp()
+            overviewScroll.swipeUp()
         }
         XCTAssertEqual(seenRoomStacks, roomStackIdentifiers, "The room overview should continue scrolling beyond four stacks.")
         keepScreenshot(named: "plant-room-stacks-six-room-lower", app: app)
 
         let studyStack = app.buttons["home-plants-room-stack-study"]
+        let lowerViewport = try observeViewport(overviewScroll, in: app)
+        XCTAssertTrue(
+            lowerViewport.elements.contains {
+                $0.identifier == "home-plants-room-stack-study" && isVisible($0, in: lowerViewport.frame)
+            },
+            "The sixth room stack did not enter the current scroll viewport."
+        )
         XCTAssertTrue(studyStack.isHittable, "The sixth room stack should be tappable after scrolling.")
         studyStack.tap()
 
@@ -117,10 +130,17 @@ final class PlantRoomStackUITests: XCTestCase {
 
         let expandedView = app.descendants(matching: .any)["home-plants-all-expanded-view"]
         XCTAssertTrue(expandedView.waitForExistence(timeout: 8), "Expand all did not reveal the grouped compact-card grid.")
-        let expandedCards = app.buttons.matching(
-            NSPredicate(format: "identifier BEGINSWITH %@", "home-plants-all-expanded-card-")
+        let expandedScroll = app.scrollViews.containing(.any, identifier: "home-plants-all-expanded-view").firstMatch
+        XCTAssertTrue(
+            waitUntil(timeout: 8) {
+                guard let observation = try? observeViewport(expandedScroll, in: app) else { return false }
+                return observation.elements.count {
+                    $0.elementType == .button && $0.identifier.hasPrefix("home-plants-all-expanded-card-") &&
+                        isVisible($0, in: observation.frame)
+                } >= 4
+            },
+            "Expanded rooms did not expose the denser four-column card grid."
         )
-        XCTAssertTrue(waitUntil(timeout: 8) { expandedCards.count >= 4 }, "Expanded rooms did not expose the denser four-column card grid.")
         keepScreenshot(named: "plant-all-rooms-expanded-compact", app: app)
 
         let expandedRoomIdentifiers = Set([
@@ -134,17 +154,21 @@ final class PlantRoomStackUITests: XCTestCase {
         var seenExpandedRooms = Set<String>()
         var seenExpandedCards = Set<String>()
         for _ in 0 ..< 10 {
-            for identifier in expandedRoomIdentifiers where app.descendants(matching: .any)[identifier].exists {
-                seenExpandedRooms.insert(identifier)
-            }
-            for index in 0 ..< expandedCards.count {
-                let identifier = expandedCards.element(boundBy: index).identifier
-                if !identifier.isEmpty {
+            // Lazy grids can mount/unmount between count and indexed queries.
+            // Read identifiers and geometry from one immutable observation,
+            // and observe again after each scroll instead of caching AX nodes.
+            let observation = try observeViewport(expandedScroll, in: app)
+            for element in observation.elements where isVisible(element, in: observation.frame) {
+                let identifier = element.identifier
+                if expandedRoomIdentifiers.contains(identifier) {
+                    seenExpandedRooms.insert(identifier)
+                }
+                if element.elementType == .button, identifier.hasPrefix("home-plants-all-expanded-card-") {
                     seenExpandedCards.insert(identifier)
                 }
             }
             if seenExpandedRooms == expandedRoomIdentifiers, seenExpandedCards.count == 24 { break }
-            app.swipeUp()
+            expandedScroll.swipeUp()
         }
         XCTAssertEqual(seenExpandedRooms, expandedRoomIdentifiers, "Expand all should group every card under its room.")
         XCTAssertEqual(seenExpandedCards.count, 24, "Expand all should remain vertically scrollable through every compact card.")
@@ -153,6 +177,35 @@ final class PlantRoomStackUITests: XCTestCase {
         XCTAssertTrue(collapseAll.waitForExistence(timeout: 8), "Collapse did not remain available in the expanded grid.")
         collapseAll.tap()
         XCTAssertTrue(overview.waitForExistence(timeout: 8), "Collapse did not restore the vertically scrolling room stacks.")
+    }
+
+    private struct ViewportObservation {
+        let frame: CGRect
+        let elements: [XCUIElementSnapshot]
+    }
+
+    @MainActor
+    private func observeViewport(_ scrollView: XCUIElement, in app: XCUIApplication) throws -> ViewportObservation {
+        let snapshot = try scrollView.snapshot()
+        guard let frame = UITestInteraction.visibleFrame(for: snapshot.frame, in: app.frame) else {
+            throw NSError(domain: "PlantRoomStackUIObservation", code: 1, userInfo: [
+                NSLocalizedDescriptionKey: "The current plant scroll view has no readable viewport."
+            ])
+        }
+        var remaining = snapshot.children
+        var elements = [XCUIElementSnapshot]()
+        while let element = remaining.popLast() {
+            elements.append(element)
+            remaining.append(contentsOf: element.children)
+        }
+        return ViewportObservation(frame: frame, elements: elements)
+    }
+
+    private func isVisible(_ element: XCUIElementSnapshot, in viewport: CGRect, fullyContained: Bool = false) -> Bool {
+        let frame = element.frame
+        guard UITestInteraction.isUsable(frame) else { return false }
+        if fullyContained { return viewport.insetBy(dx: -1, dy: -1).contains(frame) }
+        return viewport.contains(CGPoint(x: frame.midX, y: frame.midY))
     }
 
     @MainActor

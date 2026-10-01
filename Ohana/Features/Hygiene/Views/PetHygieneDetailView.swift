@@ -272,6 +272,8 @@ struct PetHygieneDetailContentView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.addEntityClose)
+            .accessibilityIdentifier("pet-hygiene-detail-close-action")
         }
         .padding(.top, 4)
     }

@@ -11,7 +11,7 @@ AUDIT_SCRIPT="${SCRIPT_DIR}/audit-ui-test-shards.sh"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/test-ui-nightly.sh [--continue-after-failure] [--print]
+  scripts/test-ui-nightly.sh [--continue-after-failure] [--shard NAME] [--print]
 
 Runs every manifest shard sequentially through its normal governed
 build-then-test lifecycle. The fixed cache keeps those builds incremental, and
@@ -22,6 +22,8 @@ still apply to every shard. A source-frozen, atomic JSON receipt is written
 under the shared TestResults evidence/receipts directory for every attempted
 run, including failures. Managed xcresults keep their existing bounded
 retention policy; this wrapper creates no DerivedData or timestamp log lane.
+--shard selects one audited manifest group for an isolated CI runner. Its
+receipt describes only that group and cannot claim complete UI acceptance.
 
 Environment:
   OHANA_UI_NIGHTLY_RECEIPT_PATH  Absolute JSON receipt override outside
@@ -31,6 +33,7 @@ USAGE
 
 print_only=0
 continue_after_failure=0
+selected_shard=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --continue-after-failure)
@@ -40,6 +43,14 @@ while [[ $# -gt 0 ]]; do
     --print)
       print_only=1
       shift
+      ;;
+    --shard)
+      if [[ $# -lt 2 || -n "${selected_shard}" || ! "$2" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+        echo "--shard requires exactly one valid manifest group name." >&2
+        exit 2
+      fi
+      selected_shard="$2"
+      shift 2
       ;;
     --help|-h)
       usage
@@ -77,11 +88,17 @@ if [[ "${OHANA_TEST_PARALLEL_ENABLED:-NO}:${OHANA_TEST_MAXIMUM_WORKERS:-1}" != "
 fi
 
 load_shard_names() {
-  awk -F '\t' '
+  awk -F '\t' -v selected="${selected_shard}" '
     /^[[:space:]]*#/ || NF == 0 { next }
+    selected != "" && $1 != selected { next }
     !seen[$1]++ { print $1 }
   ' "${MANIFEST}"
 }
+
+if [[ -n "${selected_shard}" && -z "$(load_shard_names)" ]]; then
+  echo "Unknown UI manifest shard: ${selected_shard}" >&2
+  exit 2
+fi
 
 if [[ "${print_only}" == "1" ]]; then
   "${AUDIT_SCRIPT}"
@@ -447,7 +464,8 @@ prepare_plan() {
   done < <(load_shard_names)
   PLANNED_SHARDS="$(wc -l < "${SHARD_ORDER_FILE}" | tr -d '[:space:]')"
   PLANNED_TESTS="$(
-    awk -F '\t' '/^[[:space:]]*#/ || NF == 0 { next } { count++ } END { print count + 0 }' \
+    awk -F '\t' -v selected="${selected_shard}" \
+      '/^[[:space:]]*#/ || NF == 0 { next } selected == "" || $1 == selected { count++ } END { print count + 0 }' \
       "${MANIFEST}"
   )"
   if [[ "${PLANNED_SHARDS}" -le 0 || "${PLANNED_TESTS}" -le 0 ]]; then
@@ -678,7 +696,8 @@ write_receipt() {
     "${SHARD_RECORDS_DIR}" \
     "${OHANA_TEST_FAILURE_RETENTION_COUNT}" \
     "${OHANA_TEST_FAILURE_RETENTION_DAYS}" \
-    "${continue_after_failure}" <<'PY'
+    "${continue_after_failure}" \
+    "${selected_shard}" <<'PY'
 import json
 import os
 import pathlib
@@ -724,6 +743,7 @@ import tempfile
     failure_retention_count_raw,
     failure_retention_days_raw,
     continue_after_failure_raw,
+    selected_shard,
 ) = sys.argv[1:]
 
 receipt_path = pathlib.Path(receipt_raw)
@@ -778,8 +798,9 @@ document = {
     "schema": "ohana.ui-nightly-receipt.v1",
     "receiptId": receipt_id,
     "command": {
-        "argv": ["scripts/test-ui-nightly.sh"] + (["--continue-after-failure"] if continue_after_failure_raw == "1" else []),
-        "display": f"SCHEME={scheme} scripts/test-ui-nightly.sh" + (" --continue-after-failure" if continue_after_failure_raw == "1" else ""),
+        "argv": ["scripts/test-ui-nightly.sh"] + (["--continue-after-failure"] if continue_after_failure_raw == "1" else []) + (["--shard", selected_shard] if selected_shard else []),
+        "display": f"SCHEME={scheme} scripts/test-ui-nightly.sh" + (" --continue-after-failure" if continue_after_failure_raw == "1" else "") + (f" --shard {selected_shard}" if selected_shard else ""),
+        "selectedShard": selected_shard or None,
         "workingDirectory": repo_root,
         "scheme": scheme,
         "testAction": "sequential-build-then-test-per-shard",

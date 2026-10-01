@@ -351,12 +351,21 @@ enum UITestInteraction {
     }
 
     @MainActor
+    static func snapshotDescription(of element: XCUIElement) -> String {
+        do {
+            let snapshot = try element.snapshot()
+            return "id=\(snapshot.identifier) enabled=\(snapshot.isEnabled) frame=\(snapshot.frame) label=\(snapshot.label) value=\(String(describing: snapshot.value ?? "nil"))"
+        } catch {
+            return "element snapshot unreadable: \(error)"
+        }
+    }
+
+    @MainActor
     static func recordFailure(_ reason: String, element: XCUIElement) {
         // Do not ask isHittable while diagnosing it: native menus can throw
-        // from that getter. Missing elements likewise have no queryable frame.
-        let state = element.exists
-            ? "id=\(element.identifier) enabled=\(element.isEnabled) frame=\(element.frame) value=\(String(describing: element.value ?? "nil"))"
-            : "element missing"
+        // from that getter. One snapshot also avoids resolving a disappearing
+        // element separately for every diagnostic attribute.
+        let state = snapshotDescription(of: element)
         XCTContext.runActivity(named: reason) { activity in
             let attachment = XCTAttachment(string: "\(reason)\n\(state)")
             attachment.name = "Interaction precondition"

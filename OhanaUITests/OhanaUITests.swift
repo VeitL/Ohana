@@ -5130,7 +5130,7 @@ final class OhanaUITests: XCTestCase {
         tapWhenHittable(app.buttons["zen-members-add-menu"], timeout: 8)
         XCTAssertTrue(
             tapNativeMenuOption(optionLabels: ["Person"], in: app),
-            "The Zen member menu did not expose its native Human option."
+            "The Zen member menu Human option did not become ready for one input."
         )
         let addedMemberNameField = app.textFields["member-name-input"]
         XCTAssertTrue(
@@ -12560,6 +12560,13 @@ final class OhanaUITests: XCTestCase {
             marker.waitForExistence(timeout: 18),
             "Pet feature hub route did not open marker \(route.markerIdentifier) from \(route.tileIdentifier)."
         )
+        if route.markerIdentifier == "pet-hygiene-detail-screen" {
+            tapWhenHittable(app.buttons["pet-hygiene-detail-close-action"], timeout: 8)
+            XCTAssertTrue(
+                waitUntil(timeout: 8) { !marker.exists },
+                "Pet hygiene detail did not close after one Close action."
+            )
+        }
         closeCurrentSheetToHome(in: app, humanName: humanName)
     }
 
@@ -12847,19 +12854,10 @@ final class OhanaUITests: XCTestCase {
             "Pet home card did not appear before opening the feature hub."
         )
 
-        for _ in 0 ..< 3 where !petAllFeaturesShortcutExists(in: app) {
+        if !petAllFeaturesShortcutExists(in: app) {
             let targetCard = petCard.exists ? petCard : fallbackPetCard
-            if targetCard.exists {
-                scrollTowardElement(targetCard, in: app, maxSwipes: 2)
-                _ = tapWhenSemanticallyHittable(targetCard, timeout: 8)
-            }
-            if waitUntil(timeout: 3, condition: { petAllFeaturesShortcutExists(in: app) }) {
-                break
-            }
-
-            if app.buttons["home-tab-home"].exists {
-                tapWhenHittable(app.buttons["home-tab-home"], timeout: 5)
-            }
+            scrollTowardElement(targetCard, in: app, maxSwipes: 2)
+            tapWhenHittable(targetCard, timeout: 8)
         }
         XCTAssertTrue(
             waitUntil(timeout: 8, condition: { petAllFeaturesShortcutExists(in: app) }),
@@ -13648,9 +13646,9 @@ final class OhanaUITests: XCTestCase {
         if let scrollArea {
             XCTAssertTrue(
                 waitUntil(timeout: 8) {
-                    scrollArea.exists && scrollArea.isHittable && visibleFrame(of: scrollArea, in: app) != nil
+                    app.state == .runningForeground && visibleFrame(of: scrollArea, in: app) != nil
                 },
-                "The current page did not expose its interactive scroll container."
+                "The current page did not expose a visible scroll container."
             )
         }
         for _ in 0 ..< maxSwipes {
@@ -13814,7 +13812,7 @@ final class OhanaUITests: XCTestCase {
         let didReturnHome = waitUntil(timeout: 16) {
             isHumanRouteAtHome(in: app, humanName: humanName)
         }
-        XCTAssertTrue(didReturnHome, "Closing the human feature route did not return to Home.")
+        XCTAssertTrue(didReturnHome, "Closing the member feature route did not return to Home.")
     }
 
     @MainActor
@@ -14154,7 +14152,7 @@ final class OhanaUITests: XCTestCase {
         tapGuidedJourneyControlAfterSemanticScroll(breedMenu, in: app)
         XCTAssertTrue(
             tapNativeMenuOption(optionLabels: breedOptionLabels, in: app),
-            "Pet creation did not expose a selectable breed option."
+            "Pet creation breed option did not become ready for one input."
         )
         XCTAssertTrue(
             waitUntil(timeout: 8) {
@@ -14175,14 +14173,14 @@ final class OhanaUITests: XCTestCase {
         guard waitUntil(timeout: 8, condition: {
             target = firstFrameReadyButton(labels: optionLabels, in: app)
             return target != nil
-        }), let target,
-        tapStableCoordinateTarget(
-            target.element,
-            in: app,
-            timeout: 4,
-            validatedFrame: target.frame
-        ) else { return false }
-        return waitUntil(timeout: 4) { !target.element.exists }
+        }), let target else { return false }
+        // Native menu rows are real buttons. Resolve their current activation
+        // point through XCTest rather than an application-root coordinate.
+        // Do not pre-reject the row using the native-menu isHittable getter.
+        target.element.tap()
+        // Report only whether input was sent. The caller must assert the real
+        // destination or selected value; disappearance is not activation proof.
+        return true
     }
 
     private func containsAnyElement(in app: XCUIApplication, identifiers: [String]) -> Bool {
