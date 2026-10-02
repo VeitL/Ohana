@@ -557,7 +557,7 @@ struct PetHygieneDetailContentView: View {
             currentLocalHumanID: currentLocalHumanID,
             humans: options
         )
-        guard eligibleHumanCount > 1 else {
+        guard eligibleHumanCount > 1, defaultHumanID == nil else {
             commitHygiene(type, executorID: defaultHumanID)
             return
         }

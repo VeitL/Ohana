@@ -34,8 +34,7 @@ nonisolated extension TaskCenterSystemJourneyProjection {
             + visibleJourneyItems
         let suggestions = starterItems.filter { $0.source == .suggestion }
 
-        return Array(rewardedItems.prefix(HouseholdStarterJourneyPolicy.maximumVisibleTaskCount))
-            + suggestions
+        return rewardedItems + suggestions
     }
 
     static func makeItems(

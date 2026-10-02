@@ -22,6 +22,7 @@ extension WalkTrackingCard {
                 if !isWalking, let checkpoint = snapshot.recoverableWalkCheckpoint {
                     walkRecoveryPrompt(checkpoint: checkpoint)
                 }
+                if isWalking { activeWalkerPicker }
                 controlPanel
             }
             .background(Color.ohanaCardSurface)

@@ -120,7 +120,7 @@ extension PetBasicInfoDetailView {
         infoSection(title: l.tr(zh: "健康与医疗", en: "Health & medical", de: "Gesundheit & Medizin"), icon: "cross.circle.fill", iconColor: Color.goRed) {
             infoRow(label: l.tr(zh: "芯片号", en: "Microchip", de: "Mikrochip"), value: pet.microchipID.isEmpty ? l.tr(zh: "未登记", en: "Not registered", de: "Nicht registriert") : pet.microchipID)
             infoRow(label: l.tr(zh: "诊所名称", en: "Clinic", de: "Praxis"), value: pet.vetClinicName.isEmpty ? petProfileEmptyValue : pet.vetClinicName)
-            infoRow(label: l.tr(zh: "主治医生", en: "Doctor", de: "Tierarzt"), value: pet.vetDoctorName.isEmpty ? petProfileEmptyValue : pet.vetDoctorName)
+            infoRow(label: TaskCenterPetProfileInlineCopy.contactName(l), value: pet.vetDoctorName.isEmpty ? petProfileEmptyValue : pet.vetDoctorName)
             infoRow(label: l.tr(zh: "联系电话", en: "Phone", de: "Telefon"), value: pet.vetContact.isEmpty ? petProfileEmptyValue : pet.vetContact)
             if !pet.vetAddress.isEmpty {
                 infoRow(label: l.tr(zh: "诊所地址", en: "Clinic address", de: "Praxisadresse"), value: pet.vetAddress)

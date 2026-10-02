@@ -568,6 +568,27 @@ final class PetWalkingManager {
         }
     }
 
+    /// Updates the running session and its recovery checkpoint together. The
+    /// final record uses this selection, independent of later Settings changes.
+    @discardableResult
+    func selectActiveWalker(id: UUID) -> Bool {
+        guard phase == .running || phase == .paused,
+              let context = activeWalkModelContext,
+              let checkpoint = activeRecoveryCheckpoint(modelContext: context) else { return false }
+        var descriptor = FetchDescriptor<Human>(predicate: #Predicate<Human> { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let human = try? context.fetch(descriptor).first, !human.hasPassedAway else { return false }
+        let previous = checkpoint.executorIds
+        checkpoint.setExecutorIds([id.uuidString], primaryExecutorId: id.uuidString)
+        CloudSyncMutationRecorder.markModified(checkpoint, context: context)
+        guard context.safeSaveResult(publishFailureEvent: true).didSave else {
+            checkpoint.setExecutorIds(previous, primaryExecutorId: previous.first)
+            return false
+        }
+        activeWalkExecutorIds = [id.uuidString]
+        return true
+    }
+
     private func checkpointActiveWalk(reason _: String, force: Bool) {
         guard let modelContext = activeWalkModelContext,
               let checkpoint = activeRecoveryCheckpoint(modelContext: modelContext)

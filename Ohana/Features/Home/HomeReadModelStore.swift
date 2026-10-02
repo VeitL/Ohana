@@ -201,6 +201,8 @@ final class HomeReadModelStore: ObservableObject {
         finishRefreshTask(generation: generation)
     }
 
+    var hasPendingRefresh: Bool { refreshTask != nil }
+
     func cancel() {
         refreshTask?.cancel()
         refreshTask = nil

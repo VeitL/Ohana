@@ -41,11 +41,14 @@ protocol PetWalkingManaging: AnyObject {
     var lastCompletedPetId: UUID? { get }
     var lastCompletedWalk: PetWalkLog? { get }
     var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] { get }
+    var activeWalkExecutorIds: [String] { get }
     var activePoopMarkers: [WalkPoopMarker] { get }
     var lastCompletedPoopMarkers: [WalkPoopMarker] { get }
 
     func start(pet: Pet)
     func start(pet: Pet, modelContext: ModelContext, executorIds: [String])
+    @discardableResult
+    func selectActiveWalker(id: UUID) -> Bool
     func pause()
     func resume()
     func restore(checkpoint: PetWalkLog, modelContext: ModelContext)
@@ -57,6 +60,10 @@ protocol PetWalkingManaging: AnyObject {
 }
 
 extension PetWalkingManaging {
+    var activeWalkExecutorIds: [String] { [] }
+
+    func selectActiveWalker(id: UUID) -> Bool { false }
+
     func start(pet: Pet, modelContext: ModelContext) {
         start(pet: pet)
     }
@@ -132,6 +139,10 @@ final class SharedPetWalkingManager: PetWalkingManaging {
     var lastCompletedRouteCoordinates: [CLLocationCoordinate2D] {
         manager.lastCompletedRouteCoordinates
     }
+
+    var activeWalkExecutorIds: [String] { manager.activeWalkExecutorIds }
+
+    func selectActiveWalker(id: UUID) -> Bool { manager.selectActiveWalker(id: id) }
 
     var activePoopMarkers: [WalkPoopMarker] {
         manager.activePoopMarkers

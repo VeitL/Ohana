@@ -75,6 +75,38 @@ extension WalkTrackingCard {
         }
     }
 
+    var activeWalkerPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(walkEligibleHumans) { human in
+                    let selected = mgr.activeWalkExecutorIds.contains(human.id.uuidString)
+                    Button {
+                        if mgr.selectActiveWalker(id: human.id) {
+                            selectedSharedWalkExecutorIds = [human.id.uuidString]
+                            OhanaFeedback.selection()
+                        } else {
+                            OhanaFeedback.error()
+                        }
+                    } label: {
+                        VStack(spacing: 4) {
+                            HumanAvatarPipelineView(human: human, size: 44)
+                                .background(selected ? Color.goPrimary.opacity(0.18) : Color.ohanaControlFill, in: Circle())
+                                .overlay(Circle().strokeBorder(selected ? Color.goPrimary : Color.clear, lineWidth: 2))
+                            Text(displayWalkHumanName(human))
+                                .font(OhanaFont.caption2(.semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(displayWalkHumanName(human))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("walk-tracking-walker-\(human.id.uuidString)")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+        }
+    }
+
     @ViewBuilder
     var sharedWalkExecutorMenu: some View {
         if walkEligibleHumans.count > 1 {

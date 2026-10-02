@@ -579,7 +579,7 @@ struct CalendarEventDetailPage: View {
             currentLocalHumanID: UUID(uuidString: currentLocalHumanIDRaw),
             humans: options
         )
-        guard eligible.count > 1 else {
+        guard eligible.count > 1, preferredID == nil else {
             completeAndDismiss(executorID: preferredID?.uuidString)
             return
         }

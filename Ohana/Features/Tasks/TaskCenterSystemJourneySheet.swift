@@ -413,6 +413,8 @@ struct TaskCenterSystemJourneySheet: View {
                         identifierPrefix: "task-center-starter-journey-details"
                     )
                 }
+            } else if question.checkpoint == .petEmergencyContact {
+                petInlineAction(checkpoint: .petEmergencyContact, title: openQuestionActionTitle(question))
             } else if !resolutions.isEmpty {
                 secondaryOpenButton(
                     checkpoint: question.checkpoint,
@@ -761,7 +763,7 @@ struct TaskCenterSystemJourneySheet: View {
         if guide?.task == .humanProfile, expandedHumanCheckpoint != nil {
             return .questions
         }
-        if guide?.task == .petProfile, expandedPetCheckpoint != nil {
+        if expandedPetCheckpoint != nil {
             return .questions
         }
         return TaskCenterSystemJourneySheetMode.resolve(

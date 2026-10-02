@@ -21,7 +21,7 @@ nonisolated struct PetMedicationDoseActorSelectionContext: Equatable, Sendable {
     let eligibleHumanCount: Int
     let defaultExecutorID: UUID?
 
-    var needsConfirmation: Bool { eligibleHumanCount > 1 }
+    var needsConfirmation: Bool { eligibleHumanCount > 1 && defaultExecutorID == nil }
 }
 
 @MainActor

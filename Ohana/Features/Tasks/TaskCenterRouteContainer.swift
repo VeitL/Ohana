@@ -503,7 +503,7 @@ struct TaskCenterRouteContainer: View {
             currentLocalHumanID: appServices.activeHumanSelection.currentHumanId.flatMap(UUID.init(uuidString:)),
             humans: options
         )
-        guard eligible.count > 1 else {
+        guard eligible.count > 1, preferredID == nil else {
             return executeTaskAction(item, action: action, executorID: preferredID?.uuidString)
         }
         pendingActionHumanConfirmation = ActionHumanConfirmationDraft(
@@ -1013,7 +1013,7 @@ private extension TaskCenterRouteContainer {
     }
 
     private func petProfileTarget(for item: TaskCenterItemSnapshot) -> Pet? {
-        guard item.systemDestination == .completeFirstPetProfile,
+        guard item.systemDestination == .completeFirstPetProfile || item.systemDestination == .confirmPetIdentityProtection,
               let targetID = item.subject.id else { return nil }
         return routeData.pets.first { $0.id == targetID && !$0.hasPassedAway }
     }

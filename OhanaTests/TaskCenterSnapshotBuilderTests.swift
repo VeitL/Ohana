@@ -1190,7 +1190,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(badge.attentionCount == 2)
     }
 
-    @Test func starterJourneyProjectsAtMostThreeStableTypedItemsWithSummary() throws {
+    @Test func starterJourneyProjectsAllAvailableStableTypedItemsWithSummary() throws {
         let calendar = utcCalendar()
         let now = makeDate(calendar, year: 2026, month: 7, day: 15, hour: 12)
         let human = Human(name: "Ava")
@@ -1211,8 +1211,7 @@ struct TaskCenterSnapshotBuilderTests {
             isEnabled: true,
             activeHumanID: human.id,
             taskStates: states,
-            // The Task Center remains defensive even if a future producer
-            // accidentally hands it a wider presentation frontier.
+            // Every available journey remains visible, including later tasks.
             visibleTaskStates: states
         )
 
@@ -1229,13 +1228,9 @@ struct TaskCenterSnapshotBuilderTests {
         )
 
         #expect(snapshot.starterJourney == journey)
-        #expect(snapshot.systemJourneyItems.count == 3)
+        #expect(snapshot.systemJourneyItems.count == HouseholdStarterJourneyTask.allCases.count)
         #expect(snapshot.ordinaryUnscheduledItems.isEmpty)
-        #expect(Set(snapshot.systemJourneyItems.map(\.id)) == Set([
-            HouseholdStarterJourneyTask.humanProfile.id,
-            HouseholdStarterJourneyTask.petProfile.id,
-            HouseholdStarterJourneyTask.identityProtection.id
-        ]))
+        #expect(Set(snapshot.systemJourneyItems.map(\.id)) == Set(HouseholdStarterJourneyTask.allCases.map(\.id)))
         let humanItem = try #require(snapshot.systemJourneyItems.first {
             $0.systemDestination == .completeHumanProfile
         })
@@ -1250,7 +1245,7 @@ struct TaskCenterSnapshotBuilderTests {
         #expect(petItem.subject.id == pet.id)
         #expect(petItem.rewardCoconuts == 100)
         #expect(petItem.systemJourneyPresentationState == .rewardReady)
-        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == 3)
+        #expect(TaskCenterBadgeSnapshot(snapshot: snapshot).attentionCount == HouseholdStarterJourneyTask.allCases.count)
     }
 
     @Test func pendingStarterGiftSuppressesFourHundredCoconutJourneyFrontier() throws {

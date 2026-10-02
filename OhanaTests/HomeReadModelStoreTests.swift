@@ -523,6 +523,7 @@ struct HomeReadModelStoreTests {
         #expect(payload.snapshot.activeName == oldest.name)
         #expect(payload.interaction.activeHuman?.id == oldest.id)
         #expect(payload.snapshot.coconutText == "70")
+        #expect(payload.interaction.islandCoconutBalance == 70)
         #expect(payload.snapshot.hasMoreMembers)
     }
 

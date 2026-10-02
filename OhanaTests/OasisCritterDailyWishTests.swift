@@ -1024,8 +1024,8 @@ struct OasisCritterDailyWishTests {
             wrapped.legacySystemBalance(context: context, fallback: fallback)
         }
 
-        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
-            wrapped.setDeveloperOverrideBalance(
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) throws {
+            try wrapped.setDeveloperOverrideBalance(
                 amount: amount,
                 for: human,
                 displayName: displayName,

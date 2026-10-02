@@ -115,6 +115,11 @@ nonisolated struct VerticalSolidHomeSourceState {
         UUID(uuidString: activeHumanIdRaw)
     }
 
+    var availableCoconutBalance: Int {
+        islandCoconutReserveBalance
+            + (familyCoconutTotalOverride ?? EconomyWalletWritePolicy.familyCoconutTotal(pets: pets, humans: humans))
+    }
+
     var activeHuman: Human? {
         activeHumanId.flatMap { id in humans.first { $0.id == id } } ?? humans.first
     }
@@ -182,7 +187,7 @@ nonisolated enum VerticalSolidHomeSnapshotBuilder {
             isReady: true,
             greeting: greetingText(l, now: now),
             activeName: source.activeHuman?.name ?? l.tr(zh: "家人", en: "Family", de: "Familie"),
-            coconutText: "\(source.islandCoconutReserveBalance + (source.familyCoconutTotalOverride ?? EconomyWalletWritePolicy.familyCoconutTotal(pets: source.pets, humans: source.humans)))",
+            coconutText: "\(source.availableCoconutBalance)",
             // Compatibility field for legacy render helpers. Home no longer
             // projects or displays the generated Today Focus task deck.
             todayFocus: .empty,

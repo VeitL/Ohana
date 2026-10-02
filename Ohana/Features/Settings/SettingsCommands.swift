@@ -123,13 +123,18 @@ enum SettingsCommandService {
         }
         let delta = amount - current
         let displayName = actorName ?? human?.name ?? "Legacy island total"
-        // Developer overrides must not create wallet ledger entries or reward feedback.
-        wallet.setDeveloperOverrideBalance(
-            amount: amount,
-            for: human,
-            displayName: displayName,
-            context: context
-        )
+        // Debug balances need a replayable adjustment, never a care reward.
+        do {
+            try wallet.setDeveloperOverrideBalance(
+                amount: amount, for: human, displayName: displayName, context: context
+            )
+        } catch {
+            context.rollback()
+            return SettingsCoconutBalanceCommandResult(
+                humanID: human?.id, amount: current, legacyDelta: 0, didApply: false,
+                saveErrorDescription: error.localizedDescription
+            )
+        }
         let saveResult = saveSettingsChanges(context: context)
         guard saveResult.didSave else {
             return SettingsCoconutBalanceCommandResult(
@@ -176,12 +181,17 @@ enum SettingsCommandService {
 
         let amount = max(0, rawAmount)
         let delta = amount - current
-        CoconutWalletService.setDeveloperOverrideBalance(
-            amount: amount,
-            for: pet,
-            displayName: actorName ?? pet.name,
-            context: context
-        )
+        do {
+            try CoconutWalletService.setDeveloperOverrideBalance(
+                amount: amount, for: pet, displayName: actorName ?? pet.name, context: context
+            )
+        } catch {
+            context.rollback()
+            return SettingsPetCoconutBalanceCommandResult(
+                petID: pet.id, amount: current, delta: 0, didApply: false,
+                saveErrorDescription: error.localizedDescription
+            )
+        }
         let saveResult = saveSettingsChanges(context: context)
         guard saveResult.didSave else {
             return SettingsPetCoconutBalanceCommandResult(

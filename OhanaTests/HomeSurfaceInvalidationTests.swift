@@ -4,6 +4,28 @@ import Testing
 
 @MainActor
 struct HomeSurfaceInvalidationTests {
+    @Test func coveredReadyHomeRetainsAnUnfinishedRefresh() {
+        #expect(HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+            snapshotIsReady: true, refreshIsPending: true, wasPending: false
+        ))
+        #expect(!HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+            snapshotIsReady: true, refreshIsPending: false, wasPending: false
+        ))
+    }
+
+    #if DEBUG
+    @Test func committedDeveloperWalletAdjustmentInvalidatesTheHomeBalance() {
+        let center = ReadModelRevisionCenter()
+        let publisher = SharedDomainRevisionPublisher(center: center)
+        publisher.publishSettingsCoconutBalance(
+            SettingsCoconutBalanceCommandResult(humanID: UUID(), amount: 5000, legacyDelta: 5000, didApply: true),
+            note: "test.debug.balance"
+        )
+        #expect(center.homeSurfaceInvalidation.domains.contains(.economy))
+        #expect(center.homeSurfaceInvalidation.requiresFullRefresh)
+    }
+    #endif
+
     @Test func careMutationPublishesAggregateHomeTokenWithDomainAndEntities() {
         let center = ReadModelRevisionCenter()
         let petID = UUID()

@@ -496,7 +496,7 @@ extension CalendarView {
             currentLocalHumanID: UUID(uuidString: activeHumanIdStr),
             humans: options
         )
-        guard eligible.count > 1 else {
+        guard eligible.count > 1, preferredID == nil else {
             return performEventCompletion(event, occurrenceDate: occurrenceDate, executorID: preferredID?.uuidString)
         }
         pendingActionHumanConfirmation = ActionHumanConfirmationDraft(

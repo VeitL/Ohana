@@ -274,10 +274,14 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private var actionGrid: some View {
         #if compiler(>=6.4)
         if #available(iOS 27.0, *) {
-            actionGridContent
-                .reorderContainer(for: VerticalHomeEmbeddedAction.self, isEnabled: isEditMode) { difference in
-                    applyNativeReorder(difference)
-                }
+            if isEditMode {
+                actionGridContent
+                    .reorderContainer(for: VerticalHomeEmbeddedAction.self) { difference in
+                        applyNativeReorder(difference)
+                    }
+            } else {
+                actionGridContent
+            }
         } else {
             legacyDropGrid
         }
@@ -301,7 +305,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private var actionGridContent: some View {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
             #if compiler(>=6.4)
-            if #available(iOS 27.0, *) {
+            if #available(iOS 27.0, *), isEditMode {
                 ForEach(visibleItems) { item in
                     let index = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
                     actionCell(item, index: index)

@@ -221,9 +221,7 @@ nonisolated enum HomeInteractionSnapshotBuilder {
         }
         return HomeInteractionSnapshot(
             activeHuman: activeHuman,
-            islandCoconutBalance: source.islandCoconutReserveBalance
-                + source.humans.reduce(0) { $0 + $1.coconutBalance }
-                + source.pets.reduce(0) { $0 + $1.coconutBalance },
+            islandCoconutBalance: source.availableCoconutBalance,
             petsByID: petsByID,
             humansByID: humansByID,
             plantIDs: Set(source.plants.map(\.id)),

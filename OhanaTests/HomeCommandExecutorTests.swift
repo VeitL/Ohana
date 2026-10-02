@@ -4667,7 +4667,14 @@ struct HomeCommandExecutorTests {
         #expect(account.balance == 120)
         #expect(questManager.coconutCount == 120)
         #expect(questManager.coconutLogs.map(\.id) == coconutLogsBefore.map(\.id))
-        #expect(ledgerEntriesAfter.count == ledgerEntriesBefore.count)
+        #expect(ledgerEntriesAfter.count == ledgerEntriesBefore.count + 1)
+        let adjustment = try #require(ledgerEntriesAfter.first { $0.sourceModelName == "SettingsCoconutBalanceTest" })
+        #expect(adjustment.entryKind == .adjustment)
+        #expect(adjustment.delta == 80)
+        #expect(adjustment.careLedgerEventId == nil)
+        let coldContext = ModelContext(container)
+        CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: coldContext)
+        #expect(CoconutWalletService.balance(accountKey: accountKey, context: coldContext) == 120)
     }
 
     @MainActor
@@ -4707,7 +4714,7 @@ struct HomeCommandExecutorTests {
         #expect(result.humanID == human.id)
         #expect(mutation.command == .settingsCoconutBalance(humanID: human.id, amount: 120))
         #expect(mutation.affectedEntityIDs == [human.id])
-        #expect(mutation.wroteBusinessFact == false)
+        #expect(mutation.wroteBusinessFact)
         #expect(mutation.note == "test.settings.coconut")
         #expect(revisionCenter.homeRevision.value == beforeRevision + 1)
     }

@@ -158,7 +158,7 @@ enum HouseholdStarterJourneyService {
         )
         let visible = Array(states.lazy.filter {
             $0.status != .claimed && $0.status != .locked
-        }.prefix(HouseholdStarterJourneyPolicy.maximumVisibleTaskCount))
+        })
 
         return HouseholdStarterJourneySnapshot(
             isEnabled: true,

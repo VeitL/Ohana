@@ -319,7 +319,6 @@ nonisolated enum HouseholdStarterJourneyPolicy {
     static let totalRewardCoconuts = HouseholdStarterJourneyTask.allCases.reduce(0) {
         $0 + $1.rewardCoconuts
     }
-    static let maximumVisibleTaskCount = 3
 
     static func requiredCheckpointCount(for task: HouseholdStarterJourneyTask) -> Int {
         switch task {

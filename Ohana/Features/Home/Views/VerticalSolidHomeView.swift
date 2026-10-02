@@ -474,6 +474,7 @@ struct VerticalSolidHomeView: View {
             growthLoopPulseDismissTask?.cancel()
             memberMediaAttachmentIndexRepairTask?.cancel()
             oasisEnergyInjectionTask?.cancel()
+            oasisEnergyInjectionTask = nil
             plantQuickCareFeedbackClearTasks.values.forEach { $0.cancel() }
             pendingOasisEnergyInjectionCount = 0
             pendingPlantQuickCareKeys.removeAll()

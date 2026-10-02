@@ -103,7 +103,7 @@ extension PetBasicInfoDetailView {
                 Divider().opacity(0.1)
                 editField(l.tr(zh: "诊所名称", en: "Clinic", de: "Praxis"), text: $eVetClinicName, identifier: "pet-basic-info-vet-clinic-input")
                 Divider().opacity(0.1)
-                editField(l.tr(zh: "主治医生", en: "Doctor", de: "Tierarzt"), text: $eVetDoctorName, identifier: "pet-basic-info-vet-doctor-input")
+                editField(TaskCenterPetProfileInlineCopy.contactName(l), text: $eVetDoctorName, identifier: "pet-basic-info-vet-doctor-input")
                 Divider().opacity(0.1)
                 editField(l.tr(zh: "联系电话", en: "Phone", de: "Telefon"), text: $eVetContact, identifier: "pet-basic-info-vet-contact-input")
                 Divider().opacity(0.1)

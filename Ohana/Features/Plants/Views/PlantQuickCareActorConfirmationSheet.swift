@@ -12,7 +12,7 @@ nonisolated struct PlantActionHumanSelectionContext: Equatable, Sendable {
     let eligibleHumanCount: Int
     let defaultHumanID: UUID?
 
-    var needsConfirmation: Bool { eligibleHumanCount > 1 }
+    var needsConfirmation: Bool { eligibleHumanCount > 1 && defaultHumanID == nil }
 }
 
 @MainActor

@@ -48,16 +48,24 @@ final class PlantModuleUITests: XCTestCase {
         let app = launchEnglishApp(
             resetPersistentState: true,
             enableProductionOverlays: true,
-            plantBaselineSeedCount: 1
+            unlockRewardTier: true
         )
         ensureHouseholdHome(in: app)
-        _ = ensureReusablePlantBaselineAndReturnHomePlantName(in: app)
+        openHomePlantsTabAfterUnlock(in: app)
+        let emptyAdd = app.buttons["home-plants-empty-add-action"]
+        XCTAssertTrue(emptyAdd.waitForExistence(timeout: 12),
+                      "The first-plant journey must begin with an empty Plants page.")
 
         let plantName = addPlantFromHomePlantsTab(
             in: app,
             catalogID: "monstera-deliciosa",
-            expectedPlantName: "monstera"
+            expectedPlantName: "monstera",
+            fromEmptyState: true
         )
+        XCTAssertFalse(emptyAdd.exists, "The empty state remained after saving the first plant.")
+        assertHomePlantCard(named: plantName, in: app)
+        relaunchWithoutResetToHome(in: app)
+        openHomePlantsTabAfterUnlock(in: app)
         assertHomePlantCard(named: plantName, in: app)
     }
 
@@ -70,11 +78,57 @@ final class PlantModuleUITests: XCTestCase {
         )
         ensureHouseholdHome(in: app)
 
+        // The launch fixture saves this real Plant without resetting existing
+        // preferences. Reminder settings do not require the Home plant tab.
+        let plantName = "Codex Pothos Seed-1"
+        openSettingsFromHomeChrome(in: app)
+        openPlantReminderPanel(in: app)
+        // The row identifier is inherited by its text and icon too. Select
+        // the native control, rather than an ambiguous all-element query.
+        let master = app.switches.matching(identifier: "settings-plant-reminders-master-toggle").firstMatch
+        scrollToElement(master, in: app, maxSwipes: 10)
+        let initialMasterState = try XCTUnwrap(switchOnState(of: master))
+        if !initialMasterState {
+            tapReminderToggleControl(master, timeout: 8)
+            XCTAssertTrue(waitForSwitchOnState(master, toEqual: true, timeout: 8))
+        }
+        let originalToggle = findPlantReminderToggle(named: plantName, in: app, maxSwipes: 18)
+        XCTAssertTrue(originalToggle.exists, "The saved plant fixture did not appear in reminder settings.")
+        let originalToggleIdentifier = originalToggle.identifier
+        // The master is earlier content; a root-window frame can still lie
+        // behind the navigation bar after finding the plant further down.
+        scrollTowardTopToElement(master, in: app, maxSwipes: 10)
+        tapReminderToggleControl(master, timeout: 8)
+        XCTAssertTrue(waitForSwitchOnState(master, toEqual: false, timeout: 8))
+        let perPlantSection = app.descendants(matching: .any)["settings-plant-reminders-plant-section"]
+        XCTAssertTrue(waitUntil(timeout: 8) { !perPlantSection.exists },
+                      "Turning plant reminders off did not hide their child options.")
+        scrollTowardTopToElement(master, in: app, maxSwipes: 10)
+        tapReminderToggleControl(master, timeout: 8)
+        XCTAssertTrue(waitForSwitchOnState(master, toEqual: true, timeout: 8))
+        let restoredToggle = findPlantReminderToggle(named: plantName, in: app, maxSwipes: 18)
+        XCTAssertTrue(restoredToggle.exists,
+                      "Off→On did not restore this plant's options within the same Settings session.")
+        XCTAssertEqual(restoredToggle.identifier, originalToggleIdentifier,
+                       "Off→On restored a different plant's options.")
+        assertPlantReminderToggleCanRoundTrip(restoredToggle)
+    }
+
+    // Diagnostic only: the same original per-plant journey and input, with
+    // passive touch/binding evidence. It is excluded from release acceptance.
+    @MainActor
+    func testDiagnosticPlantReminderRoundTripWithTouchTrace() throws {
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            enableAnimations: true,
+            plantBaselineSeedCount: 1,
+            extraLaunchArguments: ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        )
+        ensureHouseholdHome(in: app)
         let plantName = seedPlantBaselineAndReturnHomePlantName(in: app)
         openSettingsFromHomeChrome(in: app)
         openPlantReminderPanel(in: app)
         let plantToggle = findPlantReminderToggle(named: plantName, in: app, maxSwipes: 18)
-
         assertPlantReminderToggleCanRoundTrip(plantToggle)
     }
 
@@ -435,7 +489,8 @@ final class PlantModuleUITests: XCTestCase {
         enableProductionOverlays: Bool = false,
         enableAnimations: Bool = false,
         unlockRewardTier: Bool = false,
-        plantBaselineSeedCount: Int? = nil
+        plantBaselineSeedCount: Int? = nil,
+        extraLaunchArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += [
@@ -475,6 +530,7 @@ final class PlantModuleUITests: XCTestCase {
                 "\(plantBaselineSeedCount)"
             ]
         }
+        app.launchArguments += extraLaunchArguments
         app.launch()
         if app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 3) {
             tapWhenHittable(app.buttons["zen-toolbar-settings"], timeout: 8)
@@ -661,13 +717,18 @@ final class PlantModuleUITests: XCTestCase {
     private func addPlantFromHomePlantsTab(
         in app: XCUIApplication,
         catalogID: String = "epipremnum-aureum",
-        expectedPlantName: String = "pothos"
+        expectedPlantName: String = "pothos",
+        fromEmptyState: Bool = false
     ) -> String {
-        let addEntry = app.buttons["home-primary-action"]
-        tapWhenHittable(addEntry, timeout: 8)
-        let addPlantShortcut = app.buttons["home-add-plant-action"]
-        XCTAssertTrue(addPlantShortcut.waitForExistence(timeout: 8), "Plant toolbar menu did not expose Add Plant.")
-        XCTAssertTrue(tapWhenSemanticallyHittable(addPlantShortcut, timeout: 8), "Add Plant did not become semantically tappable.")
+        if fromEmptyState {
+            tapWhenHittable(app.buttons["home-plants-empty-add-action"], timeout: 8)
+        } else {
+            let addEntry = app.buttons["home-primary-action"]
+            tapWhenHittable(addEntry, timeout: 8)
+            let addPlantShortcut = app.buttons["home-add-plant-action"]
+            XCTAssertTrue(addPlantShortcut.waitForExistence(timeout: 8), "Plant toolbar menu did not expose Add Plant.")
+            XCTAssertTrue(tapWhenSemanticallyHittable(addPlantShortcut, timeout: 8), "Add Plant did not become semantically tappable.")
+        }
 
         let addPlantStep = app.descendants(matching: .any)["add-plant-step-plant-room"]
         XCTAssertTrue(addPlantStep.waitForExistence(timeout: 8), "Add Plant did not open on the plant-and-room step.")
@@ -1139,15 +1200,15 @@ final class PlantModuleUITests: XCTestCase {
             "Settings did not open the Notifications page."
         )
 
-        let disclosure = app.buttons["settings-advanced-notifications-disclosure"]
-        scrollToElement(disclosure, in: app, maxSwipes: 10)
-        XCTAssertTrue(disclosure.waitForExistence(timeout: 8), "Advanced reminder settings disclosure did not appear in Settings.")
-        tapWhenSemanticallyHittable(disclosure, timeout: 8)
+        let plantDetails = app.buttons["settings-plant-reminders-details"]
+        scrollToElement(plantDetails, in: app, maxSwipes: 10)
+        XCTAssertTrue(plantDetails.waitForExistence(timeout: 8), "Plant reminder settings navigation did not appear in Settings.")
+        tapWhenSemanticallyHittable(plantDetails, timeout: 8)
 
         if !overview.waitForExistence(timeout: 8) {
             scrollToElement(overview, in: app, maxSwipes: 6)
         }
-        XCTAssertTrue(overview.waitForExistence(timeout: 8), "Plant reminder settings panel did not appear after expanding advanced reminder settings.")
+        XCTAssertTrue(overview.waitForExistence(timeout: 8), "Plant reminder settings panel did not appear after opening its detail page.")
     }
 
     @MainActor

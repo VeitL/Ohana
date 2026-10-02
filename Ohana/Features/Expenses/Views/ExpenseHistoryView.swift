@@ -161,7 +161,6 @@ struct ExpenseHistoryContentView: View {
                 .zIndex(20)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .onAppear {
             if selectedPayerId == nil {
                 selectedPayerId = currentActiveHumanId

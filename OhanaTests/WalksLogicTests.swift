@@ -550,6 +550,33 @@ struct WalksLogicTests {
         #expect(walk.executorIds == capturedIDs)
     }
 
+    @Test func changingWalkerUpdatesRecoveryAndFinalRecordWithoutChangingCurrentMember() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let first = Human(name: "First walker")
+        let final = Human(name: "Final walker")
+        let pet = Pet(name: "Piper", species: "狗")
+        context.insert(first)
+        context.insert(final)
+        context.insert(pet)
+        try context.save()
+        let selection = MutableWalkActiveHumanSelection(id: first.id.uuidString)
+        let manager = PetWalkingManager(locationManager: FakeWalkLocationManager(), questManager: QuestManager(), activeHumanSelection: selection)
+        manager.start(pet: pet, modelContext: context, executorIds: [first.id.uuidString])
+        #expect(!manager.selectActiveWalker(id: UUID()))
+        #expect(manager.activeWalkExecutorIds == [first.id.uuidString])
+        manager.pause()
+        #expect(manager.selectActiveWalker(id: final.id))
+        #expect(selection.currentHumanId == first.id.uuidString)
+        let checkpoint = try #require(try context.fetch(FetchDescriptor<PetWalkLog>()).first(where: WalkRecoveryCheckpoint.isCheckpoint))
+        #expect(checkpoint.executorIds == [final.id.uuidString])
+        manager.stop(modelContext: context)
+        let saved = try #require(try context.fetch(FetchDescriptor<PetWalkLog>()).first { !WalkRecoveryCheckpoint.isCheckpoint($0) })
+        #expect(saved.executorId == final.id.uuidString)
+        #expect(saved.executorIds == [final.id.uuidString])
+        #expect(!manager.selectActiveWalker(id: first.id))
+    }
+
     @Test func restoredWalkKeepsCheckpointParticipantsAndExplicitEmptyStartStaysUnattributed() throws {
         let container = try makeContainer()
         let context = container.mainContext

@@ -1243,8 +1243,8 @@ private final class WalkFactOrderAssertingWallet: CoconutWalletManaging {
     func balance(for human: Human, context: ModelContext) -> Int { base.balance(for: human, context: context) }
     func balance(for pet: Pet, context: ModelContext) -> Int { base.balance(for: pet, context: context) }
     func legacySystemBalance(context: ModelContext, fallback: Int) -> Int { base.legacySystemBalance(context: context, fallback: fallback) }
-    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
-        base.setDeveloperOverrideBalance(amount: amount, for: human, displayName: displayName, context: context)
+    func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) throws {
+        try base.setDeveloperOverrideBalance(amount: amount, for: human, displayName: displayName, context: context)
     }
     func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
         base.refreshQuestProjection(context: context, manager: manager)

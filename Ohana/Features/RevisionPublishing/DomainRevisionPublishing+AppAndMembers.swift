@@ -94,7 +94,7 @@ extension DomainRevisionPublishing {
                 DomainMutationResult(
                     command: .settingsCoconutBalance(humanID: result.humanID, amount: result.amount),
                     affectedEntityIDs: Set(result.humanID.map { [$0] } ?? []),
-                    wroteBusinessFact: false,
+                    wroteBusinessFact: result.didApply,
                     note: note
                 )
             )

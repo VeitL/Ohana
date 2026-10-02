@@ -165,6 +165,7 @@ nonisolated struct TaskCenterSystemJourneyGuide: Equatable, Sendable {
         // Task Center answer must never imply that tapping a status choice
         // created or accepted a plan when no plan command ran.
         guard checkpoint != .acceptedRecommendedCarePlan else { return [] }
+        if checkpoint == .petEmergencyContact { return [.preferNotToSay] }
         let stableOrder: [HouseholdStarterJourneyResolution] = [
             .reviewed,
             .unknown,

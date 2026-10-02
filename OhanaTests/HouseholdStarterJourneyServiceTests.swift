@@ -57,7 +57,7 @@ struct HouseholdStarterJourneyServiceTests {
         #expect(snapshot.state(for: .firstCare)?.targetID == firstPet.id)
         #expect(snapshot.state(for: .petProfile)?.completedCheckpointCount == 0)
         #expect(snapshot.state(for: .firstCare)?.status == .actionRequired)
-        #expect(snapshot.visibleTaskStates.count == 3)
+        #expect(snapshot.visibleTaskStates.count == HouseholdStarterJourneyTask.allCases.count)
     }
 
     @Test func addingAndSwitchingSecondHumanKeepsHouseholdProfileCompletion() async throws {
@@ -1463,8 +1463,8 @@ struct HouseholdStarterJourneyServiceTests {
         func legacySystemBalance(context: ModelContext, fallback: Int) -> Int {
             wrapped.legacySystemBalance(context: context, fallback: fallback)
         }
-        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) {
-            wrapped.setDeveloperOverrideBalance(amount: amount, for: human, displayName: displayName, context: context)
+        func setDeveloperOverrideBalance(amount: Int, for human: Human?, displayName: String, context: ModelContext) throws {
+            try wrapped.setDeveloperOverrideBalance(amount: amount, for: human, displayName: displayName, context: context)
         }
         func refreshQuestProjection(context: ModelContext, manager: CoconutProjectionManaging?) {
             wrapped.refreshQuestProjection(context: context, manager: manager)

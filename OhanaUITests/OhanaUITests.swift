@@ -21,7 +21,12 @@ final class OhanaUITests: XCTestCase {
 
     override func tearDown() async throws {
         guard let testRun, testRun.totalFailureCount > 0 else { return }
-        await MainActor.run { UITestInteraction.captureFailureSnapshot() }
+        await MainActor.run {
+            UITestInteraction.captureFailureSnapshot()
+            // Preserve the failure first, then contain this known system overlay
+            // so the next independent journey can reach its own initial screen.
+            respondToPendingOhanaLocationAuthorization(timeout: 0)
+        }
     }
 
     @MainActor
@@ -2427,17 +2432,8 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petEmergencyContact"],
             in: app
         )
-        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
-        let vetContact = app.textFields["pet-basic-info-vet-contact-input"]
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The emergency-contact editor did not open.")
-        scrollTowardElement(vetContact, in: app, maxSwipes: 8)
-        XCTAssertTrue(vetContact.waitForExistence(timeout: 8), "The emergency phone field was not available.")
-        tapWhenHittable(vetContact, timeout: 8)
-        vetContact.typeText("5550107")
-        dismissKeyboardIfPresent(in: app)
-        tapWhenHittable(app.buttons["pet-basic-info-save-action"], timeout: 8)
+        saveInlineEmergencyContact(name: "Codex Contact", phone: "5550107", in: app)
 
-        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists }, "Saving did not return to the identity journey.")
         assertMemberCardProgress("2/2", in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["task-center-starter-journey-complete"]
@@ -2624,7 +2620,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testPetEmergencyContactNotApplicableThenRealSaveSupersedesResolutionAcrossRelaunch() throws {
+    func testPetEmergencyContactPrivateThenRealSaveSupersedesResolutionAcrossRelaunch() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
@@ -2650,9 +2646,8 @@ final class OhanaUITests: XCTestCase {
         let completedEmergency = app.descendants(matching: .any)[
             "task-center-starter-answer-complete-checkpoint-petEmergencyContact"
         ]
-        let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
-        let vetContact = app.textFields["pet-basic-info-vet-contact-input"]
-        let saveAction = app.buttons["pet-basic-info-save-action"]
+        let editor = app.descendants(matching: .any)["task-center-pet-profile-inline-editor-petEmergencyContact"]
+        let vetContact = app.textFields["task-center-pet-profile-inline-contact-phone"]
         let phone = "5550199"
 
         XCTAssertTrue(waitUntil(timeout: 8) {
@@ -2676,7 +2671,7 @@ final class OhanaUITests: XCTestCase {
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-resolution-petEmergencyContact-notApplicable"],
+            app.buttons["task-center-starter-resolution-petEmergencyContact-preferNotToSay"],
             in: app
         )
         XCTAssertTrue(
@@ -2699,7 +2694,7 @@ final class OhanaUITests: XCTestCase {
             "The completed Emergency Contact question did not expose its answer."
         )
         XCTAssertTrue(
-            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Not applicable"),
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Prefer not to say"),
             "The explicit Emergency Contact resolution was not displayed."
         )
 
@@ -2707,30 +2702,17 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petEmergencyContact"],
             in: app
         )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The emergency-contact editor did not open.")
-        scrollTowardElement(vetContact, in: app, maxSwipes: 8)
-        XCTAssertTrue(vetContact.waitForExistence(timeout: 8), "The emergency phone field was unavailable.")
-        tapWhenHittable(vetContact, timeout: 8)
-        vetContact.typeText(phone)
-        XCTAssertTrue(waitUntil(timeout: 8) {
-            saveAction.exists && saveAction.isEnabled && saveAction.isHittable
-        })
-        saveAction.tap()
-
-        XCTAssertTrue(
-            waitUntil(timeout: 12) { !editor.exists },
-            "Saving the real emergency phone did not return to the guided card."
-        )
+        saveInlineEmergencyContact(name: "Codex Contact", phone: phone, in: app)
         XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 12))
         XCTAssertTrue(
             waitUntil(timeout: 12) {
                 self.accessibilityText(for: completedEmergency)
                     .localizedCaseInsensitiveContains("existing information")
             },
-            "The real emergency phone did not replace the same-session Not applicable answer."
+            "The real emergency phone did not replace the same-session Prefer not to say answer."
         )
         XCTAssertFalse(
-            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Not applicable"),
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Prefer not to say"),
             "The stale Emergency Contact resolution still overrode the real phone."
         )
         assertMemberCardProgress("1/2", in: app)
@@ -2767,7 +2749,7 @@ final class OhanaUITests: XCTestCase {
             "The real emergency phone resumed as a skip resolution after relaunch."
         )
         XCTAssertFalse(
-            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Not applicable"),
+            accessibilityText(for: completedEmergency).localizedCaseInsensitiveContains("Prefer not to say"),
             "The obsolete Emergency Contact resolution returned after relaunch."
         )
 
@@ -2783,15 +2765,14 @@ final class OhanaUITests: XCTestCase {
             "The saved emergency phone was not projected after relaunch."
         )
 
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
-        let closeAction = app.buttons["pet-basic-info-close-action"]
-        XCTAssertTrue(closeAction.waitForExistence(timeout: 8))
-        tapWhenHittable(closeAction, timeout: 8)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petEmergencyContact"], in: app
+        )
         XCTAssertTrue(waitUntil(timeout: 8) { !editor.exists })
     }
 
     @MainActor
-    func testPetIdentityPrivateDocumentsAndUnknownEmergencyPersistAcrossRelaunchWithoutFabricationAndRewardsOnce() throws {
+    func testPetIdentityPrivateDocumentsAndPrivateEmergencyPersistAcrossRelaunchWithoutFabricationAndRewardsOnce() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let petName = completeFirstDayStarterFunnel(in: app)
@@ -2829,7 +2810,7 @@ final class OhanaUITests: XCTestCase {
         let cancelledDraftPhone = "5550198"
         let emergencyFieldExpectations = [
             (identifier: "pet-basic-info-vet-clinic-input", placeholder: "Clinic"),
-            (identifier: "pet-basic-info-vet-doctor-input", placeholder: "Doctor"),
+            (identifier: "pet-basic-info-vet-doctor-input", placeholder: "Contact name"),
             (identifier: "pet-basic-info-vet-contact-input", placeholder: "Phone"),
             (identifier: "pet-basic-info-vet-address-input", placeholder: "Clinic address"),
             (identifier: "pet-basic-info-allergies-input", placeholder: "Allergies")
@@ -2884,18 +2865,16 @@ final class OhanaUITests: XCTestCase {
             app.buttons["task-center-starter-journey-open-petEmergencyContact"],
             in: app
         )
-        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The emergency-contact editor did not open.")
-        let draftPhoneField = app.textFields["pet-basic-info-vet-contact-input"]
-        scrollTowardElement(draftPhoneField, in: app, maxSwipes: 8)
-        XCTAssertTrue(draftPhoneField.waitForExistence(timeout: 8), "The emergency phone field was unavailable.")
-        tapWhenHittable(draftPhoneField, timeout: 8)
+        let inlineEditor = app.descendants(matching: .any)["task-center-pet-profile-inline-editor-petEmergencyContact"]
+        XCTAssertTrue(inlineEditor.waitForExistence(timeout: 12))
+        let draftPhoneField = app.textFields["task-center-pet-profile-inline-contact-phone"]
+        tapGuidedJourneyControlAfterSemanticScroll(draftPhoneField, in: app)
         draftPhoneField.typeText(cancelledDraftPhone)
         dismissKeyboardIfPresent(in: app)
-        discardPetBasicInfoChanges(in: app)
-        let closeEditor = app.buttons["pet-basic-info-close-action"]
-        XCTAssertTrue(closeEditor.waitForExistence(timeout: 8))
-        tapWhenHittable(closeEditor, timeout: 8)
-        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petEmergencyContact"], in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !inlineEditor.exists })
         XCTAssertTrue(
             emergencyQuestion.waitForExistence(timeout: 12),
             "Cancelling the emergency draft did not return to its unanswered question."
@@ -2904,14 +2883,14 @@ final class OhanaUITests: XCTestCase {
         XCTAssertFalse(completedEmergency.exists, "Cancelling the emergency draft completed the question.")
 
         tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-resolution-petEmergencyContact-unknown"],
+            app.buttons["task-center-starter-resolution-petEmergencyContact-preferNotToSay"],
             in: app
         )
         assertMemberCardProgress("2/2", in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["task-center-starter-journey-complete"]
                 .waitForExistence(timeout: 12),
-            "The private Documents and unknown Emergency answers did not complete the guided journey."
+            "The private Documents and private Emergency answers did not complete the guided journey."
         )
 
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
@@ -3047,7 +3026,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testPetIdentityUnknownDocumentsReviewedEmergencyPersistWithoutFabricationAndRewardsOnce() throws {
+    func testPetIdentityUnknownDocumentsPrivateEmergencyPersistWithoutFabricationAndRewardsOnce() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
         _ = createFirstHuman(from: app)
         let petName = "Codex Unknown Identity Pet \(Int(Date().timeIntervalSince1970))"
@@ -3171,14 +3150,14 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(emergencyQuestion.waitForExistence(timeout: 8))
 
         tapGuidedJourneyControlAfterSemanticScroll(
-            app.buttons["task-center-starter-resolution-petEmergencyContact-reviewed"],
+            app.buttons["task-center-starter-resolution-petEmergencyContact-preferNotToSay"],
             in: app
         )
         assertMemberCardProgress("2/2", in: app)
         XCTAssertTrue(
             app.descendants(matching: .any)["task-center-starter-journey-complete"]
                 .waitForExistence(timeout: 12),
-            "The reviewed Emergency Contact answer did not complete the identity journey."
+            "The private Emergency Contact answer did not complete the identity journey."
         )
         tapGuidedJourneyControlAfterSemanticScroll(app.buttons["task-center-starter-journey-finish"], in: app)
         XCTAssertTrue(waitUntil(timeout: 12) { !sheet.exists })
@@ -3194,7 +3173,7 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 12) {
                 Int(self.numericLabel(coconutBalance.label)) == balanceBeforeClaim
             },
-            "Finishing unknown and reviewed answers changed the balance before Claim."
+            "Finishing unknown and private answers changed the balance before Claim."
         )
         openPetBasicInfoFromHome(in: app, petName: petName)
         let editor = app.descendants(matching: .any)["pet-basic-info-screen"]
@@ -3205,7 +3184,7 @@ final class OhanaUITests: XCTestCase {
         let emergencyPhoneValue = String(describing: vetContact.value ?? "")
         XCTAssertTrue(
             emergencyPhoneValue.isEmpty || emergencyPhoneValue == "Phone",
-            "Choosing Current status reviewed fabricated an emergency phone: \(emergencyPhoneValue)"
+            "Choosing Prefer not to say fabricated an emergency phone: \(emergencyPhoneValue)"
         )
         tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
         tapWhenHittable(app.buttons["BackButton"], timeout: 8)
@@ -5995,43 +5974,76 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsAdvancedNotificationControlsMountOnlyWhenExpanded() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
-        createFirstHuman(from: app)
+    func testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages() throws {
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
+        let humanName = createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
         openSettingsFromHomeChrome(in: app)
         openSettingsCategory("settings-destination-notifications", in: app)
-        let advancedNotifications = app.buttons["settings-advanced-notifications-disclosure"]
-        scrollToElement(advancedNotifications, in: app, maxSwipes: 8)
-        XCTAssertTrue(
-            advancedNotifications.waitForExistence(timeout: 12),
-            "Settings did not expose the advanced notification row."
-        )
+        let medicationToggle = app.switches.matching(identifier: "settings-notification-medication-toggle").firstMatch
+        XCTAssertTrue(medicationToggle.waitForExistence(timeout: 8), "Reminder categories were not directly available.")
+        let overview = app.descendants(matching: .any)["settings-plant-reminders-overview"]
+        XCTAssertFalse(overview.exists, "Plant details were mounted on the category page.")
 
-        let medicationToggle = app.switches["settings-notification-medication-toggle"]
-        XCTAssertFalse(
-            medicationToggle.exists,
-            "Medication notification toggle was mounted before advanced notification settings were expanded."
-        )
+        let categorySummary = app.staticTexts["settings-notification-category-summary"]
+        let disableAll = app.buttons["settings-notification-disable-all"]
+        let enableAll = app.buttons["settings-notification-enable-all"]
+        scrollToElement(disableAll, in: app, maxSwipes: 6)
+        tapWhenHittable(disableAll, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { categorySummary.label == "All off" })
+        for group in ["medication", "calendar", "feeding", "hygiene", "plantCare", "checkIn"] {
+            let toggle = app.switches.matching(identifier: "settings-notification-\(group)-toggle").firstMatch
+            scrollToElement(toggle, in: app, maxSwipes: 6)
+            XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(toggle) == false }, "Bulk off did not disable \(group).")
+        }
+        scrollToElement(enableAll, in: app, maxSwipes: 6)
+        tapWhenHittable(enableAll, timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { categorySummary.label == "All on" })
 
-        tapWhenHittable(advancedNotifications, timeout: 8)
-        scrollToElement(medicationToggle, in: app, maxSwipes: 6)
-        XCTAssertTrue(
-            medicationToggle.waitForExistence(timeout: 8),
-            "Expanding advanced notification settings did not mount the medication notification toggle."
-        )
+        let plantToggle = app.switches.matching(identifier: "settings-notification-plantCare-toggle").firstMatch
+        XCTAssertTrue(setToggle(plantToggle, enabled: false, in: app))
+        let plantDetails = app.buttons["settings-plant-reminders-details"]
+        scrollToElement(plantDetails, in: app, maxSwipes: 6)
+        tapWhenHittable(plantDetails, timeout: 8)
+        XCTAssertTrue(overview.waitForExistence(timeout: 8), "Plant detail navigation did not mount its controls.")
+        let master = app.switches.matching(identifier: "settings-plant-reminders-master-toggle").firstMatch
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(master) == false }, "Plant page did not reflect the category setting.")
+        XCTAssertTrue(setToggle(master, enabled: true, in: app))
+        let plantSettingsScreenshot = XCTAttachment(screenshot: app.screenshot())
+        plantSettingsScreenshot.name = "Plant reminder detail final"
+        plantSettingsScreenshot.lifetime = .keepAlways
+        add(plantSettingsScreenshot)
+        tapWhenHittable(app.navigationBars.buttons["BackButton"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["settings-notifications-screen"].waitForExistence(timeout: 8))
+        XCTAssertFalse(overview.exists, "Returning from plant details left their controls mounted.")
+        scrollToElement(plantToggle, in: app, maxSwipes: 6)
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(plantToggle) == true }, "Category did not refresh after changing the plant page.")
 
-        scrollToElement(advancedNotifications, in: app, maxSwipes: 4)
-        XCTAssertTrue(
-            medicationToggle.exists,
-            "Advanced notification controls disappeared before the collapse action."
-        )
-        tapWhenHittable(advancedNotifications, timeout: 8)
-        XCTAssertTrue(
-            waitUntil(timeout: 5) { !medicationToggle.exists },
-            "Collapsing advanced notification settings did not unmount category controls."
-        )
+        XCTAssertTrue(setToggle(medicationToggle, enabled: false, in: app))
+        tapWhenHittable(app.buttons["settings-close-action"], timeout: 8)
+        app.terminate()
+        // Read the existing user without replaying onboarding fixture effects.
+        app.launchArguments.removeAll {
+            $0 == "-OHANA_RESET_PERSISTENT_STATE" || $0 == "-OHANA_UI_TEST_SEED_HUMAN_BASELINE"
+        }
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+        openSettingsCategory("settings-destination-notifications", in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(medicationToggle) == false }, "Category preference did not survive cold launch.")
+        let categoriesScreenshot = XCTAttachment(screenshot: app.screenshot())
+        categoriesScreenshot.name = "Notification categories final after cold launch"
+        categoriesScreenshot.lifetime = .keepAlways
+        add(categoriesScreenshot)
+        scrollToElement(plantDetails, in: app, maxSwipes: 6)
+        let privacyScreenshot = XCTAttachment(screenshot: app.screenshot())
+        privacyScreenshot.name = "Notification detail navigation and privacy final"
+        privacyScreenshot.lifetime = .keepAlways
+        add(privacyScreenshot)
     }
 
     @MainActor
@@ -6148,6 +6160,9 @@ final class OhanaUITests: XCTestCase {
         createFirstHuman(from: app)
         completeFirstDayStarterFunnel(in: app)
 
+        let homeBalance = app.buttons["home-coconut-action"]
+        XCTAssertTrue(waitUntil(timeout: 12) { homeBalance.label == "Coconut balance 50" },
+                      "The fresh household did not retain its 50-coconut island starter reserve.")
         openSettingsFromHomeChrome(in: app)
         let debugCoconuts = app.buttons["settings-debug-coconuts-shortcut"].exists
             ? app.buttons["settings-debug-coconuts-shortcut"]
@@ -6164,7 +6179,12 @@ final class OhanaUITests: XCTestCase {
             coconutScreen.waitForExistence(timeout: 12),
             "Coconut balance developer tool did not open its sheet."
         )
-        tapWhenHittable(app.buttons["coconut-balance-apply-action"], timeout: 8)
+        let preset = app.buttons["coconut-balance-preset-5000"]
+        scrollToElement(preset, in: app, maxSwipes: 4)
+        tapWhenHittable(preset, timeout: 8)
+        let applyBalance = app.buttons["coconut-balance-apply-action"]
+        scrollToElement(applyBalance, in: app, maxSwipes: 4)
+        tapWhenHittable(applyBalance, timeout: 8)
 
         let resultMessage = app.descendants(matching: .any)["coconut-balance-result-message"]
         XCTAssertTrue(
@@ -6176,6 +6196,24 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 12) { !coconutScreen.exists && app.buttons["settings-close-action"].exists },
             "Coconut balance developer tool did not remain responsive after applying the test balance."
         )
+        tapWhenHittable(app.buttons["settings-close-action"], timeout: 8)
+        // The developer tool replaces the member wallet; Home also includes
+        // the unchanged 50-coconut island reserve from the starter gift.
+        XCTAssertTrue(waitUntil(timeout: 12) { homeBalance.label == "Coconut balance 5050" },
+                      "Home did not combine the committed 5000-member balance with the 50-island reserve.")
+
+        openOasisAndInjectStarterEnergy(in: app)
+        XCTAssertTrue(waitUntil(timeout: 12) { homeBalance.label == "Coconut balance 5000" },
+                      "Five normal energy injections did not spend exactly 50 coconuts in the header.")
+        closeOasisToHome(in: app)
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(waitUntil(timeout: 20) { homeBalance.label == "Coconut balance 5000" },
+                      "The balance did not survive cold launch.")
+        tapWhenHittable(app.buttons["home-tab-oasis"], timeout: 8)
+        XCTAssertTrue(app.otherElements["oasis-screen"].waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["home-primary-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 12) { homeBalance.label == "Coconut balance 4990" },
+                      "Energy injection stayed stuck after returning to Oasis and cold launch.")
     }
 
     @MainActor
@@ -7238,7 +7276,10 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetHomeQuickActionDetailRoutesOpenAndCancel() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
+        let app = launchEnglishApp(
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
         let humanName = createFirstHuman(from: app)
         let petName = "Codex Quick Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
@@ -7260,6 +7301,39 @@ final class OhanaUITests: XCTestCase {
             petName: petName,
             humanName: humanName
         )
+
+        // Real long presses exercise the drag-recognizer boundary that a
+        // menu's Details button never reaches. Keep the normal detail tests too.
+        for (actionType, detailID) in [
+            ("feed", "quick-feed-detail-screen"),
+            ("water", "quick-water-detail-sheet"),
+            ("walk", "walk-summary-sheet"),
+            ("play", "quick-play-detail-sheet"),
+            ("weight", "pet-weight-detail-screen"),
+            ("moment", "Moments"),
+            ("expense", "Expenses"),
+            ("allFeatures", "feature-hub-daily-food")
+        ] {
+            ensureHomePetQuickActionVisible(actionType: actionType, in: app, petName: petName)
+            let button = app.buttons["home-quick-action-\(actionType)"]
+            guard let frame = UITestInteraction.stableFrame(of: button, in: app, timeout: 8) else {
+                XCTFail("Long-press target did not stabilize: \(actionType)")
+                return
+            }
+            app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: frame.midX - app.frame.minX, dy: frame.midY - app.frame.minY))
+                .press(forDuration: 0.8)
+            let detailMarker = ["moment", "expense"].contains(actionType)
+                ? app.staticTexts[detailID]
+                : app.descendants(matching: .any)[detailID]
+            XCTAssertTrue(detailMarker.waitForExistence(timeout: 18),
+                          "Long press did not open \(actionType) details.")
+            XCTAssertEqual(app.state, .runningForeground, "Long pressing \(actionType) crashed the app.")
+            closeCurrentSheetToHome(in: app, humanName: humanName)
+        }
+        relaunchPreservingPersistentState(in: app)
+        XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 20),
+                      "The pet card did not survive the long-press journey and cold launch.")
     }
 
     @MainActor
@@ -8017,7 +8091,28 @@ final class OhanaUITests: XCTestCase {
             persistedWalkRow.waitForExistence(timeout: 18),
             "Walk summary did not show a persisted walk row after the Home quick walk flow."
         )
+        assertWalkExecutorReadback(row: persistedWalkRow, expectedName: humanName, in: app)
         closeCurrentSheetToHome(in: app, humanName: humanName)
+
+        app.terminate()
+        app.launchArguments.removeAll { $0 == "-OHANA_RESET_PERSISTENT_STATE" }
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openPetWalkSummaryFromHome(in: app, petName: petName, humanName: humanName)
+        XCTAssertTrue(persistedWalkRow.waitForExistence(timeout: 18), "Cold launch lost the original walk record.")
+        assertWalkExecutorReadback(row: persistedWalkRow, expectedName: humanName, in: app)
+        closeCurrentSheetToHome(in: app, humanName: humanName)
+    }
+
+    @MainActor
+    private func assertWalkExecutorReadback(row: XCUIElement, expectedName: String, in app: XCUIApplication) {
+        scrollToElement(row, in: app, maxSwipes: 8)
+        XCTAssertTrue(waitUntil(timeout: 8) { accessibilityText(for: row).contains(expectedName) }, "Walk history did not display its saved executor.")
+        tapWhenHittable(row, timeout: 8)
+        let executor = app.staticTexts["walk-detail-executor"]
+        XCTAssertTrue(executor.waitForExistence(timeout: 8), "Walk replay did not expose executor information.")
+        XCTAssertEqual(executor.label, expectedName, "Walk replay did not display the recorded executor.")
+        tapWhenHittable(app.buttons["walk-detail-close"], timeout: 8)
     }
 
     @MainActor
@@ -10099,6 +10194,30 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    private func saveInlineEmergencyContact(name: String, phone: String, in app: XCUIApplication) {
+        let editor = app.descendants(matching: .any)["task-center-pet-profile-inline-editor-petEmergencyContact"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 12), "The inline emergency contact form did not open.")
+        XCTAssertFalse(app.descendants(matching: .any)["pet-basic-info-screen"].exists,
+                       "The task opened the full profile instead of its inline form.")
+        let nameField = app.textFields["task-center-pet-profile-inline-contact-name"]
+        tapGuidedJourneyControlAfterSemanticScroll(nameField, in: app)
+        nameField.typeText(name)
+        let phoneField = app.textFields["task-center-pet-profile-inline-contact-phone"]
+        tapGuidedJourneyControlAfterSemanticScroll(phoneField, in: app)
+        phoneField.typeText(phone)
+        dismissKeyboardIfPresent(in: app)
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-save-petEmergencyContact"], in: app
+        )
+        XCTAssertTrue(app.descendants(matching: .any)["task-center-pet-profile-inline-saved-petEmergencyContact"]
+            .waitForExistence(timeout: 12), "The contact command did not commit.")
+        tapGuidedJourneyControlAfterSemanticScroll(
+            app.buttons["task-center-pet-profile-inline-cancel-petEmergencyContact"], in: app
+        )
+        XCTAssertTrue(waitUntil(timeout: 12) { !editor.exists })
+    }
+
+    @MainActor
     private func launchEnglishApp(
         resetPersistentState: Bool = true,
         appLanguageOverride: String? = "en",
@@ -10175,6 +10294,7 @@ final class OhanaUITests: XCTestCase {
         app.launchEnvironment["OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"] = "1"
         app.launchEnvironment.merge(extraLaunchEnvironment) { _, newValue in newValue }
         app.launch()
+        respondToPendingOhanaLocationAuthorization(timeout: 0)
         chooseInitialExperienceIfNeeded(initialExperienceMode, in: app)
         return app
     }
@@ -12469,7 +12589,9 @@ final class OhanaUITests: XCTestCase {
         let action = app.buttons["home-quick-action-\(actionType)"]
         if action.waitForExistence(timeout: 8) { return }
 
-        let petCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        // Only the collapsed card can reveal its dock. The expanded card's
+        // collapse action has the same label and must never be tapped here.
+        let petCard = app.buttons["home-card-pet-\(petName)"]
         XCTAssertTrue(
             petCard.waitForExistence(timeout: 20),
             "Pet home card did not appear before opening \(actionType)."
@@ -12532,7 +12654,7 @@ final class OhanaUITests: XCTestCase {
         let action = app.buttons["home-quick-action-\(actionType)"]
         if action.waitForExistence(timeout: 3) { return true }
 
-        let petCard = app.buttons.matching(NSPredicate(format: "label == %@", petName)).firstMatch
+        let petCard = app.buttons["home-card-pet-\(petName)"]
         guard petCard.waitForExistence(timeout: 8) else { return false }
         tapWhenHittable(petCard, timeout: 8)
         return action.waitForExistence(timeout: 5)
@@ -12680,6 +12802,8 @@ final class OhanaUITests: XCTestCase {
                 "Pet home walk quick-start menu did not expose a stable touch frame."
             )
         }
+
+        respondToPendingOhanaLocationAuthorization(timeout: 3)
 
         let exposedWalkControls = app.buttons["walk-tracking-stop-action"].waitForExistence(timeout: 6) ||
             app.descendants(matching: .any)["global-walk-bubble"].waitForExistence(timeout: 10)
@@ -13752,6 +13876,29 @@ final class OhanaUITests: XCTestCase {
             springboardButtons.first(where: { $0.exists && $0.isEnabled }) {
             button.tap()
         }
+    }
+
+    @MainActor
+    private func respondToPendingOhanaLocationAuthorization(timeout: TimeInterval) {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alert = springboard.alerts.firstMatch
+        let isOhanaLocationPrompt = {
+            guard alert.exists else { return false }
+            let title = alert.label
+            return (title.localizedCaseInsensitiveContains("Ohana") &&
+                    title.localizedCaseInsensitiveContains("location")) ||
+                alert.staticTexts.matching(NSPredicate(
+                    format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Ohana", "location"
+                )).firstMatch.exists
+        }
+        guard waitUntil(timeout: timeout, condition: isOhanaLocationPrompt) else { return }
+        // Answer the real first-use prompt once. Do not alter TCC, choose an
+        // unrelated Allow action, or retry a failed app input behind the alert.
+        let allow = alert.buttons["Allow While Using App"]
+        XCTAssertTrue(allow.exists && allow.isEnabled, "Ohana location prompt did not expose its expected foreground permission choice.")
+        guard allow.exists && allow.isEnabled else { return }
+        allow.tap()
+        XCTAssertTrue(waitUntil(timeout: 8) { !isOhanaLocationPrompt() }, "Ohana location authorization alert stayed open after its single response.")
     }
 
     @MainActor

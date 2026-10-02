@@ -82,6 +82,18 @@ nonisolated enum TaskCenterPetProfileInlineCopy {
         )
     }
 
+    static func contactName(_ l: L10n) -> String {
+        l.tr(zh: "联系人姓名", en: "Contact name", de: "Kontaktname",
+             es: "Nombre del contacto", pt: "Nome do contato", fr: "Nom du contact",
+             ja: "連絡先の名前", ko: "연락처 이름", it: "Nome del contatto")
+    }
+
+    static func contactPhone(_ l: L10n) -> String {
+        l.tr(zh: "联系电话", en: "Phone number", de: "Telefonnummer",
+             es: "Número de teléfono", pt: "Número de telefone", fr: "Numéro de téléphone",
+             ja: "電話番号", ko: "전화번호", it: "Numero di telefono")
+    }
+
     static func exactValues(_ l: L10n) -> [String] {
         [
             birthday(l), homeDate(l), boy(l), girl(l), coatColor(l),
@@ -95,6 +107,7 @@ nonisolated enum TaskCenterPetProfileInlineUpdate: Equatable, Sendable {
     case bodyProfile(gender: String, coatColor: String)
     case personality(primaryTagID: String)
     case dailyCare(foodBrand: String, dailyPortionGrams: Double?)
+    case emergencyContact(name: String, phone: String)
 }
 
 @MainActor
@@ -108,6 +121,8 @@ enum TaskCenterPetProfileInlineInputBuilder {
         var gender = Pet.canonicalSex(pet.gender) ?? pet.gender
         var coatColor = pet.coatColor
         var personalityTagIDs = pet.personalityTagIdList
+        var contactName = pet.vetDoctorName
+        var contactPhone = pet.vetContact
         var foodBrand = pet.foodBrand
         var dailyPortionGrams: Double? = pet.dailyPortionGrams > 0
             ? pet.dailyPortionGrams
@@ -128,6 +143,9 @@ enum TaskCenterPetProfileInlineInputBuilder {
         case let .dailyCare(nextFoodBrand, nextDailyPortionGrams):
             foodBrand = nextFoodBrand
             dailyPortionGrams = nextDailyPortionGrams ?? 0
+        case let .emergencyContact(name, phone):
+            contactName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            contactPhone = phone.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         return PetProfileCommandInput(
@@ -144,9 +162,9 @@ enum TaskCenterPetProfileInlineInputBuilder {
             notes: pet.notes,
             coatColor: coatColor,
             microchipID: pet.microchipID,
-            vetContact: pet.vetContact,
+            vetContact: contactPhone,
             vetClinicName: pet.vetClinicName,
-            vetDoctorName: pet.vetDoctorName,
+            vetDoctorName: contactName,
             vetAddress: pet.vetAddress,
             allergies: pet.allergies,
             passportNumber: pet.passportNumber,
@@ -166,6 +184,10 @@ enum TaskCenterPetProfileInlineInputBuilder {
         _ checkpoint: HouseholdStarterJourneyCheckpoint,
         by pet: Pet
     ) -> Bool {
+        if checkpoint == .petEmergencyContact {
+            return !pet.vetDoctorName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !pet.vetContact.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
         let category: MemberProfileCompletionCategory? = switch checkpoint {
         case .petLifeStage: .petLifeStage
         case .petBodyProfile: .petBodyProfile
@@ -180,6 +202,8 @@ enum TaskCenterPetProfileInlineInputBuilder {
 
 struct TaskCenterPetProfileInlineEditor: View {
     private enum FocusedField: Hashable {
+        case contactName
+        case contactPhone
         case coatColor
         case foodBrand
         case dailyPortion
@@ -198,6 +222,8 @@ struct TaskCenterPetProfileInlineEditor: View {
     @State private var gender: String
     @State private var coatColor: String
     @State private var primaryTagID: String
+    @State private var contactName: String
+    @State private var contactPhone: String
     @State private var foodBrand: String
     @State private var dailyPortionText: String
     @State private var isSaving = false
@@ -222,6 +248,8 @@ struct TaskCenterPetProfileInlineEditor: View {
         _gender = State(initialValue: Pet.canonicalSex(pet.gender) ?? "")
         _coatColor = State(initialValue: pet.coatColor)
         _primaryTagID = State(initialValue: pet.personalityTagIdList.first ?? "")
+        _contactName = State(initialValue: pet.vetDoctorName)
+        _contactPhone = State(initialValue: pet.vetContact)
         _foodBrand = State(initialValue: pet.foodBrand)
         _dailyPortionText = State(
             initialValue: pet.dailyPortionGrams > 0 && pet.dailyPortionGrams.isFinite
@@ -277,6 +305,8 @@ struct TaskCenterPetProfileInlineEditor: View {
             personalityEditor
         case .petDailyCare:
             dailyCareEditor
+        case .petEmergencyContact:
+            emergencyContactEditor
         default:
             EmptyView()
         }
@@ -427,6 +457,22 @@ struct TaskCenterPetProfileInlineEditor: View {
         }
     }
 
+    private var emergencyContactEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            TextField(TaskCenterPetProfileInlineCopy.contactName(l), text: $contactName)
+                .textContentType(.name)
+                .ohanaRoundedTextFieldStyle()
+                .focused($focusedField, equals: .contactName)
+                .accessibilityIdentifier("task-center-pet-profile-inline-contact-name")
+            TextField(TaskCenterPetProfileInlineCopy.contactPhone(l), text: $contactPhone)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+                .ohanaRoundedTextFieldStyle()
+                .focused($focusedField, equals: .contactPhone)
+                .accessibilityIdentifier("task-center-pet-profile-inline-contact-phone")
+        }
+    }
+
     private var dailyCareEditor: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField(
@@ -533,6 +579,12 @@ struct TaskCenterPetProfileInlineEditor: View {
             guard !normalizedBrand.isEmpty || portion != nil else { return nil }
             guard normalizedBrand != currentBrand || portion != currentPortion else { return nil }
             return .dailyCare(foodBrand: normalizedBrand, dailyPortionGrams: portion)
+        case .petEmergencyContact:
+            let name = contactName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let phone = contactPhone.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, !phone.isEmpty,
+                  name != pet.vetDoctorName || phone != pet.vetContact else { return nil }
+            return .emergencyContact(name: name, phone: phone)
         default:
             return nil
         }

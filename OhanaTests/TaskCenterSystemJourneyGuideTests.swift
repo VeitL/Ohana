@@ -47,6 +47,26 @@ struct TaskCenterSystemJourneyGuideTests {
     }
 
     @Test @MainActor
+    func emergencyContactUsesTheProfileCommandAndPreservesOtherFacts() throws {
+        let container = try ModelContainer(for: Schema(ArkSchemaV99.models), configurations: [ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)])
+        let context = container.mainContext
+        let pet = Pet(name: "Mochi", species: "cat")
+        pet.vetClinicName = "Existing clinic"
+        pet.microchipID = "chip-1"
+        context.insert(pet)
+        try context.save()
+        let input = TaskCenterPetProfileInlineInputBuilder.input(for: pet, applying: .emergencyContact(name: " Alex ", phone: " +49 123 "))
+        #expect(input.vetDoctorName == "Alex")
+        #expect(input.vetContact == "+49 123")
+        #expect(input.microchipID == "chip-1")
+        #expect(input.vetClinicName == "Existing clinic")
+        #expect(!TaskCenterPetProfileInlineInputBuilder.isSatisfied(.petEmergencyContact, by: pet))
+        let result = MemberProfileCommandService.updatePet(pet, input: input, context: context)
+        #expect(result.didPersist)
+        #expect(TaskCenterPetProfileInlineInputBuilder.isSatisfied(.petEmergencyContact, by: pet))
+    }
+
+    @Test @MainActor
     func inlinePetDatesPreserveEveryUnrelatedProfileField() {
         let originalBirthday = Date(timeIntervalSince1970: 1_000_000)
         let nextHomeDate = Date(timeIntervalSince1970: 3_000_000)
@@ -320,7 +340,7 @@ struct TaskCenterSystemJourneyGuideTests {
             .petPersonalityAppearance: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .petDailyCare: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .petIdentityDocuments: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
-            .petEmergencyContact: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
+            .petEmergencyContact: [.preferNotToSay],
             .petHealthProtection: [.reviewed, .unknown, .notApplicable, .preferNotToSay],
             .acceptedRecommendedCarePlan: []
         ]

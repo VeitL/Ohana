@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -64,7 +64,7 @@ case "${scenario}" in
       OhanaUITests/OhanaUITests/testPetDailyCareNotApplicableThenRealSetupSupersedesResolutionAcrossRelaunch
       OhanaUITests/OhanaUITests/testPetDailyCareUnknownCancelThenRealSetupSurvivesRelaunchWithoutFabricationAndRewardsOnce
       OhanaUITests/OhanaUITests/testPetIdentityNotApplicableResumesThenEmergencyContactSaveCompletes
-      OhanaUITests/OhanaUITests/testPetIdentityPrivateDocumentsAndUnknownEmergencyPersistAcrossRelaunchWithoutFabricationAndRewardsOnce
+      OhanaUITests/OhanaUITests/testPetIdentityPrivateDocumentsAndPrivateEmergencyPersistAcrossRelaunchWithoutFabricationAndRewardsOnce
       OhanaUITests/OhanaUITests/testPetProfileReviewedThenRealAnswersPersistAcrossRelaunch
       OhanaUITests/OhanaUITests/testStarterPreventiveHealthPrivateAnswerSurvivesRelaunchWithoutFabricatedRecordAndRewardsOnce
     )
@@ -102,6 +102,11 @@ case "${scenario}" in
   zen-private)
     selectors=(
       OhanaUITests/OhanaUITests/testMemberCardPrivateAppearanceSurvivesRelaunchAndZenRoundTrip
+    )
+    ;;
+  plant-reminder)
+    selectors=(
+      OhanaUITests/PlantModuleUITests/testDiagnosticPlantReminderRoundTripWithTouchTrace
     )
     ;;
   *)

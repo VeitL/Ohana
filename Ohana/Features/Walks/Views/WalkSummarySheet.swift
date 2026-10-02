@@ -10,6 +10,7 @@ import SwiftUI
 
 struct WalkSummarySheet: View {
     let pet: Pet
+    @Query private var walkers: [Human]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
@@ -27,6 +28,12 @@ struct WalkSummarySheet: View {
     private let weeklyGoalStepKm: Double = 0.5
     private let weeklyGoalMaxKm: Double = 100
     private var l: L10n { L10n(appLanguage) }
+
+    init(pet: Pet) {
+        self.pet = pet
+        let executorIds = WalkFeaturePolicy.activeWalkLogs(for: pet).flatMap(\.executorIds)
+        _walkers = Query(WalkExecutorDisplay.descriptor(for: executorIds))
+    }
 
     private var activeWalks: [PetWalkLog] {
         WalkFeaturePolicy.activeWalkLogs(for: pet)
@@ -463,7 +470,8 @@ struct WalkSummarySheet: View {
 
     // MARK: - Walk List
     private var walkListSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let namesByID = Dictionary(uniqueKeysWithValues: walkers.map { ($0.id, $0.name) })
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "历史记录", en: "History", de: "Verlauf"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -479,7 +487,7 @@ struct WalkSummarySheet: View {
 
             ForEach(Array(sortedWalks.enumerated()), id: \.element.id) { index, walk in
                 Button { selectedWalk = walk } label: {
-                    walkRow(walk)
+                    walkRow(walk, executorNames: WalkExecutorDisplay.names(for: walk.executorIds, namesByID: namesByID, l: l))
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("walk-summary-row-\(walk.id.uuidString)")
@@ -500,7 +508,7 @@ struct WalkSummarySheet: View {
         }
     }
 
-    private func walkRow(_ walk: PetWalkLog) -> some View {
+    private func walkRow(_ walk: PetWalkLog, executorNames: String) -> some View {
         HStack(spacing: 0) {
             routeArtwork(for: walk)
                 .frame(width: 132, height: 104)
@@ -526,6 +534,12 @@ struct WalkSummarySheet: View {
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
+
+                Label(executorNames, systemImage: "person.fill")
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel("\(WalkExecutorDisplay.title(l)): \(executorNames)")
 
                 HStack(spacing: 12) {
                     compactMetric(icon: "arrow.left.and.right", text: walk.distanceText)
@@ -556,7 +570,7 @@ struct WalkSummarySheet: View {
             .padding(.leading, 14)
             .padding(.trailing, 14)
         }
-        .frame(height: 104)
+        .frame(minHeight: 104)
         .goTranslucentCard(cornerRadius: OhanaRadius.input)
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))

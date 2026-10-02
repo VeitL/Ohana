@@ -21,6 +21,64 @@ final class CoconutWalletServiceTests: XCTestCase {
         XCTAssertTrue(ArkMigrationPlan.stages.isEmpty)
     }
 
+    #if DEBUG
+    func testDeveloperAdjustmentSurvivesReplayAndSpendingWithoutCareRewards() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let human = Human(name: "Owner")
+        let pet = Pet(name: "Mochi")
+        context.insert(human)
+        context.insert(pet)
+        // Reproduce a previously unlogged override: applying the same preset
+        // must repair the ledger even when the cached balance already matches.
+        human.coconutBalance = 5000
+        context.insert(CoconutAccount(
+            accountKey: CoconutAccountKey.human(human.id), ownerKind: .human,
+            ownerId: human.id.uuidString, displayName: human.name, balance: 5000
+        ))
+        try context.save()
+        try CoconutWalletService.setDeveloperOverrideBalance(
+            amount: 5000, for: human, displayName: human.name, context: context
+        )
+        try CoconutWalletService.setDeveloperOverrideBalance(
+            amount: 200, for: pet, displayName: pet.name, context: context
+        )
+        try context.save()
+        let entries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
+        XCTAssertEqual(entries.count, 2)
+        XCTAssertTrue(entries.allSatisfy { $0.entryKind == .adjustment && $0.careLedgerEventId == nil })
+
+        try CoconutWalletService.apply(
+            deltas: [.human(human, delta: -10, entryKind: .spend, source: .oasis, title: "Energy")],
+            context: context, save: true, postsRewardFeedback: false, updatesProjection: false
+        )
+        let coldContext = ModelContext(container)
+        CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: coldContext)
+        XCTAssertEqual(CoconutWalletService.balance(accountKey: CoconutAccountKey.human(human.id), context: coldContext), 4990)
+        XCTAssertEqual(CoconutWalletService.balance(accountKey: CoconutAccountKey.pet(pet.id), context: coldContext), 200)
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: coldContext), 5190)
+
+        try CoconutWalletService.setDeveloperOverrideBalance(
+            amount: 5000, for: human, displayName: human.name, context: context
+        )
+        try context.save()
+        let count = try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>())
+        try CoconutWalletService.setDeveloperOverrideBalance(
+            amount: 5000, for: human, displayName: human.name, context: context
+        )
+        try context.save()
+        XCTAssertEqual(try context.fetchCount(FetchDescriptor<CoconutLedgerEntry>()), count)
+        try CoconutWalletService.setDeveloperOverrideBalance(
+            amount: 0, for: human, displayName: human.name, context: context
+        )
+        try context.save()
+        let finalContext = ModelContext(container)
+        CoconutWalletService.reconcileFormalAccountBalancesWithLedger(context: finalContext)
+        XCTAssertEqual(CoconutWalletService.balance(accountKey: CoconutAccountKey.human(human.id), context: finalContext), 0)
+        XCTAssertEqual(CoconutWalletService.totalBalance(context: finalContext), 200)
+    }
+    #endif
+
     func testBootstrapCreatesAccountsAndImportsLegacyHistoryWithoutDoubleCounting() throws {
         let container = try makeContainer()
         let context = ModelContext(container)

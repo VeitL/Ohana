@@ -482,6 +482,7 @@ struct VerticalSolidHomeDataContainer: View {
 
         pendingForcedRefresh = HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
             snapshotIsReady: readModelStore.payload.snapshot.isReady,
+            refreshIsPending: readModelStore.hasPendingRefresh,
             wasPending: pendingForcedRefresh
         )
         refreshKeyStateTask?.cancel()
@@ -496,6 +497,7 @@ struct VerticalSolidHomeDataContainer: View {
         guard allowsRefresh else {
             pendingForcedRefresh = HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
                 snapshotIsReady: readModelStore.payload.snapshot.isReady,
+                refreshIsPending: readModelStore.hasPendingRefresh,
                 wasPending: pendingForcedRefresh
             )
             refreshKeyStateTask?.cancel()
@@ -549,9 +551,10 @@ nonisolated enum HomeSurfaceRefreshPolicy {
 
     static func pendingForcedRefreshAfterSuspension(
         snapshotIsReady: Bool,
+        refreshIsPending: Bool = false,
         wasPending: Bool
     ) -> Bool {
-        wasPending || !snapshotIsReady
+        wasPending || !snapshotIsReady || refreshIsPending
     }
 
     static func pendingForcedRefreshAfterSuppressedRequest(
