@@ -102,12 +102,10 @@ scan_rule \
   "Icon-only Button needs a VoiceOver label." \
   ".accessibilityLabel(...) on the button (localized via L10n)"
 
-# 2. decorative-looking images with no explicit a11y treatment nearby in line.
-scan_rule \
-  "image-needs-label-or-hidden" \
-  'Image\(systemName:\s*"[^"]+"\)(?!.*(accessibilityLabel|accessibilityHidden|labelStyle))' \
-  "Standalone SF Symbol should be labeled or hidden for VoiceOver." \
-  ".accessibilityLabel(...) for meaningful icons, or .accessibilityHidden(true) for purely decorative"
+# 2. Inspect the image's own modifier chain, including multiline Swift. A
+#    sibling's label or a comment must not hide an untreated symbol. Let read
+#    and parser failures fail the audit instead of silently reporting success.
+python3 scripts/audit-sf-symbol-accessibility.py "${files[@]}" >> "$warnings_file"
 
 # 3. Hardcoded tiny tap targets below the 44pt minimum.
 scan_rule \

@@ -6,7 +6,7 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct AppWorkloadPolicyTests {
-    @Test func thermalStateDowngradesRuntimeBudgets() async {
+    @Test func thermalStateDowngradesRuntimeBudgets() async throws {
         let notificationCenter = NotificationCenter()
         let thermalState = ThermalStateProbe()
         let policy = AppWorkloadPolicy(
@@ -24,8 +24,7 @@ struct AppWorkloadPolicyTests {
 
         thermalState.value = .fair
         notificationCenter.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait { policy.thermalState == .fair })
         #expect(policy.thermalState == .fair)
         #expect(policy.interactionMotionBudget() == .full)
         #expect(policy.ambientMotionBudget() == .full)
@@ -33,8 +32,7 @@ struct AppWorkloadPolicyTests {
 
         thermalState.value = .serious
         notificationCenter.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait { policy.thermalState == .serious })
         #expect(policy.thermalState == .serious)
         #expect(policy.interactionMotionBudget() == .efficient)
         #expect(policy.ambientMotionBudget() == .efficient)
@@ -42,8 +40,7 @@ struct AppWorkloadPolicyTests {
 
         thermalState.value = .critical
         notificationCenter.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait { policy.thermalState == .critical })
         #expect(policy.thermalState == .critical)
         #expect(policy.interactionMotionBudget() == .efficient)
         #expect(policy.ambientMotionBudget() == .static)

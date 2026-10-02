@@ -7,7 +7,13 @@ import Testing
 @Suite(.serialized)
 struct ExecutorPickerBarTests {
     @Test func emptyHumansRenderNoPickerChrome() {
-        UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let previous { defaults.set(previous, forKey: "currentActiveHumanId") }
+            else { defaults.removeObject(forKey: "currentActiveHumanId") }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
 
         let host = UIHostingController(rootView: ExecutorPickerBar(humans: []))
         let size = host.sizeThatFits(in: CGSize(width: 320, height: 80))
@@ -17,7 +23,13 @@ struct ExecutorPickerBarTests {
     }
 
     @Test func multipleHumansRenderPickerChrome() {
-        UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: "currentActiveHumanId")
+        defer {
+            if let previous { defaults.set(previous, forKey: "currentActiveHumanId") }
+            else { defaults.removeObject(forKey: "currentActiveHumanId") }
+        }
+        defaults.removeObject(forKey: "currentActiveHumanId")
 
         let host = UIHostingController(
             rootView: ExecutorPickerBar(

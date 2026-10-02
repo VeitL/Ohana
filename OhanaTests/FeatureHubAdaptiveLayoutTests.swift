@@ -116,7 +116,7 @@ struct FeatureHubAdaptiveLayoutTests {
         #expect(routeSource.contains("HumanAllFeaturesSheet("))
         #expect(routeSource.contains("HumanAllFeaturesRouteData.load"))
         #expect(homeRouteSource.contains("actions.showHumanAllFeatures"))
-        #expect(!sourceTreeContains("ExpandedHumanFeatures", rootURL: rootURL))
+        #expect(try sourceTreeContains("ExpandedHumanFeatures", rootURL: rootURL) == false)
         #expect(!fileExists("Ohana/Features/Members/ExpandedHumanFeaturesDataContainer.swift", rootURL: rootURL))
         #expect(!fileExists("Ohana/Features/Members/Views/ExpandedHumanFeaturesSheet.swift", rootURL: rootURL))
     }
@@ -139,27 +139,35 @@ struct FeatureHubAdaptiveLayoutTests {
         FileManager.default.fileExists(atPath: rootURL.appending(path: path).path)
     }
 
-    private func sourceTreeContains(_ needle: String, rootURL: URL) -> Bool {
+    private func sourceTreeContains(_ needle: String, rootURL: URL) throws -> Bool {
         let roots = [
             rootURL.appending(path: "Ohana"),
             rootURL.appending(path: "OhanaTests")
         ]
         for root in roots {
+            var enumerationError: Error?
             guard let enumerator = FileManager.default.enumerator(
                 at: root,
                 includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
-            ) else { continue }
+                options: [.skipsHiddenFiles, .skipsPackageDescendants],
+                errorHandler: { _, error in
+                    enumerationError = error
+                    return false
+                }
+            ) else {
+                throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: root.path])
+            }
 
             for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
                 guard fileURL.lastPathComponent != "FeatureHubAdaptiveLayoutTests.swift" else {
                     continue
                 }
-                if let source = try? String(contentsOf: fileURL, encoding: .utf8),
-                   source.contains(needle) {
+                let source = try String(contentsOf: fileURL, encoding: .utf8)
+                if source.contains(needle) {
                     return true
                 }
             }
+            if let enumerationError { throw enumerationError }
         }
         return false
     }

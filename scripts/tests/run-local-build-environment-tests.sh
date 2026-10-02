@@ -31,11 +31,17 @@ cat > "${fake_bin}/xcrun" <<'SH'
 #!/usr/bin/env bash
 if [[ "$*" == "simctl list devices available -j" ]]; then
   test_state="${FAKE_TEST_SIMULATOR_STATE:-Shutdown}"
+  newer_test_device=''
+  if [[ "${FAKE_INCLUDE_IOS27_TESTS:-0}" == "1" ]]; then
+    newer_test_device='{"name":"iPhone 17 Tests","udid":"TEST-IOS27-UDID","state":"Shutdown","isAvailable":true}'
+  fi
   cat <<JSON
 {"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-26-5":[
   {"name":"iPhone 17 Dogfood","udid":"DOGFOOD-UDID","state":"Shutdown","isAvailable":true},
   {"name":"iPhone 17 Tests","udid":"TEST-UDID","state":"${test_state}","isAvailable":true},
   {"name":"iPhone 16","udid":"OTHER-UDID","state":"Shutdown","isAvailable":true}
+],"com.apple.CoreSimulator.SimRuntime.iOS-27-0":[
+  ${newer_test_device}
 ]}}
 JSON
   exit 0
@@ -94,6 +100,14 @@ export PATH="${fake_bin}:${PATH}"
 source "${repo_root}/scripts/lib/local-build-environment.sh"
 # shellcheck source=scripts/lib/xcode-storage-lifecycle.sh
 source "${repo_root}/scripts/lib/xcode-storage-lifecycle.sh"
+
+[[ "$(FAKE_INCLUDE_IOS27_TESTS=1 ohana_resolve_simulator_by_name 'iPhone 17 Tests')" == "TEST-IOS27-UDID" ]] || \
+  fail "default test selection did not choose the latest available runtime"
+[[ "$(FAKE_INCLUDE_IOS27_TESTS=1 ohana_resolve_simulator_by_name 'iPhone 17 Tests' '26.5')" == "TEST-UDID" ]] || \
+  fail "explicit iOS 26.5 selection was ignored when iOS 27 also exists"
+if ohana_resolve_simulator_by_name 'iPhone 17 Tests' '26.4' >/dev/null 2>&1; then
+  fail "missing explicit runtime silently fell back to another runtime"
+fi
 
 expected_cache_root="${fake_home}/Library/Developer/Xcode/OhanaLocalBuild/Ohana-${OHANA_LOCAL_BUILD_CACHE_ID}"
 [[ "${OHANA_LOCAL_BUILD_CACHE_ROOT}" == "${expected_cache_root}" ]] || \

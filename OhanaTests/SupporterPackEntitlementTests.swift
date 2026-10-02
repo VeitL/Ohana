@@ -220,9 +220,7 @@ struct SupporterPackEntitlementTests {
             expirationDate: .distantFuture
         )
         await storefront.sendUpdate(.verified(revokedMonthly))
-        await waitUntil {
-            !service.activePersonalProductIDs.contains(SupporterPackCatalog.personalMonthlyProductID)
-        }
+        await waitForUpdateConsumption(2, storefront: storefront)
 
         #expect(service.hasPersonalEntitlement)
         #expect(service.activePersonalPurchaseChoices == [.lifetime])
@@ -377,7 +375,7 @@ struct SupporterPackEntitlementTests {
         #expect(service.isPurchasePending)
 
         await storefront.sendUpdate(.verified(activeTransaction(id: 15)))
-        await waitUntil { service.hasSupporterPack }
+        await waitForUpdateConsumption(2, storefront: storefront)
 
         #expect(service.hasSupporterPack)
         #expect(service.entitlementStatus == .ownedVerified)
@@ -394,11 +392,8 @@ struct SupporterPackEntitlementTests {
         await storefront.setOffline(true)
 
         await storefront.sendUpdate(.verified(activeTransaction(id: 16)))
-        let failedRefreshWasAttempted = await waitUntilAsync {
-            await storefront.entitlementInvocationCount() > entitlementCallsBeforeUpdate
-        }
-
-        #expect(failedRefreshWasAttempted)
+        await waitForUpdateConsumption(2, storefront: storefront)
+        #expect(await storefront.entitlementInvocationCount() > entitlementCallsBeforeUpdate)
         #expect(!service.hasSupporterPack)
         #expect(service.entitlementStatus == .temporarilyUnknown)
         #expect(!cache.cachedSupporterPackEntitlement())
@@ -406,7 +401,7 @@ struct SupporterPackEntitlementTests {
 
         await storefront.setOffline(false)
         await storefront.sendUpdate(.verified(activeTransaction(id: 16)))
-        await waitUntil { service.hasSupporterPack }
+        await waitForUpdateConsumption(3, storefront: storefront)
 
         #expect(service.hasSupporterPack)
         #expect(service.entitlementStatus == .ownedVerified)
@@ -423,16 +418,19 @@ struct SupporterPackEntitlementTests {
         await storefront.sendUpdate(.unverified(
             productID: SupporterPackCatalog.personalLifetimeProductID
         ))
-        for _ in 0 ..< 20 {
-            await Task.yield()
+        // A second next() request proves the listener finished handling the
+        // unverified update. Observing an unchanged false value alone cannot.
+        let unverifiedUpdateWasHandled = await waitUntilAsync {
+            await storefront.updateIteratorRequestCount() >= 2
         }
+        #expect(unverifiedUpdateWasHandled)
 
         #expect(!service.hasSupporterPack)
         #expect(!cache.cachedSupporterPackEntitlement())
         #expect(await storefront.finishedTransactionIDs().isEmpty)
 
         await storefront.sendUpdate(.verified(activeTransaction(id: 17)))
-        await waitUntil { service.hasSupporterPack }
+        await waitForUpdateConsumption(3, storefront: storefront)
 
         #expect(service.hasSupporterPack)
         #expect(cache.cachedSupporterPackEntitlement())
@@ -459,7 +457,7 @@ struct SupporterPackEntitlementTests {
             revocationDate: Date(timeIntervalSince1970: 1000)
         )
         await storefront.sendUpdate(.verified(revoked))
-        await waitUntil { !service.hasSupporterPack }
+        await waitForUpdateConsumption(2, storefront: storefront)
 
         #expect(!service.hasSupporterPack)
         #expect(service.entitlementStatus == .notOwnedVerified)
@@ -755,19 +753,21 @@ struct SupporterPackEntitlementTests {
         )
     }
 
-    private func waitUntil(_ condition: @MainActor () -> Bool) async {
-        for _ in 0 ..< 50 {
-            if condition() { return }
-            await Task.yield()
-        }
+    private func waitForUpdateConsumption(_ requestCount: Int, storefront: TestCommerceStorefront) async {
+        #expect(await waitUntilAsync { await storefront.updateIteratorRequestCount() >= requestCount })
     }
 
     private func waitUntilAsync(_ condition: () async -> Bool) async -> Bool {
-        for _ in 0 ..< 300 {
-            if await condition() { return true }
-            try? await Task.sleep(nanoseconds: 10_000_000)
+        let deadline = ContinuousClock.now.advanced(by: .seconds(3))
+        while await !condition() {
+            guard !Task.isCancelled, ContinuousClock.now < deadline else { return false }
+            do {
+                try await Task.sleep(for: .milliseconds(10))
+            } catch {
+                return false
+            }
         }
-        return await condition()
+        return true
     }
 }
 
@@ -824,7 +824,8 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
     private var familyDisplayPrice = "$39.99"
     private let storefrontUpdateStream: AsyncStream<Void>
     private let storefrontUpdateContinuation: AsyncStream<Void>.Continuation
-    private let updateStream: AsyncStream<CommerceStorefrontVerification>
+    private var updateIterator: AsyncStream<CommerceStorefrontVerification>.Iterator
+    private var updateIteratorRequests = 0
     private let updateContinuation: AsyncStream<CommerceStorefrontVerification>.Continuation
 
     init() {
@@ -832,7 +833,7 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
         storefrontUpdateStream = storefrontStream.stream
         storefrontUpdateContinuation = storefrontStream.continuation
         let stream = AsyncStream<CommerceStorefrontVerification>.makeStream()
-        updateStream = stream.stream
+        updateIterator = stream.stream.makeAsyncIterator()
         updateContinuation = stream.continuation
     }
 
@@ -915,7 +916,19 @@ private actor TestCommerceStorefront: CommerceStorefrontClient {
     }
 
     func transactionUpdates() async -> AsyncStream<CommerceStorefrontVerification> {
-        updateStream
+        AsyncStream(unfolding: { await self.nextUpdate() })
+    }
+
+    private func nextUpdate() async -> CommerceStorefrontVerification? {
+        updateIteratorRequests += 1
+        var iterator = updateIterator
+        let update = await iterator.next(isolation: self)
+        updateIterator = iterator
+        return update
+    }
+
+    func updateIteratorRequestCount() -> Int {
+        updateIteratorRequests
     }
 
     func finish(transactionID: UInt64) async {

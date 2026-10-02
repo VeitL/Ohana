@@ -49,8 +49,9 @@ struct OasisCritterDailyWishTests {
             sourceLevel: 10
         )
         let human = Human(name: "Ava")
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
         context.insert(human)
         context.insert(critter)
         try context.save()
@@ -82,8 +83,9 @@ struct OasisCritterDailyWishTests {
         let critter = makeCritter(hunger: 98, mood: 80, health: 80)
         let human = Human(name: "Ava")
         human.coconutBalance = 20
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
         context.insert(human)
         context.insert(critter)
         context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .feed, noteZh: "早饭", noteEn: "Breakfast", noteDe: "Frühstück"))
@@ -114,8 +116,9 @@ struct OasisCritterDailyWishTests {
         let critter = makeCritter()
         let human = Human(name: "Ava")
         human.coconutBalance = 1
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
         context.insert(human)
         context.insert(critter)
         try context.save()
@@ -144,8 +147,9 @@ struct OasisCritterDailyWishTests {
         let critter = makeCritter(hunger: 40, mood: 80, health: 80)
         let human = Human(name: "Ava")
         human.coconutBalance = 100
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
         context.insert(human)
         context.insert(critter)
         context.insert(OasisCritterActionLog(critterId: critter.id, critterCatalogId: critter.catalogId, action: .feed, noteZh: "早饭", noteEn: "Breakfast", noteDe: "Frühstück"))
@@ -493,6 +497,8 @@ struct OasisCritterDailyWishTests {
         context.insert(OasisCritterFragmentBalance(catalogId: critter.catalogId, amount: 400))
         let human = Human(name: "Ava")
         human.coconutBalance = 1000
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
         context.insert(human)
 
@@ -583,8 +589,9 @@ struct OasisCritterDailyWishTests {
         let fragments = OasisCritterFragmentBalance(catalogId: critter.catalogId, amount: 999)
         let human = Human(name: "Ava")
         human.coconutBalance = 999
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
         context.insert(critter)
         context.insert(fragments)
         context.insert(human)
@@ -612,8 +619,9 @@ struct OasisCritterDailyWishTests {
         )
         let human = Human(name: "Ava")
         human.coconutBalance = 40
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
         context.insert(critter)
         context.insert(specific)
         context.insert(stardust)

@@ -10,7 +10,6 @@ import SwiftUI
 
 struct WalkSummarySheet: View {
     let pet: Pet
-    @Query private var walkers: [Human]
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @Environment(\.dismiss) private var dismiss
@@ -28,12 +27,6 @@ struct WalkSummarySheet: View {
     private let weeklyGoalStepKm: Double = 0.5
     private let weeklyGoalMaxKm: Double = 100
     private var l: L10n { L10n(appLanguage) }
-
-    init(pet: Pet) {
-        self.pet = pet
-        let executorIds = WalkFeaturePolicy.activeWalkLogs(for: pet).flatMap(\.executorIds)
-        _walkers = Query(WalkExecutorDisplay.descriptor(for: executorIds))
-    }
 
     private var activeWalks: [PetWalkLog] {
         WalkFeaturePolicy.activeWalkLogs(for: pet)
@@ -95,7 +88,9 @@ struct WalkSummarySheet: View {
                         summaryCard
 
                         // 记录列表
-                        walkListSection
+                        WalkExecutorNamesDataContainer(executorIds: activeWalks.flatMap(\.executorIds)) { namesByID in
+                            walkListSection(namesByID: namesByID)
+                        }
 
                         Spacer(minLength: 40)
                     }
@@ -469,9 +464,8 @@ struct WalkSummarySheet: View {
     }
 
     // MARK: - Walk List
-    private var walkListSection: some View {
-        let namesByID = Dictionary(uniqueKeysWithValues: walkers.map { ($0.id, $0.name) })
-        return VStack(alignment: .leading, spacing: 12) {
+    private func walkListSection(namesByID: [UUID: String]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "历史记录", en: "History", de: "Verlauf"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup

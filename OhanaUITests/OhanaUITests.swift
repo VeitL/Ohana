@@ -25,7 +25,23 @@ final class OhanaUITests: XCTestCase {
             UITestInteraction.captureFailureSnapshot()
             // Preserve the failure first, then contain this known system overlay
             // so the next independent journey can reach its own initial screen.
-            respondToPendingOhanaLocationAuthorization(timeout: 0)
+            UITestInteraction.respondToPendingAuthorization(assertDismissal: false)
+        }
+    }
+
+    @MainActor
+    func testDiagnosticAuthorizationMatcherRejectsUnrelatedPrompts() {
+        XCTAssertEqual(UITestInteraction.authorizationKind(text: "“Ohana” Would Like to Send You Notifications"), .notifications)
+        XCTAssertEqual(UITestInteraction.authorizationKind(text: "„Ohana“ möchte dir Mitteilungen senden"), .notifications)
+        XCTAssertEqual(UITestInteraction.authorizationKind(text: "“Ohana”想给您发送通知"), .notifications)
+        XCTAssertEqual(UITestInteraction.authorizationKind(text: "\"Ohana\" Would Like to Use Your Location"), .location)
+        for text in [
+            "“Another App” Would Like to Send You Notifications",
+            "“Ohana Companion” Would Like to Send You Notifications",
+            "“Ohana” Would Like to Access Your Photos",
+            "Delete notifications?", ""
+        ] {
+            XCTAssertNil(UITestInteraction.authorizationKind(text: text), "An unrelated prompt was accepted: \(text)")
         }
     }
 
@@ -6003,6 +6019,11 @@ final class OhanaUITests: XCTestCase {
         scrollToElement(enableAll, in: app, maxSwipes: 6)
         tapWhenHittable(enableAll, timeout: 8)
         XCTAssertTrue(waitUntil(timeout: 8) { categorySummary.label == "All on" })
+        for group in ["medication", "calendar", "feeding", "hygiene", "plantCare", "checkIn"] {
+            let toggle = app.switches.matching(identifier: "settings-notification-\(group)-toggle").firstMatch
+            scrollToElement(toggle, in: app, maxSwipes: 6)
+            XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(toggle) == true }, "Bulk on did not enable \(group).")
+        }
 
         let plantToggle = app.switches.matching(identifier: "settings-notification-plantCare-toggle").firstMatch
         XCTAssertTrue(setToggle(plantToggle, enabled: false, in: app))
@@ -6035,6 +6056,11 @@ final class OhanaUITests: XCTestCase {
         openSettingsFromHomeChrome(in: app)
         openSettingsCategory("settings-destination-notifications", in: app)
         XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(medicationToggle) == false }, "Category preference did not survive cold launch.")
+        for group in ["calendar", "feeding", "hygiene", "plantCare", "checkIn"] {
+            let toggle = app.switches.matching(identifier: "settings-notification-\(group)-toggle").firstMatch
+            scrollToElement(toggle, in: app, maxSwipes: 6)
+            XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(toggle) == true }, "Changing Medication altered \(group) after cold launch.")
+        }
         let categoriesScreenshot = XCTAttachment(screenshot: app.screenshot())
         categoriesScreenshot.name = "Notification categories final after cold launch"
         categoriesScreenshot.lifetime = .keepAlways
@@ -7221,7 +7247,7 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     func testFeedingManualPlanAndHomeQuickActionSmoke() throws {
         let app = launchEnglishApp(enableProductionOverlays: true)
-        createFirstHuman(from: app)
+        let humanName = createFirstHuman(from: app)
         let petName = "Codex Feed Pet \(Int(Date().timeIntervalSince1970))"
         completeFirstDayStarterFunnel(
             in: app,
@@ -7236,13 +7262,24 @@ final class OhanaUITests: XCTestCase {
         performHomeFeedQuickCheckIn(in: app, petName: petName, expectsAntiRepeatConfirmation: false)
         performHomeFeedQuickCheckIn(in: app, petName: petName, expectsAntiRepeatConfirmation: true)
 
-        openFeedDetailFromHome(in: app, petName: petName, usingDetailMenuWhenAvailable: true)
+        openFeedDetailFromHome(in: app, petName: petName)
         saveManualReminderPlan(in: app)
         assertQuickFeedMode(in: app, containsAny: ["Plan", "计划"], timeout: 8)
         assertQuickFeedModeRemainsStable(in: app, containsAny: ["Plan", "计划"], duration: 1.5)
         closeFeedDetailToHome(in: app)
 
-        openFeedDetailFromHome(in: app, petName: petName, usingDetailMenuWhenAvailable: true)
+        openFeedDetailFromHome(in: app, petName: petName)
+        assertQuickFeedMode(in: app, containsAny: ["Plan", "计划"], timeout: 8)
+        closeFeedDetailToHome(in: app)
+
+        app.terminate()
+        app.launchArguments.removeAll {
+            $0 == "-OHANA_RESET_PERSISTENT_STATE" || $0 == "-OHANA_UI_TEST_SEED_HUMAN_BASELINE"
+        }
+        removeLaunchArgumentPair("-OHANA_UI_TEST_HUMAN_BASELINE_NAME", from: &app.launchArguments)
+        app.launch()
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openFeedDetailFromHome(in: app, petName: petName)
         assertQuickFeedMode(in: app, containsAny: ["Plan", "计划"], timeout: 8)
         closeFeedDetailToHome(in: app)
     }
@@ -10293,8 +10330,10 @@ final class OhanaUITests: XCTestCase {
         app.launchArguments += extraLaunchArguments
         app.launchEnvironment["OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"] = "1"
         app.launchEnvironment.merge(extraLaunchEnvironment) { _, newValue in newValue }
+        UITestInteraction.installAuthorizationMonitor(on: self)
+        UITestInteraction.respondToPendingAuthorization()
         app.launch()
-        respondToPendingOhanaLocationAuthorization(timeout: 0)
+        UITestInteraction.respondToPendingAuthorization()
         chooseInitialExperienceIfNeeded(initialExperienceMode, in: app)
         return app
     }
@@ -12482,15 +12521,17 @@ final class OhanaUITests: XCTestCase {
     @MainActor
     private func openFeedDetailFromHome(
         in app: XCUIApplication,
-        petName: String,
-        usingDetailMenuWhenAvailable: Bool = false
+        petName: String
     ) {
         ensureHomeFeedQuickActionVisible(in: app, petName: petName)
         tapHomeFeedQuickAction(in: app, timeout: 8)
 
         let detailButton = homeQuickActionMenuButton(in: app, actionType: "feed", suffix: "detail")
-        if usingDetailMenuWhenAvailable || detailButton.waitForExistence(timeout: 1.5) {
-            XCTAssertTrue(detailButton.waitForExistence(timeout: 8), "Feed detail menu action did not appear.")
+        XCTAssertTrue(
+            waitUntil(timeout: 12) { detailButton.exists || isQuickFeedHomeVisible(in: app) },
+            "Feed input reached neither its detail destination nor a detail menu action."
+        )
+        if detailButton.exists {
             XCTAssertTrue(
                 tapHomeQuickActionMenuButton(detailButton, in: app, context: "Feed detail"),
                 "Feed detail menu action did not become frame-stable."
@@ -12498,7 +12539,7 @@ final class OhanaUITests: XCTestCase {
         }
 
         XCTAssertTrue(
-            waitForQuickFeedHome(in: app, timeout: 20),
+            waitUntil(timeout: 20) { isQuickFeedHomeVisible(in: app) && !detailButton.exists },
             "Quick Feed detail did not open from the home Feed action."
         )
     }
@@ -12861,11 +12902,12 @@ final class OhanaUITests: XCTestCase {
             waitUntil(timeout: 14) { homeTab.exists && homeTab.isEnabled && homeTab.isHittable },
             "Closing the walk summary did not restore an interactive Home tab."
         )
-        let petCardIsCollapsed = app.buttons["home-card-pet-\(petName)"].exists
-        let petCardIsExpanded = app.buttons["home-expanded-detail-pet"].exists ||
-            app.buttons["home-expanded-collapse-pet"].exists
         XCTAssertTrue(
-            petCardIsCollapsed || petCardIsExpanded,
+            waitUntil(timeout: 14) {
+                app.buttons["home-card-pet-\(petName)"].exists ||
+                    app.buttons["home-expanded-detail-pet"].exists ||
+                    app.buttons["home-expanded-collapse-pet"].exists
+            },
             "Closing the walk summary did not restore the Home pet card."
         )
     }
@@ -13080,6 +13122,7 @@ final class OhanaUITests: XCTestCase {
         let savePlan = app.buttons["quick-feed-plan-save"]
         XCTAssertTrue(savePlan.waitForExistence(timeout: 10), "Manual reminder plan editor did not open.")
         tapWhenHittable(savePlan, timeout: 8)
+        UITestInteraction.respondToPendingAuthorization(kind: .notifications, timeout: 3)
 
         let didSave = waitUntil(timeout: 12) {
             app.state == .runningForeground &&
@@ -13087,27 +13130,22 @@ final class OhanaUITests: XCTestCase {
                 !savePlan.exists
         }
         XCTAssertTrue(didSave, "Manual reminder plan save did not return to the Feed screen.")
-        let successToast = app.descendants(matching: .any)["quick-feed-toast"]
-        XCTAssertTrue(
-            waitUntil(timeout: 8) {
-                successToast.exists && localizedContains(
-                    successToast.label,
-                    anyOf: ["Plan saved", "计划已保存"]
-                )
-            },
-            "Manual reminder plan did not expose the post-persistence success marker."
-        )
+        // The OS permission sheet can outlive transient feedback. The stable
+        // committed mode and the caller's reopen/readback prove this plan save.
+        assertQuickFeedMode(in: app, containsAny: ["Plan", "计划"], timeout: 8)
     }
 
     @MainActor
     private func assertQuickFeedMode(in app: XCUIApplication, containsAny expectedTexts: [String], timeout: TimeInterval) {
         let modeTitle = app.staticTexts["quick-feed-current-mode-title"]
+        var observed: String?
         let didReachMode = waitUntil(timeout: timeout) {
-            modeTitle.exists && expectedTexts.contains { modeTitle.label.contains($0) }
+            observed = (try? modeTitle.snapshot())?.label
+            return observed.map { label in expectedTexts.contains { label.contains($0) } } ?? false
         }
         XCTAssertTrue(
             didReachMode,
-            "Quick Feed mode did not settle on one of \(expectedTexts) promptly. Current: \(modeTitle.label)"
+            "Quick Feed mode did not settle on one of \(expectedTexts) promptly. Current: \(observed ?? "unreadable")"
         )
     }
 
@@ -13118,13 +13156,15 @@ final class OhanaUITests: XCTestCase {
         duration: TimeInterval
     ) {
         let modeTitle = app.staticTexts["quick-feed-current-mode-title"]
-        let deadline = Date().addingTimeInterval(duration)
-        while Date() < deadline {
+        let deadline = ProcessInfo.processInfo.systemUptime + duration
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            let observed = (try? modeTitle.snapshot())?.label
             XCTAssertTrue(
-                modeTitle.exists && expectedTexts.contains { modeTitle.label.contains($0) },
-                "Quick Feed mode changed during the stability window. Current: \(modeTitle.label)"
+                observed.map { label in expectedTexts.contains { label.contains($0) } } ?? false,
+                "Quick Feed mode changed during the stability window. Current: \(observed ?? "unreadable")"
             )
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            let remaining = deadline - ProcessInfo.processInfo.systemUptime
+            if remaining > 0 { RunLoop.current.run(until: Date().addingTimeInterval(min(0.2, remaining))) }
         }
     }
 
@@ -13376,10 +13416,17 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func discardPetBasicInfoChanges(in app: XCUIApplication) {
-        tapWhenHittable(app.buttons["pet-basic-info-cancel-edit-action"], timeout: 8)
+        let cancel = app.buttons["pet-basic-info-cancel-edit-action"]
+        tapWhenHittable(cancel, timeout: 8)
         let discard = app.buttons["pet-basic-info-discard-changes-action"].firstMatch
         XCTAssertTrue(discard.waitForExistence(timeout: 8), "Dirty Pet profile cancel did not ask for confirmation.")
         tapWhenHittable(discard, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 12) {
+                !cancel.exists && app.buttons["pet-basic-info-edit-action"].exists
+            },
+            "Discarding Pet profile changes did not return to the read-only profile."
+        )
     }
 
     @MainActor
@@ -13863,42 +13910,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func allowPendingNotificationAuthorization(in app: XCUIApplication) {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let labels = ["Allow", "Zulassen", "允许"]
-        let appButtons = labels.map { app.alerts.buttons[$0].firstMatch }
-        let springboardButtons = labels.map { springboard.alerts.buttons[$0].firstMatch }
-        let didAppear = waitUntil(timeout: 3) {
-            appButtons.contains(where: \.exists) || springboardButtons.contains(where: \.exists)
-        }
-        guard didAppear else { return }
-        if let button = appButtons.first(where: { $0.exists && $0.isEnabled }) ??
-            springboardButtons.first(where: { $0.exists && $0.isEnabled }) {
-            button.tap()
-        }
+    private func allowPendingNotificationAuthorization(in _: XCUIApplication) {
+        UITestInteraction.respondToPendingAuthorization(kind: .notifications, timeout: 3)
     }
 
     @MainActor
     private func respondToPendingOhanaLocationAuthorization(timeout: TimeInterval) {
-        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        let alert = springboard.alerts.firstMatch
-        let isOhanaLocationPrompt = {
-            guard alert.exists else { return false }
-            let title = alert.label
-            return (title.localizedCaseInsensitiveContains("Ohana") &&
-                    title.localizedCaseInsensitiveContains("location")) ||
-                alert.staticTexts.matching(NSPredicate(
-                    format: "label CONTAINS[c] %@ AND label CONTAINS[c] %@", "Ohana", "location"
-                )).firstMatch.exists
-        }
-        guard waitUntil(timeout: timeout, condition: isOhanaLocationPrompt) else { return }
-        // Answer the real first-use prompt once. Do not alter TCC, choose an
-        // unrelated Allow action, or retry a failed app input behind the alert.
-        let allow = alert.buttons["Allow While Using App"]
-        XCTAssertTrue(allow.exists && allow.isEnabled, "Ohana location prompt did not expose its expected foreground permission choice.")
-        guard allow.exists && allow.isEnabled else { return }
-        allow.tap()
-        XCTAssertTrue(waitUntil(timeout: 8) { !isOhanaLocationPrompt() }, "Ohana location authorization alert stayed open after its single response.")
+        UITestInteraction.respondToPendingAuthorization(kind: .location, timeout: timeout)
     }
 
     @MainActor
@@ -14661,17 +14679,10 @@ final class OhanaUITests: XCTestCase {
         in app: XCUIApplication
     ) -> Bool {
         let button = app.buttons.matching(identifier: identifier).firstMatch
-        // The iOS 26.5 native menu can expose an enabled, visible row while
-        // isHittable stays false. Let XCTest's semantic tap resolve its hit
-        // point instead of rejecting the action before any input is sent.
-        let ready = waitUntil(timeout: 8) {
-            guard let snapshot = try? button.snapshot(), snapshot.isEnabled,
-                  let visibleFrame = UITestInteraction.visibleFrame(
-                      for: snapshot.frame,
-                      in: app.frame
-                  ) else { return false }
-            return visibleFrame.contains(CGPoint(x: snapshot.frame.midX, y: snapshot.frame.midY))
-        }
+        // This identifier belongs to an item in the already-open native menu.
+        // XCTest resolves its activation point. A separate geometry snapshot
+        // can time out even when the enabled row is visible on iOS 26.5.
+        let ready = waitUntil(timeout: 8) { button.exists && button.isEnabled }
         guard ready else {
             UITestInteraction.recordFailure("Native menu item did not become visible and enabled", element: button)
             return false

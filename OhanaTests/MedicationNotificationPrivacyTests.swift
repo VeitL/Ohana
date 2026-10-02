@@ -570,9 +570,7 @@ struct MedicationNotificationPrivacyTests {
         _ expectedCount: Int,
         reminders: PrivacyMutationMedicationReminderSpy
     ) async {
-        for _ in 0 ..< 20 where reminders.refreshCount < expectedCount {
-            await Task.yield()
-        }
+        _ = await TestObservation.wait { reminders.refreshCount >= expectedCount }
         #expect(reminders.refreshCount == expectedCount)
     }
 }

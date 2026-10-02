@@ -116,10 +116,7 @@ struct AutomaticBackupServiceTests {
         let (suiteName, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let store = AutomaticBackupStatusStore(defaults: defaults)
-        let exporter = try FakeAutomaticBackupExporter(
-            data: Data("{\"schemaVersion\":1}".utf8),
-            delayNanoseconds: 50_000_000
-        )
+        let exporter = try PausingAutomaticBackupExporter(data: Data("{\"schemaVersion\":1}".utf8))
         let fileStore = FakeAutomaticBackupFileStore()
         let service = AutomaticBackupService(
             statusStore: store,
@@ -132,8 +129,13 @@ struct AutomaticBackupServiceTests {
         let first = Task { @MainActor in
             await service.runNow(container: container, trigger: .settingsManual)
         }
-        await Task.yield()
+        defer {
+            first.cancel()
+            exporter.release()
+        }
+        await exporter.waitUntilStarted()
         let second = await service.runNow(container: container, trigger: .settingsManual)
+        exporter.release()
         _ = await first.value
 
         #expect(second == .skipped(.alreadyRunning))
@@ -269,25 +271,28 @@ struct AutomaticBackupServiceTests {
         let context = container.mainContext
         context.insert(Pet(name: "Miso"))
         try context.save()
+        var didStartReset = false
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
             defaults: defaults,
             deletePersistentData: scopedPetDeletion(in: context),
-            systemSurfaceSnapshotSanitizer: {}
+            systemSurfaceSnapshotSanitizer: {},
+            prepareRuntimeForReset: { didStartReset = true }
         )
 
         let oldRun = Task { @MainActor in
             await service.runNow(container: container, trigger: .settingsManual)
         }
         await fileStore.waitUntilWriteStarted()
+        defer { fileStore.releaseWrite() }
         let reset = Task { @MainActor in
             try await resetter.reset(context: context, options: resetOptions())
         }
 
-        for _ in 0 ..< 5 {
-            await Task.yield()
-        }
+        // The reset has entered its write fence. A zero cleanup count before
+        // the reset even starts would not prove that it waits for the writer.
+        try #require(await TestObservation.wait { didStartReset })
         #expect(fileStore.cleanupCount == 0)
         #expect(!(try context.fetch(FetchDescriptor<Pet>())).isEmpty)
 

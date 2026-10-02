@@ -144,7 +144,7 @@ struct ManualFeedCommandTests {
             careEvents: careEvents,
             date: now
         )
-        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+        #expect(try stockReminderEvents(for: pet, context: context).count == 1)
 
         _ = ManualFeedCommand.recordManual(
             pet: pet,
@@ -153,13 +153,13 @@ struct ManualFeedCommandTests {
             foodKind: pet.mainFoodKind,
             saveAsDefault: false,
             foodRecords: [foodRecord],
-            allEvents: stockReminderEvents(for: pet, context: context),
+            allEvents: try stockReminderEvents(for: pet, context: context),
             context: context,
             executorId: nil,
             careEvents: careEvents,
             date: now.addingTimeInterval(60)
         )
-        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+        #expect(try stockReminderEvents(for: pet, context: context).count == 1)
     }
 
     @Test func quickFeedExecutorManualRecordUsesSelectedBackdate() throws {
@@ -285,7 +285,7 @@ struct ManualFeedCommandTests {
             context: context,
             executorId: nil
         )
-        let reminders = stockReminderEvents(for: pet, context: context)
+        let reminders = try stockReminderEvents(for: pet, context: context)
 
         #expect(reminders.count == 1)
         #expect(reminders.first?.id != staleEvent.id)
@@ -415,7 +415,7 @@ struct ManualFeedCommandTests {
             context: context,
             now: now
         )
-        let reminders = stockReminderEvents(for: pet, context: context)
+        let reminders = try stockReminderEvents(for: pet, context: context)
 
         #expect(reminders.count == 1)
         #expect(reminders.first?.id != staleEvent.id)
@@ -783,7 +783,7 @@ struct ManualFeedCommandTests {
             context: context,
             now: now
         )
-        let logs = (try? context.fetch(FetchDescriptor<PetCareLog>())) ?? []
+        let logs = try context.fetch(FetchDescriptor<PetCareLog>())
         let log = try #require(logs.first)
 
         #expect(firstInserted == 1)
@@ -981,7 +981,7 @@ struct ManualFeedCommandTests {
             allEvents: [],
             context: context
         )
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+        let events = try context.fetch(FetchDescriptor<Event>())
 
         #expect(result.mode == .manualReminder)
         #expect(result.targetCount == 2)
@@ -1559,7 +1559,7 @@ struct ManualFeedCommandTests {
             allEvents: [manualEvent, autoEvent],
             context: context
         )
-        let storedReminders = (try? context.fetch(FetchDescriptor<Reminder>())) ?? []
+        let storedReminders = try context.fetch(FetchDescriptor<Reminder>())
 
         if case let .switched(remindersToSchedule) = result {
             #expect(remindersToSchedule.isEmpty)
@@ -1570,8 +1570,8 @@ struct ManualFeedCommandTests {
         #expect(FeedOperatingMode.resolved(pet: pet, allEvents: [manualEvent, autoEvent]) == .autoFeeder)
     }
 
-    private func stockReminderEvents(for pet: Pet, context: ModelContext) -> [Event] {
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+    private func stockReminderEvents(for pet: Pet, context: ModelContext) throws -> [Event] {
+        let events = try context.fetch(FetchDescriptor<Event>())
         return FeedingPlanWriter.stockReminderEvents(pet: pet, allEvents: events)
     }
 

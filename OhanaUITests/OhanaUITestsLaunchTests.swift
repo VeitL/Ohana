@@ -17,6 +17,14 @@ final class OhanaUITestsLaunchTests: XCTestCase {
         continueAfterFailure = false
     }
 
+    override func tearDown() async throws {
+        guard let testRun, testRun.totalFailureCount > 0 else { return }
+        await MainActor.run {
+            UITestInteraction.captureFailureSnapshot()
+            UITestInteraction.respondToPendingAuthorization(assertDismissal: false)
+        }
+    }
+
     @MainActor
     func testLaunch() throws {
         let app = XCUIApplication()
@@ -31,7 +39,10 @@ final class OhanaUITestsLaunchTests: XCTestCase {
             "-OHANA_RESET_PERSISTENT_STATE",
             "-OHANA_UI_TEST_ENABLE_ANIMATIONS"
         ]
+        UITestInteraction.installAuthorizationMonitor(on: self)
+        UITestInteraction.respondToPendingAuthorization()
         app.launch()
+        UITestInteraction.respondToPendingAuthorization()
 
         let standardMode = app.buttons["app-experience-standard"]
         if standardMode.waitForExistence(timeout: 8) {

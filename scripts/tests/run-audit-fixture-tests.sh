@@ -51,6 +51,10 @@ if ! scripts/tests/run-dogfood-simulator-tests.sh; then
   fail "scripts/tests/run-dogfood-simulator-tests.sh: Dogfood Simulator safety regression"
 fi
 
+if ! python3 scripts/tests/run-sf-symbol-accessibility-tests.py; then
+  fail "SF Symbol accessibility modifier-chain regression"
+fi
+
 run_audit() {
   local script="$1"
   shift

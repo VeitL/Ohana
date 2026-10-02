@@ -414,13 +414,13 @@ struct HomeCommandExecutorTests {
         }
 
         performQuickFeed(at: now)
-        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+        #expect(try stockReminderEvents(for: pet, context: context).count == 1)
 
         performQuickFeed(at: now.addingTimeInterval(60))
 
         let feedingLogs = try context.fetch(FetchDescriptor<PetCareLog>()).filter { $0.careType == .feeding }
         #expect(feedingLogs.count == 2)
-        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+        #expect(try stockReminderEvents(for: pet, context: context).count == 1)
         #expect(feedbacks.map(\.cardId) == [pet.id, pet.id])
         #expect(revisionCenter.homeRevision.value == beforeRevision + 2)
     }
@@ -11515,8 +11515,8 @@ struct HomeCommandExecutorTests {
         func compensate(reminders _: [Reminder]) {}
     }
 
-    private func stockReminderEvents(for pet: Pet, context: ModelContext) -> [Event] {
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+    private func stockReminderEvents(for pet: Pet, context: ModelContext) throws -> [Event] {
+        let events = try context.fetch(FetchDescriptor<Event>())
         return FeedingPlanWriter.stockReminderEvents(pet: pet, allEvents: events)
     }
 

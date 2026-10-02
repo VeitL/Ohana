@@ -168,7 +168,7 @@ struct ReminderActionCoordinatorTests {
         )
 
         let logs = try context.fetch(FetchDescriptor<PetCareLog>())
-        let stockEvents = stockReminderEvents(for: pet, context: context)
+        let stockEvents = try stockReminderEvents(for: pet, context: context)
         #expect(result == .completed)
         #expect(logs.count == 1)
         #expect(reminder.statusEnum == .completed)
@@ -227,7 +227,7 @@ struct ReminderActionCoordinatorTests {
         #expect(event.isOccurrenceMarkedComplete(on: reminder.scheduledAt))
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).count == 1)
         #expect(!(try context.fetch(FetchDescriptor<CareLedgerEvent>())).isEmpty)
-        #expect(stockReminderEvents(for: pet, context: context).count == 1)
+        #expect(try stockReminderEvents(for: pet, context: context).count == 1)
     }
 
     @Test func calendarNotificationForDeceasedPetDoesNotWriteHistoricalFactOrCompleteReminder() throws {
@@ -526,8 +526,8 @@ struct ReminderActionCoordinatorTests {
         return try ModelContainer(for: schema, configurations: [config])
     }
 
-    private func stockReminderEvents(for pet: Pet, context: ModelContext) -> [Event] {
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+    private func stockReminderEvents(for pet: Pet, context: ModelContext) throws -> [Event] {
+        let events = try context.fetch(FetchDescriptor<Event>())
         return FeedingPlanWriter.stockReminderEvents(pet: pet, allEvents: events)
     }
 }

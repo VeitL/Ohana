@@ -81,7 +81,7 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(coordinator.locationError == "location_request_failed")
     }
 
-    @Test func firstTimePermissionGrantDoesNotTimeOutDuringSystemDialog() async {
+    @Test func firstTimePermissionGrantDoesNotTimeOutDuringSystemDialog() async throws {
         // 首次授权(.notDetermined)会弹系统对话框;即使 GPS 紧超时极短,也不能在用户
         // 授予前把对话框停留误判为定位失败(第一次报错、第二次才成功的经典竞态)。
         let defaults = makeDefaults()
@@ -98,13 +98,19 @@ struct OnboardingPreferenceCoordinatorTests {
         let task = Task {
             await coordinator.requestAutomaticLocation(locationProvider: provider)
         }
-        while !coordinator.isResolvingLocation {
-            await Task.yield()
+        defer {
+            task.cancel()
+            provider.complete(.failure(FakeOnboardingError.failed))
         }
+        try #require(await TestObservation.wait {
+            coordinator.isResolvingLocation && provider.hasPendingRequest
+        })
         // 模拟用户在对话框停留:给被误用的紧超时充分机会触发。
         // 不反复 yield: 并行测试争用 MainActor 时会不断排到队尾,反而让
         // 测试任务晚于宽限时任务恢复。
-        try? await Task.sleep(nanoseconds: 10_000_000)
+        try await Task.sleep(nanoseconds: 10_000_000)
+        #expect(coordinator.isResolvingLocation)
+        #expect(coordinator.locationError == nil)
         // 用户授予后定位到达。
         provider.complete(.success(CLLocation(latitude: 37.7749, longitude: -122.4194)))
         await task.value
@@ -115,7 +121,7 @@ struct OnboardingPreferenceCoordinatorTests {
         #expect(coordinator.city == "San Francisco")
     }
 
-    @Test func manualLocationCancelsStaleAutomaticLocationCallback() async {
+    @Test func manualLocationCancelsStaleAutomaticLocationCallback() async throws {
         let defaults = makeDefaults()
         let coordinator = OnboardingPreferenceCoordinator(
             defaults: defaults,
@@ -130,9 +136,13 @@ struct OnboardingPreferenceCoordinatorTests {
             await coordinator.requestAutomaticLocation(locationProvider: provider)
         }
 
-        while !coordinator.isResolvingLocation {
-            await Task.yield()
+        defer {
+            task.cancel()
+            provider.complete(.failure(FakeOnboardingError.failed))
         }
+        try #require(await TestObservation.wait {
+            coordinator.isResolvingLocation && provider.hasPendingRequest
+        })
 
         coordinator.useManualLocation()
         coordinator.updateCustomCountry("Custom Land")
@@ -339,6 +349,7 @@ private final class DeferredOnboardingLocationProvider: LocationProviding {
     var collectedLocations: [CLLocation] = []
     var totalDistance: Double = 0
     private var completion: ((Result<CLLocation, Error>) -> Void)?
+    var hasPendingRequest: Bool { completion != nil }
 
     init(authorizationStatus: CLAuthorizationStatus) {
         self.authorizationStatus = authorizationStatus

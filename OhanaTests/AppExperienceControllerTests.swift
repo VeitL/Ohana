@@ -121,7 +121,7 @@ struct AppExperienceControllerTests {
         #expect(defaults.object(forKey: AppExperienceMode.storageKey) == nil)
     }
 
-    @Test func settingsSwitchRebuildsOnlyTheShellAndPreservesTheOwnerBinding() async throws {
+    @Test func settingsSwitchRebuildsOnlyTheShellAndPreservesTheOwnerBinding() throws {
         let (suite, defaults) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }
         let ownerID = UUID()
@@ -131,7 +131,6 @@ struct AppExperienceControllerTests {
         let originalShellIdentity = controller.shellIdentity
 
         controller.switchAfterRouteDismissal(to: .zen, delayMilliseconds: 0)
-        try await Task.sleep(nanoseconds: 10_000_000)
 
         #expect(controller.mode == .zen)
         #expect(controller.shellIdentity != originalShellIdentity)
@@ -139,7 +138,7 @@ struct AppExperienceControllerTests {
         #expect(defaults.string(forKey: AppExperienceMode.storageKey) == AppExperienceMode.zen.rawValue)
     }
 
-    @Test func zenStandardZenRoundTripPersistsModeAndOwnerAcrossRelaunches() async throws {
+    @Test func zenStandardZenRoundTripPersistsModeAndOwnerAcrossRelaunches() throws {
         let (suite, defaults) = try makeDefaults()
         defer { defaults.removePersistentDomain(forName: suite) }
         let ownerID = UUID()
@@ -149,7 +148,6 @@ struct AppExperienceControllerTests {
 
         let firstLaunch = AppExperienceController(defaults: defaults, hasCompletedOnboarding: true)
         firstLaunch.switchAfterRouteDismissal(to: .standard, delayMilliseconds: 0)
-        try await Task.sleep(nanoseconds: 10_000_000)
 
         #expect(firstLaunch.mode == .standard)
         #expect(firstLaunch.zenOwnerHumanID == ownerID.uuidString)
@@ -160,7 +158,6 @@ struct AppExperienceControllerTests {
         #expect(!standardRelaunch.shouldOfferZenIntroduction)
 
         standardRelaunch.switchAfterRouteDismissal(to: .zen, delayMilliseconds: 0)
-        try await Task.sleep(nanoseconds: 10_000_000)
 
         let zenRelaunch = AppExperienceController(defaults: defaults, hasCompletedOnboarding: true)
         #expect(zenRelaunch.mode == .zen)

@@ -326,6 +326,7 @@ jobs:
       - name: Select Xcode and prepare disposable Simulator
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+          OHANA_TEST_RUNTIME_VERSION: "26.5"
         run: |
           sudo xcode-select -s /Applications/Xcode_26.6.app
           xcodebuild -version
@@ -334,6 +335,10 @@ jobs:
           mkdir -p .build
           printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
           scripts/prepare-test-simulator.sh
+          source scripts/lib/local-build-environment.sh
+          test_udid="$(ohana_resolve_simulator_by_name "$OHANA_TEST_SIMULATOR_NAME_FIXED" "$OHANA_TEST_RUNTIME_VERSION")"
+          ohana_assert_test_simulator_udid "$test_udid"
+          printf 'OHANA_TEST_SIMULATOR_UDID=%s\n' "$test_udid" >> "$GITHUB_ENV"
       - name: Run one audited group through the governed entrypoint
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild

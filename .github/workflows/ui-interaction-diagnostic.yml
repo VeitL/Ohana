@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, historical-failures, regression-failures, current-failures, keyboard-dismissal, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
+        options: [all, ci-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -27,6 +27,7 @@ jobs:
         scenario: >-
           ${{ fromJSON(
             inputs.scenario == 'crew' && '["crew"]' ||
+            inputs.scenario == 'ci-preflight' && '["ci-preflight-permissions","ci-preflight-interactions"]' ||
             inputs.scenario == 'historical-failures' && '["historical-failures"]' ||
             inputs.scenario == 'regression-failures' && '["regression-failures"]' ||
             inputs.scenario == 'current-failures' && '["current-failures"]' ||
@@ -48,19 +49,24 @@ jobs:
       - name: Select Xcode 26.6 and prepare disposable Tests Simulator
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
+          OHANA_TEST_RUNTIME_VERSION: "26.5"
         run: |
           sudo xcode-select -s /Applications/Xcode_26.6.app
           xcodebuild -version
           mkdir -p .build
           printf '%s\n' '00000000-0000-0000-0000-000000000001' > .build/dogfood-simulator.udid
           scripts/prepare-test-simulator.sh
+          source scripts/lib/local-build-environment.sh
+          test_udid="$(ohana_resolve_simulator_by_name "$OHANA_TEST_SIMULATOR_NAME_FIXED" "$OHANA_TEST_RUNTIME_VERSION")"
+          ohana_assert_test_simulator_udid "$test_udid"
+          printf 'OHANA_TEST_SIMULATOR_UDID=%s\n' "$test_udid" >> "$GITHUB_ENV"
       - name: Run focused governed UI diagnostics
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
           OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ matrix.scenario == 'home-date-control' && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
       - name: Export received-touch and control-state log
-        if: always() && (matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'current-failures' || matrix.scenario == 'keyboard-dismissal' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
+        if: always() && (startsWith(matrix.scenario, 'ci-preflight-') || matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'current-failures' || matrix.scenario == 'keyboard-dismissal' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
         env:
           RUNNER_TEMP: ${{ runner.temp }}
           DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}
@@ -78,6 +84,7 @@ jobs:
               device for runtime_devices in devices['devices'].values()
               for device in runtime_devices
               if device.get('name') == 'iPhone 17 Tests'
+              and device.get('udid') == os.environ.get('OHANA_TEST_SIMULATOR_UDID')
           ]
           scenario = os.environ['DIAGNOSTIC_SCENARIO']
           target = Path(os.environ['RUNNER_TEMP']) / f'ui-interaction-{scenario}-app.log'

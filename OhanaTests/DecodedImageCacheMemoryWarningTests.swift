@@ -20,8 +20,9 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(FocusWalletAvatarCache.cachedEntry(for: id, signature: signature)?.image != nil)
 
         NotificationCenter.default.post(name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait {
+            FocusWalletAvatarCache.cachedEntry(for: id, signature: signature) == nil
+        })
 
         #expect(FocusWalletAvatarCache.cachedEntry(for: id, signature: signature) == nil)
         #expect(await FocusWalletAvatarCache.preload(payloads: [payload]))
@@ -42,8 +43,9 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(FocusPopoutImageCache.cachedImage(for: id, signature: signature) != nil)
 
         NotificationCenter.default.post(name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait {
+            FocusPopoutImageCache.cachedImage(for: id, signature: signature) == nil
+        })
 
         #expect(FocusPopoutImageCache.cachedImage(for: id, signature: signature) == nil)
         #expect(await FocusPopoutImageCache.preload(payloads: [payload]))
@@ -65,8 +67,9 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(MediaThumbnailProvider.cachedImage(for: key) != nil)
 
         NotificationCenter.default.post(name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait {
+            MediaThumbnailProvider.cachedImage(for: key) == nil
+        })
 
         #expect(MediaThumbnailProvider.cachedImage(for: key) == nil)
         let rebuilt = try #require(await MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: { data }))

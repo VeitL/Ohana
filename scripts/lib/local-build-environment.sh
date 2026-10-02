@@ -661,6 +661,7 @@ ohana_require_dogfood_pin() {
 
 ohana_resolve_simulator_by_name() {
   local required_name="$1"
+  local required_runtime_version="${2:-}"
   local simctl_json
 
   if ! simctl_json="$(xcrun simctl list devices available -j 2>/dev/null)"; then
@@ -672,10 +673,17 @@ ohana_resolve_simulator_by_name() {
 import json, re, sys
 
 required_name = sys.argv[1]
+required_runtime_version = sys.argv[2]
+required_runtime = (
+    "com.apple.CoreSimulator.SimRuntime.iOS-" + required_runtime_version.replace(".", "-")
+    if required_runtime_version else None
+)
 payload = json.load(sys.stdin)
 candidates = []
 for runtime, devices in payload.get("devices", {}).items():
     if "iOS" not in runtime:
+        continue
+    if required_runtime is not None and runtime != required_runtime:
         continue
     version = [int(part) for part in re.findall(r"\d+", runtime)]
     for device in devices:
@@ -685,7 +693,7 @@ if not candidates:
     raise SystemExit(1)
 candidates.sort()
 print(candidates[-1][1])
-' "${required_name}"
+' "${required_name}" "${required_runtime_version}"
 }
 
 ohana_simulator_metadata() {

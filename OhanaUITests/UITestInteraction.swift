@@ -3,6 +3,92 @@ import XCTest
 /// Shared interaction preconditions. A successful tap means one input was sent;
 /// the journey must separately assert its destination or committed result.
 enum UITestInteraction {
+    enum AuthorizationKind: Equatable {
+        case notifications
+        case location
+    }
+
+    /// Only Ohana's known OS prompts belong to routine journey fixtures.
+    /// Permission-denial/delivery acceptance remains a separate device journey.
+    static func authorizationKind(text: String) -> AuthorizationKind? {
+        guard ["\"Ohana\"", "“Ohana”", "„Ohana“", "「Ohana」"].contains(where: text.contains) else { return nil }
+        if ["notifications", "Mitteilungen", "通知"].contains(where: text.localizedCaseInsensitiveContains) {
+            return .notifications
+        }
+        if ["location", "Standort", "位置"].contains(where: text.localizedCaseInsensitiveContains) {
+            return .location
+        }
+        return nil
+    }
+
+    @MainActor
+    static func installAuthorizationMonitor(on testCase: XCTestCase) {
+        // XCTest invokes monitors only for an interrupted input and removes
+        // them at case completion. Expected prompts are still handled explicitly.
+        testCase.addUIInterruptionMonitor(withDescription: "Ohana routine journey system permissions") { alert in
+            MainActor.assumeIsolated {
+                guard let kind = authorizationKind(of: alert) else { return false }
+                return respond(to: alert, kind: kind, assertDismissal: true)
+            }
+        }
+    }
+
+    @MainActor
+    private static func authorizationKind(of alert: XCUIElement) -> AuthorizationKind? {
+        guard alert.exists, let snapshot = try? alert.snapshot() else { return nil }
+        var labels = [snapshot.label]
+        var remaining = snapshot.children
+        while let child = remaining.popLast() {
+            if child.elementType == .staticText { labels.append(child.label) }
+            remaining.append(contentsOf: child.children)
+        }
+        return authorizationKind(text: labels.joined(separator: " "))
+    }
+
+    @MainActor
+    @discardableResult
+    static func respondToPendingAuthorization(
+        kind expectedKind: AuthorizationKind? = nil,
+        timeout: TimeInterval = 0,
+        assertDismissal: Bool = true
+    ) -> Bool {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let alert = springboard.alerts.firstMatch
+        var kind: AuthorizationKind?
+        guard wait(timeout: timeout, condition: {
+            kind = authorizationKind(of: alert)
+            return kind != nil && (expectedKind == nil || kind == expectedKind)
+        }), let kind else { return false }
+        return respond(to: alert, kind: kind, assertDismissal: assertDismissal)
+    }
+
+    @MainActor
+    private static func respond(to alert: XCUIElement, kind: AuthorizationKind, assertDismissal: Bool) -> Bool {
+        let labels = kind == .notifications
+            ? ["Allow", "Zulassen", "允许"]
+            : ["Allow While Using App", "Beim Verwenden der App", "使用App时允许", "使用期间允许"]
+        let button = alert.buttons.matching(NSPredicate(format: "label IN %@", labels)).firstMatch
+        guard wait(timeout: 8, condition: { button.exists && button.isEnabled }) else {
+            recordFailure("Ohana system permission has no expected response", element: alert)
+            if assertDismissal { XCTFail("Ohana system permission did not expose its declared response.") }
+            return false
+        }
+        XCTContext.runActivity(named: "Respond once to Ohana system permission: \(kind)") { activity in
+            let attachment = XCTAttachment(string: snapshotDescription(of: alert))
+            attachment.name = "System permission starting state"
+            attachment.lifetime = .keepAlways
+            activity.add(attachment)
+            button.tap()
+        }
+        // A failed AX snapshot must not be mistaken for a dismissed prompt.
+        let dismissed = wait(timeout: 8) { !alert.exists }
+        if !dismissed {
+            recordFailure("Ohana system permission remained after its single response", element: alert)
+            if assertDismissal { XCTFail("Ohana system permission stayed open after its single response.") }
+        }
+        return dismissed
+    }
+
     static func wait(timeout: TimeInterval, condition: () -> Bool) -> Bool {
         let deadline = ProcessInfo.processInfo.systemUptime + timeout
         repeat {
@@ -20,12 +106,13 @@ enum UITestInteraction {
         timeout: TimeInterval
     ) -> Bool {
         let application = app ?? XCUIApplication()
+        let windowFrame = application.frame
         // iOS 27 can report an off-screen lazy Menu as hittable. Observe its
         // enabled state and geometry together, then leave input to XCTest.
         // A rejected target lets the caller reveal it through normal scrolling.
         guard wait(timeout: timeout, condition: {
-            guard let snapshot = try? element.snapshot(), snapshot.isEnabled,
-                  let visibleFrame = visibleFrame(for: snapshot.frame, in: application.frame),
+            guard element.exists, let snapshot = try? element.snapshot(), snapshot.isEnabled,
+                  let visibleFrame = visibleFrame(for: snapshot.frame, in: windowFrame),
                   visibleFrame.contains(CGPoint(x: snapshot.frame.midX, y: snapshot.frame.midY)) else {
                 return false
             }
@@ -86,6 +173,7 @@ enum UITestInteraction {
         var result: CGRect?
         let ready = wait(timeout: timeout) {
             guard app.map({ $0.state == .runningForeground }) ?? true,
+                  element.exists,
                   let snapshot = try? element.snapshot(), snapshot.isEnabled else {
                 previousFrame = nil
                 return false
@@ -127,7 +215,7 @@ enum UITestInteraction {
         in app: XCUIApplication,
         minimumVisibleSize: CGFloat = 1
     ) -> VisibleFrameObservation? {
-        guard let snapshot = try? element.snapshot(),
+        guard element.exists, let snapshot = try? element.snapshot(),
               let visibleFrame = visibleFrame(
                   for: snapshot.frame,
                   in: app.frame,
@@ -158,9 +246,9 @@ enum UITestInteraction {
 
     @MainActor
     static func toggleState(_ element: XCUIElement) -> Bool? {
-        let nestedSwitch = element.descendants(matching: .switch).firstMatch
-        let snapshot = (try? nestedSwitch.snapshot()) ?? (try? element.snapshot())
-        guard let value = snapshot?.value else { return nil }
+        guard element.exists,
+              let snapshot = try? switchControl(element).snapshot(),
+              let value = snapshot.value else { return nil }
         let raw = String(describing: value)
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         return switch raw {
@@ -244,10 +332,14 @@ enum UITestInteraction {
     private static func revealTextFieldAboveKeyboard(_ field: XCUIElement, in app: XCUIApplication) -> Bool {
         // Keyboard focus can place the field under its accessory toolbar.
         // Observe geometry before revealing it; require hittability afterward.
-        guard let frame = stableFrame(of: field, in: app, timeout: 4) else {
+        // Focus has already been established. One current observation is
+        // sufficient for a semantic long press; two geometry samples can
+        // consume the whole deadline on a slower accessibility server.
+        guard let observation = visibleFrameObservation(of: field, in: app) else {
             recordFailure("Focused text field has no usable reveal geometry", element: field)
             return false
         }
+        let frame = observation.frame
         var keyboardTop = app.keyboards.firstMatch.frame.minY
         for identifier in ["ohana-keyboard-dismiss-action", "task-center-pet-profile-inline-keyboard-done", "add-event-keyboard-dismiss-action"] {
             let toolbar = app.toolbars.containing(.button, identifier: identifier).firstMatch
@@ -263,8 +355,10 @@ enum UITestInteraction {
         let start = origin.withOffset(CGVector(dx: app.frame.width / 2, dy: startY - app.frame.minY))
         let end = start.withOffset(CGVector(dx: 0, dy: -distance))
         start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.2)
-        guard let revealed = stableFrame(of: field, in: app, timeout: 4, requiresHittable: true),
-              revealed.maxY < keyboardTop - 16 else {
+        guard wait(timeout: 4, condition: {
+            guard let revealed = visibleFrameObservation(of: field, in: app) else { return false }
+            return revealed.frame.maxY < keyboardTop - 16 && field.isHittable
+        }) else {
             recordFailure("Text field remains covered by keyboard toolbar", element: field)
             return false
         }
@@ -289,7 +383,7 @@ enum UITestInteraction {
         guard wait(timeout: 4, condition: {
             action = actionIDs.map { app.buttons[$0].firstMatch }
                 .first {
-                    guard let snapshot = try? $0.snapshot(), snapshot.isEnabled else { return false }
+                    guard $0.exists, let snapshot = try? $0.snapshot(), snapshot.isEnabled else { return false }
                     let frame = snapshot.frame
                     guard isUsable(frame) else { return false }
                     actionFrame = frame
@@ -338,15 +432,17 @@ enum UITestInteraction {
         let app = XCUIApplication()
         let state = app.state
         XCTContext.runActivity(named: "Final failed journey state") { activity in
+            // Preserve the screen before AX diagnostics, which can themselves
+            // fail when the runner has lost accessibility responsiveness.
+            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screenshot.name = "Final failed journey screen"
+            screenshot.lifetime = .keepAlways
+            activity.add(screenshot)
             let hierarchy = state == .runningForeground ? app.debugDescription : "App is not running in foreground; AX query omitted."
             let text = XCTAttachment(string: "appState=\(state.rawValue)\n\(hierarchy)")
             text.name = "Final failed journey AX"
             text.lifetime = .keepAlways
             activity.add(text)
-            let screenshot = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
-            screenshot.name = "Final failed journey screen"
-            screenshot.lifetime = .keepAlways
-            activity.add(screenshot)
         }
     }
 

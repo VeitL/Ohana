@@ -470,8 +470,9 @@ struct WalksLogicTests {
 
         let location = FakeWalkLocationManager()
         let manager = PetWalkingManager(locationManager: location, questManager: QuestManager())
+        let restoreSelection = TestPreferences.preserve(["currentActiveHumanId"])
+        defer { restoreSelection() }
         UserDefaults.standard.set(human.id.uuidString, forKey: "currentActiveHumanId")
-        defer { UserDefaults.standard.removeObject(forKey: "currentActiveHumanId") }
 
         manager.start(pet: pet)
         manager.addPoop(type: .perfectPoop)
@@ -555,16 +556,22 @@ struct WalksLogicTests {
         let context = container.mainContext
         let first = Human(name: "First walker")
         let final = Human(name: "Final walker")
+        let unavailable = Human(name: "Unavailable walker")
+        unavailable.passedAwayDate = Date()
         let pet = Pet(name: "Piper", species: "狗")
         context.insert(first)
         context.insert(final)
+        context.insert(unavailable)
         context.insert(pet)
         try context.save()
         let selection = MutableWalkActiveHumanSelection(id: first.id.uuidString)
         let manager = PetWalkingManager(locationManager: FakeWalkLocationManager(), questManager: QuestManager(), activeHumanSelection: selection)
         manager.start(pet: pet, modelContext: context, executorIds: [first.id.uuidString])
         #expect(!manager.selectActiveWalker(id: UUID()))
+        #expect(!manager.selectActiveWalker(id: unavailable.id))
         #expect(manager.activeWalkExecutorIds == [first.id.uuidString])
+        let initialCheckpoint = try #require(try context.fetch(FetchDescriptor<PetWalkLog>()).first(where: WalkRecoveryCheckpoint.isCheckpoint))
+        #expect(initialCheckpoint.executorIds == [first.id.uuidString])
         manager.pause()
         #expect(manager.selectActiveWalker(id: final.id))
         #expect(selection.currentHumanId == first.id.uuidString)

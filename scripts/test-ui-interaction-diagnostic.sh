@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <permission-policy|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,46 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  ci-preflight-permissions)
+    # Original permission-blocked journeys plus the original Feed smoke. This
+    # is focused diagnostic evidence, never full 132-case acceptance.
+    selectors=(
+      OhanaUITests/OhanaUITests/testFeedingManualPlanAndHomeQuickActionSmoke
+      OhanaUITests/OhanaUITests/testFirstCareCompletedByHomeWaterBeforeOpeningJourneyBecomesClaimable
+      OhanaUITests/OhanaUITests/testPetExpandedCardShowsQuickActionsWithoutSecondTap
+      OhanaUITests/OhanaUITests/testPetFeatureHubDailyAndHealthRoutesOpenAndCancel
+      OhanaUITests/OhanaUITests/testPetHomeQuickActionDetailRoutesOpenAndCancel
+      OhanaUITests/OhanaUITests/testPetHomeWalkCardMinimizesToFloatingBubble
+      OhanaUITests/OhanaUITests/testPetPottyRecordPersistsFromQuickCareDetail
+      OhanaUITests/OhanaUITests/testPetWalkQuickActionPersistsAndSummaryReadback
+      OhanaUITests/OhanaUITests/testPetWaterCareRewardAppearsInBondVaultLedger
+      OhanaUITests/OhanaUITests/testPetWaterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail
+      OhanaUITests/OhanaUITests/testPetWaterRecordPersistsFromQuickCareDetail
+      OhanaUITests/OhanaUITests/testStarterCustomCarePlanCancelAndSaveRemainSeparatedAcrossRelaunch
+      OhanaUITests/OhanaUITests/testStarterRecommendedCarePlanAndFirstCareCancelResumeClaimSeparation
+    )
+    ;;
+  ci-preflight-interactions)
+    selectors=(
+      OhanaUITests/OhanaUITests/testCoconutBalanceButtonOpensAndClosesLedgerFromHome
+      OhanaUITests/OhanaUITests/testDeletedPetCalendarEventDoesNotOpenLiveCareRoute
+      OhanaUITests/OhanaUITests/testHumanExtendedModuleDeletesDisappearFromCurrentUI
+      OhanaUITests/OhanaUITests/testHumanPermanentDeleteWithExactNamePersistsAcrossRelaunch
+      OhanaUITests/OhanaUITests/testManualCalendarEventRowOpensDetailEditsAndDeletes
+      OhanaUITests/OhanaUITests/testPetBasicInfoEditCancelDoesNotPersistAndSaveDoes
+      OhanaUITests/OhanaUITests/testPetBasicInfoEmptyNameSaveKeepsOriginalName
+      OhanaUITests/OhanaUITests/testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu
+      OhanaUITests/OhanaUITests/testPetLitterPlanDeleteClearsSavedReminderFromQuickCareDetail
+      OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages
+      OhanaUITests/OhanaUITests/testSystemGeneratedPetCalendarFeedEventRowOpensQuickFeedDetail
+      OhanaUITests/OhanaUITests/testZenFreshInstallCreatesOnlyAHumanAndOpensTheThreeTabShell
+    )
+    ;;
+  permission-policy)
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticAuthorizationMatcherRejectsUnrelatedPrompts
+    )
+    ;;
   current-failures)
     # Original failed journeys; this focused set is not 132-case acceptance.
     selectors=(

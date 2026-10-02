@@ -343,13 +343,12 @@ struct PlantCareCommandAtomicityTests {
         )
         options.persistChanges = { stagedContext in
             saveCounter.callCount += 1
-            let stagedEvents = (try? stagedContext.fetch(FetchDescriptor<Event>())) ?? []
-            stagedCounts = CareWriteCounts(
-                logs: (try? stagedContext.fetch(FetchDescriptor<PlantCareLog>()).count) ?? -1,
-                factEvents: stagedEvents.count(where: { !$0.isAllDay }),
-                planEvents: stagedEvents.filter(\.isAllDay).count,
-                ledgerEvents: (try? stagedContext.fetch(FetchDescriptor<CareLedgerEvent>()).count) ?? -1
-            )
+            do {
+                stagedCounts = try careWriteCounts(in: stagedContext)
+            } catch {
+                // The injected save failure must not hide an unrelated read failure.
+                Issue.record("Failed to inspect staged care writes: \(error)")
+            }
             return ModelContextSaveResult(
                 didSave: false,
                 errorDescription: "forcedCorePersistenceFailure"
@@ -417,7 +416,7 @@ struct PlantCareCommandAtomicityTests {
             )
         )
 
-        let counts = careWriteCounts(in: context)
+        let counts = try careWriteCounts(in: context)
         let events = try context.fetch(FetchDescriptor<Event>())
         let planEventCandidate = events.first { event in
             event.isAllDay
@@ -480,14 +479,14 @@ struct PlantCareCommandAtomicityTests {
             options: options
         )
         let revisionAfterFirstAttempt = revisionCenter.homeRevision.value
-        let countsAfterFirstAttempt = careWriteCounts(in: context)
+        let countsAfterFirstAttempt = try careWriteCounts(in: context)
         let replay = executor.recordCare(
             request,
             note: "test.plant.atomicity.reward",
             options: options
         )
 
-        let countsAfterReplay = careWriteCounts(in: context)
+        let countsAfterReplay = try careWriteCounts(in: context)
         let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
         #expect(first.didPersist)
         #expect(first.didWrite)
@@ -825,13 +824,13 @@ struct PlantCareCommandAtomicityTests {
         return options
     }
 
-    private func careWriteCounts(in context: ModelContext) -> CareWriteCounts {
-        let events = (try? context.fetch(FetchDescriptor<Event>())) ?? []
+    private func careWriteCounts(in context: ModelContext) throws -> CareWriteCounts {
+        let events = try context.fetch(FetchDescriptor<Event>())
         return CareWriteCounts(
-            logs: (try? context.fetch(FetchDescriptor<PlantCareLog>()).count) ?? -1,
+            logs: try context.fetch(FetchDescriptor<PlantCareLog>()).count,
             factEvents: events.count(where: { !$0.isAllDay }),
             planEvents: events.filter(\.isAllDay).count,
-            ledgerEvents: (try? context.fetch(FetchDescriptor<CareLedgerEvent>()).count) ?? -1
+            ledgerEvents: try context.fetch(FetchDescriptor<CareLedgerEvent>()).count
         )
     }
 

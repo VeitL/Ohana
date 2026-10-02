@@ -68,8 +68,8 @@ struct PhysicalDeletionServiceTests {
 
         #expect(try context.fetch(FetchDescriptor<PetDocument>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetDocumentAttachment>()).isEmpty)
-        #expect(deletionTombstone(PetDocument.self, id: document.id, context: context) != nil)
-        #expect(deletionTombstone(PetDocumentAttachment.self, id: attachment.id, context: context) != nil)
+        #expect(try deletionTombstone(PetDocument.self, id: document.id, context: context) != nil)
+        #expect(try deletionTombstone(PetDocumentAttachment.self, id: attachment.id, context: context) != nil)
     }
 
     @Test func deletePetPhysicallyDeletesCareFactsAndWritesTombstones() throws {
@@ -90,9 +90,9 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetCareLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<PetWalkLog>()).isEmpty)
-        #expect(deletionTombstone(Pet.self, id: pet.id, context: context) != nil)
-        #expect(deletionTombstone(PetCareLog.self, id: careLog.id, context: context) != nil)
-        #expect(deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
+        #expect(try deletionTombstone(Pet.self, id: pet.id, context: context) != nil)
+        #expect(try deletionTombstone(PetCareLog.self, id: careLog.id, context: context) != nil)
+        #expect(try deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
     }
 
     @Test func physicalMemberDeletionPreservesHistoricalPresenceFactsAndRewardReceipts() throws {
@@ -247,13 +247,13 @@ struct PhysicalDeletionServiceTests {
         #expect(retainedLedgers.first?.metadataJSON.contains("\"deletedOwnerKind\":\"plant\"") == true)
         #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [unrelatedEvent.id])
         #expect(scheduler.cancelledIds == ["plant-water-reminder"])
-        #expect(deletionTombstone(Plant.self, id: plantID, context: context) != nil)
-        #expect(deletionTombstone(PlantCareLog.self, id: log.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
-        #expect(deletionTombstone(FamilyCollaborationTask.self, id: plantTask.id, context: context) != nil)
-        #expect(deletionTombstone(CareLedgerEvent.self, id: ledger.id, context: context) != nil)
-        #expect(deletionTombstone(CareLedgerEvent.self, id: rewardLedger.id, context: context) == nil)
+        #expect(try deletionTombstone(Plant.self, id: plantID, context: context) != nil)
+        #expect(try deletionTombstone(PlantCareLog.self, id: log.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: event.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+        #expect(try deletionTombstone(FamilyCollaborationTask.self, id: plantTask.id, context: context) != nil)
+        #expect(try deletionTombstone(CareLedgerEvent.self, id: ledger.id, context: context) != nil)
+        #expect(try deletionTombstone(CareLedgerEvent.self, id: rewardLedger.id, context: context) == nil)
     }
 
     @Test func deletePlantRetainsHumanCoconutRewardAndReconcilesWalletDrift() throws {
@@ -305,7 +305,7 @@ struct PhysicalDeletionServiceTests {
         #expect(human.coconutBalance == 8)
         #expect(CoconutWalletService.totalBalance(context: context) == 8)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [plantCareReward.id])
-        #expect(deletionTombstone(CoconutLedgerEntry.self, id: plantCareReward.id, context: context) == nil)
+        #expect(try deletionTombstone(CoconutLedgerEntry.self, id: plantCareReward.id, context: context) == nil)
     }
 
     @Test func deletePetRetiresWalletAccountKeepsLedgerAndScrubsSharedSessionReferences() throws {
@@ -435,9 +435,9 @@ struct PhysicalDeletionServiceTests {
         #expect(undoReceipts.isEmpty)
         #expect(sessions.first?.totalAmountGrams == survivorLog.amountGrams)
         #expect(CoconutWalletService.totalBalance(context: context) == 0)
-        #expect(deletionTombstone(CoconutLedgerEntry.self, id: walletEntry.id, context: context) == nil)
-        #expect(deletionTombstone(CareLedgerEvent.self, id: careLedger.id, context: context) != nil)
-        #expect(deletionTombstone(CareLedgerEvent.self, id: rewardCareLedger.id, context: context) == nil)
+        #expect(try deletionTombstone(CoconutLedgerEntry.self, id: walletEntry.id, context: context) == nil)
+        #expect(try deletionTombstone(CareLedgerEvent.self, id: careLedger.id, context: context) != nil)
+        #expect(try deletionTombstone(CareLedgerEvent.self, id: rewardCareLedger.id, context: context) == nil)
     }
 
     @Test func deletePetRetainsPetScopedHumanRewardsWithoutRollback() throws {
@@ -487,7 +487,7 @@ struct PhysicalDeletionServiceTests {
         #expect(remainingAccount.balance == 10)
         #expect(human.coconutBalance == 10)
         #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).map(\.id) == [petCareReward.id])
-        #expect(deletionTombstone(CoconutLedgerEntry.self, id: petCareReward.id, context: context) == nil)
+        #expect(try deletionTombstone(CoconutLedgerEntry.self, id: petCareReward.id, context: context) == nil)
     }
 
     @Test func deletePetCascadesFirstReleaseRegisteredOwnedEntities() throws {
@@ -648,12 +648,12 @@ struct PhysicalDeletionServiceTests {
         #expect(CoconutWalletService.totalBalance(context: context) == 0)
         #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>()).isEmpty)
-        #expect(deletionTombstone(Pet.self, id: pet.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
-        #expect(deletionTombstone(PetRelationship.self, id: relationship.id, context: context) != nil)
-        #expect(deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
-        #expect(deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
+        #expect(try deletionTombstone(Pet.self, id: pet.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: event.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+        #expect(try deletionTombstone(PetRelationship.self, id: relationship.id, context: context) != nil)
+        #expect(try deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
+        #expect(try deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
     }
 
     @Test func deletePetUsesUnifiedResolverForIndirectScheduleEvents() throws {
@@ -715,12 +715,12 @@ struct PhysicalDeletionServiceTests {
 
         #expect(try context.fetch(FetchDescriptor<Event>()).map(\.id) == [survivorEvent.id])
         #expect(try context.fetch(FetchDescriptor<Reminder>()).map(\.id) == [survivorReminder.id])
-        #expect(deletionTombstone(Event.self, id: stockEvent.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: insuranceEvent.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: stockReminder.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: medicationReminder.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: insuranceReminder.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: stockEvent.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: insuranceEvent.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: stockReminder.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: medicationReminder.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: insuranceReminder.id, context: context) != nil)
     }
 
     @Test func deleteHumanCascadesFirstReleaseRegisteredOwnedEntities() throws {
@@ -964,7 +964,7 @@ struct PhysicalDeletionServiceTests {
         #expect(retainedHealthMetrics.first?.sourceReportID == nil)
         #expect(retainedHealthMetrics.first?.sourceLabel == "HbA1c")
         #expect(retainedHealthMetrics.first?.referenceRangeText == "4.0–5.6")
-        #expect(deletionTombstone(HumanHealthMetricLog.self, id: unownedReportMetric.id, context: context) != nil)
+        #expect(try deletionTombstone(HumanHealthMetricLog.self, id: unownedReportMetric.id, context: context) != nil)
         let retiredAccount = try #require(try context.fetch(FetchDescriptor<CoconutAccount>()).first { $0.ownerId == humanId })
         #expect(retiredAccount.balance == 0)
         #expect(CoconutWalletAccountLifecycleMetadata.isDeletedOwner(retiredAccount))
@@ -976,13 +976,13 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<SharedCareUndoReceipt>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<CoconutExchangeRequest>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<FamilyCollaborationTask>()).isEmpty)
-        #expect(deletionTombstone(Human.self, id: human.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
-        #expect(deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
-        #expect(deletionTombstone(CoconutExchangeRequest.self, id: exchange.id, context: context) != nil)
-        #expect(deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
-        #expect(deletionTombstone(FamilyCollaborationTask.self, id: humanSubjectTask.id, context: context) != nil)
+        #expect(try deletionTombstone(Human.self, id: human.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: event.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+        #expect(try deletionTombstone(EconomyBudgetUsageEvent.self, id: budgetUsage.id, context: context) != nil)
+        #expect(try deletionTombstone(CoconutExchangeRequest.self, id: exchange.id, context: context) != nil)
+        #expect(try deletionTombstone(FamilyCollaborationTask.self, id: task.id, context: context) != nil)
+        #expect(try deletionTombstone(FamilyCollaborationTask.self, id: humanSubjectTask.id, context: context) != nil)
     }
 
     @Test func deleteHumanUsesUnifiedResolverForMedicationNotesAndAssignments() throws {
@@ -1065,12 +1065,12 @@ struct PhysicalDeletionServiceTests {
         #expect(try context.fetch(FetchDescriptor<HumanMedicationLog>()).isEmpty)
         #expect(try context.fetch(FetchDescriptor<HumanHealthReport>()).isEmpty)
         #expect(events.first?.assigneeId == nil)
-        #expect(deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: noteEvent.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: assignedOnlyEvent.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: medicationReminder.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: noteReminder.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: assignedOnlyReminder.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: medicationEvent.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: noteEvent.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: assignedOnlyEvent.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: medicationReminder.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: noteReminder.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: assignedOnlyReminder.id, context: context) != nil)
     }
 
     @Test func deleteHumanDetachesSharedCareChildrenWhenOnlyExecutorSessionIsRemoved() throws {
@@ -1147,7 +1147,7 @@ struct PhysicalDeletionServiceTests {
         #expect(ledgers.map(\.id) == [careLedger.id])
         #expect(ledgers.first?.actorKind == CareLedgerActorKind.unknown.rawValue)
         #expect(ledgers.first?.actorId == nil)
-        #expect(deletionTombstone(SharedCareSession.self, id: session.id, context: context) != nil)
+        #expect(try deletionTombstone(SharedCareSession.self, id: session.id, context: context) != nil)
     }
 
     @Test func deleteHumanScrubsExecutorFromRetainedPetFactsAndLedgers() throws {
@@ -1459,9 +1459,9 @@ struct PhysicalDeletionServiceTests {
         _: T.Type,
         id: UUID,
         context: ModelContext
-    ) -> CloudSyncRecordState? {
+    ) throws -> CloudSyncRecordState? {
         let key = CloudSyncRecordState.recordKey(entityName: String(describing: T.self), localRecordId: id)
-        return (try? context.fetch(FetchDescriptor<CloudSyncRecordState>()))?
+        return try context.fetch(FetchDescriptor<CloudSyncRecordState>())
             .first { $0.recordKey == key && $0.isDeletionTombstone }
     }
 }

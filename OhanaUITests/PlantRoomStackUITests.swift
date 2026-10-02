@@ -12,7 +12,10 @@ final class PlantRoomStackUITests: XCTestCase {
 
     override func tearDown() async throws {
         guard let testRun, testRun.totalFailureCount > 0 else { return }
-        await MainActor.run { UITestInteraction.captureFailureSnapshot() }
+        await MainActor.run {
+            UITestInteraction.captureFailureSnapshot()
+            UITestInteraction.respondToPendingAuthorization(assertDismissal: false)
+        }
     }
 
     @MainActor
@@ -33,7 +36,10 @@ final class PlantRoomStackUITests: XCTestCase {
             "-OHANA_UI_TEST_PLANT_BASELINE_ROOM_COUNT", "6",
             "-OHANA_UI_TEST_UNLOCK_REWARD_TIER"
         ]
+        UITestInteraction.installAuthorizationMonitor(on: self)
+        UITestInteraction.respondToPendingAuthorization()
         app.launch()
+        UITestInteraction.respondToPendingAuthorization()
 
         let standardMode = app.buttons["app-experience-standard"]
         if standardMode.waitForExistence(timeout: 3) {

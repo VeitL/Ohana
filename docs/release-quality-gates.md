@@ -2,6 +2,10 @@
 
 Ohana changes must be safe to ship, diagnose, and recover.
 
+Owner: repository validation workflow under `AGENTS.md`.
+Status: active policy. Last reviewed: 2026-10-02 against the current validation
+entrypoints; this date does not certify app or release acceptance.
+
 ## Gate Severity And Ownership
 
 - Correctness boundaries with a zero baseline—data safety, privacy, migration,
@@ -35,6 +39,12 @@ Ohana changes must be safe to ship, diagnose, and recover.
 - Business rules are owned by Unit/Integration tests; UI tests do not inspect
   persistence internals or stand in for ledger, migration, reward, or cache
   assertions.
+- Test readback errors must throw or record a failed issue. Never substitute
+  an empty array, nil, or a sentinel for a failed fetch when asserting deletion,
+  absence, counts, or rollback. Use isolated stores/defaults where injectable;
+  otherwise restore every modified shared preference and in-memory projection
+  on all exits. Source-text checks prove architectural constraints, not runtime
+  behavior, and must follow accepted product changes rather than obsolete UI.
 - The normal change lane runs at most one high-value UI path for each affected
   module. Exhaustive UI shards are retained for nightly/RC regression.
 - Closing a P0/P1 risk requires failure, recovery/retry, and repeat/idempotency
@@ -130,7 +140,7 @@ full UI suite as a default response to a local code edit.
 | Full unit suite | `scripts/test-unit.sh` or `scripts/module-exit-gate.sh --unit` | Broad module handoff or phase boundary; it does not pull in the UI target. |
 | Release UI smoke | `scripts/test-ui-release-smoke.sh smoke` | First-release onboarding and first-pet path changed. |
 | Domain UI shard | `scripts/test-ui-shard.sh <shard>` | One user-facing domain changed; use `--list` to see the available shards. |
-| Full UI regression | `scripts/test-ui-nightly.sh` | Nightly, release candidate, or an explicitly requested whole-app UI pass. Each shard runs the governed normal build-then-test lifecycle sequentially against the fixed incremental cache; the campaign fails at a shard boundary, deletes passing results, and retains only the bounded failure set. |
+| Full UI regression | `scripts/test-ui-nightly.sh --continue-after-failure` | Nightly, release candidate, or an explicitly requested whole-app UI pass. Collect every shard once through the governed sequential build-then-test lifecycle and fixed incremental cache. Any failed shard keeps the campaign failed after collection; passing results are deleted and failure retention remains bounded. |
 | Signed WMO Archive | `scripts/archive-release-local.sh` | RC/signing/device-matrix gates only. It keeps whole-module optimization, writes outside the File Provider-managed repository, verifies code signing/xattrs, and does not upload. |
 | Real-device acceptance | `docs/release-true-device-test-plan.md` | Permissions, HealthKit, background delivery, location, energy, iCloud, biometrics, camera, keyboard, and device-only behavior. |
 
@@ -142,26 +152,133 @@ full UI suite as a default response to a local code edit.
 | One business rule, command, service, read model, or persistence behavior | Targeted Unit/Integration selector plus build when compiler/startup/persistence risk requires it | One high-value path only when navigation or visible integration changed |
 | P0/P1 repair | Targeted failure + recovery/retry + repeat/idempotency tests, relevant audits, and build | One high-value recovery/user path; UI must not assert database internals |
 | Broad module handoff | Full unit lane plus module-relevant audits | One module path, not every button |
-| Nightly | Full unit as scheduled plus sequential UI shards | Complete shard manifest |
-| RC / release candidate | Whole-repo audits, full unit, sequential full UI, and applicable real-device plan | Complete release paths and device-owned behavior |
+| Nightly | Full unit as scheduled plus full UI collection | Complete shard manifest |
+| RC / release candidate | Whole-repo audits, full unit, full UI collection, and applicable real-device plan | Complete release paths and device-owned behavior |
 
 `scripts/module-exit-gate.sh` defaults to the fast changed/static lane. Repeat
 `--test <target/test>` for targeted Unit/Integration selectors and, only when
 needed, one UI selector. Use `--unit` for the full unit lane and `--full` for
 the canonical release static baseline plus full unit tests. It does not rerun
 the changed audits after `dev-check-changed.sh`. The complete UI suite remains
-`scripts/test-ui-nightly.sh`, or `scripts/release-hardening-check.sh --with-ui`
+`scripts/test-ui-nightly.sh --continue-after-failure`, or
+`scripts/release-hardening-check.sh --with-ui`
 for an explicit RC lane.
 
-UI shards intentionally run sequentially with parallel testing disabled. Each
+Local UI shards run sequentially with parallel testing disabled. Each
 shard owns one normal governed build-then-test lifecycle; the fixed cache keeps
 those builds incremental without sharing a stale build-for-testing artifact
 across shard boundaries. The UI tests launch, reset, seed, and sometimes
 preserve state in the same simulator, so parallel runners would compete for the
-app process and persistence container.
+app process and persistence container. Hosted CI shards may run concurrently
+only on separate hosts with independent simulators. A fresh hosted simulator
+and a reused local simulator do not establish equivalent permission or data
+preconditions merely because the source revision matches.
 `scripts/audit-ui-test-shards.sh` requires every source UI test to appear in
 exactly one shard so a newly added test cannot silently disappear from the full
 regression lane.
+
+## UI Automation Evidence Contract
+
+### Comparable Preconditions
+
+- Record the source revision and any uncommitted patch, toolchain/SDK, actual
+  simulator runtime, build configuration, device, seed/store lifecycle,
+  language/time zone, animation settings, and diagnostic flags. Record
+  notification and location authorization separately, or mark them unknown.
+  Resetting app data is not evidence that system permissions were reset.
+- Each independent case must establish its own declared starting conditions.
+  If one case intentionally preserves state, name that dependency. After a
+  failure, capture the screen and accessibility state before containment, and
+  verify that a leftover system overlay cannot obstruct the next case.
+- Handle an expected permission request through the real system UI, once, with
+  a handler scoped to Ohana's specific alert and intended choice; verify the
+  alert has closed. Do not add a blanket Allow handler, direct permission/store
+  writes, or a business bypass. Keep Simulator reset and storage operations
+  within the existing `AGENTS.md` safeguards.
+- Diagnose on the failing CI toolchain first. A different OS is valuable
+  compatibility evidence, but does not isolate a cause. Controlled comparisons
+  change one declared variable at a time.
+
+### Behavioral Assertions And Interaction
+
+- Derive expected behavior from `docs/specs/product-foundation.md` and the
+  accepted flow. Preserve save, reward, deletion, cancellation, and relevant
+  cold-launch readback assertions through normal UI. Unit/Integration tests
+  own persistent invariants as described in the Test Portfolio Contract.
+- Assert the user's resulting state or destination. Do not require an obsolete
+  intermediate menu or a source-code layout when the accepted flow reaches the
+  correct result directly. Replace a stale implementation assertion with
+  behavioral evidence; do not restore old UI solely to satisfy it or delete a
+  business assertion to make a run pass.
+- Use semantic operations for ordinary native controls. Keep a coordinate path
+  only as an explicit, documented exception supported by evidence. Scope
+  queries and scrolling to the current page/container; observe related
+  properties consistently and observe again after scrolling, keyboard changes,
+  or navigation. Do not add fixed sleeps or repeat clicks to hide a failure.
+- Wait for an observable state transition, not elapsed time. A short success
+  toast alone is not persistence proof, and a permission dialog may obscure it.
+  Keep transient feedback verification separate from stable saved-state
+  readback, and state which requirement each assertion proves.
+
+### Failure Classification And Complete Collection
+
+The raw runner result and the diagnosed cause are separate facts. Every failed
+case must identify its actual failing step, the last successful step, whether
+the named business action was reached, and supporting activities plus a screen
+or accessibility capture. Include explicit diagnostic attachments even when
+the result exporter does not mark them as automatic failure attachments.
+
+| Cause | Evidence required before assigning it |
+|---|---|
+| Product behavior | Valid starting conditions and input reached the business action, but the specified result or invariant failed. |
+| Test interaction or assertion | The driver selected the wrong target, assumed an obsolete route, or evaluated the wrong observation; the captured UI and accepted behavior explain the mismatch. |
+| Setup or environment | A permission overlay, runner initialization, or other preparation failure prevented the business step; identify the step that was never reached. |
+| Undetermined | Evidence does not distinguish the causes. Preserve the uncertainty and collect the missing observation before changing product code. |
+
+- Stop the current journey when its prerequisite fails; continuing downstream
+  would manufacture more errors. Continue the other independent cases and all
+  shards once. Collection never turns failure into success. If a storage,
+  runtime, or safety preflight prevents continuation, report the remaining
+  selectors as not run, not passed.
+- Report planned, executed, passed, failed, skipped, and not-run counts against
+  the complete shard manifest. Group cases with a shared cause for diagnosis,
+  while retaining every raw failure and distinguishing blocked preparation
+  from a reached business assertion. Keep static, Unit, UI, and device results
+  separate; neither diagnostic selectors nor manual checks fill missing UI
+  coverage or overwrite a historical failure.
+
+### Repair And Acceptance Sequence
+
+1. Read existing receipts, activities, and final screens before another run.
+   Establish the protected worktree baseline and classify the actual step;
+   a test name alone cannot identify the broken feature.
+2. After an evidence-based change stabilizes, run the relevant changed-file
+   static/accessibility checks and Unit/Integration proof before long UI work.
+   Catch stale assertions and static gate failures here, rather than spending a
+   full CI campaign discovering them.
+3. Use the shortest real journey for the unresolved cause with comparable
+   preconditions. Mark it diagnostic. If it passes while the longer journey
+   fails, inspect preceding state and isolation before changing click APIs or
+   timeouts. A zero-execution runner failure is neither a business failure nor
+   a pass; an environment repair may justify one documented verification while
+   preserving the original result.
+4. Verify the relevant failure set after the repair. Each retained change must
+   explain the original failing step, why the change addresses it, and the
+   business result proved. Do not rerun unchanged code simply to clear a failure.
+5. Freeze the final revision and configuration for complete acceptance. Check
+   for a matching active or completed full CI run before dispatching; dispatch
+   once per revision under the task's authorization. Collect the full manifest
+   on every required toolchain/runtime, with the required gates passing. Do not
+   combine revisions or targeted runs into a full-pass claim. Change grouping
+   only after evidence of session degradation, retaining total coverage.
+
+Manual acceptance remains valid for the named steps, artifact, and OS tested.
+An automation preparation failure does not invalidate that observation. Ask
+for one short manual comparison only when it resolves an uncertain product
+fact; do not repeatedly ask for an unchanged flow already accepted. Manual
+evidence cannot certify a different OS or replace a separately required
+automated gate. Permissions, delivery, background behavior, and other
+hardware-owned acceptance still follow the real-device plan.
 
 ## Rollback and Recovery
 
@@ -185,6 +302,9 @@ Affected data:
 Affected permissions:
 Affected background work:
 Validation commands:
+UI source/toolchain/runtime and starting permissions/data:
+UI planned/executed/passed/failed/skipped/not-run:
+UI failures: actual step, business action reached, cause, evidence:
 Simulator/system simulation:
 Signed Archive:
 Physical device:

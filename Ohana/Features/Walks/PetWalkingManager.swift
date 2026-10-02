@@ -577,7 +577,8 @@ final class PetWalkingManager {
               let checkpoint = activeRecoveryCheckpoint(modelContext: context) else { return false }
         var descriptor = FetchDescriptor<Human>(predicate: #Predicate<Human> { $0.id == id })
         descriptor.fetchLimit = 1
-        guard let human = try? context.fetch(descriptor).first, !human.hasPassedAway else { return false }
+        guard let human = try? context.fetch(descriptor).first,
+              MemberWritePolicy.disposition(human: human, intent: .activeOnly).isAllowed else { return false }
         let previous = checkpoint.executorIds
         checkpoint.setExecutorIds([id.uuidString], primaryExecutorId: id.uuidString)
         CloudSyncMutationRecorder.markModified(checkpoint, context: context)

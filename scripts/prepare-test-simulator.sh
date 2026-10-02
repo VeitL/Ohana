@@ -16,7 +16,7 @@ elif [[ $# -gt 0 ]]; then
 fi
 
 dogfood_udid="$(ohana_require_dogfood_pin)"
-test_udid="$(ohana_resolve_simulator_by_name "${OHANA_TEST_SIMULATOR_NAME_FIXED}" || true)"
+test_udid="$(ohana_resolve_simulator_by_name "${OHANA_TEST_SIMULATOR_NAME_FIXED}" "${OHANA_TEST_RUNTIME_VERSION:-}" || true)"
 
 if [[ -n "${test_udid}" ]]; then
   ohana_assert_test_simulator_udid "${test_udid}"

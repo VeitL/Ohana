@@ -111,16 +111,24 @@ struct SettingsRouteContainerTests {
         #expect(debug.contains("PerformanceDiagnosticsView()"))
     }
 
-    @Test func notificationCategoriesUseNativeLazyDisclosure() throws {
-        let notifications = try source("Ohana/Features/Settings/Views/SettingsNotificationsPage.swift")
+    @Test(arguments: NotificationPreferenceGroup.allCases)
+    func notificationCategoryChangesPersistWithoutChangingOtherCategories(_ group: NotificationPreferenceGroup) throws {
+        // Navigation/lazy mounting belongs to the real UI journey. This unit
+        // contract checks independent preferences, not the view's source shape.
+        let suite = "SettingsNotificationCategoryTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let groups = NotificationPreferenceGroup.allCases
+        #expect(Set(groups.map(\.storageKey)).count == groups.count)
+        #expect(groups.allSatisfy { NotificationPreferenceStore.isEnabled($0, defaults: defaults) })
 
-        #expect(notifications.contains("@State private var showAdvancedNotificationSettings = false"))
-        #expect(notifications.contains("DisclosureGroup(isExpanded: $showAdvancedNotificationSettings)"))
-        #expect(notifications.contains("SettingsPlantReminderDataContainer()"))
-        #expect(notifications.contains("title: l.tr(zh: \"日历事项提醒\""))
-        #expect(notifications.contains("group: .calendar"))
-        #expect(notifications.contains("settings-notification-\\(group.rawValue)-toggle"))
-        #expect(notifications.contains("preferenceGroups.forEach"))
+        NotificationPreferenceStore.set(false, for: group, defaults: defaults)
+        let readback = try #require(UserDefaults(suiteName: suite))
+        for candidate in groups {
+            #expect(NotificationPreferenceStore.isEnabled(candidate, defaults: readback) == (candidate != group))
+        }
+        NotificationPreferenceStore.set(true, for: group, defaults: defaults)
+        #expect(groups.allSatisfy { NotificationPreferenceStore.isEnabled($0, defaults: readback) })
     }
 
     @Test func pageStateIsOwnedByDestinationViews() throws {

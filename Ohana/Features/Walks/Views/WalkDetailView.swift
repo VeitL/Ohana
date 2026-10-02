@@ -12,7 +12,6 @@ struct WalkDetailView: View {
     let walk: PetWalkLog
     let pet: Pet
 
-    @Query private var walkers: [Human]
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.dismiss) private var dismiss
     @AppStorage(RainbowWalkEffectKeys.route) private var equipFxRainbow: Bool = false
@@ -23,12 +22,6 @@ struct WalkDetailView: View {
     @State private var isRendering = false
     @State private var rainbowRoutePhase: CGFloat = 0
     private var l: L10n { L10n(appLanguage) }
-
-    init(walk: PetWalkLog, pet: Pet) {
-        self.walk = walk
-        self.pet = pet
-        _walkers = Query(WalkExecutorDisplay.descriptor(for: walk.executorIds))
-    }
 
     // 解码路径坐标
     private var routeCoordinates: [CLLocationCoordinate2D] {
@@ -93,7 +86,9 @@ struct WalkDetailView: View {
                     VStack(spacing: 18) {
                         pageChrome
                         heroSummary
-                        executorSummary
+                        WalkExecutorNamesDataContainer(executorIds: walk.executorIds) { namesByID in
+                            executorSummary(namesByID: namesByID)
+                        }
                         mapSection
                         metricStrip
                         detailTimeline
@@ -199,9 +194,8 @@ struct WalkDetailView: View {
         }
     }
 
-    private var executorSummary: some View {
-        let names = Dictionary(uniqueKeysWithValues: walkers.map { ($0.id, $0.name) })
-        return HStack(alignment: .top, spacing: 12) {
+    private func executorSummary(namesByID: [UUID: String]) -> some View {
+        HStack(alignment: .top, spacing: 12) {
             Image(systemName: "person.fill")
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
@@ -209,7 +203,7 @@ struct WalkDetailView: View {
                 Text(WalkExecutorDisplay.title(l))
                     .font(OhanaFont.footnote())
                     .foregroundStyle(Color.ohanaSecondaryText)
-                Text(WalkExecutorDisplay.names(for: walk.executorIds, namesByID: names, l: l))
+                Text(WalkExecutorDisplay.names(for: walk.executorIds, namesByID: namesByID, l: l))
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)

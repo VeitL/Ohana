@@ -1,4 +1,5 @@
 # Manual diagnostic selectors. These are excluded from the 132-case release shard manifest.
+OhanaUITests/OhanaUITests/testDiagnosticAuthorizationMatcherRejectsUnrelatedPrompts
 OhanaUITests/OhanaUITests/testDiagnosticCrewMenuOpensHumanCreation
 OhanaUITests/OhanaUITests/testDiagnosticCrewMenuWithAnimationsOpensHumanCreation
 OhanaUITests/OhanaUITests/testDiagnosticCrewMenuAfterRealOnboardingOpensHumanCreation

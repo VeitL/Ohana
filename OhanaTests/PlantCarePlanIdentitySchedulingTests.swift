@@ -123,11 +123,11 @@ struct PlantCarePlanIdentitySchedulingTests {
         )
 
         let expectedID = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
-        let migrated = try #require(fetchEvent(id: expectedID, context: context))
+        let migrated = try #require(try fetchEvent(id: expectedID, context: context))
         #expect(result.didPersist)
         #expect(result.eventIDs == [expectedID])
         #expect(result.removedEventIDs == [pointedID])
-        #expect(fetchEvent(id: pointedID, context: context) == nil)
+        #expect(try fetchEvent(id: pointedID, context: context) == nil)
         #expect(PlantCarePlanIdentity.isStructuredMatch(migrated, plantID: plant.id, careType: .watering))
         #expect(defaults.string(forKey: key) == expectedID.uuidString)
         #expect(notifications.cancelledNotificationIDs.contains("localized-pointed-plan"))
@@ -173,10 +173,10 @@ struct PlantCarePlanIdentitySchedulingTests {
         )
 
         let expectedID = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
-        let migrated = try #require(fetchEvent(id: expectedID, context: context))
+        let migrated = try #require(try fetchEvent(id: expectedID, context: context))
         #expect(result.didPersist)
         #expect(result.removedEventIDs == [pointedID])
-        #expect(fetchEvent(id: pointedID, context: context) == nil)
+        #expect(try fetchEvent(id: pointedID, context: context) == nil)
         #expect(PlantCarePlanIdentity.isStructuredMatch(migrated, plantID: plant.id, careType: .watering))
         #expect(defaults.string(forKey: key) == expectedID.uuidString)
     }
@@ -218,10 +218,10 @@ struct PlantCarePlanIdentitySchedulingTests {
         )
 
         let expectedID = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
-        let migrated = try #require(fetchEvent(id: expectedID, context: context))
+        let migrated = try #require(try fetchEvent(id: expectedID, context: context))
         #expect(result.didPersist)
         #expect(result.removedEventIDs.contains(legacyID))
-        #expect(fetchEvent(id: legacyID, context: context) == nil)
+        #expect(try fetchEvent(id: legacyID, context: context) == nil)
         #expect(migrated.taskCareKindRaw == TaskCareKind.plantWatering.rawValue)
         #expect(!migrated.title.contains(PlantCarePlanIdentity.legacyTitleMarker))
         #expect(PlantCarePlanIdentity.isStructuredMatch(migrated, plantID: plant.id, careType: .watering))
@@ -286,7 +286,7 @@ struct PlantCarePlanIdentitySchedulingTests {
             localization: L10n("en")
         )
 
-        let surviving = try #require(fetchEvent(id: expectedID, context: context))
+        let surviving = try #require(try fetchEvent(id: expectedID, context: context))
         let relatedEvents = try context.fetch(FetchDescriptor<Event>()).filter {
             $0.relatedEntityId == plant.id.uuidString && $0.eventType == EventType.watering.rawValue
         }
@@ -353,7 +353,7 @@ struct PlantCarePlanIdentitySchedulingTests {
                 localization: L10n(language)
             )
             let eventID = try #require(petResult.eventIDs.first)
-            let petTitle = try #require(fetchEvent(id: eventID, context: context)).title
+            let petTitle = try #require(try fetchEvent(id: eventID, context: context)).title
             #expect(petTitle.contains(expectedPetCopy))
             #expect(!petTitle.contains(PlantCarePlanIdentity.legacyTitleMarker))
 
@@ -367,7 +367,7 @@ struct PlantCarePlanIdentitySchedulingTests {
                 localization: L10n(language)
             )
             let childEventID = try #require(childResult.eventIDs.first)
-            let childTitle = try #require(fetchEvent(id: childEventID, context: context)).title
+            let childTitle = try #require(try fetchEvent(id: childEventID, context: context)).title
             #expect(childTitle.contains(expectedChildCopy))
             #expect(!childTitle.contains(PlantCarePlanIdentity.legacyTitleMarker))
             if language != "zh" {
@@ -635,9 +635,9 @@ struct PlantCarePlanIdentitySchedulingTests {
         return event
     }
 
-    private func fetchEvent(id: UUID, context: ModelContext) -> Event? {
+    private func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {
         var descriptor = FetchDescriptor<Event>(predicate: #Predicate<Event> { $0.id == id })
         descriptor.fetchLimit = 1
-        return (try? context.fetch(descriptor))?.first
+        return try context.fetch(descriptor).first
     }
 }

@@ -5216,6 +5216,8 @@ struct OhanaTests {
 
     @MainActor
     @Test func islandQuestEngineAggregatesDuePlantsByRoom() async throws {
+        let previousLanguage = setAppLanguageForTest("zh")
+        defer { restoreAppLanguageForTest(previousLanguage) }
         let now = dateForTest(year: 2026, month: 6, day: 11, hour: 8)
         let calendar = Calendar.current
 

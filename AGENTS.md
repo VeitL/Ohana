@@ -73,6 +73,11 @@ interactions light and changes focused.
 
 - Use the narrowest trustworthy proof after code stabilizes. Do not repeat an
   unchanged passing command or validate merely for reassurance.
+- UI diagnosis and acceptance follow the **UI Automation Evidence Contract** in
+  `docs/release-quality-gates.md`. Full failure collection uses
+  `scripts/test-ui-nightly.sh --continue-after-failure`; abort an invalid
+  journey, collect the remaining independent cases, and report the actual
+  failing step and cause separately from the raw test result.
 - For changes needing runtime acceptance, define the shortest relevant journey
   before editing. Include existing-user cold launch, resume, or media readback
   when affected; check these on `iPhone 17 Tests` where possible before the

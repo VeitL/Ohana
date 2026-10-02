@@ -12,7 +12,10 @@ final class PlantModuleUITests: XCTestCase {
 
     override func tearDown() async throws {
         guard let testRun, testRun.totalFailureCount > 0 else { return }
-        await MainActor.run { UITestInteraction.captureFailureSnapshot() }
+        await MainActor.run {
+            UITestInteraction.captureFailureSnapshot()
+            UITestInteraction.respondToPendingAuthorization(assertDismissal: false)
+        }
     }
 
     @MainActor
@@ -531,7 +534,10 @@ final class PlantModuleUITests: XCTestCase {
             ]
         }
         app.launchArguments += extraLaunchArguments
+        UITestInteraction.installAuthorizationMonitor(on: self)
+        UITestInteraction.respondToPendingAuthorization()
         app.launch()
+        UITestInteraction.respondToPendingAuthorization()
         if app.descendants(matching: .any)["zen-home-screen"].waitForExistence(timeout: 3) {
             tapWhenHittable(app.buttons["zen-toolbar-settings"], timeout: 8)
             XCTAssertTrue(
