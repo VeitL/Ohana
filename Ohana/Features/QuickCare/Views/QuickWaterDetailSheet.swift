@@ -332,6 +332,9 @@ struct QuickWaterDetailSheet: View {
             }
         }
         .onDisappear {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan detailDisappeared isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+            #endif
             waterSnapshotRefreshTask?.cancel()
             waterModeTransitionTask?.cancel()
             waterModeMaintenanceTask?.cancel()
@@ -486,6 +489,9 @@ struct QuickWaterDetailSheet: View {
     }
 
     func closeActiveWaterSheet() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan closeSheet sheet=\(activeSheet?.id ?? "nil") returns=\(waterSheetReturnStack.count)")
+        #endif
         if nestedInlineSheet != nil {
             nestedInlineSheet = nil
             return

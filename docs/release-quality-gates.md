@@ -219,6 +219,10 @@ regression lane.
   toast alone is not persistence proof, and a permission dialog may obscure it.
   Keep transient feedback verification separate from stable saved-state
   readback, and state which requirement each assertion proves.
+- A successful process exit is not execution evidence. The governed test
+  entrypoint checks the result bundle for executed cases; a successful UI run
+  must contain every requested selector, with no skipped, synthetic, repeated,
+  or unexpected cases. Enumeration is preparation only and never a test pass.
 
 ### Failure Classification And Complete Collection
 

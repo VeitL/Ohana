@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <permission-policy|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -55,6 +55,25 @@ case "${scenario}" in
       OhanaUITests/OhanaUITests/testPetLitterPlanDeleteClearsSavedReminderFromQuickCareDetail
       OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages
       OhanaUITests/OhanaUITests/testSystemGeneratedPetCalendarFeedEventRowOpensQuickFeedDetail
+      OhanaUITests/OhanaUITests/testZenFreshInstallCreatesOnlyAHumanAndOpensTheThreeTabShell
+    )
+    ;;
+  water-plan-control)
+    # Passive action/commit observation. Both journeys use the same normal UI
+    # and preserve Calendar save/delete readback; only preexisting state differs.
+    selectors=(
+      'OhanaUITests/OhanaUITests/testDiagnosticWaterPlanAfterStarterWithPassiveStateTrace()'
+      'OhanaUITests/OhanaUITests/testDiagnosticWaterPlanMatureHouseholdWithPassiveStateTrace()'
+    )
+    ;;
+  ci-repair-preflight)
+    # Compare passive observation with the unchanged original Water journey.
+    # Zen uses its evidence-backed, exact-menu interaction repair. No result
+    # from this four-case comparison is a complete release acceptance.
+    selectors=(
+      'OhanaUITests/OhanaUITests/testDiagnosticWaterPlanAfterStarterWithPassiveStateTrace()'
+      'OhanaUITests/OhanaUITests/testDiagnosticWaterPlanMatureHouseholdWithPassiveStateTrace()'
+      OhanaUITests/OhanaUITests/testPetWaterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail
       OhanaUITests/OhanaUITests/testZenFreshInstallCreatesOnlyAHumanAndOpensTheThreeTabShell
     )
     ;;

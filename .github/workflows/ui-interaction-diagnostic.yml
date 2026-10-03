@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, ci-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
+        options: [all, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -27,6 +27,8 @@ jobs:
         scenario: >-
           ${{ fromJSON(
             inputs.scenario == 'crew' && '["crew"]' ||
+            inputs.scenario == 'water-plan-control' && '["water-plan-control"]' ||
+            inputs.scenario == 'ci-repair-preflight' && '["ci-repair-preflight"]' ||
             inputs.scenario == 'ci-preflight' && '["ci-preflight-permissions","ci-preflight-interactions"]' ||
             inputs.scenario == 'historical-failures' && '["historical-failures"]' ||
             inputs.scenario == 'regression-failures' && '["regression-failures"]' ||
@@ -63,10 +65,10 @@ jobs:
       - name: Run focused governed UI diagnostics
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
-          OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ matrix.scenario == 'home-date-control' && '1' || '0' }}
+          OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ (matrix.scenario == 'home-date-control' || matrix.scenario == 'water-plan-control' || matrix.scenario == 'ci-repair-preflight') && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
       - name: Export received-touch and control-state log
-        if: always() && (startsWith(matrix.scenario, 'ci-preflight-') || matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'current-failures' || matrix.scenario == 'keyboard-dismissal' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
+        if: always() && (startsWith(matrix.scenario, 'ci-preflight-') || matrix.scenario == 'ci-repair-preflight' || matrix.scenario == 'water-plan-control' || matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'current-failures' || matrix.scenario == 'keyboard-dismissal' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
         env:
           RUNNER_TEMP: ${{ runner.temp }}
           DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}

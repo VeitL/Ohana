@@ -450,6 +450,28 @@ if [[ "${TEST_ACTION}" != "build-for-testing" && -n "${source_hash_before_test}"
     test_status=75
   fi
 fi
+
+# Xcode can exit zero after selecting no tests. Validate the actual result
+# before the lifecycle labels or removes it as successful evidence.
+if [[ "${test_status}" == "0" && "${TEST_ACTION}" != "build-for-testing" ]]; then
+  enumeration_only=0
+  execution_check_args=(--bundle "${RESULT_BUNDLE_PATH}" --scheme "${SCHEME}")
+  for argument in ${ORIGINAL_XCODEBUILD_ARGS[@]+"${ORIGINAL_XCODEBUILD_ARGS[@]}"}; do
+    case "${argument}" in
+      -enumerate-tests) enumeration_only=1 ;;
+      -only-testing:*) execution_check_args+=(--selector "${argument#-only-testing:}") ;;
+    esac
+  done
+  if [[ "${enumeration_only}" == "1" ]]; then
+    echo "Enumeration only: no test execution evidence requested."
+  else
+    if [[ "${OHANA_ALLOW_TEST_REPETITION:-0}" == "1" ]]; then
+      execution_check_args+=(--allow-repeated-tests)
+    fi
+    python3 scripts/verify-xcode-test-execution.py "${execution_check_args[@]}"
+    test_status=$?
+  fi
+fi
 set -e
 
 shutdown_test_simulator

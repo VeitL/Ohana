@@ -67,6 +67,7 @@ jobs:
         run: scripts/audit-ui-test-shards.sh
       - name: UI collection and aggregate self-tests
         run: |
+          python3 scripts/tests/run-xcode-test-execution-tests.py
           scripts/tests/run-ui-nightly-receipt-tests.sh
           python3 scripts/tests/run-ui-nightly-aggregate-tests.py
       - name: Release test-surface audit (whole repo, strict)

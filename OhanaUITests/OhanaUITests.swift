@@ -5124,7 +5124,7 @@ final class OhanaUITests: XCTestCase {
         let addedMemberName = "Codex Zen Member"
         tapWhenHittable(app.buttons["zen-members-add-menu"], timeout: 8)
         XCTAssertTrue(
-            tapNativeMenuOption(optionLabels: ["Person"], in: app),
+            tapZenMemberHumanMenuItem(in: app),
             "The Zen member menu Human option did not become ready for one input."
         )
         let addedMemberNameField = app.textFields["member-name-input"]
@@ -8023,19 +8023,43 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     func testPetWaterPlanCalendarEventAppearsAndDeletesFromQuickCareDetail() throws {
-        let app = launchEnglishApp(enableProductionOverlays: true)
-        let humanName = createFirstHuman(from: app)
+        runWaterPlanCalendarJourney()
+    }
+
+    @MainActor
+    func testDiagnosticWaterPlanAfterStarterWithPassiveStateTrace() throws {
+        runWaterPlanCalendarJourney(passiveStateTrace: true)
+    }
+
+    @MainActor
+    func testDiagnosticWaterPlanMatureHouseholdWithPassiveStateTrace() throws {
+        runWaterPlanCalendarJourney(matureHouseholdBaseline: true, passiveStateTrace: true)
+    }
+
+    @MainActor
+    private func runWaterPlanCalendarJourney(
+        matureHouseholdBaseline: Bool = false,
+        passiveStateTrace: Bool = false
+    ) {
         let petName = "Codex Water Calendar Pet \(Int(Date().timeIntervalSince1970))"
+        let app = launchEnglishApp(
+            matureHouseholdPetName: matureHouseholdBaseline ? petName : nil,
+            enableProductionOverlays: true,
+            extraLaunchArguments: passiveStateTrace ? ["-OHANA_UI_TEST_TRACE_CONTROL_STATE"] : []
+        )
+        let humanName = createFirstHuman(from: app)
         let waterEventTitles = [
             "\(petName) water",
             "\(petName) 喂水",
             "\(petName) Wasser"
         ]
-        completeFirstDayStarterFunnel(
-            in: app,
-            petName: petName,
-            completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
-        )
+        if !matureHouseholdBaseline {
+            completeFirstDayStarterFunnel(
+                in: app,
+                petName: petName,
+                completionMessage: "Creating the first pet did not leave the pet creation handoff in time."
+            )
+        }
 
         openPetWaterDetailFromHome(in: app, petName: petName, humanName: humanName)
         tapWhenHittable(app.buttons["quick-water-mode-plan"], timeout: 8)
@@ -14327,6 +14351,17 @@ final class OhanaUITests: XCTestCase {
             },
             "Pet creation breed selection did not apply. Current menu label: \(breedMenu.label)"
         )
+    }
+
+    @MainActor
+    private func tapZenMemberHumanMenuItem(in app: XCUIApplication) -> Bool {
+        // CI 37080033998: the visible native row had the correct frame, but
+        // XCTest's semantic activation point was {-1, -1}; no input was sent.
+        // Keep this exception scoped to that exact menu, with no tap fallback.
+        let row = app.buttons["zen-members-add-human-action"]
+        guard app.descendants(matching: .any)["zen-members-screen"].exists,
+              let frame = UITestInteraction.stableFrame(of: row, in: app, timeout: 8) else { return false }
+        return UITestInteraction.tapFrame(row, in: app, timeout: 0, validatedFrame: frame)
     }
 
     @MainActor

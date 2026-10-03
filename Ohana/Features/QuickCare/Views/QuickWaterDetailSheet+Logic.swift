@@ -255,6 +255,9 @@ extension QuickWaterDetailSheet {
     }
 
     func startWaterPlanSave() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan saveAction isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+        #endif
         guard !isSavingWaterPlan else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             return
@@ -288,6 +291,9 @@ extension QuickWaterDetailSheet {
     }
 
     func saveWaterPlan() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan commandBegin isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+        #endif
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
@@ -302,6 +308,9 @@ extension QuickWaterDetailSheet {
                 count: waterPlanCount,
                 allEvents: latestAllEvents()
             )
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan commandCommitted events=\(result.optimisticPlanEvents.count)")
+            #endif
             waterPlanTimes = result.normalizedTimes
             optimisticWaterPlanEvents = result.optimisticPlanEvents
             scheduleWaterReminders(
@@ -315,11 +324,17 @@ extension QuickWaterDetailSheet {
             setActiveWaterMode(.reminder)
             showSaveConfirmation(result.targetCount > 1 ? localizedSharedWaterPlanSaved(result.targetCount) : l.tr(zh: "已保存喂水计划", en: "Water plan saved", de: "Trinkplan gespeichert"))
         } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan commandDenied personalPlanQuota")
+            #endif
             optimisticWaterPlanEvents = []
             personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds, syncModeAfterRefresh: true)
         } catch {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan commandFailed type=\(String(describing: type(of: error)))")
+            #endif
             optimisticWaterPlanEvents = []
             handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_drink"))
             scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds, syncModeAfterRefresh: true)
