@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <record-input-control|record-input-observed|unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,21 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  record-input-control)
+    # Complete original journeys, including Health cancel/save/cold readback.
+    selectors=(
+      OhanaUITests/OhanaUITests/testPetWaterRecordPersistsFromQuickCareDetail
+      OhanaUITests/OhanaUITests/testPetHealthRecordCancelAndSavePersistsFromFeatureHub
+    )
+    ;;
+  record-input-observed)
+    # Same journeys and inputs; only passive received-touch/editing observation.
+    # Neither arm counts as the full 132-case release gate.
+    selectors=(
+      OhanaUITests/OhanaUITests/testPetWaterRecordPersistsFromQuickCareDetailWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testPetHealthRecordCancelAndSavePersistsFromFeatureHubWithReceivedInputTrace
+    )
+    ;;
   unresolved-controls-switch-input-control|unresolved-controls-switch-input-press)
     # Fresh complete original context in both arms. Only the one observed
     # Notifications journey changes switch contact duration, never assertions.

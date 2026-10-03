@@ -104,6 +104,9 @@ private extension UIWindow {
             if let control = node as? UIControl {
                 state += " enabled=\(control.isEnabled) tracking=\(control.isTracking) inside=\(control.isTouchInside) highlighted=\(control.isHighlighted)"
             }
+            if let field = node as? UITextField {
+                state += " editing=\(field.isEditing) firstResponder=\(field.isFirstResponder)"
+            }
             if let scroll = node as? UIScrollView {
                 state += " tracking=\(scroll.isTracking) dragging=\(scroll.isDragging) decelerating=\(scroll.isDecelerating) delayBegan=\(scroll.delaysContentTouches) cancelContent=\(scroll.canCancelContentTouches)"
             }

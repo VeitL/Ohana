@@ -32,6 +32,20 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetWaterRecordPersistsFromQuickCareDetailWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetWaterRecordPersistsFromQuickCareDetail()
+    }
+
+    @MainActor
+    func testPetHealthRecordCancelAndSavePersistsFromFeatureHubWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetHealthRecordCancelAndSavePersistsFromFeatureHub()
+    }
+
+    @MainActor
     func testExistingPetRealUserJourneyWithoutResetWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
@@ -12733,9 +12747,8 @@ final class OhanaUITests: XCTestCase {
         in app: XCUIApplication,
         context: String
     ) -> Bool {
-        guard waitUntil(timeout: 8, condition: {
-            button.exists && button.isEnabled && hasVisibleFrame(button, in: app)
-        }) else {
+        guard let frame = UITestInteraction.stableFrame(of: button, in: app, timeout: 8) else {
+            UITestInteraction.recordFailure("Home quick-action target did not stabilize", element: button)
             return false
         }
 
@@ -12746,13 +12759,15 @@ final class OhanaUITests: XCTestCase {
         // still prove the action completed.
         XCTContext.runActivity(named: "Testability gap: Home quick-action coordinate fallback") { activity in
             let attachment = XCTAttachment(
-                string: "identifier=\(button.identifier), AX frame=\(button.frame), app frame=\(app.frame), context=\(context)"
+                string: "validated AX frame=\(frame), context=\(context)"
             )
             attachment.name = "Home quick-action fallback target"
             attachment.lifetime = .keepAlways
             activity.add(attachment)
         }
-        return tapStableCoordinateTarget(button, in: app, timeout: 4, usesPointerClick: false)
+        // Reuse this observation immediately. A second frame wait and diagnostic
+        // property queries previously consumed the budget before any input.
+        return UITestInteraction.tapFrame(button, in: app, timeout: 0, validatedFrame: frame)
     }
 
     @MainActor
@@ -14301,8 +14316,10 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(didShowNameField, missingFieldMessage)
 
-        tapWhenHittable(nameField, timeout: 8)
-        nameField.typeText(name)
+        XCTAssertTrue(
+            UITestInteraction.enterTextInEmptyField(name, into: nameField, in: app, timeout: 8),
+            "Member name input did not become ready or retain the normally typed name."
+        )
         dismissKeyboardIfPresent(in: app, returnKeyIsSafe: true)
 
         tapThroughMemberCreationSteps(

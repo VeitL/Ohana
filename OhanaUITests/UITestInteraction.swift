@@ -161,10 +161,11 @@ enum UITestInteraction {
             return false
         }
         let point = CGPoint(x: frame.minX + frame.width * offset.dx, y: frame.minY + frame.height * offset.dy)
-        if let app, !app.frame.contains(point) { return false }
-        let coordinate: XCUICoordinate = if let app {
+        let windowFrame = app?.frame
+        if let windowFrame, !windowFrame.contains(point) { return false }
+        let coordinate: XCUICoordinate = if let app, let windowFrame {
             app.coordinate(withNormalizedOffset: .zero)
-                .withOffset(CGVector(dx: point.x - app.frame.minX, dy: point.y - app.frame.minY))
+                .withOffset(CGVector(dx: point.x - windowFrame.minX, dy: point.y - windowFrame.minY))
         } else {
             element.coordinate(withNormalizedOffset: offset)
         }
@@ -185,18 +186,21 @@ enum UITestInteraction {
         timeout: TimeInterval,
         requiresHittable: Bool = false
     ) -> CGRect? {
+        guard app.map({ $0.state == .runningForeground }) ?? true else { return nil }
+        // No input or route change occurs during this observation. Reuse the
+        // window bounds and read each target sample from one public snapshot;
+        // separate exists/enabled/frame queries can exhaust the sampling budget.
+        let windowFrame = app?.frame
         var previousFrame: CGRect?
         var result: CGRect?
         let ready = wait(timeout: timeout) {
-            guard app.map({ $0.state == .runningForeground }) ?? true,
-                  element.exists,
-                  let snapshot = try? element.snapshot(), snapshot.isEnabled else {
+            guard let snapshot = try? element.snapshot(), snapshot.isEnabled else {
                 previousFrame = nil
                 return false
             }
             let frame = snapshot.frame
             guard isUsable(frame),
-                  app.map({ $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) }) ?? true,
+                  windowFrame.map({ $0.contains(CGPoint(x: frame.midX, y: frame.midY)) }) ?? true,
                   !requiresHittable || element.isHittable else {
                 previousFrame = nil
                 return false
@@ -211,6 +215,35 @@ enum UITestInteraction {
             return true
         }
         return ready ? result : nil
+    }
+
+    /// For an initially empty field. One normal tap, observable keyboard
+    /// readiness, then normal typing and exact field readback. Keyboard presence
+    /// alone does not establish which field received focus; typeText and value
+    /// readback must still succeed. Never retry the tap after a missing keyboard.
+    @MainActor
+    static func enterTextInEmptyField(
+        _ text: String,
+        into field: XCUIElement,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        guard tap(field, in: app, timeout: timeout) else { return false }
+        let windowFrame = app.frame
+        guard wait(timeout: timeout, condition: {
+            guard let keyboard = try? app.keyboards.firstMatch.snapshot() else { return false }
+            return visibleFrame(for: keyboard.frame, in: windowFrame) != nil
+        }) else {
+            recordFailure("Single field tap did not present a visible keyboard; no text sent", element: field)
+            return false
+        }
+        field.typeText(text)
+        let entered = wait(timeout: timeout) {
+            guard let snapshot = try? field.snapshot() else { return false }
+            return snapshot.value as? String == text
+        }
+        if !entered { recordFailure("Typed text did not reach the intended field", element: field) }
+        return entered
     }
 
     static func isUsable(_ frame: CGRect) -> Bool {

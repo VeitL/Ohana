@@ -72,12 +72,18 @@ struct MemberNameInputField: UIViewRepresentable {
 
         func textFieldDidBeginEditing(_ textField: UITextField) {
             MemberCreationPerformance.event("Name Editing Began")
+            #if DEBUG
+                OhanaUITestTouchTrace.record("member-name-input editing began firstResponder=\(textField.isFirstResponder)")
+            #endif
             isEditing = true
             latestText = textField.text ?? ""
         }
 
         func textFieldDidEndEditing(_ textField: UITextField) {
             MemberCreationPerformance.event("Name Editing Ended")
+            #if DEBUG
+                OhanaUITestTouchTrace.record("member-name-input editing ended firstResponder=\(textField.isFirstResponder)")
+            #endif
             isEditing = false
             latestText = textField.text ?? ""
             commitLatestText()
