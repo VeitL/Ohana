@@ -105,6 +105,16 @@ enum UITestInteraction {
         in app: XCUIApplication? = nil,
         timeout: TimeInterval
     ) -> Bool {
+        sendSemanticInput(element, in: app, timeout: timeout, diagnosticPressDuration: nil)
+    }
+
+    @MainActor
+    private static func sendSemanticInput(
+        _ element: XCUIElement,
+        in app: XCUIApplication? = nil,
+        timeout: TimeInterval,
+        diagnosticPressDuration: TimeInterval?
+    ) -> Bool {
         let application = app ?? XCUIApplication()
         let windowFrame = application.frame
         // iOS 27 can report an off-screen lazy Menu as hittable. Observe its
@@ -121,7 +131,13 @@ enum UITestInteraction {
             recordFailure("Semantic tap target did not become ready", element: element)
             return false
         }
-        element.tap()
+        if let duration = diagnosticPressDuration {
+            // Opt-in controlled diagnostic only: one normal press, no extra
+            // input or elapsed-time wait. Original journeys still use tap().
+            element.press(forDuration: duration)
+        } else {
+            element.tap()
+        }
         return true
     }
 
@@ -259,7 +275,12 @@ enum UITestInteraction {
     }
 
     @MainActor
-    static func setToggle(_ element: XCUIElement, enabled: Bool, timeout: TimeInterval) -> Bool {
+    static func setToggle(
+        _ element: XCUIElement,
+        enabled: Bool,
+        timeout: TimeInterval,
+        diagnosticPressDuration: TimeInterval? = nil
+    ) -> Bool {
         var initial: Bool?
         guard wait(timeout: timeout, condition: {
             initial = toggleState(element)
@@ -269,7 +290,11 @@ enum UITestInteraction {
             return false
         }
         if initial == enabled { return true }
-        guard tap(switchControl(element), timeout: timeout) else { return false }
+        guard sendSemanticInput(
+            switchControl(element),
+            timeout: timeout,
+            diagnosticPressDuration: diagnosticPressDuration
+        ) else { return false }
         // A second tap could undo a delayed first transition. Observe the one
         // requested action and let an unchanged state fail the journey.
         func label(_ state: Bool?) -> String {

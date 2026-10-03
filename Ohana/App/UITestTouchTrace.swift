@@ -51,37 +51,39 @@ enum OhanaUITestTouchTrace {
 
 private extension UIWindow {
     @objc dynamic func ohana_observeTouchEvent(_ event: UIEvent) {
-        // Capture the hit-test and touch-recipient paths before UIKit updates
-        // the event, then dispatch the original event exactly once.
+        // Read only UIKit's actual recipient and public state. A second hitTest
+        // would re-enter input routing and could disturb the observed event.
+        // Dispatch the original event exactly once.
         var samples: [(
             touch: UITouch,
             phase: String,
             timestamp: TimeInterval,
             point: CGPoint,
-            recipientPath: String,
-            hitTestPath: String
+            recipient: UIView?,
+            recipientPath: String
         )] = []
         for touch in event.allTouches ?? [] {
             guard touch.phase == .began || touch.phase == .ended || touch.phase == .cancelled else { continue }
             let point = touch.location(in: self)
-            let recipientPath = ohana_viewPath(touch.view)
-            let hitTestPath = ohana_viewPath(hitTest(point, with: event))
+            let recipient = touch.view
+            let recipientPath = ohana_viewPath(recipient)
             samples.append((
                 touch,
                 String(describing: touch.phase.rawValue),
                 touch.timestamp,
                 point,
-                recipientPath,
-                hitTestPath
+                recipient,
+                recipientPath
             ))
         }
         ohana_observeTouchEvent(event)
-        for (touch, phase, timestamp, point, recipientPath, hitTestPath) in samples {
+        for (touch, phase, timestamp, point, recipient, recipientPath) in samples {
             let receiver = touch.view.map { String(describing: type(of: $0)) } ?? "nil"
+            let recipientPathAfter = ohana_viewPath(recipient)
             OhanaUITestTouchTrace.record(
                 "touch=\(ObjectIdentifier(touch)) phase=\(phase) timestamp=\(timestamp) "
                     + "point=\(point) window=\(ObjectIdentifier(self)) receiverAfter=\(receiver) "
-                    + "recipientPathBefore=\(recipientPath) hitTestPathBefore=\(hitTestPath)"
+                    + "recipientPathBefore=\(recipientPath) recipientPathAfter=\(recipientPathAfter)"
             )
         }
     }
@@ -91,8 +93,18 @@ private extension UIWindow {
         var current = view
         while let node = current {
             let identifier = node.accessibilityIdentifier ?? ""
-            let controlState = (node as? UISwitch).map { " isOn=\($0.isOn)" } ?? ""
-            nodes.append("\(type(of: node))[id=\(identifier)]\(controlState)")
+            var state = (node as? UISwitch).map { " isOn=\($0.isOn)" } ?? ""
+            if let control = node as? UIControl {
+                state += " enabled=\(control.isEnabled) tracking=\(control.isTracking) inside=\(control.isTouchInside) highlighted=\(control.isHighlighted)"
+            }
+            if let scroll = node as? UIScrollView {
+                state += " tracking=\(scroll.isTracking) dragging=\(scroll.isDragging) decelerating=\(scroll.isDecelerating) delayBegan=\(scroll.delaysContentTouches) cancelContent=\(scroll.canCancelContentTouches)"
+            }
+            let gestures = (node.gestureRecognizers ?? []).map {
+                "\(type(of: $0))(state=\($0.state.rawValue),enabled=\($0.isEnabled),cancel=\($0.cancelsTouchesInView),delayBegan=\($0.delaysTouchesBegan),delayEnded=\($0.delaysTouchesEnded))"
+            }.joined(separator: ",")
+            if !gestures.isEmpty { state += " gestures=[\(gestures)]" }
+            nodes.append("\(type(of: node))[id=\(identifier)]\(state)")
             current = node.superview
         }
         return nodes.joined(separator: " < ")

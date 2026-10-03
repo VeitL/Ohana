@@ -10,6 +10,7 @@ import XCTest
 final class OhanaUITests: XCTestCase {
     private var seededHumanBaselineName: String?
     private var observesReceivedInput = false
+    private var diagnosticSwitchPressDuration: TimeInterval?
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -48,6 +49,19 @@ final class OhanaUITests: XCTestCase {
     func testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePagesWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
+        try testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages()
+    }
+
+    @MainActor
+    func testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePagesWithSwitchPressWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        diagnosticSwitchPressDuration = 0.2
+        defer {
+            observesReceivedInput = false
+            diagnosticSwitchPressDuration = nil
+        }
+        // Same complete journey and assertions; only switch contact duration
+        // differs from the paired default-tap diagnostic. This is not a repair.
         try testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages()
     }
 
@@ -14888,7 +14902,12 @@ final class OhanaUITests: XCTestCase {
     ) -> Bool {
         guard toggle.waitForExistence(timeout: 8) else { return false }
         scrollTowardElement(toggle, in: app, maxSwipes: 6)
-        return UITestInteraction.setToggle(toggle, enabled: expectedState, timeout: 5)
+        return UITestInteraction.setToggle(
+            toggle,
+            enabled: expectedState,
+            timeout: 5,
+            diagnosticPressDuration: diagnosticSwitchPressDuration
+        )
     }
 
     private func accessibilityText(for element: XCUIElement) -> String {

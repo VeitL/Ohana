@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,26 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  unresolved-controls-switch-input-control|unresolved-controls-switch-input-press)
+    # Fresh complete original context in both arms. Only the one observed
+    # Notifications journey changes switch contact duration, never assertions.
+    selectors=()
+    while IFS=$'\t' read -r shard selector; do
+      [[ "${shard}" == "launch-onboarding" ]] || continue
+      if [[ "${selector}" == "OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages" ]]; then
+        if [[ "${scenario}" == "unresolved-controls-switch-input-press" ]]; then
+          selector="OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePagesWithSwitchPressWithReceivedInputTrace"
+        else
+          selector="OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePagesWithReceivedInputTrace"
+        fi
+      fi
+      selectors+=("${selector}")
+    done < "${SCRIPT_DIR}/ui-test-shards.tsv"
+    if [[ ${#selectors[@]} -ne 26 ]]; then
+      echo "Switch input diagnosis requires the complete original 26-case context." >&2
+      exit 2
+    fi
+    ;;
   unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session)
     # Preserve every original group prerequisite and XCTest lexical position.
     # Only its previously failed case opts into input observation. This is
