@@ -245,7 +245,15 @@ free_space_is_below_gate() {
 }
 
 cache_cleanup_status=0
-if [[ "${action}" != "build-for-testing" ]]; then
+if [[ "${action}" != "build-for-testing" && "${OHANA_KEEP_TEST_SIMULATOR_BOOTED:-0}" == "1" ]]; then
+  # Diagnostic log export owns the later shutdown. Never ask the cleanup
+  # entrypoint to inspect/delete caches while that evidence is still live.
+  echo "Deferring Tests cache cleanup while the Simulator is explicitly kept booted for evidence."
+  if free_space_is_below_gate; then
+    echo "Post-test free space is below ${OHANA_MINIMUM_FREE_GIB} GiB; preserve evidence and shut down Tests before reviewed cleanup." >&2
+    cache_cleanup_status=75
+  fi
+elif [[ "${action}" != "build-for-testing" ]]; then
   set +e
   apply_reviewed_cleanup_scope test-app-cache
   app_cache_cleanup_status=$?
