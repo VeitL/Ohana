@@ -1,6 +1,7 @@
 #if DEBUG
 import ObjectiveC
 import OSLog
+import SwiftUI
 import UIKit
 
 /// Opt-in observation of received touches. Input synthesis and dispatch stay unchanged.
@@ -31,6 +32,20 @@ enum OhanaUITestTouchTrace {
     static func record(_ message: String) {
         guard touchObservationInstalled || controlStateObservationEnabled else { return }
         logger.notice("\(message, privacy: .public)")
+    }
+
+    /// Forward the real setter once. Unobserved controls retain their original
+    /// binding; the diagnostic never substitutes an expected state or action.
+    static func observingToggle(_ binding: Binding<Bool>, identifier: String) -> Binding<Bool> {
+        guard touchObservationInstalled || controlStateObservationEnabled else { return binding }
+        return Binding(
+            get: { binding.wrappedValue },
+            set: { value in
+                record("\(identifier) setter requested=\(value) previous=\(binding.wrappedValue)")
+                binding.wrappedValue = value
+                record("\(identifier) setter returned=\(binding.wrappedValue)")
+            }
+        )
     }
 }
 

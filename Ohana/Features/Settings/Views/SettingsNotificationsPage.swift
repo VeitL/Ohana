@@ -180,7 +180,7 @@ struct SettingsNotificationsPage: View {
     }
 
     private func notificationPreferenceBinding(for group: NotificationPreferenceGroup) -> Binding<Bool> {
-        switch group {
+        let binding: Binding<Bool> = switch group {
         case .medication: $medicationRemindersEnabled
         case .calendar: $calendarRemindersEnabled
         case .feeding: $feedingRemindersEnabled
@@ -188,6 +188,11 @@ struct SettingsNotificationsPage: View {
         case .plantCare: $plantRemindersEnabled
         case .checkIn: $checkInRemindersEnabled
         }
+        #if DEBUG
+        return OhanaUITestTouchTrace.observingToggle(binding, identifier: "notification-category-\(group.rawValue)")
+        #else
+        return binding
+        #endif
     }
 
     private var allCategoriesActions: some View {

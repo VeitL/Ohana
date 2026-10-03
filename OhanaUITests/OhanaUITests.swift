@@ -9,6 +9,7 @@ import XCTest
 
 final class OhanaUITests: XCTestCase {
     private var seededHumanBaselineName: String?
+    private var observesReceivedInput = false
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -27,6 +28,27 @@ final class OhanaUITests: XCTestCase {
             // so the next independent journey can reach its own initial screen.
             UITestInteraction.respondToPendingAuthorization(assertDismissal: false)
         }
+    }
+
+    @MainActor
+    func testDiagnosticExistingPetJourneyWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testExistingPetRealUserJourneyWithoutReset()
+    }
+
+    @MainActor
+    func testDiagnosticPetScoopPlanWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetail()
+    }
+
+    @MainActor
+    func testDiagnosticSettingsNotificationCategoriesWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages()
     }
 
     @MainActor
@@ -10352,6 +10374,11 @@ final class OhanaUITests: XCTestCase {
             app.launchArguments += ["-OHANA_UI_TEST_RESET_ECONOMY_BUDGET"]
         }
         app.launchArguments += extraLaunchArguments
+        if observesReceivedInput {
+            // The paired diagnostic changes only opt-in observation. Original
+            // inputs, fixture lifecycle and business assertions stay intact.
+            app.launchArguments += ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        }
         app.launchEnvironment["OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"] = "1"
         app.launchEnvironment.merge(extraLaunchEnvironment) { _, newValue in newValue }
         UITestInteraction.installAuthorizationMonitor(on: self)

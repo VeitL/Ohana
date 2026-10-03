@@ -130,11 +130,17 @@ extension MemberCardCreationContentView {
         ) {
             ForEach(petBreedPickerOptions, id: \.name) { breed in
                 Button(breedLabel(breed.name)) {
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record("member-pet-breed-picker action catalogBreed=\(breed.name)")
+                    #endif
                     draft.isCustomBreed = breed.name == "其他"
                     draft.breed = breed.name == "其他" ? "" : breed.name
                     draft.customBreed = ""
                     draft.coatColor = ""
                     clampPetAppearance()
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record("member-pet-breed-picker action returned selected=\(draft.breed == breed.name)")
+                    #endif
                 }
             }
         }

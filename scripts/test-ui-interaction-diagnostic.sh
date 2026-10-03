@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,23 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  unresolved-controls-control)
+    # Unchanged original journeys on a fresh governed Tests environment.
+    selectors=(
+      OhanaUITests/OhanaUITests/testExistingPetRealUserJourneyWithoutReset
+      OhanaUITests/OhanaUITests/testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetail
+      OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages
+    )
+    ;;
+  unresolved-controls-observed)
+    # The same journeys with opt-in received-input and actual setter receipts.
+    # A diagnostic pass cannot replace any original full-run failure.
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticExistingPetJourneyWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testDiagnosticPetScoopPlanWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testDiagnosticSettingsNotificationCategoriesWithReceivedInputTrace
+    )
+    ;;
   ci-preflight-permissions)
     # Original permission-blocked journeys plus the original Feed smoke. This
     # is focused diagnostic evidence, never full 132-case acceptance.

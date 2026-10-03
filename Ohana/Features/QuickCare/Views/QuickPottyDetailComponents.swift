@@ -830,6 +830,17 @@ struct PoopCycleSettingsSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    private var draftReminderBinding: Binding<Bool> {
+        #if DEBUG
+        OhanaUITestTouchTrace.observingToggle(
+            $draftReminderOn,
+            identifier: accessibilityIDPrefix.map { "\($0)-reminder-toggle" } ?? "potty-plan-reminder-toggle"
+        )
+        #else
+        $draftReminderOn
+        #endif
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -874,7 +885,7 @@ struct PoopCycleSettingsSheet: View {
                     .tint(tint)
                     .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-anchor-date-picker" } ?? "")
 
-                    Toggle(isOn: $draftReminderOn) {
+                    Toggle(isOn: draftReminderBinding) {
                         settingsRow(
                             l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"),
                             value: draftReminderOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
@@ -911,6 +922,11 @@ struct PoopCycleSettingsSheet: View {
         }
         .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-sheet" } ?? "")
         .onAppear {
+            #if DEBUG
+            OhanaUITestTouchTrace.record(
+                "\(accessibilityIDPrefix ?? "potty-plan") appeared reminder=\(reminderOn) previousDraft=\(draftReminderOn)"
+            )
+            #endif
             draftIntervalDays = intervalDays
             draftAnchorDate = anchorDate
             draftReminderOn = reminderOn
