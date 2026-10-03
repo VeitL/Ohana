@@ -78,7 +78,7 @@ while IFS= read -r selector || [[ -n "${selector}" ]]; do
 done < "${DIAGNOSTIC_MANIFEST}"
 
 perl -ne '
-  while (m{(OhanaUITests/[A-Za-z_][A-Za-z0-9_]*/testDiagnostic[A-Za-z0-9_]+)}g) {
+  while (m{(OhanaUITests/[A-Za-z_][A-Za-z0-9_]*/test(?:Diagnostic[A-Za-z0-9_]+|[A-Za-z0-9_]+WithReceivedInputTrace))}g) {
     print "$1\n";
   }
 ' "${DIAGNOSTIC_ENTRYPOINT}" > "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}"

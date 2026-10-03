@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,28 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session)
+    # Preserve every original group prerequisite and XCTest lexical position.
+    # Only its previously failed case opts into input observation. This is
+    # group-context diagnosis, never a replacement for the full 132-case gate.
+    group="${scenario#unresolved-controls-context-}"
+    selectors=()
+    observed_cases=0
+    while IFS=$'\t' read -r shard selector; do
+      [[ "${shard}" == "${group}" ]] || continue
+      case "${selector}" in
+        OhanaUITests/OhanaUITests/testExistingPetRealUserJourneyWithoutReset|OhanaUITests/OhanaUITests/testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetail|OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages)
+          selector="${selector}WithReceivedInputTrace"
+          observed_cases=$((observed_cases + 1))
+          ;;
+      esac
+      selectors+=("${selector}")
+    done < "${SCRIPT_DIR}/ui-test-shards.tsv"
+    if [[ "${observed_cases}" != "1" || ${#selectors[@]} -eq 0 ]]; then
+      echo "Context diagnosis requires exactly one observed case in an existing complete group." >&2
+      exit 2
+    fi
+    ;;
   unresolved-controls-control)
     # Unchanged original journeys on a fresh governed Tests environment.
     selectors=(
@@ -35,9 +57,9 @@ case "${scenario}" in
     # The same journeys with opt-in received-input and actual setter receipts.
     # A diagnostic pass cannot replace any original full-run failure.
     selectors=(
-      OhanaUITests/OhanaUITests/testDiagnosticExistingPetJourneyWithReceivedInputTrace
-      OhanaUITests/OhanaUITests/testDiagnosticPetScoopPlanWithReceivedInputTrace
-      OhanaUITests/OhanaUITests/testDiagnosticSettingsNotificationCategoriesWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testExistingPetRealUserJourneyWithoutResetWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetailWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePagesWithReceivedInputTrace
     )
     ;;
   ci-preflight-permissions)

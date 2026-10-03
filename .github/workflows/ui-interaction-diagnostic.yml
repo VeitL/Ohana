@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, unresolved-controls, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
+        options: [all, unresolved-controls, unresolved-controls-context, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -26,6 +26,7 @@ jobs:
       matrix:
         scenario: >-
           ${{ fromJSON(
+            inputs.scenario == 'unresolved-controls-context' && '["unresolved-controls-context-launch-onboarding","unresolved-controls-context-pet-care-hygiene","unresolved-controls-context-pet-long-session"]' ||
             inputs.scenario == 'unresolved-controls' && '["unresolved-controls-control","unresolved-controls-observed"]' ||
             inputs.scenario == 'crew' && '["crew"]' ||
             inputs.scenario == 'water-plan-control' && '["water-plan-control"]' ||

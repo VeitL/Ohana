@@ -31,21 +31,21 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    func testDiagnosticExistingPetJourneyWithReceivedInputTrace() throws {
+    func testExistingPetRealUserJourneyWithoutResetWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
         try testExistingPetRealUserJourneyWithoutReset()
     }
 
     @MainActor
-    func testDiagnosticPetScoopPlanWithReceivedInputTrace() throws {
+    func testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetailWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
         try testPetScoopPlanCalendarEventAppearsAndDeletesFromQuickCareDetail()
     }
 
     @MainActor
-    func testDiagnosticSettingsNotificationCategoriesWithReceivedInputTrace() throws {
+    func testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePagesWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
         try testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages()

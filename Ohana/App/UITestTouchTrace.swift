@@ -40,9 +40,9 @@ enum OhanaUITestTouchTrace {
         guard touchObservationInstalled || controlStateObservationEnabled else { return binding }
         return Binding(
             get: { binding.wrappedValue },
-            set: { value in
+            set: { value, transaction in
                 record("\(identifier) setter requested=\(value) previous=\(binding.wrappedValue)")
-                binding.wrappedValue = value
+                binding.transaction(transaction).wrappedValue = value
                 record("\(identifier) setter returned=\(binding.wrappedValue)")
             }
         )
