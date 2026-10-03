@@ -59,6 +59,8 @@ private extension UIWindow {
             phase: String,
             timestamp: TimeInterval,
             point: CGPoint,
+            touchType: Int,
+            assignedGestures: String,
             recipient: UIView?,
             recipientPath: String
         )] = []
@@ -72,17 +74,22 @@ private extension UIWindow {
                 String(describing: touch.phase.rawValue),
                 touch.timestamp,
                 point,
+                touch.type.rawValue,
+                (touch.gestureRecognizers ?? []).map {
+                    "\(type(of: $0))(state=\($0.state.rawValue),enabled=\($0.isEnabled))"
+                }.joined(separator: ","),
                 recipient,
                 recipientPath
             ))
         }
         ohana_observeTouchEvent(event)
-        for (touch, phase, timestamp, point, recipient, recipientPath) in samples {
+        for (touch, phase, timestamp, point, touchType, assignedGestures, recipient, recipientPath) in samples {
             let receiver = touch.view.map { String(describing: type(of: $0)) } ?? "nil"
             let recipientPathAfter = ohana_viewPath(recipient)
             OhanaUITestTouchTrace.record(
                 "touch=\(ObjectIdentifier(touch)) phase=\(phase) timestamp=\(timestamp) "
-                    + "point=\(point) window=\(ObjectIdentifier(self)) receiverAfter=\(receiver) "
+                    + "point=\(point) type=\(touchType) assignedGesturesBefore=[\(assignedGestures)] "
+                    + "window=\(ObjectIdentifier(self)) receiverAfter=\(receiver) "
                     + "recipientPathBefore=\(recipientPath) recipientPathAfter=\(recipientPathAfter)"
             )
         }

@@ -5624,7 +5624,7 @@ final class OhanaUITests: XCTestCase {
         customSpecies.typeText("Axolotl")
         customSpecies.typeText("\n")
         XCTAssertTrue(
-            waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
+            waitUntil(timeout: 4) { UITestInteraction.isKeyboardDismissed(in: app) },
             "The custom Species keyboard did not dismiss before opening Breed."
         )
         XCTAssertEqual(
@@ -5672,7 +5672,7 @@ final class OhanaUITests: XCTestCase {
         customBreed.typeText("Golden Albino")
         customBreed.typeText("\n")
         XCTAssertTrue(
-            waitUntil(timeout: 4) { !app.keyboards.firstMatch.exists },
+            waitUntil(timeout: 4) { UITestInteraction.isKeyboardDismissed(in: app) },
             "The custom Breed keyboard did not dismiss before leaving the step."
         )
         XCTAssertEqual(

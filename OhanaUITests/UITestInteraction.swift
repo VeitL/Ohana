@@ -437,7 +437,7 @@ enum UITestInteraction {
     }
 
     @MainActor
-    private static func isKeyboardDismissed(in app: XCUIApplication) -> Bool {
+    static func isKeyboardDismissed(in app: XCUIApplication) -> Bool {
         // Done can remove the keyboard between separate exists/frame queries.
         // Observe presence and geometry from one application snapshot instead.
         // An unreadable snapshot must never count as successful dismissal.

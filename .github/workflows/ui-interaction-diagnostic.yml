@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, unresolved-controls, unresolved-controls-context, unresolved-controls-switch-input, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
+        options: [all, unresolved-controls, unresolved-controls-context, unresolved-controls-switch-input, notifications-context, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -26,6 +26,7 @@ jobs:
       matrix:
         scenario: >-
           ${{ fromJSON(
+            inputs.scenario == 'notifications-context' && '["unresolved-controls-context-launch-onboarding"]' ||
             inputs.scenario == 'unresolved-controls-switch-input' && '["unresolved-controls-switch-input-control","unresolved-controls-switch-input-press"]' ||
             inputs.scenario == 'unresolved-controls-context' && '["unresolved-controls-context-launch-onboarding","unresolved-controls-context-pet-care-hygiene","unresolved-controls-context-pet-long-session"]' ||
             inputs.scenario == 'unresolved-controls' && '["unresolved-controls-control","unresolved-controls-observed"]' ||

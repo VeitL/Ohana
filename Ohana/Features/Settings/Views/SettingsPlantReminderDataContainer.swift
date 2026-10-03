@@ -242,8 +242,20 @@ private struct SettingsPlantReminderPanelContent: View {
             isOn: Binding(
                 get: { plantCareRemindersEnabled },
                 set: { value in
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record(
+                        "plant-reminders-master setter requested=\(value) previous=\(plantCareRemindersEnabled) "
+                            + "persistedBefore=\(NotificationPreferenceStore.isEnabled(.plantCare))"
+                    )
+                    #endif
                     NotificationPreferenceStore.set(value, for: .plantCare)
                     applyPreferenceChange()
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record(
+                        "plant-reminders-master setter returned=\(plantCareRemindersEnabled) "
+                            + "persistedAfter=\(NotificationPreferenceStore.isEnabled(.plantCare))"
+                    )
+                    #endif
                 }
             )
         )
