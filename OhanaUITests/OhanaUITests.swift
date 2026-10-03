@@ -8769,8 +8769,9 @@ final class OhanaUITests: XCTestCase {
 
         openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
 
+        let healthDetail = app.scrollViews["pet-health-detail-screen"]
         let recentRowPredicate = NSPredicate(format: "identifier BEGINSWITH %@", "pet-health-recent-row-")
-        let recentRow = app.descendants(matching: .any).matching(recentRowPredicate).firstMatch
+        let recentRow = healthDetail.descendants(matching: .any).matching(recentRowPredicate).firstMatch
         XCTAssertFalse(
             recentRow.waitForExistence(timeout: 2),
             "Fresh pet unexpectedly showed a health recent row before the health record flow."
@@ -8782,6 +8783,10 @@ final class OhanaUITests: XCTestCase {
             "Health visit action did not open the record sheet."
         )
         tapWhenHittable(app.buttons["pet-health-record-close-action"], timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 10) { !app.descendants(matching: .any)["pet-health-record-sheet"].exists },
+            "Cancelling the health record did not return to the health detail."
+        )
         XCTAssertFalse(
             recentRow.waitForExistence(timeout: 2),
             "Cancelling the health record popup created a recent health record."
@@ -8794,13 +8799,21 @@ final class OhanaUITests: XCTestCase {
             "Health record popup did not expose the save action."
         )
         tapWhenHittable(saveAction, timeout: 8)
+        XCTAssertTrue(
+            waitUntil(timeout: 18) { !app.descendants(matching: .any)["pet-health-record-sheet"].exists },
+            "Saving the health record did not commit and return to the health detail."
+        )
+        // Saving can grow the alerts above Recent and move the record below
+        // the viewport. Reveal it through this page's normal scroll container
+        // before checking its identity; an app-wide firstMatch can miss it.
+        scrollTowardElement(recentRow, in: app, maxSwipes: 2, scrollArea: healthDetail)
 
         XCTAssertTrue(
             recentRow.waitForExistence(timeout: 18),
             "Health log did not appear in the recent health records after saving."
         )
         XCTAssertEqual(
-            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: healthDetail),
             1,
             "Saving one health visit did not produce exactly one visible recent row."
         )
@@ -8817,13 +8830,18 @@ final class OhanaUITests: XCTestCase {
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
         openPetHealthDetailFromHome(in: app, petName: petName, humanName: humanName)
 
-        let persistedRow = app.descendants(matching: .any)[savedRowIdentifier]
+        // SwiftUI exposes the row identifier on its image and text children.
+        // Select one child explicitly; the unique-ID count below still rejects
+        // missing or duplicated persistent records after the cold launch.
+        let persistedRow = healthDetail.descendants(matching: .any)
+            .matching(identifier: savedRowIdentifier).firstMatch
+        scrollTowardElement(persistedRow, in: app, maxSwipes: 2, scrollArea: healthDetail)
         XCTAssertTrue(
             persistedRow.waitForExistence(timeout: 18),
             "Relaunch did not read back the same saved health record."
         )
         XCTAssertEqual(
-            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: app),
+            uniqueAccessibilityIdentifierCount(prefix: "pet-health-recent-row-", in: healthDetail),
             1,
             "Relaunch lost or duplicated the saved health record."
         )
@@ -13079,8 +13097,9 @@ final class OhanaUITests: XCTestCase {
 
     @MainActor
     private func openPetHealthVisitPopup(in app: XCUIApplication) {
-        let visitAction = app.buttons["pet-health-tool-visit-action"]
-        scrollToElement(visitAction, in: app, maxSwipes: 2)
+        let healthDetail = app.scrollViews["pet-health-detail-screen"]
+        let visitAction = healthDetail.buttons["pet-health-tool-visit-action"]
+        scrollTowardElement(visitAction, in: app, maxSwipes: 2, scrollArea: healthDetail)
         XCTAssertTrue(
             visitAction.waitForExistence(timeout: 8),
             "Pet health detail did not expose the current visit action."
@@ -14684,7 +14703,7 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
-    private func uniqueAccessibilityIdentifierCount(prefix: String, in app: XCUIApplication) -> Int {
+    private func uniqueAccessibilityIdentifierCount(prefix: String, in app: XCUIElement) -> Int {
         let matches = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", prefix))
         let count = matches.count
