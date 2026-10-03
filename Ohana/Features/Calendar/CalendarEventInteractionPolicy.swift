@@ -20,6 +20,16 @@ enum CalendarEventDetailAction: Equatable {
 }
 
 enum CalendarEventInteractionPolicy {
+    static func isFamilyTaskProjection(_ event: Event) -> Bool {
+        let planID = event.familyTaskPlanId?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let occurrenceKey = event.familyTaskOccurrenceKey?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return !planID.isEmpty || !occurrenceKey.isEmpty
+    }
+
+    static func allowsDirectMutation(for event: Event) -> Bool {
+        !isFamilyTaskProjection(event)
+    }
+
     static func tapInteraction(for event: Event, pets: [Pet]) -> CalendarEventTapInteraction {
         shouldOpenRelatedDestination(for: event, pets: pets) ? .relatedDestination : .userEventDetail
     }
@@ -29,6 +39,13 @@ enum CalendarEventInteractionPolicy {
     }
 
     static func shouldOpenRelatedDestination(for event: Event, pets: [Pet]) -> Bool {
+        // A family-task occurrence owns its own role-aware workflow. Calendar
+        // is only a read-only projection and must not redirect to another
+        // feature that could expose unrelated mutation controls.
+        if isFamilyTaskProjection(event) {
+            return false
+        }
+
         if CarePlanCalendarSync.isGeneratedCalendarPlan(event, pets: pets) {
             return true
         }
@@ -54,6 +71,7 @@ enum CalendarEventInteractionPolicy {
     }
 
     static func detailActions(for event: Event, allowsEditing: Bool) -> [CalendarEventDetailAction] {
+        guard allowsDirectMutation(for: event) else { return [] }
         var actions: [CalendarEventDetailAction] = []
         if allowsEditing { actions.append(.edit) }
         if event.isActionableTask { actions.append(.complete) }
@@ -62,7 +80,8 @@ enum CalendarEventInteractionPolicy {
     }
 
     static func detailDeletionScopes(for event: Event) -> [CalendarEventDeletionScope] {
-        event.recurrenceDays > 0 ? [.singleOccurrence, .thisAndFuture] : [.wholeEvent]
+        guard allowsDirectMutation(for: event) else { return [] }
+        return event.recurrenceDays > 0 ? [.singleOccurrence, .thisAndFuture] : [.wholeEvent]
     }
 
     static func showsScheduleConfigurationInReadOnlyDetail(for _: Event) -> Bool {

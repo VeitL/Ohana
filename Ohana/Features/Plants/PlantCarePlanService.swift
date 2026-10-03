@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SwiftData
 
 nonisolated struct PlantCareTaskSnapshot: Identifiable, Equatable, Sendable {
     let id: String
@@ -21,6 +22,297 @@ nonisolated struct PlantCareTaskSnapshot: Identifiable, Equatable, Sendable {
     let priority: Int
     let effectiveIntervalDays: Int
     let learningSummary: String
+}
+
+nonisolated struct PlantCarePlanningNoteSnapshot: Equatable, Sendable {
+    let date: Date
+    let note: String
+}
+
+nonisolated struct PlantCarePlanningHistory: Equatable, Sendable {
+    let latestCareDates: [PlantCareType: Date]
+    let recentWateringDates: [Date]
+    let recentCustomNotes: [PlantCarePlanningNoteSnapshot]
+
+    static let empty = PlantCarePlanningHistory(
+        latestCareDates: [:],
+        recentWateringDates: [],
+        recentCustomNotes: []
+    )
+}
+
+nonisolated struct PlantCarePlanningHistoryBatch: Equatable, Sendable {
+    let historiesByPlantID: [UUID: PlantCarePlanningHistory]
+    let failedPlantIDs: Set<UUID>
+}
+
+/// Bounded SwiftData projection used by high-frequency plant surfaces. The
+/// deterministic planner remains a value-only service and never needs to walk
+/// a plant's unbounded relationship when this projection is supplied.
+nonisolated enum PlantCarePlanningHistoryQuery {
+    private static let latestTrackedTypes: [PlantCareType] = [
+        .pestCheck,
+        .pestFound,
+        .leafCleaning,
+        .rotating,
+        .pruning,
+        .repotting,
+        .misting
+    ]
+    private static let recentWateringLimit = 4
+    private static let recentCustomNoteLimit = 64
+    // The extra row distinguishes a complete sparse history from a saturated
+    // seed. Most Home plants therefore need one fetch, while saturated plants
+    // receive exact, type-scoped fallbacks rather than an unbounded scan.
+    private static let combinedSeedLimit =
+        latestTrackedTypes.count + recentWateringLimit + recentCustomNoteLimit + 1
+    private static let trackedSeedLimit = latestTrackedTypes.count + 1
+
+    static func build(plantID: UUID, context: ModelContext) throws -> PlantCarePlanningHistory {
+        try build(plantID: plantID) { descriptor in
+            try context.fetch(descriptor)
+        }
+    }
+
+    /// Builds value projections for a bounded set of plants. A corrupt row or
+    /// transient fetch failure degrades only that plant; task cancellation is
+    /// still propagated so callers do not publish stale Home snapshots.
+    static func buildMany(
+        plantIDs: [UUID],
+        context: ModelContext
+    ) throws -> PlantCarePlanningHistoryBatch {
+        try buildMany(plantIDs: plantIDs) { _, descriptor in
+            try context.fetch(descriptor)
+        }
+    }
+
+    static func buildMany(
+        plantIDs: [UUID],
+        fetchLogs: (UUID, FetchDescriptor<PlantCareLog>) throws -> [PlantCareLog]
+    ) throws -> PlantCarePlanningHistoryBatch {
+        var historiesByPlantID: [UUID: PlantCarePlanningHistory] = [:]
+        var failedPlantIDs: Set<UUID> = []
+        var seenPlantIDs: Set<UUID> = []
+        historiesByPlantID.reserveCapacity(plantIDs.count)
+
+        for plantID in plantIDs where seenPlantIDs.insert(plantID).inserted {
+            try Task.checkCancellation()
+            do {
+                historiesByPlantID[plantID] = try build(plantID: plantID) { descriptor in
+                    try fetchLogs(plantID, descriptor)
+                }
+            } catch {
+                if error is CancellationError {
+                    throw error
+                }
+                historiesByPlantID[plantID] = .empty
+                failedPlantIDs.insert(plantID)
+            }
+        }
+
+        return PlantCarePlanningHistoryBatch(
+            historiesByPlantID: historiesByPlantID,
+            failedPlantIDs: failedPlantIDs
+        )
+    }
+
+    static func build(
+        plantID: UUID,
+        fetchLogs: (FetchDescriptor<PlantCareLog>) throws -> [PlantCareLog]
+    ) throws -> PlantCarePlanningHistory {
+        var combinedDescriptor = combinedSeedDescriptor(plantID: plantID)
+        combinedDescriptor.fetchLimit = combinedSeedLimit
+        let combinedSeed = try fetchLogs(combinedDescriptor)
+        var history = projection(from: combinedSeed)
+
+        guard combinedSeed.count >= combinedSeedLimit else {
+            return history
+        }
+
+        let missingTrackedTypes = latestTrackedTypes.filter {
+            history.latestCareDates[$0] == nil
+        }
+        if !missingTrackedTypes.isEmpty {
+            // A second fused query is valuable when watering/feedback entirely
+            // crowded tracked care out of the combined seed. If that seed
+            // already found a tracked type, exact missing-type lookups use no
+            // more fetches than the former nine-query implementation.
+            var needsExactTrackedFallback = !history.latestCareDates.isEmpty
+            if history.latestCareDates.isEmpty {
+                var trackedDescriptor = trackedTypesDescriptor(plantID: plantID)
+                trackedDescriptor.fetchLimit = trackedSeedLimit
+                let trackedSeed = try fetchLogs(trackedDescriptor)
+                history = mergingLatestTrackedDates(from: trackedSeed, into: history)
+                needsExactTrackedFallback = trackedSeed.count >= trackedSeedLimit
+            }
+
+            if needsExactTrackedFallback {
+                for careType in latestTrackedTypes where history.latestCareDates[careType] == nil {
+                    var exactDescriptor = descriptor(
+                        plantID: plantID,
+                        careType: careType,
+                        order: .reverse
+                    )
+                    exactDescriptor.fetchLimit = 1
+                    if let date = try fetchLogs(exactDescriptor).first?.date {
+                        history = settingLatestDate(date, for: careType, in: history)
+                    }
+                }
+            }
+        }
+
+        if history.recentWateringDates.count < recentWateringLimit {
+            var wateringDescriptor = descriptor(
+                plantID: plantID,
+                careType: .watering,
+                order: .reverse
+            )
+            wateringDescriptor.fetchLimit = recentWateringLimit
+            history = PlantCarePlanningHistory(
+                latestCareDates: history.latestCareDates,
+                recentWateringDates: try fetchLogs(wateringDescriptor).map(\.date),
+                recentCustomNotes: history.recentCustomNotes
+            )
+        }
+
+        if history.recentCustomNotes.count < recentCustomNoteLimit {
+            var noteDescriptor = descriptor(
+                plantID: plantID,
+                careType: .customNote,
+                order: .reverse
+            )
+            noteDescriptor.fetchLimit = recentCustomNoteLimit
+            history = PlantCarePlanningHistory(
+                latestCareDates: history.latestCareDates,
+                recentWateringDates: history.recentWateringDates,
+                recentCustomNotes: try fetchLogs(noteDescriptor).map {
+                    PlantCarePlanningNoteSnapshot(date: $0.date, note: $0.note)
+                }
+            )
+        }
+
+        return history
+    }
+
+    private static func projection(from logs: [PlantCareLog]) -> PlantCarePlanningHistory {
+        var latestCareDates: [PlantCareType: Date] = [:]
+        var recentWateringDates: [Date] = []
+        var recentCustomNotes: [PlantCarePlanningNoteSnapshot] = []
+
+        for log in logs {
+            guard let careType = PlantCareType(rawValue: log.careTypeRaw) else { continue }
+            if latestTrackedTypes.contains(careType) {
+                let current = latestCareDates[careType]
+                if current == nil || log.date > current! {
+                    latestCareDates[careType] = log.date
+                }
+            } else if careType == .watering,
+                      recentWateringDates.count < recentWateringLimit {
+                recentWateringDates.append(log.date)
+            } else if careType == .customNote,
+                      recentCustomNotes.count < recentCustomNoteLimit {
+                recentCustomNotes.append(
+                    PlantCarePlanningNoteSnapshot(date: log.date, note: log.note)
+                )
+            }
+        }
+
+        return PlantCarePlanningHistory(
+            latestCareDates: latestCareDates,
+            recentWateringDates: recentWateringDates,
+            recentCustomNotes: recentCustomNotes
+        )
+    }
+
+    private static func mergingLatestTrackedDates(
+        from logs: [PlantCareLog],
+        into history: PlantCarePlanningHistory
+    ) -> PlantCarePlanningHistory {
+        var latestCareDates = history.latestCareDates
+        for log in logs {
+            guard let careType = PlantCareType(rawValue: log.careTypeRaw),
+                  latestTrackedTypes.contains(careType) else { continue }
+            let current = latestCareDates[careType]
+            if current == nil || log.date > current! {
+                latestCareDates[careType] = log.date
+            }
+        }
+        return PlantCarePlanningHistory(
+            latestCareDates: latestCareDates,
+            recentWateringDates: history.recentWateringDates,
+            recentCustomNotes: history.recentCustomNotes
+        )
+    }
+
+    private static func settingLatestDate(
+        _ date: Date,
+        for careType: PlantCareType,
+        in history: PlantCarePlanningHistory
+    ) -> PlantCarePlanningHistory {
+        var latestCareDates = history.latestCareDates
+        latestCareDates[careType] = date
+        return PlantCarePlanningHistory(
+            latestCareDates: latestCareDates,
+            recentWateringDates: history.recentWateringDates,
+            recentCustomNotes: history.recentCustomNotes
+        )
+    }
+
+    private static func combinedSeedDescriptor(
+        plantID: UUID
+    ) -> FetchDescriptor<PlantCareLog> {
+        let fertilizingRaw = PlantCareType.fertilizing.rawValue
+        let photoRaw = PlantCareType.photo.rawValue
+        let newLeafRaw = PlantCareType.newLeaf.rawValue
+        let yellowLeafRaw = PlantCareType.yellowLeaf.rawValue
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID &&
+                    log.careTypeRaw != fertilizingRaw &&
+                    log.careTypeRaw != photoRaw &&
+                    log.careTypeRaw != newLeafRaw &&
+                    log.careTypeRaw != yellowLeafRaw
+            },
+            sortBy: [SortDescriptor(\PlantCareLog.date, order: .reverse)]
+        )
+    }
+
+    private static func trackedTypesDescriptor(
+        plantID: UUID
+    ) -> FetchDescriptor<PlantCareLog> {
+        let wateringRaw = PlantCareType.watering.rawValue
+        let fertilizingRaw = PlantCareType.fertilizing.rawValue
+        let photoRaw = PlantCareType.photo.rawValue
+        let newLeafRaw = PlantCareType.newLeaf.rawValue
+        let yellowLeafRaw = PlantCareType.yellowLeaf.rawValue
+        let customNoteRaw = PlantCareType.customNote.rawValue
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID &&
+                    log.careTypeRaw != wateringRaw &&
+                    log.careTypeRaw != fertilizingRaw &&
+                    log.careTypeRaw != photoRaw &&
+                    log.careTypeRaw != newLeafRaw &&
+                    log.careTypeRaw != yellowLeafRaw &&
+                    log.careTypeRaw != customNoteRaw
+            },
+            sortBy: [SortDescriptor(\PlantCareLog.date, order: .reverse)]
+        )
+    }
+
+    private static func descriptor(
+        plantID: UUID,
+        careType: PlantCareType,
+        order: SortOrder
+    ) -> FetchDescriptor<PlantCareLog> {
+        let typeRaw = careType.rawValue
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID && log.careTypeRaw == typeRaw
+            },
+            sortBy: [SortDescriptor(\PlantCareLog.date, order: order)]
+        )
+    }
 }
 
 @MainActor
@@ -129,46 +421,60 @@ nonisolated enum PlantCarePlanService {
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> [PlantCareTaskSnapshot] {
+        tasks(
+            for: plant,
+            history: planningHistory(from: plant.careLogs),
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    static func tasks(
+        for plant: Plant,
+        history: PlantCarePlanningHistory,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [PlantCareTaskSnapshot] {
         guard !plant.isArchived else { return [] }
 
-        let wateringPlan = intervalPlan(for: .watering, plant: plant, calendar: calendar)
-        let fertilizingPlan = intervalPlan(for: .fertilizing, plant: plant, calendar: calendar)
+        let wateringPlan = intervalPlan(for: .watering, plant: plant, history: history, calendar: calendar)
+        let fertilizingPlan = intervalPlan(for: .fertilizing, plant: plant, history: history, calendar: calendar)
         let base = plant.createdAt
         var candidates: [(PlantCareType, Date?, IntervalPlan, Int, String)] = [
             (.watering, plant.lastWateredDate, wateringPlan, 0, wateringSubtitle(for: plant)),
             (.fertilizing, plant.lastFertilizedDate, fertilizingPlan, 2, fertilizingSubtitle(for: plant)),
             (
                 .pestCheck,
-                latestCareDate(for: plant, types: [.pestCheck, .pestFound]) ?? plant.lastHealthCheckDate,
-                intervalPlan(for: .pestCheck, plant: plant, calendar: calendar),
+                latestCareDate(in: history, types: [.pestCheck, .pestFound]) ?? plant.lastHealthCheckDate,
+                intervalPlan(for: .pestCheck, plant: plant, history: history, calendar: calendar),
                 1,
                 L10n.current.tr(zh: "查看叶背、土面和新芽", en: "Check leaf undersides, soil surface, and new growth", de: "Blattunterseiten, Erdoberfläche und neue Triebe prüfen")
             ),
             (
                 .leafCleaning,
-                latestCareDate(for: plant, types: [.leafCleaning]),
-                intervalPlan(for: .leafCleaning, plant: plant, calendar: calendar),
+                latestCareDate(in: history, types: [.leafCleaning]),
+                intervalPlan(for: .leafCleaning, plant: plant, history: history, calendar: calendar),
                 3,
                 L10n.current.tr(zh: "擦掉灰尘，让叶片更好接光", en: "Wipe dust so leaves can receive light better", de: "Staub abwischen, damit Blätter besser Licht bekommen")
             ),
             (
                 .rotating,
-                latestCareDate(for: plant, types: [.rotating]),
-                intervalPlan(for: .rotating, plant: plant, calendar: calendar),
+                latestCareDate(in: history, types: [.rotating]),
+                intervalPlan(for: .rotating, plant: plant, history: history, calendar: calendar),
                 4,
                 rotatingSubtitle(for: plant)
             ),
             (
                 .pruning,
-                latestCareDate(for: plant, types: [.pruning]),
-                intervalPlan(for: .pruning, plant: plant, calendar: calendar),
+                latestCareDate(in: history, types: [.pruning]),
+                intervalPlan(for: .pruning, plant: plant, history: history, calendar: calendar),
                 5,
                 L10n.current.tr(zh: "剪掉黄叶、枯叶或过密枝叶", en: "Trim yellow, dry, or crowded leaves", de: "Gelbe, trockene oder zu dichte Blätter schneiden")
             ),
             (
                 .repotting,
-                latestCareDate(for: plant, types: [.repotting]),
-                intervalPlan(for: .repotting, plant: plant, calendar: calendar),
+                latestCareDate(in: history, types: [.repotting]),
+                intervalPlan(for: .repotting, plant: plant, history: history, calendar: calendar),
                 6,
                 repottingSubtitle(for: plant)
             )
@@ -176,8 +482,8 @@ nonisolated enum PlantCarePlanService {
         if shouldScheduleMisting(for: plant) {
             candidates.append((
                 .misting,
-                latestCareDate(for: plant, types: [.misting]),
-                intervalPlan(for: .misting, plant: plant, calendar: calendar),
+                latestCareDate(in: history, types: [.misting]),
+                intervalPlan(for: .misting, plant: plant, history: history, calendar: calendar),
                 3,
                 mistingSubtitle(for: plant)
             ))
@@ -193,7 +499,8 @@ nonisolated enum PlantCarePlanService {
                     subtitle: subtitle,
                     priority: priority,
                     now: now,
-                    calendar: calendar
+                    calendar: calendar,
+                    deferredUntil: deferredUntil(for: type, history: history, calendar: calendar)
                 )
             }
             .sorted {
@@ -238,17 +545,28 @@ nonisolated enum PlantCarePlanService {
     }
 
     static func intervalDays(for type: PlantCareType, plant: Plant) -> Int {
-        intervalPlan(for: type, plant: plant, calendar: .current).effectiveDays
+        intervalPlan(
+            for: type,
+            plant: plant,
+            history: planningHistory(from: plant.careLogs),
+            calendar: .current
+        ).effectiveDays
     }
 
     private static func intervalPlan(
         for type: PlantCareType,
         plant: Plant,
+        history: PlantCarePlanningHistory,
         calendar: Calendar
     ) -> IntervalPlan {
         let reference = referenceIntervalDays(for: type, plant: plant)
         let environment = environmentAdjustedIntervalDays(for: type, plant: plant)
-        let learning = learningAdjustment(for: type, plant: plant, environmentDays: environment, calendar: calendar)
+        let learning = learningAdjustment(
+            for: type,
+            history: history,
+            environmentDays: environment,
+            calendar: calendar
+        )
         return IntervalPlan(
             referenceDays: reference,
             environmentDays: environment,
@@ -438,7 +756,7 @@ nonisolated enum PlantCarePlanService {
 
     private static func learningAdjustment(
         for type: PlantCareType,
-        plant: Plant,
+        history: PlantCarePlanningHistory,
         environmentDays: Int,
         calendar: Calendar
     ) -> LearningAdjustment {
@@ -446,21 +764,26 @@ nonisolated enum PlantCarePlanService {
 
         var delta = 0
         var summaries: [String] = []
-        let wetCount = consecutiveWetSoilFeedbackCount(for: plant, type: type)
+        let wetCount = consecutiveFeedbackCount(in: history) { noteIndicatesWetSoil($0) }
         if wetCount >= 2 {
             let extensionDays = min(6, wetCount * 2)
             delta += extensionDays
             summaries.append(L10n.current.tr(zh: "最近 \(wetCount) 次反馈土还湿，周期自动延长 \(extensionDays) 天", en: "Last \(wetCount) wet-soil feedback entries extend the cadence by \(extensionDays) days", de: "Die letzten \(wetCount) Rückmeldungen zu feuchter Erde verlängern den Rhythmus um \(extensionDays) Tage"))
         }
 
-        let skipCount = consecutiveSkipFeedbackCount(for: plant, type: type)
+        let skipPrefix = "skip:\(type.rawValue):"
+        let skipCount = consecutiveFeedbackCount(in: history) { $0.hasPrefix(skipPrefix) }
         if skipCount >= 2 {
             let extensionDays = min(4, skipCount)
             delta += extensionDays
             summaries.append(L10n.current.tr(zh: "最近 \(skipCount) 次跳过浇水，周期自动延长 \(extensionDays) 天", en: "Last \(skipCount) skipped watering entries extend the cadence by \(extensionDays) days", de: "Die letzten \(skipCount) übersprungenen Gießaufgaben verlängern den Rhythmus um \(extensionDays) Tage"))
         }
 
-        let earlyCount = earlyCompletionCount(for: plant, type: type, intervalDays: environmentDays, calendar: calendar)
+        let earlyCount = earlyCompletionCount(
+            dates: history.recentWateringDates,
+            intervalDays: environmentDays,
+            calendar: calendar
+        )
         if earlyCount >= 2 {
             let shorteningDays = min(4, earlyCount)
             delta -= shorteningDays
@@ -471,46 +794,24 @@ nonisolated enum PlantCarePlanService {
         return LearningAdjustment(deltaDays: delta, summary: summaries.joined(separator: "；"))
     }
 
-    private static func consecutiveWetSoilFeedbackCount(for plant: Plant, type: PlantCareType) -> Int {
-        consecutiveFeedbackCount(for: plant, type: type) { log in
-            noteIndicatesWetSoil(log.note)
-        }
-    }
-
-    private static func consecutiveSkipFeedbackCount(for plant: Plant, type: PlantCareType) -> Int {
-        consecutiveFeedbackCount(for: plant, type: type) { log in
-            isSkipFeedback(log, for: type)
-        }
-    }
-
     private static func consecutiveFeedbackCount(
-        for plant: Plant,
-        type: PlantCareType,
-        matchesFeedback: (PlantCareLog) -> Bool
+        in history: PlantCarePlanningHistory,
+        matchesFeedback: @escaping (String) -> Bool
     ) -> Int {
-        var count = 0
-        for log in plant.careLogs.sorted(by: { $0.date > $1.date }) {
-            if log.careType == type {
-                break
-            }
-            if matchesFeedback(log) {
-                count += 1
-                if count >= 4 { break }
-            }
-        }
-        return count
+        let latestWateringDate = history.recentWateringDates.max()
+        return history.recentCustomNotes.lazy
+            .filter { latestWateringDate == nil || $0.date > latestWateringDate! }
+            .filter { matchesFeedback($0.note) }
+            .prefix(4)
+            .count
     }
 
     private static func earlyCompletionCount(
-        for plant: Plant,
-        type: PlantCareType,
+        dates: [Date],
         intervalDays: Int,
         calendar: Calendar
     ) -> Int {
-        let dates = plant.careLogs
-            .filter { $0.careType == type }
-            .map(\.date)
-            .sorted()
+        let dates = dates.sorted()
         guard dates.count >= 3 else { return 0 }
 
         let threshold = max(1, Int((Double(max(intervalDays, 1)) * 0.75).rounded(.down)))
@@ -525,10 +826,6 @@ nonisolated enum PlantCarePlanService {
         }
 
         return intervals.suffix(3).count(where: { $0 <= threshold })
-    }
-
-    private static func isSkipFeedback(_ log: PlantCareLog, for type: PlantCareType) -> Bool {
-        log.careType == .customNote && log.note.hasPrefix("skip:\(type.rawValue):")
     }
 
     private static func noteIndicatesWetSoil(_ note: String) -> Bool {
@@ -728,12 +1025,13 @@ nonisolated enum PlantCarePlanService {
         subtitle: String,
         priority: Int,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        deferredUntil: Date?
     ) -> PlantCareTaskSnapshot? {
         var dueDate = calendar.date(byAdding: .day, value: intervalPlan.effectiveDays, to: calendar.startOfDay(for: lastDate))
             ?? calendar.startOfDay(for: lastDate)
         var explanation = explanation(for: type, plant: plant, intervalPlan: intervalPlan)
-        if let deferredDate = deferredUntil(for: type, plant: plant, calendar: calendar),
+        if let deferredDate = deferredUntil,
            deferredDate > dueDate {
             dueDate = deferredDate
             explanation += "；\(L10n.current.tr(zh: "最近一次跳过/延后反馈已纳入本次到期日", en: "The latest skip/defer feedback is included in this due date", de: "Die letzte Überspringen-/Verschieben-Rückmeldung ist in diesem Termin berücksichtigt"))"
@@ -759,16 +1057,17 @@ nonisolated enum PlantCarePlanService {
         )
     }
 
-    private static func latestCareDate(for plant: Plant, types: [PlantCareType]) -> Date? {
-        plant.careLogs
-            .filter { types.contains($0.careType) }
-            .map(\.date)
+    private static func latestCareDate(
+        in history: PlantCarePlanningHistory,
+        types: [PlantCareType]
+    ) -> Date? {
+        types.compactMap { history.latestCareDates[$0] }
             .max()
     }
 
     private static func deferredUntil(
         for type: PlantCareType,
-        plant: Plant,
+        history: PlantCarePlanningHistory,
         calendar: Calendar
     ) -> Date? {
         let formatter = ISO8601DateFormatter()
@@ -776,17 +1075,38 @@ nonisolated enum PlantCarePlanService {
             "defer:\(type.rawValue):",
             "skip:\(type.rawValue):"
         ]
-        return plant.careLogs
-            .filter { log in
-                log.careType == .customNote && prefixes.contains { log.note.hasPrefix($0) }
-            }
-            .compactMap { log -> Date? in
-                let prefix = prefixes.first { log.note.hasPrefix($0) } ?? ""
-                let raw = String(log.note.dropFirst(prefix.count))
+        return history.recentCustomNotes
+            .compactMap { item -> Date? in
+                guard let prefix = prefixes.first(where: { item.note.hasPrefix($0) }) else { return nil }
+                let raw = String(item.note.dropFirst(prefix.count))
                 let rawDate = raw.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? raw
                 return formatter.date(from: rawDate)
             }
             .map { calendar.startOfDay(for: $0) }
             .max()
+    }
+
+    private static func planningHistory(from logs: [PlantCareLog]) -> PlantCarePlanningHistory {
+        var latestCareDates: [PlantCareType: Date] = [:]
+        for log in logs {
+            let existing = latestCareDates[log.careType]
+            if existing == nil || log.date > existing! {
+                latestCareDates[log.careType] = log.date
+            }
+        }
+        let recentWateringDates = logs.lazy
+            .filter { $0.careType == .watering }
+            .map(\.date)
+            .sorted(by: >)
+            .prefix(4)
+        let recentCustomNotes = logs.lazy
+            .filter { $0.careType == .customNote }
+            .map { PlantCarePlanningNoteSnapshot(date: $0.date, note: $0.note) }
+            .sorted { $0.date > $1.date }
+        return PlantCarePlanningHistory(
+            latestCareDates: latestCareDates,
+            recentWateringDates: Array(recentWateringDates),
+            recentCustomNotes: recentCustomNotes
+        )
     }
 }

@@ -134,8 +134,8 @@ enum FeedHomeSnapshotBuilder {
         )
 
         return QuickFeedHomeSnapshot(
-            manualPlanEvents: manualPlanEvents,
-            autoFeederEvents: autoFeederEvents,
+            manualPlanEvents: manualPlanEvents.map(QuickFeedPlanRenderEvent.init),
+            autoFeederEvents: autoFeederEvents.map(QuickFeedPlanRenderEvent.init),
             todayMainFoodGrams: todaySummary.dryFoodGrams + todaySummary.wetFoodGrams,
             todayDryFoodGrams: todaySummary.dryFoodGrams,
             todayWetFoodGrams: todaySummary.wetFoodGrams,

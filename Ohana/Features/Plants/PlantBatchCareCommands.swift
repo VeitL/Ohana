@@ -9,179 +9,9 @@
 import Foundation
 import SwiftData
 
-nonisolated struct PlantBatchCareSelection: Hashable, Sendable {
-    let plantID: UUID
-    let careType: PlantCareType
-    let taskID: String?
-
-    init(plantID: UUID, careType: PlantCareType, taskID: String? = nil) {
-        self.plantID = plantID
-        self.careType = careType
-        self.taskID = taskID
-    }
-}
-
-nonisolated struct PlantBatchCareRestorePoint: Codable, Equatable, Sendable {
-    let plantID: UUID
-    let lastWateredDate: Date?
-    let lastFertilizedDate: Date?
-    let lastHealthCheckDate: Date?
-    let healthStatusRaw: String
-}
-
-nonisolated struct PlantBatchCareUndoItem: Codable, Equatable, Sendable {
-    let plantID: UUID
-    let careType: PlantCareType
-    let logID: UUID
-    let eventID: UUID
-    let ledgerEventID: UUID
-    let occurredAt: Date
-    let wasRewardEligible: Bool
-}
-
-nonisolated struct PlantBatchCareUndoToken: Codable, Identifiable, Equatable, Sendable {
-    let id: UUID
-    let batchID: UUID
-    let createdAt: Date
-    let expiresAt: Date
-    let executorId: String?
-    let items: [PlantBatchCareUndoItem]
-    let restorePoints: [PlantBatchCareRestorePoint]
-
-    var affectedEntityIDs: Set<UUID> {
-        var ids = Set(restorePoints.map(\.plantID))
-        for item in items {
-            ids.insert(item.logID)
-            ids.insert(item.eventID)
-            ids.insert(item.ledgerEventID)
-        }
-        return ids
-    }
-}
-
-nonisolated enum PlantBatchCarePendingRewardStore {
-    private static let key = "ohana_pending_plant_batch_care_reward_tokens_v1"
-
-    static func upsert(_ token: PlantBatchCareUndoToken, defaults: UserDefaults = .standard) {
-        var tokens = load(defaults: defaults).filter { $0.batchID != token.batchID }
-        tokens.append(token)
-        save(tokens, defaults: defaults)
-    }
-
-    static func remove(batchID: UUID, defaults: UserDefaults = .standard) {
-        let tokens = load(defaults: defaults).filter { $0.batchID != batchID }
-        save(tokens, defaults: defaults)
-    }
-
-    static func expiredTokens(now: Date = Date(), defaults: UserDefaults = .standard) -> [PlantBatchCareUndoToken] {
-        load(defaults: defaults)
-            .filter { $0.expiresAt <= now }
-            .sorted { $0.expiresAt < $1.expiresAt }
-    }
-
-    static func nextSettlementDate(now: Date = Date(), defaults: UserDefaults = .standard) -> Date? {
-        load(defaults: defaults)
-            .map(\.expiresAt)
-            .filter { $0 >= now }
-            .min()
-    }
-
-    static func load(defaults: UserDefaults = .standard) -> [PlantBatchCareUndoToken] {
-        guard let data = defaults.data(forKey: key),
-              let tokens = try? JSONDecoder().decode([PlantBatchCareUndoToken].self, from: data) else {
-            return []
-        }
-        return tokens
-    }
-
-    static func reset(defaults: UserDefaults = .standard) {
-        defaults.removeObject(forKey: key)
-    }
-
-    private static func save(_ tokens: [PlantBatchCareUndoToken], defaults: UserDefaults) {
-        if tokens.isEmpty {
-            defaults.removeObject(forKey: key)
-            return
-        }
-        guard let data = try? JSONEncoder().encode(tokens) else { return }
-        defaults.set(data, forKey: key)
-    }
-}
-
-nonisolated struct PlantBatchCareSkippedSelection: Equatable, Sendable {
-    enum Reason: String, Sendable {
-        case duplicate
-        case missingPlant
-        case notDue
-        case unsupportedCareType
-        case archivedPlant
-        case commandRejected
-    }
-
-    let selection: PlantBatchCareSelection
-    let reason: Reason
-}
-
-nonisolated struct PlantBatchCareCommandResult: Equatable, Sendable {
-    let batchID: UUID
-    let items: [PlantBatchCareUndoItem]
-    let skipped: [PlantBatchCareSkippedSelection]
-    let undoToken: PlantBatchCareUndoToken?
-    let estimatedCoconutDelta: Int
-    let didPersist: Bool
-    let persistenceErrorDescription: String?
-
-    var completedCount: Int { items.count }
-    var affectedEntityIDs: Set<UUID> { didPersist ? undoToken?.affectedEntityIDs ?? [] : [] }
-    var didWrite: Bool { didPersist && !items.isEmpty }
-}
-
-nonisolated struct PlantBatchCareUndoResult: Equatable, Sendable {
-    let batchID: UUID
-    let didUndo: Bool
-    let removedLogIDs: [UUID]
-    let removedEventIDs: [UUID]
-    let removedLedgerEventIDs: [UUID]
-    let restoredPlantIDs: [UUID]
-    let didPersist: Bool
-    let persistenceErrorDescription: String?
-
-    var affectedEntityIDs: Set<UUID> {
-        didPersist ? Set(removedLogIDs + removedEventIDs + removedLedgerEventIDs + restoredPlantIDs) : []
-    }
-}
-
-nonisolated struct PlantBatchCareRewardCommitResult: Equatable, Sendable {
-    let batchID: UUID
-    let didCommit: Bool
-    let awardedCoconutDelta: Int
-    let ledgerEventIDs: [UUID]
-    let walletEntryIDs: [UUID]
-    let budgetUsageIDs: [UUID]
-    let didPersist: Bool
-    let persistenceErrorDescription: String?
-
-    var affectedEntityIDs: Set<UUID> {
-        didPersist ? Set(ledgerEventIDs + walletEntryIDs + budgetUsageIDs) : []
-    }
-}
-
-nonisolated enum PlantBatchCarePolicy {
-    static let supportedQuickCareTypes: [PlantCareType] = [
-        .watering,
-        .fertilizing,
-        .misting,
-        .repotting,
-        .pruning,
-        .leafCleaning,
-        .rotating,
-        .pestCheck
-    ]
-}
-
 @MainActor
 enum PlantBatchCareCommandService {
-    private static let undoWindowSeconds: TimeInterval = 6
+    static let undoWindowSeconds: TimeInterval = 6
 
     private struct PreflightSelection {
         let selection: PlantBatchCareSelection
@@ -200,6 +30,69 @@ enum PlantBatchCareCommandService {
         let duplicateSkips: [PlantBatchCareSkippedSelection]
     }
 
+    private struct ValidatedBatchRewardItem {
+        let item: PlantBatchCareUndoItem
+        let action: DomainCareRewardAction
+        let ledger: CareLedgerEvent
+    }
+
+    private struct ValidatedBatchUndoItem {
+        let item: PlantBatchCareUndoItem
+        let event: Event
+        let ledger: CareLedgerEvent
+        let log: PlantCareLog
+        let eventMutation: AuthorizedDomainScheduleMutation
+    }
+
+    private enum BatchUndoValidation {
+        case alreadyUndone
+        case ready(items: [ValidatedBatchUndoItem], plantsByID: [UUID: Plant])
+    }
+
+    private enum BatchRewardValidationFailure: Error {
+        case conflict
+
+        var description: String {
+            "plantBatchCareRewardTokenConflict"
+        }
+    }
+
+    private enum BatchUndoValidationFailure: Error {
+        case conflict
+
+        var description: String {
+            "plantBatchCareUndoTokenConflict"
+        }
+    }
+
+    private enum BatchFactValidationPurpose {
+        case rewardCommit
+        case undo
+    }
+
+    private struct BatchRecordingOptions {
+        let calendar: Calendar
+        let requiresDueTask: Bool
+        let syncCarePlan: Bool
+        let scheduleNotifications: Bool
+        let operationID: UUID
+        let clock: () -> Date
+        let persistChanges: ((ModelContext) -> ModelContextSaveResult)?
+    }
+
+    private struct BatchRecordedFacts {
+        var skipped: [PlantBatchCareSkippedSelection]
+        var items: [PlantBatchCareUndoItem] = []
+        var restorePointsByPlantID: [UUID: PlantBatchCareRestorePoint] = [:]
+        var touchedPlants: [Plant] = []
+        var estimatedCoconutDelta = 0
+    }
+
+    private enum BatchRecordingOutcome {
+        case recorded(BatchRecordedFacts)
+        case rejected(PlantBatchCareCommandResult)
+    }
+
     @discardableResult
     static func completeDueCare(
         selections rawSelections: [PlantBatchCareSelection],
@@ -208,18 +101,28 @@ enum PlantBatchCareCommandService {
         now: Date = Date(),
         calendar: Calendar = .current,
         syncCarePlan: Bool = true,
-        scheduleNotifications: Bool = false
+        scheduleNotifications: Bool = false,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init,
+        persistChanges: ((ModelContext) -> ModelContextSaveResult)? = nil
     ) -> PlantBatchCareCommandResult {
-        recordBatchCare(
-            selections: rawSelections,
-            context: context,
-            executorId: executorId,
-            now: now,
-            calendar: calendar,
-            requiresDueTask: true,
-            syncCarePlan: syncCarePlan,
-            scheduleNotifications: scheduleNotifications
-        )
+        withoutActuallyEscaping(clock) { escapingClock in
+            recordBatchCare(
+                selections: rawSelections,
+                context: context,
+                executorId: executorId,
+                now: now,
+                options: BatchRecordingOptions(
+                    calendar: calendar,
+                    requiresDueTask: true,
+                    syncCarePlan: syncCarePlan,
+                    scheduleNotifications: scheduleNotifications,
+                    operationID: operationID,
+                    clock: escapingClock,
+                    persistChanges: persistChanges
+                )
+            )
+        }
     }
 
     @discardableResult
@@ -230,18 +133,28 @@ enum PlantBatchCareCommandService {
         now: Date = Date(),
         calendar: Calendar = .current,
         syncCarePlan: Bool = true,
-        scheduleNotifications: Bool = false
+        scheduleNotifications: Bool = false,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init,
+        persistChanges: ((ModelContext) -> ModelContextSaveResult)? = nil
     ) -> PlantBatchCareCommandResult {
-        recordBatchCare(
-            selections: rawSelections,
-            context: context,
-            executorId: executorId,
-            now: now,
-            calendar: calendar,
-            requiresDueTask: false,
-            syncCarePlan: syncCarePlan,
-            scheduleNotifications: scheduleNotifications
-        )
+        withoutActuallyEscaping(clock) { escapingClock in
+            recordBatchCare(
+                selections: rawSelections,
+                context: context,
+                executorId: executorId,
+                now: now,
+                options: BatchRecordingOptions(
+                    calendar: calendar,
+                    requiresDueTask: false,
+                    syncCarePlan: syncCarePlan,
+                    scheduleNotifications: scheduleNotifications,
+                    operationID: operationID,
+                    clock: escapingClock,
+                    persistChanges: persistChanges
+                )
+            )
+        }
     }
 
     @discardableResult
@@ -250,24 +163,52 @@ enum PlantBatchCareCommandService {
         context: ModelContext,
         executorId: String?,
         now: Date,
-        calendar: Calendar,
-        requiresDueTask: Bool,
-        syncCarePlan: Bool,
-        scheduleNotifications: Bool
+        options: BatchRecordingOptions
     ) -> PlantBatchCareCommandResult {
-        let preparation = batchPreparation(rawSelections, now: now, requiresDueTask: requiresDueTask, calendar: calendar)
-        if let replay = persistedReplay(for: preparation, context: context) { return replay }
+        let preparation = batchPreparation(rawSelections, operationID: options.operationID)
+        let effectiveExecutorID: String?
+        do {
+            effectiveExecutorID = try resolvedBatchExecutorID(
+                executorId,
+                context: context
+            )
+        } catch {
+            return emptyBatchResult(
+                batchID: preparation.id,
+                skipped: preparation.duplicateSkips,
+                didPersist: false,
+                persistenceErrorDescription: "plantBatchCareExecutorLookupFailed: \(error.localizedDescription)"
+            )
+        }
+        if let replay = persistedReplay(
+            for: preparation,
+            occurrenceDate: now,
+            requestedExecutorID: effectiveExecutorID,
+            context: context
+        ) {
+            return replay
+        }
         let batchID = preparation.id
         let selections = preparation.selections
-        let preflight = preflight(
-            selections: selections,
-            context: context,
-            now: now,
-            calendar: calendar,
-            requiresDueTask: requiresDueTask
-        )
-        let preflightSkips = preparation.duplicateSkips + preflight.failures
-        guard preflight.failures.isEmpty else {
+        let preflightResult: PreflightResult
+        do {
+            preflightResult = try preflight(
+                selections: selections,
+                context: context,
+                now: now,
+                calendar: options.calendar,
+                requiresDueTask: options.requiresDueTask
+            )
+        } catch {
+            return emptyBatchResult(
+                batchID: batchID,
+                skipped: preparation.duplicateSkips,
+                didPersist: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
+        let preflightSkips = preparation.duplicateSkips + preflightResult.failures
+        guard preflightResult.failures.isEmpty else {
             return emptyBatchResult(
                 batchID: batchID,
                 skipped: preflightSkips,
@@ -276,81 +217,167 @@ enum PlantBatchCareCommandService {
             )
         }
 
-        var skipped = preparation.duplicateSkips
-        var items: [PlantBatchCareUndoItem] = []
-        var restorePointsByPlantID: [UUID: PlantBatchCareRestorePoint] = [:]
-        var touchedPlants: [Plant] = []
-        var scheduleResults: [PlantCarePlanScheduleResult] = []
-        var estimatedCoconutDelta = 0
-        let deferredEconomy = PlantBatchCareDeferredEconomyAwarder()
+        let recordedFacts: BatchRecordedFacts
+        switch recordValidatedSelections(
+            preflightResult.selections,
+            batchID: batchID,
+            initialSkips: preparation.duplicateSkips,
+            executorID: effectiveExecutorID,
+            now: now,
+            context: context
+        ) {
+        case let .recorded(facts):
+            recordedFacts = facts
+        case let .rejected(result):
+            return result
+        }
+        return finishBatchRecording(
+            recordedFacts,
+            batchID: batchID,
+            executorID: effectiveExecutorID,
+            now: now,
+            context: context,
+            options: options
+        )
+    }
 
-        for validatedSelection in preflight.selections {
+    private static func recordValidatedSelections(
+        _ selections: [PreflightSelection],
+        batchID: UUID,
+        initialSkips: [PlantBatchCareSkippedSelection],
+        executorID: String?,
+        now: Date,
+        context: ModelContext
+    ) -> BatchRecordingOutcome {
+        var facts = BatchRecordedFacts(skipped: initialSkips)
+        let deferredEconomy = PlantBatchCareDeferredEconomyAwarder()
+        for validatedSelection in selections {
             let selection = validatedSelection.selection
             let plant = validatedSelection.plant
-            let existingRestorePoint = restorePointsByPlantID[plant.id]
-            let restorePointBeforeCommand = existingRestorePoint ?? restorePoint(for: plant)
-
+            if facts.restorePointsByPlantID[plant.id] == nil {
+                facts.restorePointsByPlantID[plant.id] = restorePoint(for: plant)
+                facts.touchedPlants.append(plant)
+            }
+            let wasRewardEligible = validatedSelection.wasDue &&
+                PlantCareCommandService.rewardAction(for: selection.careType) != nil
             let result = recordCare(
                 selection: selection,
                 plant: plant,
-                executorId: executorId,
+                executorId: executorID,
                 now: now,
                 careTransactionId: batchID.uuidString,
                 economy: deferredEconomy,
                 context: context
             )
             guard result.didPersist else {
-                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .commandRejected))
-                context.rollback()
-                return emptyBatchResult(
+                return rejectRecordedSelection(
+                    facts,
+                    selection: selection,
                     batchID: batchID,
-                    skipped: skipped,
-                    didPersist: false,
-                    persistenceErrorDescription: result.persistenceError
+                    error: result.persistenceError,
+                    context: context
                 )
             }
-            if existingRestorePoint == nil {
-                restorePointsByPlantID[plant.id] = restorePointBeforeCommand
-                touchedPlants.append(plant)
+            let ledger: CareLedgerEvent
+            do {
+                guard let fetchedLedger = try fetchLedgerEvent(id: result.ledgerEventID, context: context) else {
+                    return rejectRecordedSelection(
+                        facts,
+                        selection: selection,
+                        batchID: batchID,
+                        error: "plantBatchCareMissingLedger",
+                        context: context
+                    )
+                }
+                ledger = fetchedLedger
+            } catch {
+                return rejectRecordedSelection(
+                    facts,
+                    selection: selection,
+                    batchID: batchID,
+                    error: error.localizedDescription,
+                    context: context
+                )
             }
-            let wasRewardEligible = validatedSelection.wasDue && PlantCareCommandService.rewardAction(for: selection.careType) != nil
+            ledger.metadataJSON = preparedRewardMetadata(
+                batchID: batchID,
+                existingMetadata: ledger.metadataJSON,
+                wasRewardEligible: wasRewardEligible
+            )
             if wasRewardEligible, let action = PlantCareCommandService.rewardAction(for: selection.careType) {
                 let rewards = action.baseRewards
-                estimatedCoconutDelta += max(0, rewards.human) + max(0, rewards.pet)
+                facts.estimatedCoconutDelta += max(0, rewards.human) + max(0, rewards.pet)
             }
-            items.append(
-                PlantBatchCareUndoItem(
-                    plantID: result.plantID,
-                    careType: result.careType,
-                    logID: result.logID,
-                    eventID: result.eventID,
-                    ledgerEventID: result.ledgerEventID,
-                    occurredAt: now,
-                    wasRewardEligible: wasRewardEligible
-                )
-            )
+            facts.items.append(PlantBatchCareUndoItem(
+                plantID: result.plantID,
+                careType: result.careType,
+                logID: result.logID,
+                eventID: result.eventID,
+                ledgerEventID: result.ledgerEventID,
+                occurredAt: now,
+                wasRewardEligible: wasRewardEligible
+            ))
         }
+        return .recorded(facts)
+    }
 
-        if syncCarePlan {
-            for plant in touchedPlants {
+    private static func rejectRecordedSelection(
+        _ facts: BatchRecordedFacts,
+        selection: PlantBatchCareSelection,
+        batchID: UUID,
+        error: String?,
+        context: ModelContext
+    ) -> BatchRecordingOutcome {
+        restoreBatchCareFacts(facts.restorePointsByPlantID, on: facts.touchedPlants)
+        context.rollback()
+        return .rejected(emptyBatchResult(
+            batchID: batchID,
+            skipped: facts.skipped + [PlantBatchCareSkippedSelection(selection: selection, reason: .commandRejected)],
+            didPersist: false,
+            persistenceErrorDescription: error
+        ))
+    }
+
+    private static func finishBatchRecording(
+        _ facts: BatchRecordedFacts,
+        batchID: UUID,
+        executorID: String?,
+        now: Date,
+        context: ModelContext,
+        options: BatchRecordingOptions
+    ) -> PlantBatchCareCommandResult {
+        var scheduleResults: [PlantCarePlanScheduleResult] = []
+        if options.syncCarePlan {
+            for plant in facts.touchedPlants {
                 let scheduleResult = PlantCarePlanScheduleService.sync(
                     plant: plant,
                     context: context,
                     now: now,
-                    calendar: calendar,
-                    scheduleNotifications: scheduleNotifications,
+                    calendar: options.calendar,
+                    scheduleNotifications: options.scheduleNotifications,
                     saveChanges: false
                 )
+                guard scheduleResult.didPersist else {
+                    restoreBatchCareFacts(facts.restorePointsByPlantID, on: facts.touchedPlants)
+                    context.rollback()
+                    return emptyBatchResult(
+                        batchID: batchID,
+                        skipped: facts.skipped,
+                        didPersist: false,
+                        persistenceErrorDescription: scheduleResult.persistenceErrorDescription
+                    )
+                }
                 scheduleResults.append(scheduleResult)
             }
         }
-        if !items.isEmpty {
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        if !facts.items.isEmpty {
+            let saveResult = options.persistChanges?(context) ?? context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
+                restoreBatchCareFacts(facts.restorePointsByPlantID, on: facts.touchedPlants)
                 context.rollback()
                 return emptyBatchResult(
                     batchID: batchID,
-                    skipped: skipped,
+                    skipped: facts.skipped,
                     didPersist: false,
                     persistenceErrorDescription: saveResult.errorDescription
                 )
@@ -360,23 +387,26 @@ enum PlantBatchCareCommandService {
             PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult, context: context)
         }
 
-        let restorePoints = Array(restorePointsByPlantID.values)
+        let restorePoints = Array(facts.restorePointsByPlantID.values)
             .sorted { $0.plantID.uuidString < $1.plantID.uuidString }
-        let token = items.isEmpty ? nil : PlantBatchCareUndoToken(
-            id: batchID,
-            batchID: batchID,
-            createdAt: now,
-            expiresAt: now.addingTimeInterval(undoWindowSeconds),
-            executorId: executorId,
-            items: items,
-            restorePoints: restorePoints
-        )
+        let committedAt = facts.items.isEmpty ? nil : options.clock()
+        let token = committedAt.map { committedAt in
+            PlantBatchCareUndoToken(
+                id: batchID,
+                batchID: batchID,
+                createdAt: committedAt,
+                expiresAt: committedAt.addingTimeInterval(undoWindowSeconds),
+                executorId: executorID,
+                items: facts.items,
+                restorePoints: restorePoints
+            )
+        }
         return PlantBatchCareCommandResult(
             batchID: batchID,
-            items: items,
-            skipped: skipped,
+            items: facts.items,
+            skipped: facts.skipped,
             undoToken: token,
-            estimatedCoconutDelta: estimatedCoconutDelta,
+            estimatedCoconutDelta: facts.estimatedCoconutDelta,
             didPersist: true,
             persistenceErrorDescription: nil
         )
@@ -412,7 +442,8 @@ enum PlantBatchCareCommandService {
             careType: selection.careType,
             plant: plant,
             executorID: executorId,
-            now: now
+            now: now,
+            rewardOperationDate: now
         )
         let options = PlantCareCommandOptions(
             careLedger: CareLedgerService(),
@@ -436,19 +467,29 @@ enum PlantBatchCareCommandService {
         context: ModelContext,
         now: Date = Date(),
         calendar: Calendar = .current,
-        allowExpired: Bool = false
+        allowExpired: Bool = false,
+        scheduleSync: ((Plant, ModelContext, Date, Calendar) -> PlantCarePlanScheduleResult)? = nil
     ) -> PlantBatchCareUndoResult {
         guard allowExpired || now <= token.expiresAt else {
-            return PlantBatchCareUndoResult(
+            return emptyUndoResult(batchID: token.batchID)
+        }
+
+        let validation: BatchUndoValidation
+        do {
+            validation = try validateUndo(token, context: context)
+        } catch let failure as BatchUndoValidationFailure {
+            return failedUndoResult(
                 batchID: token.batchID,
-                didUndo: false,
-                removedLogIDs: [],
-                removedEventIDs: [],
-                removedLedgerEventIDs: [],
-                restoredPlantIDs: [],
-                didPersist: true,
-                persistenceErrorDescription: nil
+                errorDescription: failure.description
             )
+        } catch {
+            return failedUndoResult(
+                batchID: token.batchID,
+                errorDescription: error.localizedDescription
+            )
+        }
+        guard case let .ready(validatedItems, plantsByID) = validation else {
+            return emptyUndoResult(batchID: token.batchID)
         }
 
         var removedLogIDs: [UUID] = []
@@ -457,49 +498,67 @@ enum PlantBatchCareCommandService {
         var restoredPlantIDs: [UUID] = []
         var notificationIDsToCancel: [String] = []
         var scheduleResults: [PlantCarePlanScheduleResult] = []
+        var liveSummaryRestorePoints: [UUID: PlantBatchCareRestorePoint] = [:]
+        var liveSummaryPlants: [Plant] = []
 
-        for item in token.items {
-            if let event = fetchEvent(id: item.eventID, context: context),
-               let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
-                   event: event,
-                   writeKind: .care,
-                   source: .userCommand,
-                   context: context
-               ) {
-                let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: now, deletedByHumanId: token.executorId)
-                if result.didDelete {
-                    removedEventIDs.append(item.eventID)
-                }
-                notificationIDsToCancel.append(contentsOf: result.notificationIdsToCancel)
+        for point in token.restorePoints {
+            guard let plant = plantsByID[point.plantID] else {
+                return failedUndoResult(
+                    batchID: token.batchID,
+                    errorDescription: BatchUndoValidationFailure.conflict.description
+                )
             }
+            liveSummaryRestorePoints[plant.id] = restorePoint(for: plant)
+            liveSummaryPlants.append(plant)
+        }
 
-            if let ledger = fetchLedgerEvent(id: item.ledgerEventID, context: context) {
-                CloudSyncMutationRecorder.markDeleted(ledger, context: context, deletedAt: now, deletedByHumanId: token.executorId)
-                context.delete(ledger)
-                removedLedgerEventIDs.append(item.ledgerEventID)
+        for validated in validatedItems {
+            guard deleteUndoItem(validated, token: token, context: context, now: now, notificationIDsToCancel: &notificationIDsToCancel) else {
+                rollbackUndoChanges(
+                    context: context,
+                    liveSummaryRestorePoints: liveSummaryRestorePoints,
+                    liveSummaryPlants: liveSummaryPlants
+                )
+                return failedUndoResult(
+                    batchID: token.batchID,
+                    errorDescription: BatchUndoValidationFailure.conflict.description
+                )
             }
-
-            if let log = fetchPlantCareLog(id: item.logID, context: context) {
-                context.delete(log)
-                removedLogIDs.append(item.logID)
-            }
+            removedEventIDs.append(validated.item.eventID)
+            removedLedgerEventIDs.append(validated.item.ledgerEventID)
+            removedLogIDs.append(validated.item.logID)
         }
 
         for point in token.restorePoints {
-            guard let plant = fetchPlant(id: point.plantID, context: context) else { continue }
+            guard let plant = plantsByID[point.plantID] else { continue }
             plant.lastWateredDate = point.lastWateredDate
             plant.lastFertilizedDate = point.lastFertilizedDate
             plant.lastHealthCheckDate = point.lastHealthCheckDate
             plant.healthStatusRaw = point.healthStatusRaw
             CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
-            let scheduleResult = PlantCarePlanScheduleService.sync(
-                plant: plant,
-                context: context,
-                now: now,
-                calendar: calendar,
-                scheduleNotifications: false,
-                saveChanges: false
-            )
+            let scheduleResult = if let scheduleSync {
+                scheduleSync(plant, context, now, calendar)
+            } else {
+                PlantCarePlanScheduleService.sync(
+                    plant: plant,
+                    context: context,
+                    now: now,
+                    calendar: calendar,
+                    scheduleNotifications: false,
+                    saveChanges: false
+                )
+            }
+            guard scheduleResult.didPersist else {
+                rollbackUndoChanges(
+                    context: context,
+                    liveSummaryRestorePoints: liveSummaryRestorePoints,
+                    liveSummaryPlants: liveSummaryPlants
+                )
+                return failedUndoResult(
+                    batchID: token.batchID,
+                    errorDescription: scheduleResult.persistenceErrorDescription
+                )
+            }
             scheduleResults.append(scheduleResult)
             restoredPlantIDs.append(point.plantID)
         }
@@ -508,7 +567,11 @@ enum PlantBatchCareCommandService {
         if didChange {
             let saveResult = context.safeSaveResult(publishFailureEvent: true)
             guard saveResult.didSave else {
-                context.rollback()
+                rollbackUndoChanges(
+                    context: context,
+                    liveSummaryRestorePoints: liveSummaryRestorePoints,
+                    liveSummaryPlants: liveSummaryPlants
+                )
                 return PlantBatchCareUndoResult(
                     batchID: token.batchID,
                     didUndo: false,
@@ -521,20 +584,74 @@ enum PlantBatchCareCommandService {
                 )
             }
         }
-        DomainRehydrateEffectsDispatcher.cancelNotifications(notificationIDsToCancel)
-        for scheduleResult in scheduleResults {
-            PlantCarePlanScheduleService.commitSideEffects(for: scheduleResult, context: context)
-        }
+        commitUndoSideEffects(notificationIDs: notificationIDsToCancel, scheduleResults: scheduleResults, context: context)
 
-        return PlantBatchCareUndoResult(
+        return completedUndoResult(
             batchID: token.batchID,
-            didUndo: didChange,
+            didChange: didChange,
             removedLogIDs: removedLogIDs,
             removedEventIDs: removedEventIDs,
             removedLedgerEventIDs: removedLedgerEventIDs,
-            restoredPlantIDs: restoredPlantIDs,
-            didPersist: true,
-            persistenceErrorDescription: nil
+            restoredPlantIDs: restoredPlantIDs
+        )
+    }
+
+    private static func deleteUndoItem(
+        _ validated: ValidatedBatchUndoItem,
+        token: PlantBatchCareUndoToken,
+        context: ModelContext,
+        now: Date,
+        notificationIDsToCancel: inout [String]
+    ) -> Bool {
+        guard DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+            event: validated.event,
+            writeKind: .care,
+            source: .userCommand,
+            context: context
+        ) != nil else { return false }
+        let result = DomainScheduleWriter.deleteEvent(
+            validated.event,
+            mutation: validated.eventMutation,
+            context: context,
+            deletedAt: now,
+            deletedByHumanId: token.executorId
+        )
+        guard result.didDelete else { return false }
+        notificationIDsToCancel.append(contentsOf: result.notificationIdsToCancel)
+        CloudSyncMutationRecorder.markDeleted(
+            validated.ledger,
+            context: context,
+            deletedAt: now,
+            deletedByHumanId: token.executorId
+        )
+        context.delete(validated.ledger)
+        context.delete(validated.log)
+        return true
+    }
+
+    private static func rollbackUndoChanges(
+        context: ModelContext,
+        liveSummaryRestorePoints: [UUID: PlantBatchCareRestorePoint],
+        liveSummaryPlants: [Plant]
+    ) {
+        restoreBatchCareFacts(liveSummaryRestorePoints, on: liveSummaryPlants)
+        context.rollback()
+        restoreBatchCareFacts(liveSummaryRestorePoints, on: liveSummaryPlants)
+    }
+
+    private static func failedUndoResult(
+        batchID: UUID,
+        errorDescription: String?
+    ) -> PlantBatchCareUndoResult {
+        PlantBatchCareUndoResult(
+            batchID: batchID,
+            didUndo: false,
+            removedLogIDs: [],
+            removedEventIDs: [],
+            removedLedgerEventIDs: [],
+            restoredPlantIDs: [],
+            didPersist: false,
+            persistenceErrorDescription: errorDescription
         )
     }
 
@@ -543,66 +660,106 @@ enum PlantBatchCareCommandService {
         for token: PlantBatchCareUndoToken,
         context: ModelContext,
         now: Date = Date(),
-        economy providedEconomy: CareEventEconomyAwarding? = nil
+        economy providedEconomy: CareEventEconomyAwarding? = nil,
+        persistChanges: (ModelContext) -> ModelContextSaveResult = { context in
+            context.safeSaveResult(publishFailureEvent: true)
+        }
     ) -> PlantBatchCareRewardCommitResult {
+        guard now >= token.expiresAt else {
+            return failedRewardCommitResult(batchID: token.batchID, error: "plantBatchCareUndoWindowActive")
+        }
         let economy = providedEconomy ?? DomainServiceDependencyRegistry.careEventEconomy()
         var awardedCoconutDelta = 0
         var ledgerEventIDs: [UUID] = []
         var walletEntryIDs: [UUID] = []
         var budgetUsageIDs: [UUID] = []
+        var hasPendingFinalization = false
+        let validatedRewardItems: [ValidatedBatchRewardItem]
+        do {
+            validatedRewardItems = try validateRewardItems(in: token, context: context)
+        } catch let failure as BatchRewardValidationFailure {
+            return failedRewardCommitResult(batchID: token.batchID, error: failure.description)
+        } catch {
+            return failedRewardCommitResult(batchID: token.batchID, error: error.localizedDescription)
+        }
 
-        for item in token.items where item.wasRewardEligible {
-            guard let action = PlantCareCommandService.rewardAction(for: item.careType),
-                  let ledger = fetchLedgerEvent(id: item.ledgerEventID, context: context),
-                  ledger.coconutDelta == 0 else {
-                continue
-            }
-            let walletBefore = Set(fetchAll(CoconutLedgerEntry.self, context: context).map(\.id))
-            let budgetBefore = Set(fetchAll(EconomyBudgetUsageEvent.self, context: context).map(\.id))
-            let reward = economy.awardCareAction(
+        for validated in validatedRewardItems {
+            let item = validated.item
+            let action = validated.action
+            let ledger = validated.ledger
+            guard shouldFinalizeReward(in: ledger) else { continue }
+            let idempotencyKey = batchRewardIdempotencyKey(
+                batchID: token.batchID,
+                ledgerEventID: ledger.id
+            )
+            let operationDate = PlantCareCommandService.rewardOperationDate(
+                in: ledger,
+                fallback: item.occurredAt
+            )
+            let reward = economy.awardIdempotentCareAction(
                 type: action,
                 pet: nil,
                 context: context,
                 quality: .none,
-                date: item.occurredAt,
-                executorId: token.executorId,
-                careObjectKey: item.plantID
+                date: operationDate,
+                executorId: ledger.actorId ?? token.executorId,
+                careObjectKey: item.plantID,
+                idempotencyKey: idempotencyKey,
+                idempotencyID: ledger.id
             )
-            let newWalletEntries = fetchAll(CoconutLedgerEntry.self, context: context)
-                .filter { !walletBefore.contains($0.id) }
-            let newBudgetEvents = fetchAll(EconomyBudgetUsageEvent.self, context: context)
-                .filter { !budgetBefore.contains($0.id) }
+            guard reward.didPersist else {
+                hasPendingFinalization = true
+                continue
+            }
+            let rewardPair = (humanGot: reward.humanGot, petGot: reward.petGot)
+            let rewardJSON = economy.rewardMetadata(for: rewardPair)
+            let trace = rewardTrace(
+                idempotencyKey: idempotencyKey,
+                context: context
+            )
             let delta = max(0, reward.humanGot) + max(0, reward.petGot)
             ledger.coconutDelta = delta
             ledger.metadataJSON = rewardMetadata(
                 batchID: token.batchID,
                 existingMetadata: ledger.metadataJSON,
-                rewardMetadata: economy.rewardMetadata(for: reward),
-                walletEntries: newWalletEntries,
-                budgetEvents: newBudgetEvents
+                rewardMetadata: rewardJSON,
+                idempotencyKey: idempotencyKey,
+                walletEntryIDs: trace.walletEntryIDs,
+                budgetUsageIDs: trace.budgetUsageIDs
             )
             CloudSyncMutationRecorder.markModified(ledger, context: context, modifiedAt: now)
-            awardedCoconutDelta += delta
-            ledgerEventIDs.append(ledger.id)
-            walletEntryIDs.append(contentsOf: newWalletEntries.map(\.id))
-            budgetUsageIDs.append(contentsOf: newBudgetEvents.map(\.id))
-        }
-
-        if !ledgerEventIDs.isEmpty {
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
-            guard saveResult.didSave else {
+            let checkpoint = persistChanges(context)
+            guard checkpoint.didSave else {
                 context.rollback()
+                economy.refreshProjectionAfterRollback(context: context)
                 return PlantBatchCareRewardCommitResult(
                     batchID: token.batchID,
-                    didCommit: false,
-                    awardedCoconutDelta: 0,
-                    ledgerEventIDs: [],
-                    walletEntryIDs: [],
-                    budgetUsageIDs: [],
+                    didCommit: !ledgerEventIDs.isEmpty,
+                    awardedCoconutDelta: awardedCoconutDelta,
+                    ledgerEventIDs: ledgerEventIDs,
+                    walletEntryIDs: walletEntryIDs,
+                    budgetUsageIDs: budgetUsageIDs,
                     didPersist: false,
-                    persistenceErrorDescription: saveResult.errorDescription
+                    persistenceErrorDescription: checkpoint.errorDescription
                 )
             }
+            awardedCoconutDelta += delta
+            ledgerEventIDs.append(ledger.id)
+            walletEntryIDs.append(contentsOf: trace.walletEntryIDs)
+            budgetUsageIDs.append(contentsOf: trace.budgetUsageIDs)
+        }
+
+        if hasPendingFinalization {
+            return PlantBatchCareRewardCommitResult(
+                batchID: token.batchID,
+                didCommit: !ledgerEventIDs.isEmpty,
+                awardedCoconutDelta: awardedCoconutDelta,
+                ledgerEventIDs: ledgerEventIDs,
+                walletEntryIDs: walletEntryIDs,
+                budgetUsageIDs: budgetUsageIDs,
+                didPersist: false,
+                persistenceErrorDescription: "plantBatchCareRewardFinalizationPending"
+            )
         }
 
         return PlantBatchCareRewardCommitResult(
@@ -616,6 +773,239 @@ enum PlantBatchCareCommandService {
             persistenceErrorDescription: nil
         )
     }
+}
+
+@MainActor
+extension PlantBatchCareCommandService {
+    private static func validateUndo(
+        _ token: PlantBatchCareUndoToken,
+        context: ModelContext
+    ) throws -> BatchUndoValidation {
+        guard tokenEnvelopeIsValid(token, requiresRestorePoints: true) else {
+            throw BatchUndoValidationFailure.conflict
+        }
+        var lookups: [(
+            item: PlantBatchCareUndoItem,
+            event: Event?,
+            ledger: CareLedgerEvent?,
+            log: PlantCareLog?
+        )] = []
+        for item in token.items {
+            lookups.append((
+                item: item,
+                event: try fetchEvent(id: item.eventID, context: context),
+                ledger: try fetchLedgerEvent(id: item.ledgerEventID, context: context),
+                log: try fetchPlantCareLog(id: item.logID, context: context)
+            ))
+        }
+        if lookups.allSatisfy({ $0.event == nil && $0.ledger == nil && $0.log == nil }) {
+            return .alreadyUndone
+        }
+        guard lookups.allSatisfy({ $0.event != nil && $0.ledger != nil && $0.log != nil }) else {
+            throw BatchUndoValidationFailure.conflict
+        }
+
+        var plantsByID: [UUID: Plant] = [:]
+        for point in token.restorePoints {
+            guard let plant = try fetchPlant(id: point.plantID, context: context),
+                  !plant.isArchived else {
+                throw BatchUndoValidationFailure.conflict
+            }
+            plantsByID[plant.id] = plant
+        }
+
+        let items = try lookups.map { lookup -> ValidatedBatchUndoItem in
+            guard let event = lookup.event,
+                  let ledger = lookup.ledger,
+                  let log = lookup.log,
+                  batchFactLinksAreValid(
+                      item: lookup.item,
+                      token: token,
+                      event: event,
+                      ledger: ledger,
+                      log: log,
+                      purpose: .undo
+                  ),
+                  let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
+                      event: event,
+                      writeKind: .care,
+                      source: .userCommand,
+                      context: context
+                  ) else {
+                throw BatchUndoValidationFailure.conflict
+            }
+            return ValidatedBatchUndoItem(
+                item: lookup.item,
+                event: event,
+                ledger: ledger,
+                log: log,
+                eventMutation: mutation
+            )
+        }
+        return .ready(items: items, plantsByID: plantsByID)
+    }
+
+    private static func validateRewardItems(
+        in token: PlantBatchCareUndoToken,
+        context: ModelContext
+    ) throws -> [ValidatedBatchRewardItem] {
+        guard tokenEnvelopeIsValid(token, requiresRestorePoints: false) else {
+            throw BatchRewardValidationFailure.conflict
+        }
+        return try token.items.filter(\.wasRewardEligible).map { item in
+            guard let action = PlantCareCommandService.rewardAction(for: item.careType),
+                  let ledger = try fetchLedgerEvent(id: item.ledgerEventID, context: context),
+                  let log = try fetchPlantCareLog(id: item.logID, context: context),
+                  batchFactLinksAreValid(
+                      item: item,
+                      token: token,
+                      event: nil,
+                      ledger: ledger,
+                      log: log,
+                      purpose: .rewardCommit
+                  ) else {
+                throw BatchRewardValidationFailure.conflict
+            }
+            return ValidatedBatchRewardItem(item: item, action: action, ledger: ledger)
+        }
+    }
+
+    private static func tokenEnvelopeIsValid(
+        _ token: PlantBatchCareUndoToken,
+        requiresRestorePoints: Bool
+    ) -> Bool {
+        guard token.id == token.batchID,
+              !token.items.isEmpty,
+              token.executorId == normalizedExecutorID(token.executorId),
+              Set(token.items.map(\.ledgerEventID)).count == token.items.count,
+              Set(token.items.map(\.logID)).count == token.items.count,
+              Set(token.items.map(\.eventID)).count == token.items.count else {
+            return false
+        }
+        let targetKeys = token.items.map {
+            "\($0.plantID.uuidString):\($0.careType.rawValue)"
+        }
+        guard Set(targetKeys).count == targetKeys.count else { return false }
+        guard requiresRestorePoints else { return true }
+        let restorePointPlantIDs = token.restorePoints.map(\.plantID)
+        return !restorePointPlantIDs.isEmpty &&
+            Set(restorePointPlantIDs).count == restorePointPlantIDs.count &&
+            Set(restorePointPlantIDs) == Set(token.items.map(\.plantID))
+    }
+
+    private static func batchFactLinksAreValid(
+        item: PlantBatchCareUndoItem,
+        token: PlantBatchCareUndoToken,
+        event: Event?,
+        ledger: CareLedgerEvent,
+        log: PlantCareLog,
+        purpose: BatchFactValidationPurpose
+    ) -> Bool {
+        let transactionID = token.batchID.uuidString
+        let expectedExecutorID = normalizedExecutorID(token.executorId)
+        let expectedActorKind = expectedExecutorID == nil
+            ? CareLedgerActorKind.unknown.rawValue
+            : CareLedgerActorKind.human.rawValue
+        guard log.plant?.id == item.plantID,
+              log.careType == item.careType,
+              log.careTransactionId == transactionID,
+              log.date == item.occurredAt,
+              log.executorId == expectedExecutorID,
+              ledger.subjectKind == CareLedgerSubjectKind.plant.rawValue,
+              ledger.subjectId == item.plantID.uuidString,
+              ledger.eventKind == CareLedgerEventKind.plantCare.rawValue,
+              ledger.actionType == item.careType.rawValue,
+              ledger.occurredAt == item.occurredAt,
+              ledger.actorKind == expectedActorKind,
+              ledger.actorId == expectedExecutorID,
+              ledger.source == CareLedgerSource.detail.rawValue,
+              ledger.sourceReminderId == nil,
+              ledger.legacyModelName == String(describing: PlantCareLog.self),
+              ledger.legacyModelId == item.logID.uuidString,
+              CareLedgerMetadata.stringValue(
+                  named: CareLedgerMetadata.careTransactionId,
+                  in: ledger.metadataJSON
+              ) == transactionID else {
+            return false
+        }
+
+        switch purpose {
+        case .rewardCommit:
+            let sourceEventMatches = ledger.sourceEventId == item.eventID.uuidString ||
+                (ledger.sourceEventId == nil && item.eventID == ledger.id)
+            guard sourceEventMatches else { return false }
+        case .undo:
+            guard ledger.sourceEventId == item.eventID.uuidString,
+                  let event,
+                  event.relatedEntityType == EntityKind.plant.rawValue,
+                  event.relatedEntityId == item.plantID.uuidString,
+                  event.eventType == item.careType.eventType.rawValue,
+                  event.startDate == item.occurredAt,
+                  event.recurrenceDays == 0,
+                  !event.isAllDay,
+                  event.assigneeId == expectedExecutorID else {
+                return false
+            }
+        }
+
+        let metadata = CalendarTaskCompletionSyncService.metadataDictionary(from: ledger.metadataJSON)
+        if let rawBatchID = metadata[CareLedgerMetadata.batchID],
+           rawBatchID as? String != transactionID {
+            return false
+        }
+        let generatedBy: String?
+        if let rawGeneratedBy = metadata["generatedBy"] {
+            guard let value = rawGeneratedBy as? String,
+                  value == "PlantBatchCareCommandService" else {
+                return false
+            }
+            generatedBy = value
+        } else {
+            generatedBy = nil
+        }
+        let rewardState: String?
+        if let rawRewardState = metadata[PlantCareCommandService.rewardStateMetadataKey] {
+            guard let value = rawRewardState as? String else { return false }
+            rewardState = value
+        } else {
+            rewardState = nil
+        }
+
+        if item.wasRewardEligible {
+            guard PlantCareCommandService.rewardAction(for: item.careType) != nil else { return false }
+            switch purpose {
+            case .rewardCommit:
+                if let rewardState {
+                    return rewardState == PlantCareCommandService.rewardStatePending ||
+                        rewardState == PlantCareCommandService.rewardStateSettled
+                }
+                // Pre-state tokens are pending when no generated marker exists;
+                // a generated marker denotes an already-settled legacy token.
+                return generatedBy == nil || generatedBy == "PlantBatchCareCommandService"
+            case .undo:
+                if let rewardState {
+                    return rewardState == PlantCareCommandService.rewardStatePending
+                }
+                return generatedBy == nil
+            }
+        }
+
+        switch purpose {
+        case .rewardCommit:
+            return false
+        case .undo:
+            if let rewardState {
+                return rewardState == PlantCareCommandService.rewardStateNotEligible
+            }
+            return generatedBy == nil
+        }
+    }
+
+    private static func normalizedExecutorID(_ raw: String?) -> String? {
+        guard let normalized = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !normalized.isEmpty else { return nil }
+        return normalized
+    }
 
     private nonisolated static let supportedBatchCareTypes = Set(PlantBatchCarePolicy.supportedQuickCareTypes)
 
@@ -625,7 +1015,7 @@ enum PlantBatchCareCommandService {
         now: Date,
         calendar: Calendar,
         requiresDueTask: Bool
-    ) -> PreflightResult {
+    ) throws -> PreflightResult {
         var validatedSelections: [PreflightSelection] = []
         var failures: [PlantBatchCareSkippedSelection] = []
 
@@ -634,7 +1024,7 @@ enum PlantBatchCareCommandService {
                 failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .unsupportedCareType))
                 continue
             }
-            guard let plant = fetchPlant(id: selection.plantID, context: context) else {
+            guard let plant = try fetchPlant(id: selection.plantID, context: context) else {
                 failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .missingPlant))
                 continue
             }
@@ -642,7 +1032,13 @@ enum PlantBatchCareCommandService {
                 failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .archivedPlant))
                 continue
             }
-            let due = isDue(selection.careType, for: plant, now: now, calendar: calendar)
+            let due = try isDue(
+                selection.careType,
+                for: plant,
+                context: context,
+                now: now,
+                calendar: calendar
+            )
             guard !requiresDueTask || due else {
                 failures.append(PlantBatchCareSkippedSelection(selection: selection, reason: .notDue))
                 continue
@@ -655,66 +1051,23 @@ enum PlantBatchCareCommandService {
         return PreflightResult(selections: validatedSelections, failures: failures)
     }
 
-    private static func normalizedSelections(_ selections: [PlantBatchCareSelection]) -> [PlantBatchCareSelection] {
-        var seen: Set<String> = []
-        var result: [PlantBatchCareSelection] = []
-        for selection in selections {
-            let key = "\(selection.plantID.uuidString):\(selection.careType.rawValue)"
-            guard !seen.contains(key) else { continue }
-            seen.insert(key)
-            result.append(selection)
-        }
-        return result
-    }
-
-    private static func skippedDuplicates(in selections: [PlantBatchCareSelection]) -> [PlantBatchCareSkippedSelection] {
-        var seen: Set<String> = []
-        var skipped: [PlantBatchCareSkippedSelection] = []
-        for selection in selections {
-            let key = "\(selection.plantID.uuidString):\(selection.careType.rawValue)"
-            if seen.contains(key) {
-                skipped.append(PlantBatchCareSkippedSelection(selection: selection, reason: .duplicate))
-            } else {
-                seen.insert(key)
-            }
-        }
-        return skipped
-    }
-
-    private static func isDue(
-        _ type: PlantCareType,
-        for plant: Plant,
-        now: Date,
-        calendar: Calendar
-    ) -> Bool {
-        PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
-            .contains { $0.careType == type && $0.daysUntilDue <= 0 }
-    }
-
-    private static func restorePoint(for plant: Plant) -> PlantBatchCareRestorePoint {
-        PlantBatchCareRestorePoint(
-            plantID: plant.id,
-            lastWateredDate: plant.lastWateredDate,
-            lastFertilizedDate: plant.lastFertilizedDate,
-            lastHealthCheckDate: plant.lastHealthCheckDate,
-            healthStatusRaw: plant.healthStatusRaw
-        )
-    }
-
     private static func rewardMetadata(
         batchID: UUID,
         existingMetadata: String,
         rewardMetadata: String,
-        walletEntries: [CoconutLedgerEntry],
-        budgetEvents: [EconomyBudgetUsageEvent]
+        idempotencyKey: String,
+        walletEntryIDs: [UUID],
+        budgetUsageIDs: [UUID]
     ) -> String {
         var object = CalendarTaskCompletionSyncService.metadataDictionary(from: existingMetadata)
         let rewardObject = CalendarTaskCompletionSyncService.metadataDictionary(from: rewardMetadata)
         object.merge(rewardObject) { _, rewardValue in rewardValue }
         object[CareLedgerMetadata.careTransactionId] = batchID.uuidString
         object[CareLedgerMetadata.batchID] = batchID.uuidString
-        object["walletEntryIds"] = walletEntries.map(\.id.uuidString)
-        object["budgetUsageIds"] = budgetEvents.map(\.id.uuidString)
+        object[PlantCareCommandService.rewardStateMetadataKey] = PlantCareCommandService.rewardStateSettled
+        object["rewardIdempotencyKey"] = idempotencyKey
+        object["walletEntryIds"] = walletEntryIDs.map(\.uuidString)
+        object["budgetUsageIds"] = budgetUsageIDs.map(\.uuidString)
         object["generatedBy"] = "PlantBatchCareCommandService"
         guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
               let json = String(data: data, encoding: .utf8) else {
@@ -723,47 +1076,69 @@ enum PlantBatchCareCommandService {
         return json
     }
 
-    private static func fetchPlant(id: UUID, context: ModelContext) -> Plant? {
+    private static func preparedRewardMetadata(
+        batchID: UUID,
+        existingMetadata: String,
+        wasRewardEligible: Bool
+    ) -> String {
+        var object = CalendarTaskCompletionSyncService.metadataDictionary(from: existingMetadata)
+        object[CareLedgerMetadata.careTransactionId] = batchID.uuidString
+        object[CareLedgerMetadata.batchID] = batchID.uuidString
+        object[PlantCareCommandService.rewardStateMetadataKey] = wasRewardEligible
+            ? PlantCareCommandService.rewardStatePending
+            : PlantCareCommandService.rewardStateNotEligible
+        object["generatedBy"] = "PlantBatchCareCommandService"
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return existingMetadata
+        }
+        return json
+    }
+
+    private static func shouldFinalizeReward(in ledger: CareLedgerEvent) -> Bool {
+        let metadata = CalendarTaskCompletionSyncService.metadataDictionary(from: ledger.metadataJSON)
+        let state = metadata[PlantCareCommandService.rewardStateMetadataKey] as? String
+        if state == PlantCareCommandService.rewardStatePending { return true }
+        if state == PlantCareCommandService.rewardStateSettled ||
+            state == PlantCareCommandService.rewardStateNotEligible ||
+            state == PlantCareCommandService.rewardStateInvalid {
+            return false
+        }
+        // Compatibility for tokens written before the explicit reward state:
+        // generated batch metadata means settlement already completed, while
+        // a bare/disabled care ledger still needs its delayed reward.
+        return metadata["generatedBy"] as? String != "PlantBatchCareCommandService"
+    }
+
+    private static func batchRewardIdempotencyKey(batchID: UUID, ledgerEventID: UUID) -> String {
+        "plantBatchCareReward:\(batchID.uuidString):\(ledgerEventID.uuidString)"
+    }
+
+    private static func fetchPlant(id: UUID, context: ModelContext) throws -> Plant? {
         var descriptor = FetchDescriptor<Plant>(predicate: #Predicate<Plant> { $0.id == id })
         descriptor.fetchLimit = 1
-        return fetchOrEmpty(descriptor, context: context).first
+        return try context.fetch(descriptor).first
     }
 
-    private static func fetchEvent(id: UUID, context: ModelContext) -> Event? {
+    private static func fetchEvent(id: UUID, context: ModelContext) throws -> Event? {
         var descriptor = FetchDescriptor<Event>(predicate: #Predicate<Event> { $0.id == id })
         descriptor.fetchLimit = 1
-        return fetchOrEmpty(descriptor, context: context).first
+        return try context.fetch(descriptor).first
     }
 
-    private static func fetchPlantCareLog(id: UUID, context: ModelContext) -> PlantCareLog? {
+    private static func fetchPlantCareLog(id: UUID, context: ModelContext) throws -> PlantCareLog? {
         var descriptor = FetchDescriptor<PlantCareLog>(predicate: #Predicate<PlantCareLog> { $0.id == id })
         descriptor.fetchLimit = 1
-        return fetchOrEmpty(descriptor, context: context).first
-    }
-
-    private static func hasPersistedBatch(_ batchID: UUID, context: ModelContext) -> Bool {
-        let transactionID = batchID.uuidString
-        var descriptor = FetchDescriptor<PlantCareLog>(
-            predicate: #Predicate<PlantCareLog> { $0.careTransactionId == transactionID }
-        )
-        descriptor.fetchLimit = 1
-        return !fetchOrEmpty(descriptor, context: context).isEmpty
+        return try context.fetch(descriptor).first
     }
 
     private static func batchPreparation(
         _ rawSelections: [PlantBatchCareSelection],
-        now: Date,
-        requiresDueTask: Bool,
-        calendar: Calendar
+        operationID: UUID
     ) -> BatchPreparation {
         let selections = normalizedSelections(rawSelections)
         return BatchPreparation(
-            id: stableBatchID(
-                selections: selections,
-                occurrenceDate: now,
-                requiresDueTask: requiresDueTask,
-                calendar: calendar
-            ),
+            id: operationID,
             selections: selections,
             duplicateSkips: skippedDuplicates(in: rawSelections)
         )
@@ -771,9 +1146,69 @@ enum PlantBatchCareCommandService {
 
     private static func persistedReplay(
         for preparation: BatchPreparation,
+        occurrenceDate: Date,
+        requestedExecutorID: String?,
         context: ModelContext
     ) -> PlantBatchCareCommandResult? {
-        guard hasPersistedBatch(preparation.id, context: context) else { return nil }
+        let transactionID = preparation.id.uuidString
+        var descriptor = FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { $0.careTransactionId == transactionID }
+        )
+        descriptor.fetchLimit = max(1, preparation.selections.count + 1)
+        let persistedLogs: [PlantCareLog]
+        do {
+            persistedLogs = try context.fetch(descriptor)
+        } catch {
+            return emptyBatchResult(
+                batchID: preparation.id,
+                skipped: preparation.duplicateSkips,
+                didPersist: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
+        guard !persistedLogs.isEmpty else { return nil }
+
+        let expectedTargets = Set(preparation.selections.map {
+            "\($0.plantID.uuidString):\($0.careType.rawValue)"
+        })
+        let persistedTargets = Set(persistedLogs.compactMap { log -> String? in
+            guard let plantID = log.plant?.id else { return nil }
+            return "\(plantID.uuidString):\(log.careType.rawValue)"
+        })
+        let isExactReplay = persistedLogs.count == preparation.selections.count &&
+            persistedTargets == expectedTargets &&
+            persistedLogs.allSatisfy { $0.date == occurrenceDate }
+        guard isExactReplay else {
+            return emptyBatchResult(
+                batchID: preparation.id,
+                skipped: preparation.duplicateSkips,
+                didPersist: false,
+                persistenceErrorDescription: "plantBatchCareOperationConflict"
+            )
+        }
+        do {
+            try validatePersistedReplayLinks(
+                persistedLogs,
+                batchID: preparation.id,
+                occurrenceDate: occurrenceDate,
+                requestedExecutorID: requestedExecutorID,
+                context: context
+            )
+        } catch let failure as PlantBatchReplayValidationFailure {
+            return emptyBatchResult(
+                batchID: preparation.id,
+                skipped: preparation.duplicateSkips,
+                didPersist: false,
+                persistenceErrorDescription: failure.description
+            )
+        } catch {
+            return emptyBatchResult(
+                batchID: preparation.id,
+                skipped: preparation.duplicateSkips,
+                didPersist: false,
+                persistenceErrorDescription: "plantBatchCareOperationLookupFailed: \(error.localizedDescription)"
+            )
+        }
         return emptyBatchResult(
             batchID: preparation.id,
             skipped: preparation.duplicateSkips,
@@ -782,90 +1217,149 @@ enum PlantBatchCareCommandService {
         )
     }
 
-    private static func stableBatchID(
-        selections: [PlantBatchCareSelection],
-        occurrenceDate: Date,
-        requiresDueTask: Bool,
-        calendar: Calendar
-    ) -> UUID {
-        let day = calendar.dateComponents([.year, .month, .day], from: occurrenceDate)
-        let targetKey = selections
-            .map { "\($0.plantID.uuidString):\($0.careType.rawValue)" }
-            .sorted()
-            .joined(separator: "|")
-        let seed = [
-            requiresDueTask ? "due" : "quick",
-            String(format: "%04d-%02d-%02d", day.year ?? 0, day.month ?? 0, day.day ?? 0),
-            targetKey
-        ].joined(separator: ":")
-        var hash = UInt64(1_469_598_103_934_665_603)
-        for byte in seed.utf8 {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
+    private enum PlantBatchReplayValidationFailure: Error {
+        case incomplete
+        case conflict
+
+        var description: String {
+            switch self {
+            case .incomplete:
+                "plantBatchCareOperationIncomplete"
+            case .conflict:
+                "plantBatchCareOperationConflict"
+            }
         }
-        let a = UInt32(truncatingIfNeeded: hash)
-        let b = UInt16(truncatingIfNeeded: hash >> 32)
-        let c = UInt16(truncatingIfNeeded: hash >> 48)
-        let d = UInt16(truncatingIfNeeded: hash ^ 0xBA7C)
-        let e = UInt64(truncatingIfNeeded: hash ^ 0x0B47_C4A3_5EED_F00D)
-        let value = String(
-            format: "%08X-%04X-%04X-%04X-%012llX",
-            a,
-            b,
-            c,
-            d,
-            e & 0x0000_FFFF_FFFF_FFFF
-        )
-        return UUID(uuidString: value) ?? UUID()
     }
 
-    private static func fetchLedgerEvent(id: UUID, context: ModelContext) -> CareLedgerEvent? {
+    private static func validatePersistedReplayLinks(
+        _ logs: [PlantCareLog],
+        batchID: UUID,
+        occurrenceDate: Date,
+        requestedExecutorID: String?,
+        context: ModelContext
+    ) throws {
+        let transactionID = batchID.uuidString
+        let normalizedRequestedExecutorID = requestedExecutorID?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let expectedActorKind = normalizedRequestedExecutorID == nil
+            ? CareLedgerActorKind.unknown.rawValue
+            : CareLedgerActorKind.human.rawValue
+        for log in logs {
+            guard let plant = log.plant else {
+                throw PlantBatchReplayValidationFailure.incomplete
+            }
+            guard log.executorId == normalizedRequestedExecutorID else {
+                throw PlantBatchReplayValidationFailure.conflict
+            }
+
+            let ledgers = try fetchReplayLedgers(logID: log.id, context: context)
+            guard ledgers.count == 1, let ledger = ledgers.first else {
+                throw PlantBatchReplayValidationFailure.incomplete
+            }
+            guard ledger.actorKind == expectedActorKind,
+                  ledger.actorId == log.executorId,
+                  ledger.subjectKind == CareLedgerSubjectKind.plant.rawValue,
+                  ledger.subjectId == plant.id.uuidString,
+                  ledger.eventKind == CareLedgerEventKind.plantCare.rawValue,
+                  ledger.actionType == log.careType.rawValue,
+                  ledger.occurredAt == occurrenceDate,
+                  ledger.source == CareLedgerSource.detail.rawValue,
+                  ledger.sourceReminderId == nil,
+                  ledger.legacyModelName == String(describing: PlantCareLog.self),
+                  ledger.legacyModelId == log.id.uuidString,
+                  CareLedgerMetadata.stringValue(
+                      named: CareLedgerMetadata.careTransactionId,
+                      in: ledger.metadataJSON
+                  ) == transactionID,
+                  CareLedgerMetadata.stringValue(
+                      named: CareLedgerMetadata.batchID,
+                      in: ledger.metadataJSON
+                  ) == transactionID,
+                  CalendarTaskCompletionSyncService.metadataDictionary(
+                      from: ledger.metadataJSON
+                  )["generatedBy"] as? String == "PlantBatchCareCommandService" else {
+                throw PlantBatchReplayValidationFailure.conflict
+            }
+            let rewardState = CareLedgerMetadata.stringValue(
+                named: PlantCareCommandService.rewardStateMetadataKey,
+                in: ledger.metadataJSON
+            )
+            guard let rewardState, [
+                PlantCareCommandService.rewardStatePending,
+                PlantCareCommandService.rewardStateSettled,
+                PlantCareCommandService.rewardStateNotEligible,
+                PlantCareCommandService.rewardStateInvalid
+            ].contains(rewardState) else {
+                throw PlantBatchReplayValidationFailure.incomplete
+            }
+            guard let sourceEventID = ledger.sourceEventId.flatMap(UUID.init(uuidString:)),
+                  let event = try fetchReplayEvent(id: sourceEventID, context: context) else {
+                throw PlantBatchReplayValidationFailure.incomplete
+            }
+            guard event.relatedEntityType == EntityKind.plant.rawValue,
+                  event.relatedEntityId == plant.id.uuidString,
+                  event.eventType == log.careType.eventType.rawValue,
+                  event.startDate == occurrenceDate,
+                  event.recurrenceDays == 0,
+                  !event.isAllDay,
+                  event.assigneeId == normalizedRequestedExecutorID else {
+                throw PlantBatchReplayValidationFailure.conflict
+            }
+        }
+    }
+
+    private static func fetchReplayLedgers(
+        logID: UUID,
+        context: ModelContext
+    ) throws -> [CareLedgerEvent] {
+        let modelName = String(describing: PlantCareLog.self)
+        let modelID = logID.uuidString
+        let eventKind = CareLedgerEventKind.plantCare.rawValue
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { ledger in
+                ledger.legacyModelName == modelName &&
+                    ledger.legacyModelId == modelID &&
+                    ledger.eventKind == eventKind
+            }
+        )
+        descriptor.fetchLimit = 2
+        return try context.fetch(descriptor)
+    }
+
+    private static func fetchReplayEvent(
+        id: UUID,
+        context: ModelContext
+    ) throws -> Event? {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in event.id == id }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
+    private static func resolvedBatchExecutorID(
+        _ requestedExecutorID: String?,
+        context: ModelContext
+    ) throws -> String? {
+        guard let raw = requestedExecutorID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            let humanID = UUID(uuidString: raw) else {
+            return nil
+        }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in human.id == humanID }
+        )
+        descriptor.fetchLimit = 1
+        guard let human = try context.fetch(descriptor).first,
+              !human.hasPassedAway else {
+            return nil
+        }
+        return human.id.uuidString
+    }
+
+    private static func fetchLedgerEvent(id: UUID, context: ModelContext) throws -> CareLedgerEvent? {
         var descriptor = FetchDescriptor<CareLedgerEvent>(predicate: #Predicate<CareLedgerEvent> { $0.id == id })
         descriptor.fetchLimit = 1
-        return fetchOrEmpty(descriptor, context: context).first
+        return try context.fetch(descriptor).first
     }
-
-    private static func fetchAll<T: PersistentModel>(_ model: T.Type, context: ModelContext) -> [T] {
-        fetchOrEmpty(FetchDescriptor<T>(), context: context)
-    }
-
-    private static func fetchOrEmpty<T: PersistentModel>(_ descriptor: FetchDescriptor<T>, context: ModelContext) -> [T] {
-        do {
-            return try context.fetch(descriptor)
-        } catch {
-            OhanaLog.warning("PlantBatchCareCommandService fetch failed: \(error.localizedDescription)", category: "Plants")
-            return []
-        }
-    }
-}
-
-@MainActor
-private final class PlantBatchCareDeferredEconomyAwarder: CareEventEconomyAwarding {
-    func awardCareAction(
-        type _: DomainCareRewardAction,
-        pet _: Pet?,
-        context _: ModelContext,
-        quality _: DomainCareRewardQuality,
-        date _: Date,
-        executorId _: String?,
-        careObjectKey _: UUID?
-    ) -> (humanGot: Int, petGot: Int) {
-        (0, 0)
-    }
-
-    func awardSharedCareAction(
-        type _: DomainCareRewardAction,
-        pets _: [Pet],
-        context _: ModelContext,
-        quality _: DomainCareRewardQuality,
-        title _: String?,
-        executorId _: String?
-    ) -> (humanGot: Int, petGot: Int) {
-        (0, 0)
-    }
-
-    func rewardMetadata(for _: (humanGot: Int, petGot: Int)?) -> String { "" }
-    func recordFirstMeal(actorId _: String?, context _: ModelContext) {}
-    func clearCooldown(petId _: UUID?, type _: DomainCareRewardAction) {}
-    func refreshProjectionAfterRollback(context _: ModelContext) {}
 }

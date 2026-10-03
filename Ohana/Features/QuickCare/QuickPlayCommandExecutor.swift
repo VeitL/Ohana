@@ -38,6 +38,7 @@ struct QuickPlayCommandExecutor {
     private let context: ModelContext
     private let careEvents: CareEventRecording
     private let derivations: CareDerivationExecutor
+    private let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
         self.init(
@@ -58,11 +59,42 @@ struct QuickPlayCommandExecutor {
     init(
         context: ModelContext,
         careEvents: CareEventRecording,
-        revisions: DomainRevisionPublishing
+        revisions: DomainRevisionPublishing,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) {
         self.context = context
         self.careEvents = careEvents
         derivations = CareDerivationExecutor(revisions: revisions)
+        self.personalAccessLevel = personalAccessLevel
+    }
+
+    func syncPlayPlan(
+        pet: Pet,
+        intervalDays: Int,
+        enabled: Bool,
+        anchor: Date
+    ) throws -> Event? {
+        let currentEvents = fetchQuickPlayModelsOrLog(
+            FetchDescriptor<Event>(),
+            context: context,
+            operation: "fetch play plan for quota"
+        )
+        let replacingPlans = currentEvents.filter {
+            CarePlanCalendarSync.isStoredPlan($0, kind: "play", pet: pet)
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            addingActivePlanCount: enabled && intervalDays > 0 ? 1 : 0,
+            replacingPlans: replacingPlans
+        )
+        return CarePlanCalendarSync.syncPlayPlan(
+            pet: pet,
+            context: context,
+            intervalDays: intervalDays,
+            enabled: enabled,
+            anchor: anchor
+        )
     }
 
     func recordPlay(

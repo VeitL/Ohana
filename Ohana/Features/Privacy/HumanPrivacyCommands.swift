@@ -172,22 +172,40 @@ enum HumanPrivacyCommandService {
 struct HumanPrivacyCommandExecutor {
     let context: ModelContext
     let revisions: DomainRevisionPublishing
+    let medicationReminders: MedicationReminderManaging?
 
     init(context: ModelContext) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher())
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(),
+            medicationReminders: nil
+        )
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter),
+            medicationReminders: nil
+        )
     }
 
     init(context: ModelContext, services: AppServices) {
-        self.init(context: context, revisions: services.domainRevisions)
+        self.init(
+            context: context,
+            revisions: services.domainRevisions,
+            medicationReminders: services.medicationReminders
+        )
     }
 
-    init(context: ModelContext, revisions: DomainRevisionPublishing) {
+    init(
+        context: ModelContext,
+        revisions: DomainRevisionPublishing,
+        medicationReminders: MedicationReminderManaging? = nil
+    ) {
         self.context = context
         self.revisions = revisions
+        self.medicationReminders = medicationReminders
     }
 
     @discardableResult
@@ -263,13 +281,31 @@ struct HumanPrivacyCommandExecutor {
         for human: Human,
         note: String
     ) throws -> HumanPrivacyCommandResult {
-        let result = try HumanPrivacyCommandService.setPrivateField(
-            field,
-            isPrivate: isPrivate,
-            for: human,
-            context: context
-        )
+        let changesMedicationPrivacy = field == .medication
+            && human.privateFields.contains(field.rawValue) != isPrivate
+        if changesMedicationPrivacy {
+            medicationReminders?.invalidateNotificationMutations()
+        }
+        let result: HumanPrivacyCommandResult
+        do {
+            result = try HumanPrivacyCommandService.setPrivateField(
+                field,
+                isPrivate: isPrivate,
+                for: human,
+                context: context
+            )
+        } catch {
+            refreshMedicationNotificationsAfterPrivacyMutation(
+                if: changesMedicationPrivacy,
+                reason: "human.privacy.field.rollback"
+            )
+            throw error
+        }
         revisions.publishHumanPrivacy(result, note: note)
+        refreshMedicationNotificationsAfterPrivacyMutation(
+            if: result.changedFields.contains(HumanPrivateField.medication.rawValue),
+            reason: "human.privacy.field"
+        )
         return result
     }
 
@@ -279,12 +315,49 @@ struct HumanPrivacyCommandExecutor {
         for human: Human,
         note: String
     ) throws -> HumanPrivacyCommandResult {
-        let result = try HumanPrivacyCommandService.setAllPrivateFields(
-            isPrivate: isPrivate,
-            for: human,
-            context: context
-        )
+        let changesMedicationPrivacy = human.privateFields
+            .contains(HumanPrivateField.medication.rawValue) != isPrivate
+        if changesMedicationPrivacy {
+            medicationReminders?.invalidateNotificationMutations()
+        }
+        let result: HumanPrivacyCommandResult
+        do {
+            result = try HumanPrivacyCommandService.setAllPrivateFields(
+                isPrivate: isPrivate,
+                for: human,
+                context: context
+            )
+        } catch {
+            refreshMedicationNotificationsAfterPrivacyMutation(
+                if: changesMedicationPrivacy,
+                reason: "human.privacy.all.rollback"
+            )
+            throw error
+        }
         revisions.publishHumanPrivacy(result, note: note)
+        refreshMedicationNotificationsAfterPrivacyMutation(
+            if: result.changedFields.contains(HumanPrivateField.medication.rawValue),
+            reason: "human.privacy.all"
+        )
         return result
+    }
+
+    private func refreshMedicationNotificationsAfterPrivacyMutation(
+        if shouldRefresh: Bool,
+        reason: String
+    ) {
+        guard shouldRefresh, let medicationReminders else { return }
+        Task { @MainActor in
+            let result = await medicationReminders.refreshScheduledMedicationReminders(
+                context: context,
+                hidingDetails: MedicationNotificationPrivacyStore.hidesMedicationDetails()
+            )
+            if !result.failureDescriptions.isEmpty {
+                OhanaLog.warning(
+                    "Medication notification privacy refresh after \(reason) had \(result.failureDescriptions.count) incomplete request(s).",
+                    category: "Care"
+                )
+            }
+        }
     }
 }

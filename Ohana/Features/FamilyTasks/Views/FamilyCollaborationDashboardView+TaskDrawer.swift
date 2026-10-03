@@ -164,83 +164,56 @@ extension FamilyCollaborationDashboardView {
     }
 
     func familyTaskRow(_ task: FamilyCollaborationTask) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: task.relatedPetId == nil ? "checklist" : "pawprint.fill")
-                .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 44, height: 44)
-                .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                Text(task.title)
+        Button {
+            presentFamilyTaskDetail(taskID: task.id)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: task.relatedPetId == nil ? "checklist" : "pawprint.fill")
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(taskSubtitle(task))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 6)
-            if task.rewardCoconuts > 0 {
-                Text("+\(task.rewardCoconuts)🥥")
+                    .foregroundStyle(Color.goPrimary)
+                    .frame(width: 44, height: 44)
+                    .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(task.title)
+                        .font(OhanaFont.callout(.black))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .lineLimit(1)
+                    Text(taskSubtitle(task))
+                        .font(OhanaFont.caption2(.bold))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 6)
+                if task.rewardCoconuts > 0 {
+                    Text("+\(task.rewardCoconuts)🥥")
+                        .font(OhanaFont.caption(.black))
+                        .foregroundStyle(Color.arkInk)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(Color.goYellow, in: Capsule())
+                        .ohanaPing(
+                            trigger: "\(task.id.uuidString)-\(task.statusRaw)",
+                            accent: Color.goYellow,
+                            isEnabled: task.status == .pendingReview
+                        )
+                        .ohanaShine(trigger: task.statusRaw, cornerRadius: OhanaRadius.row, isEnabled: task.status == .pendingReview)
+                }
+                Image(systemName: "chevron.right").accessibilityHidden(true)
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(Color.goYellow, in: Capsule())
-                    .ohanaPing(
-                        trigger: "\(task.id.uuidString)-\(task.statusRaw)",
-                        accent: Color.goYellow,
-                        isEnabled: task.status == .pendingReview
-                    )
-                    .ohanaShine(trigger: task.statusRaw, cornerRadius: OhanaRadius.row, isEnabled: task.status == .pendingReview)
+                    .foregroundStyle(Color.ohanaTertiaryText)
             }
-            taskPrimaryAction(task)
+            .padding(12)
+            .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
+            .contentShape(Rectangle())
         }
-        .padding(12)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-    }
-
-    @ViewBuilder
-    func taskPrimaryAction(_ task: FamilyCollaborationTask) -> some View {
-        if task.status == .pendingReview, task.createdById == currentHumanRecordID {
-            HStack(spacing: 6) {
-                smallAction(title: l.tr(zh: "退回", en: "Redo", de: "Zurück"), color: Color.goRed) {
-                    runFamilyTaskCommand {
-                        commandExecutor.rejectCompletion(task, by: currentHuman)
-                    }
-                }
-                smallAction(title: l.tr(zh: "确认", en: "Confirm", de: "Bestätigen"), color: Color.goPrimary) {
-                    runFamilyTaskCommand {
-                        commandExecutor.confirmCompletion(task, by: currentHuman)
-                    }
-                }
-            }
-        } else if task.status == .pendingReview {
-            Text(l.tr(zh: "待确认", en: "Review", de: "Prüfung"))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.goYellow)
-        } else if task.assignedToId == currentHumanRecordID || task.claimedById == currentHumanRecordID {
-            smallAction(title: l.tr(zh: "完成", en: "Done", de: "Fertig"), color: Color.goPrimary) {
-                runFamilyTaskCommand {
-                    commandExecutor.complete(task, by: currentHuman)
-                }
-            }
-        } else if task.isOpen, let human = currentHuman {
-            smallAction(title: l.tr(zh: "接手", en: "Take", de: "Nehmen"), color: Color.goTeal) {
-                runFamilyTaskCommand {
-                    commandExecutor.claim(task, by: human)
-                }
-            }
-        } else if task.createdById == currentHumanRecordID {
-            smallAction(
-                title: l.tr(zh: "编辑", en: "Edit", de: "Bearb."),
-                color: Color.goPrimary
-            ) {
-                presentEditor(.editTask(task.id))
-            }
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(task.title), \(taskSubtitle(task))")
+        .accessibilityHint(l.tr(
+            zh: "打开按当前家庭成员权限显示的任务详情",
+            en: "Open task details with actions for the current household member",
+            de: "Aufgabendetails mit Aktionen für das aktuelle Familienmitglied öffnen"
+        ))
     }
 
     func taskSubtitle(_ task: FamilyCollaborationTask) -> String {
@@ -295,8 +268,199 @@ extension FamilyCollaborationDashboardView {
         switch action {
         case let .presentEditor(route):
             presentEditor(route)
+        case let .presentTaskDetail(taskID):
+            activeTaskDetail = FamilyCollaborationTaskDetailRoute(taskID: taskID)
         case .openWeeklyReport:
             onOpenWeeklyReport()
+        }
+    }
+
+    func presentFamilyTaskDetail(taskID: UUID) {
+        guard familyTasks.contains(where: { $0.id == taskID }) else { return }
+        if activeSheetRoute == .moreCollaboration {
+            dismissMoreCollaboration(then: .presentTaskDetail(taskID))
+        } else {
+            activeTaskDetail = FamilyCollaborationTaskDetailRoute(taskID: taskID)
+        }
+    }
+
+    @ViewBuilder
+    func familyTaskDetailSheet(_ route: FamilyCollaborationTaskDetailRoute) -> some View {
+        if let task = familyTasks.first(where: { $0.id == route.taskID }) {
+            let capabilities = FamilyTaskCapabilities.resolve(
+                task: task,
+                currentHumanID: currentHuman?.id
+            )
+            FamilyTaskDetailView(
+                snapshot: familyTaskDetailSnapshot(task, capabilities: capabilities),
+                onEdit: capabilities.canEdit ? {
+                    presentFamilyTaskEditorAfterDetail(taskID: task.id)
+                } : nil,
+                onTaskAction: { action in
+                    performFamilyTaskDetailAction(taskID: task.id, action: action)
+                },
+                onDecline: { reason in
+                    declineFamilyTask(taskID: task.id, reason: reason)
+                },
+                onPostpone: { dueAt in
+                    postponeFamilyTask(taskID: task.id, to: dueAt)
+                },
+                onComment: { body in
+                    commentOnFamilyTask(taskID: task.id, body: body)
+                },
+                onCancel: { scope in
+                    await cancelFamilyTask(taskID: task.id, scope: scope)
+                }
+            )
+        } else {
+            ContentUnavailableView(
+                l.tr(zh: "任务不可用", en: "Task unavailable", de: "Aufgabe nicht verfügbar"),
+                systemImage: "exclamationmark.triangle"
+            )
+        }
+    }
+
+    func familyTaskDetailSnapshot(
+        _ task: FamilyCollaborationTask,
+        capabilities: FamilyTaskCapabilities
+    ) -> TaskCenterFamilyTaskDetailSnapshot {
+        let event = linkedEvent(for: task)
+        var actions: Set<TaskCenterAvailableAction> = []
+        if capabilities.canComplete {
+            actions.insert(task.hasReward ? .submitForReview : .complete)
+        }
+        if capabilities.canApprove { actions.insert(.approve) }
+        if capabilities.canReturnForRedo { actions.insert(.reject) }
+        if task.isOpen, currentHuman != nil { actions.insert(.claim) }
+
+        return TaskCenterFamilyTaskDetailSnapshot(
+            taskID: task.id,
+            title: task.title,
+            note: task.note,
+            emoji: task.emoji,
+            creatorName: task.createdByName,
+            assigneeName: task.claimedByName ?? task.assignedToName,
+            viewerRole: familyTaskViewerRole(task),
+            capabilities: capabilities,
+            status: task.status,
+            dueAt: task.dueAt,
+            isAllDay: event?.isAllDay ?? false,
+            isRecurring: task.planId != nil || (event?.recurrenceDays ?? 0) > 0,
+            allowsThisAndFutureCancellation: task.planId != nil && task.nominalAt != nil,
+            rewardCoconuts: task.rewardCoconuts,
+            availableActions: actions,
+            isLinkedToCalendar: event != nil || task.relatedEventId != nil,
+            activities: commandExecutor.occurrenceTimeline(
+                taskID: task.id,
+                limit: 100
+            )
+        )
+    }
+
+    func linkedEvent(for task: FamilyCollaborationTask) -> Event? {
+        if let reminderID = task.relatedReminderId,
+           let event = pendingReminders.first(where: { $0.id.uuidString == reminderID })?.event {
+            return event
+        }
+        guard let eventID = task.relatedEventId else { return nil }
+        return pendingReminders.lazy.compactMap(\.event).first { $0.id.uuidString == eventID }
+    }
+
+    func familyTaskViewerRole(_ task: FamilyCollaborationTask) -> TaskCenterFamilyTaskViewerRole {
+        guard let humanID = currentHuman?.id.uuidString else { return .familyMember }
+        if task.createdById == humanID { return .creator }
+        if task.claimedById == humanID || task.assignedToId == humanID { return .assignee }
+        return .familyMember
+    }
+
+    func presentFamilyTaskEditorAfterDetail(taskID: UUID) {
+        activeTaskDetail = nil
+        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 160) {
+            guard let task = familyTasks.first(where: { $0.id == taskID }),
+                  FamilyTaskCapabilities.resolve(
+                      task: task,
+                      currentHumanID: currentHuman?.id
+                  ).canEdit else { return }
+            presentEditor(.editTask(taskID))
+        }
+    }
+
+    func performFamilyTaskDetailAction(
+        taskID: UUID,
+        action: TaskCenterAvailableAction
+    ) -> Bool {
+        guard let task = familyTasks.first(where: { $0.id == taskID }),
+              let human = currentHuman else { return false }
+        let capabilities = FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id)
+        switch action {
+        case .complete, .submitForReview:
+            guard capabilities.canComplete else { return false }
+            return commandExecutor.complete(task, by: human)
+        case .claim:
+            guard task.isOpen else { return false }
+            return commandExecutor.claim(task, by: human)
+        case .approve:
+            guard capabilities.canApprove else { return false }
+            return commandExecutor.confirmCompletion(task, by: human)
+        case .reject:
+            guard capabilities.canReturnForRedo else { return false }
+            return commandExecutor.rejectCompletion(task, by: human)
+        }
+    }
+
+    func declineFamilyTask(taskID: UUID, reason: String) -> Bool {
+        guard let task = familyTasks.first(where: { $0.id == taskID }),
+              let human = currentHuman,
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canDecline else {
+            return false
+        }
+        return commandExecutor.declineAssignment(task, by: human, reason: reason)
+    }
+
+    func postponeFamilyTask(taskID: UUID, to dueAt: Date) -> Bool {
+        guard let task = familyTasks.first(where: { $0.id == taskID }),
+              let human = currentHuman,
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canPostpone else {
+            return false
+        }
+        return commandExecutor.postponeOccurrence(task, to: dueAt, by: human)
+    }
+
+    func commentOnFamilyTask(taskID: UUID, body: String) -> Bool {
+        guard let task = familyTasks.first(where: { $0.id == taskID }),
+              let human = currentHuman,
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canComment else {
+            return false
+        }
+        return commandExecutor.addComment(
+            task,
+            body: body,
+            by: human,
+            idempotencyKey: "family-task:\(taskID.uuidString):comment:\(human.id.uuidString):\(UUID().uuidString)"
+        )
+    }
+
+    func cancelFamilyTask(
+        taskID: UUID,
+        scope: FamilyTaskEditScope
+    ) async -> Bool {
+        guard let task = familyTasks.first(where: { $0.id == taskID }),
+              let human = currentHuman,
+              FamilyTaskCapabilities.resolve(task: task, currentHumanID: human.id).canCancel else {
+            return false
+        }
+        switch scope {
+        case .onlyThis:
+            return commandExecutor.cancelTask(task, by: human)
+        case .thisAndFuture:
+            guard let rawPlanID = task.planId,
+                  let planID = UUID(uuidString: rawPlanID),
+                  let nominalAt = task.nominalAt else { return false }
+            return await commandExecutor.cancelThisAndFuture(
+                planID: planID,
+                from: nominalAt,
+                by: human
+            )
         }
     }
 

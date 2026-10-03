@@ -1,5 +1,41 @@
 import SwiftUI
 
+nonisolated enum HumanHealthReportMutationAction: CaseIterable, Equatable, Sendable {
+    case create
+    case update
+    case delete
+}
+
+nonisolated struct HumanHealthReportMutationState: Equatable, Sendable {
+    var activeAction: HumanHealthReportMutationAction?
+    var failedAction: HumanHealthReportMutationAction?
+
+    var isSaving: Bool { activeAction != nil }
+}
+
+nonisolated enum HumanHealthReportMutationEvent: Equatable, Sendable {
+    case started(HumanHealthReportMutationAction)
+    case completed(HumanHealthReportMutationAction, succeeded: Bool)
+}
+
+nonisolated enum HumanHealthReportMutationStateReducer {
+    static func reduce(
+        _ state: HumanHealthReportMutationState,
+        event: HumanHealthReportMutationEvent
+    ) -> HumanHealthReportMutationState {
+        var next = state
+        switch event {
+        case let .started(action):
+            next.activeAction = action
+            next.failedAction = nil
+        case let .completed(action, succeeded):
+            next.activeAction = nil
+            next.failedAction = succeeded ? nil : action
+        }
+        return next
+    }
+}
+
 extension ReportConclusion {
     var color: Color {
         switch self {

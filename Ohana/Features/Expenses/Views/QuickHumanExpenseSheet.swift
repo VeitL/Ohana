@@ -88,11 +88,13 @@ struct QuickHumanExpenseSheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("quick-human-expense-sheet")
             .navigationTitle(l.tr(zh: "快速记账", en: "Quick Expense", de: "Schnelle Ausgabe"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel) { close() }
+                        .accessibilityIdentifier("ohana-sheet-close-action")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
@@ -173,7 +175,6 @@ struct QuickHumanExpenseSheet: View {
                 Text(l.tr(zh: "快速记账", en: "Quick Expense", de: "Schnelle Ausgabe"))
                     .font(OhanaFont.title3(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .accessibilityIdentifier("quick-human-expense-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -229,7 +230,7 @@ struct QuickHumanExpenseSheet: View {
                         } label: {
                             Text("\(AppCurrency.symbol)\(displayAmount(amount))")
                                 .font(OhanaFont.caption(.black))
-                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : Color.ohanaPrimaryText)
+                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 13)
                                 .frame(height: 34)
                                 .background(
@@ -318,7 +319,7 @@ struct QuickHumanExpenseSheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(isValid && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -345,7 +346,7 @@ struct QuickHumanExpenseSheet: View {
                 Text(l.expenseCategoryTitle(category))
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 34)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

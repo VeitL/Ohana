@@ -44,8 +44,11 @@ struct FunctionMenuRootView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         sectionHeader(
                             icon: "square.grid.2x2.fill",
-                            title: l.tr(zh: "功能", en: "Features", de: "Funktionen"),
-                            label: "CORE"
+                            title: l.tr(
+                                zh: "功能", en: "Features", de: "Funktionen",
+                                es: "Funciones", pt: "Funcionalidades", fr: "Fonctionnalités",
+                                ja: "機能", ko: "기능", it: "Funzioni"
+                            )
                         )
 
                         LazyVGrid(columns: columns, spacing: 10) {
@@ -68,8 +71,11 @@ struct FunctionMenuRootView: View {
                         VStack(alignment: .leading, spacing: 10) {
                             sectionHeader(
                                 icon: "wrench.and.screwdriver.fill",
-                                title: l.tr(zh: "工具", en: "Tools", de: "Tools"),
-                                label: "TOOLS"
+                                title: l.tr(
+                                    zh: "工具", en: "Tools", de: "Tools",
+                                    es: "Herramientas", pt: "Ferramentas", fr: "Outils",
+                                    ja: "ツール", ko: "도구", it: "Strumenti"
+                                )
                             )
 
                             LazyVGrid(columns: columns, spacing: 10) {
@@ -103,16 +109,13 @@ struct FunctionMenuRootView: View {
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
-            Text(l.tr(zh: "更多功能", en: "More", de: "Mehr"))
+            Text(l.tr(
+                zh: "更多功能", en: "More", de: "Mehr",
+                es: "Más", pt: "Mais", fr: "Plus",
+                ja: "その他", ko: "더보기", it: "Altro"
+            ))
                 .font(OhanaFont.title2(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-
-            Text("Lv.\(currentTreeLevel)")
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.arkInk)
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(Color.goPrimary, in: Capsule())
 
             Spacer()
 
@@ -131,7 +134,8 @@ struct FunctionMenuRootView: View {
     private var functionMenuGroups: [FeatureGroup] {
         AppFeatureRouteGuard.visibleFeatureGroups(
             from: [.dailyCare, .healthBody, .archiveMemory, .householdHub],
-            currentLevel: currentTreeLevel
+            currentLevel: currentTreeLevel,
+            plan: appServices.commerce.ohanaPlanLevel
         )
     }
 
@@ -150,6 +154,14 @@ struct FunctionMenuRootView: View {
                 destination: .wealthDashboard
             ),
             ToolEntry(
+                id: "achievements",
+                title: l.tr(zh: "成就", en: "Achievements", de: "Erfolge"),
+                subtitle: l.tr(zh: "本人 · 伙伴 · 全岛", en: "You · Pets · Island", de: "Du · Tiere · Insel"),
+                icon: "trophy.fill",
+                color: Color(hex: "EAB308"),
+                destination: .featureAggregate(.achievements)
+            ),
+            ToolEntry(
                 id: "shop",
                 title: l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"),
                 subtitle: l.tr(zh: "装饰 · 周报 · 奖励", en: "Cosmetics · Reports · Rewards", de: "Deko · Berichte · Belohnungen"),
@@ -160,13 +172,19 @@ struct FunctionMenuRootView: View {
             ToolEntry(
                 id: "gacha",
                 title: l.tr(zh: "收藏玩法", en: "Collection Play", de: "Sammlungsspiel"),
-                subtitle: l.tr(zh: "扭蛋 · 电子宠物", en: "Draws · E-critter", de: "Ziehungen · E-Critter"),
+                subtitle: l.tr(zh: "扭蛋 · 收藏", en: "Draws · Collection", de: "Ziehungen · Sammlung"),
                 icon: "circle.grid.cross.fill",
                 color: Color(hex: "F97316"),
                 destination: .gacha
             )
         ]
-        .filter { AppFeatureRouteGuard.isVisibleFunctionDestination($0.destination, currentLevel: currentTreeLevel) }
+        .filter {
+            AppFeatureRouteGuard.isVisibleFunctionDestination(
+                $0.destination,
+                currentLevel: currentTreeLevel,
+                plan: appServices.commerce.ohanaPlanLevel
+            )
+        }
     }
 
     private func subtitle(for group: FeatureGroup) -> String {
@@ -176,11 +194,11 @@ struct FunctionMenuRootView: View {
                 ? l.tr(zh: "饮食 · 清洁 · 遛狗 · 便便", en: "Food · Hygiene · Walks · Potty", de: "Futter · Pflege · Gassi · Toilette")
                 : l.tr(zh: "饮食 · 清洁 · 便便", en: "Food · Hygiene · Potty", de: "Futter · Pflege · Toilette")
         case .healthBody:
-            l.tr(zh: "健康档案 · 用药 · 体重", en: "Health · Medication · Weight", de: "Gesundheit · Medikamente · Gewicht")
+            l.tr(zh: "健康概览 · 用药趋势", en: "Health · Medication trends", de: "Gesundheit · Medikamententrends")
         case .archiveMemory:
             l.tr(zh: "成长 · 基本信息 · 证件 · 时刻", en: "Growth · Profile · Documents · Moments", de: "Wachstum · Profil · Dokumente · Momente")
         case .householdHub:
-            l.tr(zh: "花费 · 照护分析 · 提醒 · 周报", en: "Expenses · Care analysis · Reminders · Weekly", de: "Ausgaben · Pflegeanalyse · Erinnerungen · Woche")
+            l.tr(zh: "体重 · 花费 · 周报 · 回顾", en: "Weight · Expenses · Reports · Review", de: "Gewicht · Ausgaben · Berichte · Rückblick")
         case .oasisRewards:
             l.tr(zh: "\(wealthSubtitle) · 商店 · 扭蛋", en: "\(wealthSubtitle) · Shop · Gacha", de: "\(wealthSubtitle) · Shop · Gacha")
         case .plants:
@@ -205,7 +223,11 @@ struct FunctionMenuRootView: View {
     }
 
     private func select(_ destination: FMDest) {
-        switch AppFeatureRouteGuard.functionDestinationDecision(destination, currentLevel: currentTreeLevel) {
+        switch AppFeatureRouteGuard.functionDestinationDecision(
+            destination,
+            currentLevel: currentTreeLevel,
+            plan: appServices.commerce.ohanaPlanLevel
+        ) {
         case let .allow(destination):
             onSelect(destination)
         case let .redirectToRoadmap(note):
@@ -269,7 +291,7 @@ struct FunctionMenuRootView: View {
         .accessibilityIdentifier(accessibilityIdentifier ?? "function-menu-tile-\(title)")
     }
 
-    private func sectionHeader(icon: String, title: String, label: String) -> some View {
+    private func sectionHeader(icon: String, title: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -278,10 +300,6 @@ struct FunctionMenuRootView: View {
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
-            Text(label)
-                .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goPrimary.opacity(0.6))
-                .tracking(2)
         }
         .padding(.bottom, 2)
     }

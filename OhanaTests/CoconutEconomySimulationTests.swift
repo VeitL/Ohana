@@ -64,6 +64,36 @@ struct CoconutEconomySimulationTests {
         #expect(report.recordOnlyEvents == 0)
         #expect(report.cooldownEvents == 49)
     }
+
+    @Test func zenNaturalTreeGrowthStaysPredictableAt30_90_365Days() {
+        let ownerOnly = [30, 90, 365].map { ZenTreeProgressionSimulation.run(days: $0, recordsDailyStatus: false) }
+        let fullDaily = [30, 90, 365].map { ZenTreeProgressionSimulation.run(days: $0, recordsDailyStatus: true) }
+
+        #expect(ownerOnly.map(\.totalEnergy) == [180, 540, 2190])
+        #expect(ownerOnly.map(\.level) == [.lv2, .lv4, .lv7])
+        #expect(fullDaily.map(\.totalEnergy) == [240, 720, 2920])
+        #expect(fullDaily.map(\.level) == [.lv2, .lv4, .lv8])
+        #expect(fullDaily.allSatisfy { $0.dailyGrowthXP == PresenceTreeGrowthPolicy.dailyGrowthXPCap })
+        #expect(OasisTreeEnergyInjectionPolicy.starterPackageCost == 10)
+        #expect(OasisTreeEnergyInjectionPolicy.starterPackageXP == 10)
+    }
+}
+
+private struct ZenTreeProgressionSimulation {
+    let totalEnergy: Int
+    let dailyGrowthXP: Int
+    let level: TreeLevel
+
+    static func run(days: Int, recordsDailyStatus: Bool) -> Self {
+        let dailyGrowthXP = PresenceTreeGrowthPolicy.ownerDailyGrowthXP +
+            (recordsDailyStatus ? PresenceTreeGrowthPolicy.dailyStatusGrowthXP : 0)
+        let totalEnergy = max(0, days) * dailyGrowthXP
+        return ZenTreeProgressionSimulation(
+            totalEnergy: totalEnergy,
+            dailyGrowthXP: dailyGrowthXP,
+            level: OasisTreeManager.treeLevel(forTotalEnergy: totalEnergy)
+        )
+    }
 }
 
 private enum EconomyCohortPreset {

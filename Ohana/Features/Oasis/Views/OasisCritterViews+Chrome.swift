@@ -53,18 +53,12 @@ extension OasisCritterCodexView {
                 close()
             }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(headerTitle(entry: nil))
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Text(headerSubtitle(entry: nil))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-            }
+            Text(headerTitle(entry: nil))
+                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .accessibilityLabel("\(headerTitle(entry: nil)). \(headerSubtitle(entry: nil))")
 
             Spacer(minLength: 0)
             coconutBalanceButton
@@ -96,18 +90,22 @@ extension OasisCritterCodexView {
                 .accessibilityLabel(l.tr(zh: "返回图鉴", en: "Back to codex", de: "Zurück zum Album"))
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: mode == .codex ? 4 : 0) {
                 Text(headerTitle(entry: entry))
                     .font(OhanaFont.adaptive(size: 25, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
-                Text(headerSubtitle(entry: entry))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.78)
+                if mode == .codex {
+                    Text(headerSubtitle(entry: entry))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+                }
             }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(headerTitle(entry: entry)). \(headerSubtitle(entry: entry))")
             Spacer()
             Button {
                 close()

@@ -37,12 +37,14 @@ struct CoHealthDashboardFullContentView: View {
         let petName = associatedPets.first?.name ?? l.tr(zh: "毛孩子", en: "your pets", de: "deine Tiere")
         let km = String(format: "%.1f", thisMonthWalkKm)
         if let delta = petWeightDelta {
-            let amount = String(format: "%.1f", abs(delta))
-            return delta < 0
-                ? l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n\(petName)瘦了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month\n\(petName) is down \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\n\(petName) hat \(amount) kg abgenommen 🎉")
-                : l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n\(petName)胖了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month\n\(petName) is up \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\n\(petName) hat \(amount) kg zugenommen 🎉")
+            let change = String(format: "%+.1f", delta)
+            return l.tr(
+                zh: "本月同行 \(km) km · \(petName) 体重 \(change) kg",
+                en: "\(km) km together this month · \(petName) weight \(change) kg",
+                de: "Diesen Monat \(km) km zusammen · \(petName) Gewicht \(change) kg"
+            )
         }
-        return l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n继续加油！💪", en: "You walked \(km) km with \(petName) this month\nKeep going! 💪", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\nWeiter so! 💪")
+        return l.tr(zh: "本月同行 \(km) km", en: "\(km) km together this month", de: "Diesen Monat \(km) km zusammen")
     }
 
     var body: some View {

@@ -1,11 +1,12 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Ohana
 
 @MainActor
 @Suite(.serialized)
 struct AppWorkloadPolicyTests {
-    @Test func thermalStateDowngradesRuntimeBudgets() async {
+    @Test func thermalStateDowngradesRuntimeBudgets() async throws {
         let notificationCenter = NotificationCenter()
         let thermalState = ThermalStateProbe()
         let policy = AppWorkloadPolicy(
@@ -23,8 +24,7 @@ struct AppWorkloadPolicyTests {
 
         thermalState.value = .fair
         notificationCenter.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait { policy.thermalState == .fair })
         #expect(policy.thermalState == .fair)
         #expect(policy.interactionMotionBudget() == .full)
         #expect(policy.ambientMotionBudget() == .full)
@@ -32,8 +32,7 @@ struct AppWorkloadPolicyTests {
 
         thermalState.value = .serious
         notificationCenter.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait { policy.thermalState == .serious })
         #expect(policy.thermalState == .serious)
         #expect(policy.interactionMotionBudget() == .efficient)
         #expect(policy.ambientMotionBudget() == .efficient)
@@ -41,8 +40,7 @@ struct AppWorkloadPolicyTests {
 
         thermalState.value = .critical
         notificationCenter.post(name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait { policy.thermalState == .critical })
         #expect(policy.thermalState == .critical)
         #expect(policy.interactionMotionBudget() == .efficient)
         #expect(policy.ambientMotionBudget() == .static)
@@ -176,6 +174,78 @@ struct AppWorkloadPolicyTests {
         )
         #expect(!criticalBudget.hasWorkCapacity)
         #expect(criticalBudget.isDeferred)
+    }
+
+    @Test func foregroundResumeMakesDeferredHomeAvatarPreloadEligibleAgain() {
+        let policy = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        let signature = "same-home-media"
+
+        policy.updateScenePhase(.background)
+        let deferred = HomeAvatarPreloadTaskKey(
+            signature: signature,
+            canRun: policy.backgroundWorkBudget(
+                operation: "home_first_screen_avatars",
+                requestedItemCount: 1
+            ).hasWorkCapacity
+        )
+        #expect(!deferred.canRun)
+
+        policy.updateScenePhase(.active)
+        let resumed = HomeAvatarPreloadTaskKey(
+            signature: signature,
+            canRun: policy.backgroundWorkBudget(
+                operation: "home_first_screen_avatars",
+                requestedItemCount: 1
+            ).hasWorkCapacity
+        )
+        #expect(resumed.canRun)
+        #expect(resumed != deferred)
+    }
+
+    @Test func systemSurfaceBudgetsFollowCentralRuntimePolicy() {
+        let normal = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        #expect(
+            normal.walkLiveActivityUpdateBudget() == OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 50,
+                maximumUpdateInterval: 30,
+                allowsAutomaticUpdates: true
+            )
+        )
+        #expect(normal.systemSurfaceSnapshotDebounceMilliseconds() == 350)
+
+        let lowPower = AppWorkloadPolicy(
+            lowPowerModeProvider: { true },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .nominal }
+        )
+        #expect(
+            lowPower.walkLiveActivityUpdateBudget() == OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 100,
+                maximumUpdateInterval: 90,
+                allowsAutomaticUpdates: true
+            )
+        )
+        #expect(lowPower.systemSurfaceSnapshotDebounceMilliseconds() == 1200)
+
+        let critical = AppWorkloadPolicy(
+            lowPowerModeProvider: { false },
+            reduceMotionProvider: { false },
+            userPowerSavingProvider: { false },
+            thermalStateProvider: { .critical }
+        )
+        #expect(!critical.walkLiveActivityUpdateBudget().allowsAutomaticUpdates)
+        #expect(critical.systemSurfaceSnapshotDebounceMilliseconds() == 2500)
     }
 }
 

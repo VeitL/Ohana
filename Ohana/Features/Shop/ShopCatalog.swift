@@ -12,8 +12,100 @@ nonisolated struct AppIconShopDescriptor: Identifiable, Equatable {
     var assetName: String { "\(alternateIconName ?? "AppIcon")Preview" }
 }
 
-struct ShopItem: Identifiable, Equatable {
-    enum ShopCategory: String, CaseIterable, Identifiable {
+nonisolated enum ShopApplicationRequirement: String, Equatable, Sendable {
+    case none
+    case activePet
+    case activeDog
+}
+
+nonisolated enum ShopEffectKind: String, Equatable, Sendable {
+    case popoutCard
+    case limeGlow
+    case rainbowTrail
+    case rainbowPoop
+    case starfall
+    case firework
+}
+
+nonisolated enum ShopProductApplication: Equatable, Sendable {
+    case appIcon
+    case avatarPass
+    case effect(ShopEffectKind)
+    case plantDecor
+    case title
+    case goldenLuck
+    case streakShield
+    case backdatePasses(Int)
+    case treeEnergy(Int)
+    case unsupported
+
+    var isInventoryConsumable: Bool {
+        switch self {
+        case .avatarPass, .goldenLuck, .streakShield, .backdatePasses:
+            true
+        default:
+            false
+        }
+    }
+}
+
+/// Single catalog-to-runtime mapping. Every sellable item must resolve to a
+/// concrete application path so a successful purchase can never become inert
+/// inventory.
+nonisolated enum ShopProductApplicationCatalog {
+    static func application(for itemID: String) -> ShopProductApplication {
+        if AppIconCatalog.descriptor(forItemId: itemID) != nil {
+            return .appIcon
+        }
+        if itemID == Avatar2DAccess.shopItemId {
+            return .avatarPass
+        }
+        switch itemID {
+        case "fx_popout_card":
+            return .effect(.popoutCard)
+        case "fx_lime_glow":
+            return .effect(.limeGlow)
+        case "fx_rainbow":
+            return .effect(.rainbowTrail)
+        case "fx_rainbow_poop":
+            return .effect(.rainbowPoop)
+        case "fx_stars":
+            return .effect(.starfall)
+        case "fx_firework":
+            return .effect(.firework)
+        case "title_guardian", "title_pioneer", "title_chef":
+            return .title
+        case "boost_double":
+            return .goldenLuck
+        case "boost_streak":
+            return .streakShield
+        case "boost_backdate_single":
+            return .backdatePasses(1)
+        case "boost_backdate_pack":
+            return .backdatePasses(3)
+        case "boost_tree":
+            return .treeEnergy(OasisTreeEnergyInjectionPolicy.starterPackageXP)
+        case "boost_tree_large":
+            return .treeEnergy(OasisTreeEnergyInjectionPolicy.largePackageXP)
+        default:
+            return OasisPlantDecorID.isPlantDecor(itemID) ? .plantDecor : .unsupported
+        }
+    }
+
+    static func requirement(for itemID: String) -> ShopApplicationRequirement {
+        switch application(for: itemID) {
+        case .effect(.popoutCard), .effect(.limeGlow):
+            .activePet
+        case .effect(.rainbowTrail), .effect(.rainbowPoop):
+            .activeDog
+        default:
+            .none
+        }
+    }
+}
+
+nonisolated struct ShopItem: Identifiable, Equatable {
+    nonisolated enum ShopCategory: String, CaseIterable, Identifiable {
         case appIcon
         case avatar2d
         case cashExchange
@@ -25,7 +117,15 @@ struct ShopItem: Identifiable, Equatable {
         var id: String { rawValue }
 
         static var visibleCases: [ShopCategory] {
-            allCases.filter(\.isVisibleInFirstRelease)
+            [
+                .effect,
+                .plantDecor,
+                .appIcon,
+                .avatar2d,
+                .title_,
+                .boost,
+                .cashExchange
+            ].filter(\.isVisibleInFirstRelease)
         }
 
         var isVisibleInFirstRelease: Bool {
@@ -79,6 +179,10 @@ struct ShopItem: Identifiable, Equatable {
 
     func name(_ l: L10n) -> String { l.text(nameText) }
     func description(_ l: L10n) -> String { l.text(descriptionText) }
+    var application: ShopProductApplication { ShopProductApplicationCatalog.application(for: id) }
+    var applicationRequirement: ShopApplicationRequirement {
+        ShopProductApplicationCatalog.requirement(for: id)
+    }
 }
 
 nonisolated enum AppIconCatalog {
@@ -139,24 +243,107 @@ nonisolated enum AppIconCatalog {
     }
 }
 
-enum ShopCatalog {
+nonisolated enum ShopCatalog {
     static func allItems(purchasedSet: Set<String> = []) -> [ShopItem] {
-        rawItems.map { item in
-            var copy = item
-            if item.appIcon?.isDefault == true {
-                copy.isPurchased = true
-            } else if !item.isConsumable {
-                copy.isPurchased = purchasedSet.contains(item.id)
-            }
-            return copy
-        }
+        sellableItems.map { decorated($0, purchasedSet: purchasedSet) }
     }
 
     static func item(id: String, purchasedSet: Set<String> = []) -> ShopItem? {
-        allItems(purchasedSet: purchasedSet).first { $0.id == id }
+        allCatalogItems
+            .first { $0.id == id }
+            .map { decorated($0, purchasedSet: purchasedSet) }
     }
 
-    private static let rawItems: [ShopItem] = appIconItems + avatarItems + effectItems + plantDecorItems + titleItems + boostItems
+    static func isSellable(itemID: String) -> Bool {
+        sellableItems.contains { $0.id == itemID }
+    }
+
+    static var allCatalogIDsHaveApplications: Bool {
+        allCatalogItems.allSatisfy { $0.application != .unsupported }
+    }
+
+    private static func decorated(_ item: ShopItem, purchasedSet: Set<String>) -> ShopItem {
+        var copy = item
+        if item.appIcon?.isDefault == true {
+            copy.isPurchased = true
+        } else if !item.isConsumable {
+            copy.isPurchased = purchasedSet.contains(item.id)
+        }
+        return copy
+    }
+
+    private static let sellableItems: [ShopItem] =
+        appIconItems + avatarItems + effectItems + plantDecorItems + titleItems + boostItems
+
+    /// Retained only so historical in-flight purchases can finish after an app
+    /// update. Tree energy remains available from Oasis itself, not as a
+    /// duplicated shop shelf. Backdate passes remain recoverable for old
+    /// receipts and backups, but are not sold while the retired makeup command
+    /// has no supported Presence write path.
+    private static let legacyFulfillmentItems: [ShopItem] = [
+        ShopItem(
+            id: "boost_tree",
+            emoji: "🌱",
+            nameText: .init(
+                zh: "树能量 +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)XP",
+                en: "Tree XP +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)",
+                de: "Baum-XP +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)"
+            ),
+            descriptionText: .init(
+                zh: "旧版商店树能量订单；新注入请前往绿洲。基础植物照护不靠购买。",
+                en: "Legacy shop tree-energy order. New injections live in Oasis; basic plant care is never purchased.",
+                de: "Ältere Baumenergie-Bestellung. Neue Energie wird in Oasis eingespeist; grundlegende Pflanzenpflege wird nie gekauft."
+            ),
+            cost: OasisTreeEnergyInjectionPolicy.starterPackageCost,
+            category: .boost,
+            isConsumable: true
+        ),
+        ShopItem(
+            id: "boost_tree_large",
+            emoji: "🌳",
+            nameText: .init(
+                zh: "树能量包 +\(OasisTreeEnergyInjectionPolicy.largePackageXP)XP",
+                en: "Tree XP Pack +\(OasisTreeEnergyInjectionPolicy.largePackageXP)",
+                de: "Baum-XP-Paket +\(OasisTreeEnergyInjectionPolicy.largePackageXP)"
+            ),
+            descriptionText: .init(
+                zh: "旧版商店树能量订单；新注入请前往绿洲。基础植物照护不靠购买。",
+                en: "Legacy shop tree-energy order. New injections live in Oasis; basic plant care is never purchased.",
+                de: "Ältere Baumenergie-Bestellung. Neue Energie wird in Oasis eingespeist; grundlegende Pflanzenpflege wird nie gekauft."
+            ),
+            cost: OasisTreeEnergyInjectionPolicy.largePackageCost,
+            category: .boost,
+            isConsumable: true
+        ),
+        ShopItem(
+            id: "boost_backdate_single",
+            emoji: "📅",
+            nameText: .init(zh: "补签券 ×1", en: "Backdate Pass ×1", de: "Nachtragspass ×1"),
+            descriptionText: .init(
+                zh: "旧版补签券库存；当前版本不再新增出售。",
+                en: "Legacy backdate inventory; no longer sold in this version.",
+                de: "Älterer Nachtragspass; in dieser Version nicht mehr erhältlich."
+            ),
+            cost: 240,
+            category: .boost,
+            isConsumable: true
+        ),
+        ShopItem(
+            id: "boost_backdate_pack",
+            emoji: "🗓️",
+            nameText: .init(zh: "补签券 ×3", en: "Backdate Pass ×3", de: "Nachtragspass ×3"),
+            descriptionText: .init(
+                zh: "旧版补签券库存；当前版本不再新增出售。",
+                en: "Legacy backdate inventory; no longer sold in this version.",
+                de: "Ältere Nachtragspässe; in dieser Version nicht mehr erhältlich."
+            ),
+            cost: 580,
+            category: .boost,
+            isConsumable: true
+        )
+    ]
+
+    private static let allCatalogItems = sellableItems + legacyFulfillmentItems
 
     private static let appIconItems: [ShopItem] = [
         ShopItem(
@@ -238,10 +425,64 @@ enum ShopCatalog {
 
     private static let effectItems: [ShopItem] = [
         ShopItem(id: "fx_popout_card", emoji: "🃏", nameText: .init(zh: "3D 破框卡片", en: "3D Popout Card", de: "3D-Popout-Karte"), descriptionText: .init(zh: "宠物主体从卡片破框悬浮而出，需配合透明抠图使用。", en: "Let a pet pop out from its card when cutout assets are available.", de: "Lässt ein Tier aus der Karte hervortreten, wenn Freisteller verfügbar sind."), cost: 800, category: .effect),
-        ShopItem(id: "fx_lime_glow", emoji: "💚", nameText: .init(zh: "青柠光晕", en: "Lime Glow", de: "Lime-Leuchten"), descriptionText: .init(zh: "打卡时宠物卡片发出青柠光芒特效。", en: "Adds a lime glow to pet check-ins.", de: "Fügt Check-ins ein Lime-Leuchten hinzu."), cost: 300, category: .effect),
+        ShopItem(
+            id: "fx_lime_glow",
+            emoji: "💚",
+            nameText: .init(
+                zh: "青柠光晕",
+                en: "Lime Glow",
+                de: "Lime-Leuchten",
+                es: "Brillo lima",
+                pt: "Brilho lima",
+                fr: "Halo citron vert",
+                ja: "ライムグロー",
+                ko: "라임 글로우",
+                it: "Bagliore lime"
+            ),
+            descriptionText: .init(
+                zh: "让主页上的在世宠物卡片散发青柠光晕。",
+                en: "Adds a lime glow to active pet cards on Home.",
+                de: "Verleiht aktiven Tierkarten auf der Startseite ein Lime-Leuchten.",
+                es: "Añade un brillo lima a las tarjetas de mascotas activas en Inicio.",
+                pt: "Adiciona um brilho lima aos cartões de pets ativos na tela inicial.",
+                fr: "Ajoute un halo citron vert aux cartes des animaux actifs sur l’accueil.",
+                ja: "ホームにいる有効なペットカードへライム色の光を加えます。",
+                ko: "홈의 활성 반려동물 카드에 라임빛 광채를 더합니다.",
+                it: "Aggiunge un bagliore lime alle schede degli animali attivi nella Home."
+            ),
+            cost: 300,
+            category: .effect
+        ),
         ShopItem(id: "fx_rainbow", emoji: "🌈", nameText: .init(zh: "彩虹轨迹", en: "Rainbow Trail", de: "Regenbogenroute"), descriptionText: .init(zh: "遛狗路线地图显示彩虹轨迹风格。", en: "Shows dog-walk routes with a rainbow trail.", de: "Zeigt Spaziergänge als Regenbogenroute."), cost: 650, category: .effect),
         ShopItem(id: "fx_rainbow_poop", emoji: "💩", nameText: .init(zh: "彩虹便便", en: "Rainbow Poop", de: "Regenbogenkot"), descriptionText: .init(zh: "遛狗便便标记显示流动彩虹光圈。", en: "Adds a flowing rainbow ring to walk poop markers.", de: "Fügt Gassi-Kotmarkierungen einen fließenden Regenbogenring hinzu."), cost: 420, category: .effect),
-        ShopItem(id: "fx_stars", emoji: "⭐️", nameText: .init(zh: "星尘落雨", en: "Stardust", de: "Sternenstaub"), descriptionText: .init(zh: "完成每日委托时触发星尘粒子特效。", en: "Adds stardust particles to daily quest completions.", de: "Fügt Tagesaufgaben Sternenstaub-Partikel hinzu."), cost: 350, category: .effect),
+        ShopItem(
+            id: "fx_stars",
+            emoji: "⭐️",
+            nameText: .init(
+                zh: "星光落雨",
+                en: "Starfall",
+                de: "Sternenregen",
+                es: "Lluvia estelar",
+                pt: "Chuva de estrelas",
+                fr: "Pluie d’étoiles",
+                ja: "星降る光",
+                ko: "별빛 비",
+                it: "Pioggia di stelle"
+            ),
+            descriptionText: .init(
+                zh: "完成每日委托时触发星光粒子特效；它不是伙伴星光货币。",
+                en: "Adds starfall particles to daily quest completions. This is not companion stardust currency.",
+                de: "Zeigt Sternenregen bei Tagesaufgaben. Dies ist keine Begleiter-Sternenstaubwährung.",
+                es: "Añade partículas de estrellas al completar encargos diarios. No es la moneda de compañeros.",
+                pt: "Adiciona partículas de estrelas ao concluir tarefas diárias. Não é a moeda dos companheiros.",
+                fr: "Ajoute une pluie d’étoiles aux quêtes quotidiennes. Ce n’est pas la monnaie des compagnons.",
+                ja: "デイリー依頼の完了時に星の粒子を表示します。仲間用通貨ではありません。",
+                ko: "일일 의뢰 완료 시 별빛 입자를 표시합니다. 동료 재화가 아닙니다.",
+                it: "Aggiunge particelle stellari alle missioni giornaliere. Non è la valuta dei compagni."
+            ),
+            cost: 350,
+            category: .effect
+        ),
         ShopItem(id: "fx_firework", emoji: "🎆", nameText: .init(zh: "烟花庆典", en: "Firework", de: "Feuerwerk"), descriptionText: .init(zh: "达成里程碑时升级烟花动画。", en: "Upgrades milestone celebrations with fireworks.", de: "Erweitert Meilensteinfeiern mit Feuerwerk."), cost: 720, category: .effect)
     ]
 
@@ -351,11 +592,7 @@ enum ShopCatalog {
     ]
 
     private static let boostItems: [ShopItem] = [
-        ShopItem(id: "boost_double", emoji: "⚡️", nameText: .init(zh: "金色幸运券", en: "Golden Luck", de: "Goldenes Glück"), descriptionText: .init(zh: "下次普通照护触发金色幸运，受每日预算控制。", en: "Turns the next regular care reward into Golden Luck, within the daily budget.", de: "Macht die nächste normale Pflege zu goldenem Glück, im Tagesbudget."), cost: 80, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_streak", emoji: "🛡️", nameText: .init(zh: "Streak 保护盾", en: "Streak Shield", de: "Streak-Schild"), descriptionText: .init(zh: "48 小时内漏签 1 天也不断连胜。", en: "Protects one missed day within 48 hours.", de: "Schützt einen verpassten Tag innerhalb von 48 Stunden."), cost: 180, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_tree", emoji: "🌱", nameText: .init(zh: "树能量 +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)XP", en: "Tree XP +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)", de: "Baum-XP +\(OasisTreeEnergyInjectionPolicy.starterPackageXP)"), descriptionText: .init(zh: "可重复注入生命之树；基础植物照护不靠购买，树能量只推动绿洲收益和奖励层。", en: "Repeatable tree energy. Basic plant care is not purchased; this only pushes Oasis yield and reward layers.", de: "Wiederholbare Baumenergie. Grundlegende Pflanzenpflege wird nicht gekauft; dies stärkt Oasis-Ertrag und Belohnungen."), cost: OasisTreeEnergyInjectionPolicy.starterPackageCost, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_tree_large", emoji: "🌳", nameText: .init(zh: "树能量包 +\(OasisTreeEnergyInjectionPolicy.largePackageXP)XP", en: "Tree XP Pack +\(OasisTreeEnergyInjectionPolicy.largePackageXP)", de: "Baum-XP-Paket +\(OasisTreeEnergyInjectionPolicy.largePackageXP)"), descriptionText: .init(zh: "Lv.5 后用于继续养绿洲收益；椰子足够就能重复注入。", en: "For growing Oasis yield after Lv.5; repeat while you have enough coconuts.", de: "Für mehr Oasis-Ertrag ab Lv.5; wiederholbar, solange genug Kokosnüsse vorhanden sind."), cost: OasisTreeEnergyInjectionPolicy.largePackageCost, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_backdate_single", emoji: "📅", nameText: .init(zh: "补签券 ×1", en: "Backdate Pass ×1", de: "Nachtragspass ×1"), descriptionText: .init(zh: "获得 1 张昨日补签券，放入百宝箱。", en: "Adds one yesterday backdate pass.", de: "Fügt einen Nachtragspass für gestern hinzu."), cost: 240, category: .boost, isConsumable: true),
-        ShopItem(id: "boost_backdate_pack", emoji: "🗓️", nameText: .init(zh: "补签券 ×3", en: "Backdate Pass ×3", de: "Nachtragspass ×3"), descriptionText: .init(zh: "获得 3 张昨日补签券，适合连续补签。", en: "Adds three backdate passes.", de: "Fügt drei Nachtragspässe hinzu."), cost: 580, category: .boost, isConsumable: true)
+        ShopItem(id: "boost_double", emoji: "⚡️", nameText: .init(zh: "金色幸运券", en: "Golden Luck", de: "Goldenes Glück"), descriptionText: .init(zh: "下次普通照护触发金色幸运，受每日预算控制。", en: "Turns the next regular care reward into Golden Luck, within the daily budget.", de: "Macht die nächste normale Pflege zu goldenem Glück, im Tagesbudget."), cost: 20, category: .boost, isConsumable: true),
+        ShopItem(id: "boost_streak", emoji: "🛡️", nameText: .init(zh: "Streak 保护盾", en: "Streak Shield", de: "Streak-Schild"), descriptionText: .init(zh: "48 小时内漏签 1 天也不断连胜。", en: "Protects one missed day within 48 hours.", de: "Schützt einen verpassten Tag innerhalb von 48 Stunden."), cost: 180, category: .boost, isConsumable: true)
     ]
 }

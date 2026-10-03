@@ -31,7 +31,11 @@ struct PetSharedCheckInView: View {
                 id: "feed",
                 title: l.tr(zh: "共同喂食", en: "Shared Feeding", de: "Gemeinsam füttern"),
                 value: "\(activePets.count)",
-                subtitle: l.tr(zh: "进入后选择同类成员和餐食", en: "Choose same-species members and meal details", de: "Gleiche Tierart und Mahlzeit wählen"),
+                subtitle: l.tr(
+                    zh: "同类成员 · 餐食", en: "Same species · Meal", de: "Gleiche Tierart · Mahlzeit",
+                    es: "Misma especie · Comida", pt: "Mesma espécie · Refeição", fr: "Même espèce · Repas",
+                    ja: "同じ種類 · 食事", ko: "같은 종 · 식사", it: "Stessa specie · Pasto"
+                ),
                 icon: "fork.knife",
                 tint: Color.goYellow,
                 pets: activePets,
@@ -41,7 +45,11 @@ struct PetSharedCheckInView: View {
                 id: "water",
                 title: l.tr(zh: "共同喂水", en: "Shared Water", de: "Gemeinsam trinken"),
                 value: "\(activePets.count)",
-                subtitle: l.tr(zh: "进入后选择目标宠物和水量", en: "Choose target pets and amount inside", de: "Zieltiere und Menge wählen"),
+                subtitle: l.tr(
+                    zh: "宠物 · 水量", en: "Pets · Amount", de: "Tiere · Menge",
+                    es: "Mascotas · Cantidad", pt: "Pets · Quantidade", fr: "Animaux · Quantité",
+                    ja: "ペット · 水量", ko: "반려동물 · 물의 양", it: "Animali · Quantità"
+                ),
                 icon: "drop.fill",
                 tint: Color.goTeal,
                 pets: activePets,
@@ -71,8 +79,6 @@ struct PetSharedCheckInView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
-                        summaryPanel
-
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(actions) { action in
                                 Button {
@@ -103,42 +109,31 @@ struct PetSharedCheckInView: View {
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive header glyph.
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "多宠物打卡", en: "Multi-Pet Check-in", de: "Mehrere Tiere"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(l.tr(
-                    zh: "选择一个共同动作，再进入已有详情页确认",
-                    en: "Pick a shared action, then confirm in the detail page",
-                    de: "Aktion wählen und im Detail bestätigen"
+            Text(l.tr(
+                zh: "多宠物打卡", en: "Multi-Pet Check-in", de: "Mehrere Tiere",
+                es: "Check-in de varias mascotas", pt: "Check-in de vários pets", fr: "Check-in multi-animaux",
+                ja: "複数ペットのチェックイン", ko: "여러 반려동물 체크인", it: "Check-in multi-animale"
+            ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .accessibilityHint(l.tr(
+                    zh: "选择共同动作后确认详情",
+                    en: "Choose a shared action, then confirm the details",
+                    de: "Gemeinsame Aktion wählen und Details bestätigen",
+                    es: "Elige una acción compartida y confirma los detalles",
+                    pt: "Escolha uma ação compartilhada e confirme os detalhes",
+                    fr: "Choisissez une action partagée, puis confirmez les détails",
+                    ja: "共同アクションを選び、詳細を確認します",
+                    ko: "공동 활동을 선택한 다음 세부 내용을 확인하세요",
+                    it: "Scegli un’azione condivisa e conferma i dettagli"
                 ))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
-            }
 
             Spacer(minLength: 54)
         }
         .padding(.horizontal, 18)
         .padding(.top, 12)
         .padding(.bottom, 6)
-    }
-
-    private var summaryPanel: some View {
-        FeatureHubSummaryPanel(
-            title: l.tr(zh: "共同照护入口", en: "Shared Care Entries", de: "Gemeinsame Pflege"),
-            statusText: actions.isEmpty
-                ? l.tr(zh: "暂无可用共同动作", en: "No shared actions yet", de: "Noch keine gemeinsamen Aktionen")
-                : l.tr(zh: "\(actions.count) 个共同动作", en: "\(actions.count) shared actions", de: "\(actions.count) Aktionen"),
-            statusTint: actions.isEmpty ? Color.ohanaSecondaryText : Color.goPrimary,
-            metrics: [
-                FeatureHubMetric(id: "pets", title: l.tr(zh: "活跃宠物", en: "Active pets", de: "Aktive Tiere"), value: "\(activePets.count)"),
-                FeatureHubMetric(id: "cats", title: l.tr(zh: "猫砂可用", en: "Litter ready", de: "Streu bereit"), value: "\(cats.count)"),
-                FeatureHubMetric(id: "actions", title: l.tr(zh: "共同动作", en: "Shared actions", de: "Aktionen"), value: "\(actions.count)")
-            ]
-        )
-        .accessibilityIdentifier("pet-shared-check-in-summary-panel")
     }
 
     private func tileData(for action: PetSharedCheckInAction) -> FeatureHubTileData {

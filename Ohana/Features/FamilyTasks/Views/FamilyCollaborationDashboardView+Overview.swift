@@ -22,9 +22,9 @@ extension FamilyCollaborationDashboardView {
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
-                        zh: "以人类档案记录任务归属，不会发送远程通知。",
-                        en: "Human profiles record attribution; no remote notifications are sent.",
-                        de: "Personenprofile speichern die Zuordnung; es werden keine Remote-Mitteilungen gesendet."
+                        zh: "本机归属，不发送远程通知",
+                        en: "On-device assignment, no remote notifications",
+                        de: "Lokale Zuordnung, keine Remote-Mitteilungen"
                     ))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -64,21 +64,20 @@ extension FamilyCollaborationDashboardView {
                 presentEditor(.create)
             } label: {
                 Label(
-                    l.tr(zh: "发布奖励任务", en: "Post reward task", de: "Prämienaufgabe erstellen"),
+                    l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen"),
                     systemImage: "plus.circle.fill"
                 )
                 .font(OhanaFont.callout(.black))
                 .frame(maxWidth: .infinity, minHeight: 44)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.goPrimary)
+            .ohanaPrimaryProminentButton()
             .disabled(currentHuman == nil || humans.count(where: { !$0.hasPassedAway }) < 2)
             .accessibilityIdentifier("family-collaboration-create-task")
 
             Text(l.tr(
-                zh: "每个任务必须设置椰子奖励；发布时验证余额，完成后由发布者确认转账。",
-                en: "Every task needs a coconut reward. Balance is checked when posted; transfer happens after publisher confirmation.",
-                de: "Jede Aufgabe braucht eine Kokosprämie. Das Guthaben wird beim Erstellen geprüft; die Übertragung folgt nach Bestätigung."
+                zh: "奖励可选 · 确认完成后转账",
+                en: "Rewards optional · transfer after completion approval",
+                de: "Prämie optional · Übertragung nach Bestätigung"
             ))
             .font(OhanaFont.caption2(.bold))
             .foregroundStyle(Color.ohanaSecondaryText)
@@ -170,7 +169,7 @@ extension FamilyCollaborationDashboardView {
             if householdPrioritizedTasks.isEmpty {
                 compactEmpty(
                     icon: "checkmark.seal.fill",
-                    text: l.tr(zh: "当前没有进行中的家庭任务。", en: "There are no active household tasks.", de: "Es gibt keine aktiven Familienaufgaben.")
+                    text: l.tr(zh: "暂无进行中的任务", en: "No active tasks", de: "Keine aktiven Aufgaben")
                 )
             } else {
                 VStack(spacing: 8) {
@@ -185,7 +184,7 @@ extension FamilyCollaborationDashboardView {
     var householdSecondaryActions: some View {
         VStack(spacing: 8) {
             householdNavigationRow(
-                title: l.tr(zh: "任务、宠物状态与家庭动态", en: "Tasks, pet status, and activity", de: "Aufgaben, Tierstatus und Aktivität"),
+                title: l.tr(zh: "全部协作", en: "All collaboration", de: "Alle Zusammenarbeit"),
                 icon: "list.bullet.rectangle.portrait.fill"
             ) {
                 openMoreCollaboration()
@@ -257,11 +256,11 @@ extension FamilyCollaborationDashboardView {
                     Text(l.tr(zh: "今日协作", en: "Today care", de: "Pflege heute"))
                         .font(OhanaFont.title2(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(openFocusCount == 0
-                        ? l.tr(zh: "全家照护节奏很稳。", en: "The family rhythm is steady.", de: "Der Familienrhythmus ist stabil.")
-                        : l.tr(zh: "还有 \(openFocusCount) 个协作点。", en: "\(openFocusCount) care points remain.", de: "\(openFocusCount) Pflegepunkte offen."))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
+                    if openFocusCount > 0 {
+                        Text(l.tr(zh: "\(openFocusCount) 个待处理", en: "\(openFocusCount) remaining", de: "\(openFocusCount) offen"))
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
                 }
                 Spacer()
                 Text("\(Int(boardProgress * 100))%")
@@ -299,6 +298,7 @@ extension FamilyCollaborationDashboardView {
                 count: todayAssignedReminders.count,
                 subtitle: assignedSlotSubtitle,
                 tint: Color.goPurple,
+                tintForeground: OhanaResolvedPrimaryAccent(customHex: "A855F7")?.actionTextColor ?? Color.ohanaPrimaryText,
                 actionTitle: todayAssignedReminders.isEmpty
                     ? l.tr(zh: "稳", en: "Clear", de: "Frei")
                     : l.tr(zh: "查看", en: "View", de: "Ansehen"),
@@ -311,6 +311,7 @@ extension FamilyCollaborationDashboardView {
                 count: careGapPets.count,
                 subtitle: gapSlotSubtitle,
                 tint: Color.goYellow,
+                tintForeground: Color.arkInk,
                 actionTitle: careGapPets.isEmpty
                     ? l.tr(zh: "完成", en: "Done", de: "Fertig")
                     : l.tr(zh: "补上", en: "Cover", de: "Erledigen"),
@@ -329,29 +330,30 @@ extension FamilyCollaborationDashboardView {
                 count: bountyFamilyTasks.count,
                 subtitle: bountySlotSubtitle,
                 tint: Color.goTeal,
+                tintForeground: Color.arkInk,
                 actionTitle: bountySlotActionTitle,
                 action: { performPrimaryBountyAction() }
             )
         }
     }
 
-    var assignedSlotSubtitle: String {
+    var assignedSlotSubtitle: String? {
         guard let reminder = todayAssignedReminders.first else {
-            return l.tr(zh: "没有指派给你的任务", en: "Nothing assigned to you", de: "Dir ist nichts zugewiesen")
+            return nil
         }
         return reminderTitle(reminder, fallback: reminderSubtitle(reminder))
     }
 
-    var gapSlotSubtitle: String {
+    var gapSlotSubtitle: String? {
         guard let pet = careGapPets.first else {
-            return l.tr(zh: "今天照护已补齐", en: "Care is covered today", de: "Heute ist alles erledigt")
+            return nil
         }
         return "\(pet.name) · \(careGapLabels(for: pet).prefix(2).joined(separator: " · "))"
     }
 
-    var bountySlotSubtitle: String {
+    var bountySlotSubtitle: String? {
         guard let task = bountyFamilyTasks.first else {
-            return l.tr(zh: "发布一个奖励任务", en: "Post a reward task", de: "Prämienaufgabe erstellen")
+            return nil
         }
         return task.rewardCoconuts > 0
             ? "\(task.title) · +\(task.rewardCoconuts)🥥"
@@ -380,7 +382,16 @@ extension FamilyCollaborationDashboardView {
         return l.tr(zh: "查看", en: "View", de: "Ansehen")
     }
 
-    func taskSlot(icon: String, title: String, count: Int, subtitle: String, tint: Color, actionTitle: String, action: @escaping () -> Void) -> some View {
+    func taskSlot(
+        icon: String,
+        title: String,
+        count: Int,
+        subtitle: String?,
+        tint: Color,
+        tintForeground: Color,
+        actionTitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 ZStack {
@@ -399,16 +410,18 @@ extension FamilyCollaborationDashboardView {
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("\(count)")
                             .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(tintForeground)
                             .monospacedDigit()
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
                             .background(tint, in: Capsule())
                     }
-                    Text(subtitle)
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(OhanaFont.caption(.bold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .lineLimit(1)
+                    }
                 }
 
                 Spacer(minLength: 6)
@@ -461,7 +474,7 @@ extension FamilyCollaborationDashboardView {
             if todayAssignedReminders.isEmpty {
                 compactEmpty(
                     icon: "checkmark.seal.fill",
-                    text: l.tr(zh: "你今天没有被指派的任务。", en: "Nothing assigned to you today.", de: "Heute ist dir nichts zugewiesen.")
+                    text: l.tr(zh: "今日无任务", en: "No tasks today", de: "Heute keine Aufgaben")
                 )
             } else {
                 VStack(spacing: 8) {
@@ -482,7 +495,7 @@ extension FamilyCollaborationDashboardView {
             if careGapPets.isEmpty {
                 compactEmpty(
                     icon: "checkmark.circle.fill",
-                    text: l.tr(zh: "今天的照护缺口已经补齐。", en: "Today's care gaps are covered.", de: "Die heutigen Lücken sind geschlossen.")
+                    text: l.tr(zh: "暂无照护缺口", en: "No care gaps", de: "Keine Versorgungslücken")
                 )
             } else {
                 VStack(spacing: 8) {
@@ -516,7 +529,7 @@ extension FamilyCollaborationDashboardView {
             if bountyFamilyTasks.isEmpty {
                 compactEmpty(
                     icon: "sparkles",
-                    text: l.tr(zh: "发布一个带椰子奖励的任务。", en: "Post a task with coconut rewards.", de: "Erstelle eine Aufgabe mit Kokosnuss-Belohnung.")
+                    text: l.tr(zh: "暂无奖励任务", en: "No reward tasks", de: "Keine Prämienaufgaben")
                 )
             } else {
                 VStack(spacing: 10) {
@@ -540,10 +553,6 @@ extension FamilyCollaborationDashboardView {
                     Text(l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"))
                         .font(OhanaFont.callout(.black))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "完整宠物状态、今日动态和家庭周报", en: "Full pet status, activity, and weekly report", de: "Tierstatus, Aktivität und Wochenbericht"))
-                        .font(OhanaFont.caption2(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
@@ -588,7 +597,7 @@ extension FamilyCollaborationDashboardView {
                 count: assignedFamilyTasks.count
             ) {
                 if assignedFamilyTasks.isEmpty {
-                    compactEmpty(icon: "checkmark.seal.fill", text: l.tr(zh: "当前没有发给你的任务。", en: "Nothing assigned to you right now.", de: "Dir ist gerade nichts zugewiesen."))
+                    compactEmpty(icon: "checkmark.seal.fill", text: l.tr(zh: "暂无指派任务", en: "No assigned tasks", de: "Keine zugewiesenen Aufgaben"))
                 } else {
                     VStack(spacing: 8) {
                         ForEach(assignedFamilyTasks) { task in
@@ -618,7 +627,7 @@ extension FamilyCollaborationDashboardView {
                 }
             ) {
                 if bountyFamilyTasks.isEmpty {
-                    compactEmpty(icon: "sparkles", text: l.tr(zh: "还没有带椰子奖励的任务。", en: "No reward tasks yet.", de: "Noch keine Prämien."))
+                    compactEmpty(icon: "sparkles", text: l.tr(zh: "暂无奖励任务", en: "No reward tasks", de: "Keine Prämienaufgaben"))
                 } else {
                     VStack(spacing: 8) {
                         ForEach(bountyFamilyTasks) { task in

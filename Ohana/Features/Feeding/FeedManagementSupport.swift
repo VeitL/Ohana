@@ -329,23 +329,75 @@ nonisolated enum FeedRuleMetadata {
     static let autoFeederEntityType = DomainEntityLinkRegistry.petAutoFeeder
 
     static func isManualReminderEvent(_ event: Event, pet: Pet) -> Bool {
-        let role = DomainEntityLinkRegistry.role(for: event)
-        guard role == .directPet,
-              MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString),
-              event.eventType == EventType.foodChange.rawValue
-        else { return false }
-        if event.feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue {
-            return true
-        }
-        return event.feedRuleKindRaw.isEmpty && hasLegacyManualReminderTitle(event.title)
+        isManualReminderEvent(event, petID: pet.id)
+    }
+
+    static func isManualReminderEvent(_ event: Event, petID: UUID) -> Bool {
+        let link = DomainEntityLink(event: event)
+        let role = DomainEntityLinkRegistry.role(for: link)
+        return ruleKind(
+            eventType: event.eventType,
+            link: link,
+            feedRuleKindRaw: event.feedRuleKindRaw,
+            title: event.title
+        ) == .manualReminder &&
+            DomainEntityLinkRegistry.affectedEntityId(for: link, role: role) == petID
     }
 
     static func isAutoFeederEvent(_ event: Event, pet: Pet) -> Bool {
-        let role = DomainEntityLinkRegistry.role(for: event)
-        return (event.feedRuleKindRaw == FeedRuleKind.autoFeeder.rawValue || event.feedRuleKindRaw.isEmpty) &&
-            role == .petAutoFeeder &&
-            MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: pet.id.uuidString) &&
-            event.eventType == EventType.foodChange.rawValue
+        isAutoFeederEvent(event, petID: pet.id)
+    }
+
+    static func isAutoFeederEvent(_ event: Event, petID: UUID) -> Bool {
+        let link = DomainEntityLink(event: event)
+        let role = DomainEntityLinkRegistry.role(for: link)
+        return ruleKind(
+            eventType: event.eventType,
+            link: link,
+            feedRuleKindRaw: event.feedRuleKindRaw,
+            title: event.title
+        ) == .autoFeeder &&
+            DomainEntityLinkRegistry.affectedEntityId(for: link, role: role) == petID
+    }
+
+    static func isFeedRuleEvent(_ event: Event, petIDs: Set<UUID>) -> Bool {
+        guard !petIDs.isEmpty else { return false }
+        return petIDs.contains { petID in
+            isManualReminderEvent(event, petID: petID) ||
+                isAutoFeederEvent(event, petID: petID)
+        }
+    }
+
+    static func isFeedRuleEvent(_ event: Event) -> Bool {
+        ruleKind(
+            eventType: event.eventType,
+            link: DomainEntityLink(event: event),
+            feedRuleKindRaw: event.feedRuleKindRaw,
+            title: event.title
+        ) != nil
+    }
+
+    static func ruleKind(
+        eventType: String,
+        link: DomainEntityLink,
+        feedRuleKindRaw: String,
+        title: String
+    ) -> FeedRuleKind? {
+        guard eventType == EventType.foodChange.rawValue else { return nil }
+        switch DomainEntityLinkRegistry.role(for: link) {
+        case .directPet:
+            guard feedRuleKindRaw == FeedRuleKind.manualReminder.rawValue ||
+                    (feedRuleKindRaw.isEmpty && hasLegacyManualReminderTitle(title))
+            else { return nil }
+            return .manualReminder
+        case .petAutoFeeder:
+            guard feedRuleKindRaw == FeedRuleKind.autoFeeder.rawValue || feedRuleKindRaw.isEmpty else {
+                return nil
+            }
+            return .autoFeeder
+        default:
+            return nil
+        }
     }
 
     private static func hasLegacyManualReminderTitle(_ title: String) -> Bool {

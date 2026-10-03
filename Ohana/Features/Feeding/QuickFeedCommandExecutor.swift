@@ -32,12 +32,14 @@ struct QuickFeedCommandExecutor {
     private let careEvents: CareEventRecording
     private let derivations: CareDerivationExecutor
     private let reminderScheduling: ReminderSchedulingManaging
+    private let personalAccessLevel: PersonalAccessLevel
 
     init(context: ModelContext) {
         self.context = context
         careEvents = CareEventService()
         derivations = CareDerivationExecutor()
         reminderScheduling = ReminderSchedulingManager()
+        personalAccessLevel = .personal
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
@@ -45,18 +47,21 @@ struct QuickFeedCommandExecutor {
         careEvents = CareEventService()
         derivations = CareDerivationExecutor(revisions: SharedDomainRevisionPublisher(center: revisionCenter))
         reminderScheduling = ReminderSchedulingManager()
+        personalAccessLevel = .personal
     }
 
     init(
         context: ModelContext,
         careEvents: CareEventRecording,
         revisions: DomainRevisionPublishing,
-        reminderScheduling: ReminderSchedulingManaging
+        reminderScheduling: ReminderSchedulingManaging,
+        personalAccessLevel: PersonalAccessLevel = .personal
     ) {
         self.context = context
         self.careEvents = careEvents
         derivations = CareDerivationExecutor(revisions: revisions)
         self.reminderScheduling = reminderScheduling
+        self.personalAccessLevel = personalAccessLevel
     }
 
     /// Newest-first feeding history for the lazily-loaded history/overview
@@ -290,6 +295,27 @@ struct QuickFeedCommandExecutor {
         draft: FeedPlanDraft,
         allEvents: [Event]
     ) throws -> SaveFeedPlanCommandResult {
+        let normalizedTargets = SharedPetTargetResolver
+            .normalizedTargets(targets, fallback: pet)
+            .filter { !$0.hasPassedAway }
+        let replacingPlans = normalizedTargets.flatMap { target -> [Event] in
+            switch FeedOperatingMode.resolved(pet: target, allEvents: allEvents) {
+            case .manual:
+                []
+            case .manualReminder:
+                FeedingPlanWriter.planEvents(pet: target, kind: .manualReminder, allEvents: allEvents)
+            case .autoFeeder:
+                FeedingPlanWriter.planEvents(pet: target, kind: .autoFeeder, allEvents: allEvents)
+            }
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: personalAccessLevel,
+            // The writer assigns one group ID to the whole multi-pet,
+            // multi-meal schedule, so it is one logical plan at this boundary.
+            addingActivePlanCount: normalizedTargets.isEmpty ? 0 : 1,
+            replacingPlans: replacingPlans
+        )
         let result = try SaveFeedPlanCommand.run(
             pet: pet,
             targets: targets,

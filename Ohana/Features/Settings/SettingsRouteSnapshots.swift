@@ -9,7 +9,7 @@ struct SettingsHumanSnapshot: Identifiable, Equatable, Sendable {
     let hasPasscode: Bool
     let hasPassedAway: Bool
 
-    init(
+    nonisolated init(
         id: UUID,
         name: String,
         avatarEmoji: String,
@@ -27,14 +27,14 @@ struct SettingsHumanSnapshot: Identifiable, Equatable, Sendable {
         self.hasPassedAway = hasPassedAway
     }
 
-    init(human: Human) {
+    nonisolated init(human: Human) {
         self.init(
             id: human.id,
             name: human.name,
             avatarEmoji: human.avatarEmoji,
             themeColorHex: human.themeColor,
             appleUserIdentifier: human.appleUserIdentifier,
-            hasPasscode: HumanPasscodeService.hasPasscode(human),
+            hasPasscode: !human.pinHash.isEmpty && !human.pinSalt.isEmpty,
             hasPassedAway: human.hasPassedAway
         )
     }
@@ -73,14 +73,14 @@ struct SettingsPetSnapshot: Identifiable, Equatable, Sendable {
     let avatarEmoji: String
     let canWriteWallet: Bool
 
-    init(id: UUID, name: String, avatarEmoji: String, canWriteWallet: Bool) {
+    nonisolated init(id: UUID, name: String, avatarEmoji: String, canWriteWallet: Bool) {
         self.id = id
         self.name = name
         self.avatarEmoji = avatarEmoji
         self.canWriteWallet = canWriteWallet
     }
 
-    init(pet: Pet) {
+    nonisolated init(pet: Pet) {
         self.init(
             id: pet.id,
             name: pet.name,
@@ -100,13 +100,13 @@ struct SettingsHouseholdSnapshot: Identifiable, Equatable, Sendable {
     let name: String
     let ckShareRecordName: String
 
-    init(id: UUID, name: String, ckShareRecordName: String) {
+    nonisolated init(id: UUID, name: String, ckShareRecordName: String) {
         self.id = id
         self.name = name
         self.ckShareRecordName = ckShareRecordName
     }
 
-    init(household: Household) {
+    nonisolated init(household: Household) {
         self.init(
             id: household.id,
             name: household.name,

@@ -11,6 +11,8 @@ struct IslandToastView: View {
     let message: String
     var isShowing: Bool
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: 8) {
             Text(message)
@@ -23,8 +25,8 @@ struct IslandToastView: View {
         .background(Color.ohanaCardSurface, in: Capsule())
         .shadow(color: .black.opacity(0.15), radius: 16, y: 4) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
         .opacity(isShowing ? 1 : 0)
-        .offset(y: isShowing ? 0 : 24)
-        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isShowing) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+        .offset(y: isShowing || reduceMotion ? 0 : 10)
+        .animation(reduceMotion ? GoMotion.reduced : GoMotion.stateChange, value: isShowing)
     }
 }
 

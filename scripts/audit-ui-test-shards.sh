@@ -5,9 +5,20 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 MANIFEST="${OHANA_UI_TEST_SHARD_MANIFEST:-${SCRIPT_DIR}/ui-test-shards.tsv}"
 UI_TEST_ROOT="${REPO_ROOT}/OhanaUITests"
+SELECTOR_ENTRYPOINTS="${OHANA_UI_TEST_SELECTOR_ENTRYPOINTS:-${SCRIPT_DIR}/test-ui-release-smoke.sh}"
+DIAGNOSTIC_MANIFEST="${OHANA_UI_DIAGNOSTIC_MANIFEST:-${SCRIPT_DIR}/ui-interaction-diagnostics.txt}"
+DIAGNOSTIC_ENTRYPOINT="${SCRIPT_DIR}/test-ui-interaction-diagnostic.sh"
 
 if [[ ! -f "${MANIFEST}" ]]; then
   echo "UI test shard audit failed: manifest not found: ${MANIFEST}" >&2
+  exit 2
+fi
+if [[ ! -f "${DIAGNOSTIC_MANIFEST}" ]]; then
+  echo "UI test shard audit failed: diagnostic manifest not found: ${DIAGNOSTIC_MANIFEST}" >&2
+  exit 2
+fi
+if [[ ! -f "${DIAGNOSTIC_ENTRYPOINT}" ]]; then
+  echo "UI test shard audit failed: diagnostic entrypoint not found: ${DIAGNOSTIC_ENTRYPOINT}" >&2
   exit 2
 fi
 
@@ -20,8 +31,15 @@ trap cleanup EXIT
 SOURCE_SELECTORS="${TEMP_DIR}/source-selectors.txt"
 MANIFEST_SELECTORS="${TEMP_DIR}/manifest-selectors.txt"
 MANIFEST_SHARDS="${TEMP_DIR}/manifest-shards.txt"
+DIAGNOSTIC_SELECTORS="${TEMP_DIR}/diagnostic-selectors.txt"
+DIAGNOSTIC_ENTRYPOINT_SELECTORS="${TEMP_DIR}/diagnostic-entrypoint-selectors.txt"
+ALL_ASSIGNED_SELECTORS="${TEMP_DIR}/all-assigned-selectors.txt"
+ENTRYPOINT_SELECTORS="${TEMP_DIR}/entrypoint-selectors.txt"
 : > "${MANIFEST_SELECTORS}"
 : > "${MANIFEST_SHARDS}"
+: > "${DIAGNOSTIC_SELECTORS}"
+: > "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}"
+: > "${ENTRYPOINT_SELECTORS}"
 
 syntax_failed=0
 line_number=0
@@ -48,6 +66,23 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
   printf '%s\n' "${shard}" >> "${MANIFEST_SHARDS}"
 done < "${MANIFEST}"
 
+while IFS= read -r selector || [[ -n "${selector}" ]]; do
+  selector="${selector%$'\r'}"
+  [[ -z "${selector}" || "${selector}" =~ ^[[:space:]]*# ]] && continue
+  if [[ ! "${selector}" =~ ^OhanaUITests/[A-Za-z_][A-Za-z0-9_]*/test[A-Za-z0-9_]+$ ]]; then
+    echo "${DIAGNOSTIC_MANIFEST}: invalid diagnostic selector '${selector}'" >&2
+    syntax_failed=1
+    continue
+  fi
+  printf '%s\n' "${selector}" >> "${DIAGNOSTIC_SELECTORS}"
+done < "${DIAGNOSTIC_MANIFEST}"
+
+perl -ne '
+  while (m{(OhanaUITests/[A-Za-z_][A-Za-z0-9_]*/test(?:Diagnostic[A-Za-z0-9_]+|[A-Za-z0-9_]+WithReceivedInputTrace))}g) {
+    print "$1\n";
+  }
+' "${DIAGNOSTIC_ENTRYPOINT}" > "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}"
+
 if [[ "${syntax_failed}" != "0" ]]; then
   exit 1
 fi
@@ -65,6 +100,19 @@ perl -ne '
   }
 ' "${UI_TEST_ROOT}"/*.swift > "${SOURCE_SELECTORS}"
 
+IFS=':' read -r -a selector_entrypoint_files <<< "${SELECTOR_ENTRYPOINTS}"
+for selector_entrypoint in "${selector_entrypoint_files[@]}"; do
+  if [[ ! -f "${selector_entrypoint}" ]]; then
+    echo "UI test shard audit failed: selector entrypoint not found: ${selector_entrypoint}" >&2
+    exit 2
+  fi
+  perl -ne '
+    while (m{(OhanaUITests/[A-Za-z_][A-Za-z0-9_]*/test[A-Za-z0-9_]+)}g) {
+      print "$1\n";
+    }
+  ' "${selector_entrypoint}" >> "${ENTRYPOINT_SELECTORS}"
+done
+
 if [[ ! -s "${SOURCE_SELECTORS}" ]]; then
   echo "UI test shard audit failed: no XCTest UI test methods were discovered." >&2
   exit 1
@@ -73,18 +121,41 @@ if [[ ! -s "${MANIFEST_SELECTORS}" ]]; then
   echo "UI test shard audit failed: the manifest contains no selectors." >&2
   exit 1
 fi
+if [[ ! -s "${ENTRYPOINT_SELECTORS}" ]]; then
+  echo "UI test shard audit failed: selector entrypoints contain no UI test selectors." >&2
+  exit 1
+fi
 
 sort "${SOURCE_SELECTORS}" -o "${SOURCE_SELECTORS}"
 sort "${MANIFEST_SELECTORS}" -o "${MANIFEST_SELECTORS}"
+sort "${DIAGNOSTIC_SELECTORS}" -o "${DIAGNOSTIC_SELECTORS}"
+sort -u "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}" -o "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}"
+sort -u "${ENTRYPOINT_SELECTORS}" -o "${ENTRYPOINT_SELECTORS}"
+cat "${MANIFEST_SELECTORS}" "${DIAGNOSTIC_SELECTORS}" | sort > "${ALL_ASSIGNED_SELECTORS}"
 
 duplicate_selectors="$(uniq -d "${MANIFEST_SELECTORS}")"
-missing_selectors="$(comm -23 "${SOURCE_SELECTORS}" "${MANIFEST_SELECTORS}")"
-stale_selectors="$(comm -13 "${SOURCE_SELECTORS}" "${MANIFEST_SELECTORS}")"
+duplicate_diagnostic_selectors="$(uniq -d "${DIAGNOSTIC_SELECTORS}")"
+overlapping_selectors="$(comm -12 "${MANIFEST_SELECTORS}" "${DIAGNOSTIC_SELECTORS}")"
+missing_diagnostic_entrypoint="$(comm -23 "${DIAGNOSTIC_SELECTORS}" "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}")"
+stale_diagnostic_entrypoint="$(comm -13 "${DIAGNOSTIC_SELECTORS}" "${DIAGNOSTIC_ENTRYPOINT_SELECTORS}")"
+missing_selectors="$(comm -23 "${SOURCE_SELECTORS}" "${ALL_ASSIGNED_SELECTORS}")"
+stale_selectors="$(comm -13 "${SOURCE_SELECTORS}" "${ALL_ASSIGNED_SELECTORS}")"
+stale_entrypoint_selectors="$(comm -23 "${ENTRYPOINT_SELECTORS}" "${SOURCE_SELECTORS}")"
 
 failed=0
 if [[ -n "${duplicate_selectors}" ]]; then
   echo "UI test shard audit failed: selectors assigned more than once:" >&2
   printf '%s\n' "${duplicate_selectors}" | sed 's/^/  - /' >&2
+  failed=1
+fi
+if [[ -n "${duplicate_diagnostic_selectors}" || -n "${overlapping_selectors}" ]]; then
+  echo "UI test shard audit failed: diagnostic selectors are duplicated or overlap release shards:" >&2
+  printf '%s\n' "${duplicate_diagnostic_selectors}" "${overlapping_selectors}" | sed '/^$/d; s/^/  - /' >&2
+  failed=1
+fi
+if [[ -n "${missing_diagnostic_entrypoint}" || -n "${stale_diagnostic_entrypoint}" ]]; then
+  echo "UI test shard audit failed: diagnostic manifest and entrypoint disagree:" >&2
+  printf '%s\n' "${missing_diagnostic_entrypoint}" "${stale_diagnostic_entrypoint}" | sed '/^$/d; s/^/  - /' >&2
   failed=1
 fi
 if [[ -n "${missing_selectors}" ]]; then
@@ -97,10 +168,17 @@ if [[ -n "${stale_selectors}" ]]; then
   printf '%s\n' "${stale_selectors}" | sed 's/^/  - /' >&2
   failed=1
 fi
+if [[ -n "${stale_entrypoint_selectors}" ]]; then
+  echo "UI test shard audit failed: entrypoint selectors not found in source:" >&2
+  printf '%s\n' "${stale_entrypoint_selectors}" | sed 's/^/  - /' >&2
+  failed=1
+fi
 if [[ "${failed}" != "0" ]]; then
   exit 1
 fi
 
 test_count="$(wc -l < "${SOURCE_SELECTORS}" | tr -d '[:space:]')"
+release_count="$(wc -l < "${MANIFEST_SELECTORS}" | tr -d '[:space:]')"
+diagnostic_count="$(wc -l < "${DIAGNOSTIC_SELECTORS}" | tr -d '[:space:]')"
 shard_count="$(sort -u "${MANIFEST_SHARDS}" | wc -l | tr -d '[:space:]')"
-echo "UI test shard audit passed: ${test_count} tests assigned exactly once across ${shard_count} shards."
+echo "UI test shard audit passed: ${release_count} release tests across ${shard_count} shards, ${diagnostic_count} separate diagnostic tests (${test_count} source tests assigned exactly once)."

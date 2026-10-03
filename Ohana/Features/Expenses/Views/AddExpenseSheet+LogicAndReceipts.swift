@@ -24,17 +24,185 @@ extension AddExpenseSheetContent {
     func configureInitialPayer() {
         guard !activeExpenseHumans.isEmpty else {
             selectedPayerId = nil
+            selectedPayerIDs = []
+            payerAmountInputs = [:]
             return
         }
+        let primaryID: String
         if let pid = preselectedPayerId,
            activeExpenseHumans.contains(where: { $0.id.uuidString == pid }) {
-            selectedPayerId = pid
+            primaryID = pid
         } else {
             let stored = appServices.activeHumanSelection.currentHumanIdRaw
-            selectedPayerId = (!stored.isEmpty && activeExpenseHumans.contains(where: { $0.id.uuidString == stored }))
+            primaryID = (!stored.isEmpty && activeExpenseHumans.contains(where: { $0.id.uuidString == stored }))
                 ? stored
-                : activeExpenseHumans.first?.id.uuidString
+                : activeExpenseHumans[0].id.uuidString
         }
+        selectedPayerId = primaryID
+        selectedPayerIDs = activeExpenseHumans.count > 1
+            ? [primaryID] + activeExpenseHumans.map(\.id.uuidString).filter { $0 != primaryID }
+            : [primaryID]
+        resetPayerAmountsToEqual()
+    }
+
+    func togglePayer(_ id: String?) {
+        guard !hasSavedMedicalExpense else { return }
+        if let id {
+            if selectedPayerIDs.contains(id) {
+                selectedPayerIDs.removeAll { $0 == id }
+            } else if activeExpenseHumans.contains(where: { $0.id.uuidString == id }) {
+                selectedPayerIDs.append(id)
+            }
+        } else {
+            selectedPayerIDs = []
+        }
+        selectedPayerId = selectedPayerIDs.first
+        resetPayerAmountsToEqual()
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func resetPayerAmountsToEqual() {
+        activePayerAmountID = nil
+        guard selectedPayerIDs.count > 1,
+              let total = parsedAmount,
+              let contributions = try? ExpensePayerContributionPolicy.equalSplit(
+                  total: total,
+                  humanIDs: selectedPayerIDs.compactMap { UUID(uuidString: $0) }
+              ),
+              contributions.count == selectedPayerIDs.count
+        else {
+            payerAmountInputs = [:]
+            return
+        }
+        payerAmountInputs = Dictionary(uniqueKeysWithValues: contributions.compactMap { contribution in
+            guard let humanID = contribution.humanID else { return nil }
+            return (
+                humanID.uuidString,
+                CountryDecimalInput.format(
+                    contribution.amount,
+                    countryCode: appCountry,
+                    maxFractionDigits: 2
+                )
+            )
+        })
+    }
+
+    func payerAmountBinding(for humanID: String) -> Binding<String> {
+        Binding(
+            get: { payerAmountInputs[humanID] ?? "" },
+            set: { newValue in
+                payerAmountInputs[humanID] = CountryDecimalInput.sanitize(
+                    newValue,
+                    countryCode: appCountry,
+                    maxFractionDigits: 2
+                )
+                syncAmountFromPayerInputs()
+            }
+        )
+    }
+
+    var payerInputsMatchCurrentAmount: Bool {
+        guard selectedPayerIDs.count > 1,
+              let amount = parsedAmount,
+              let amountUnits = ExpensePayerContributionPolicy.minorUnits(amount),
+              let contributions = draftedPayerContributions,
+              let payerTotal = try? ExpensePayerContributionPolicy.totalAmount(of: contributions),
+              let payerUnits = ExpensePayerContributionPolicy.minorUnits(payerTotal)
+        else {
+            return false
+        }
+        return amountUnits == payerUnits
+    }
+
+    func syncAmountFromPayerInputs() {
+        guard selectedPayerIDs.count > 1,
+              let contributions = draftedPayerContributions,
+              let total = try? ExpensePayerContributionPolicy.totalAmount(of: contributions)
+        else {
+            return
+        }
+        let updatedAmount = CountryDecimalInput.format(
+            total,
+            countryCode: appCountry,
+            maxFractionDigits: 2
+        )
+        if amountInput != updatedAmount {
+            amountInput = updatedAmount
+        }
+    }
+
+    var payerSplitValidationText: String? {
+        guard selectedPayerIDs.count > 1,
+              let total = parsedAmount,
+              payerContributionsForSave == nil,
+              let totalUnits = ExpensePayerContributionPolicy.minorUnits(total)
+        else {
+            return nil
+        }
+        if totalUnits < Int64(selectedPayerIDs.count) {
+            return l.tr(
+                zh: "总额不足以分给每位支付人",
+                en: "The total is too small for every payer",
+                de: "Die Summe ist für alle Zahlenden zu klein",
+                es: "El total es demasiado pequeño para todas las personas",
+                pt: "O total é demasiado baixo para todas as pessoas",
+                fr: "Le total est trop faible pour toutes les personnes",
+                ja: "全員に分けるには合計額が小さすぎます",
+                ko: "모든 결제자에게 나누기에는 총액이 너무 적습니다",
+                it: "Il totale è troppo basso per tutte le persone"
+            )
+        }
+        let enteredUnits = selectedPayerIDs.reduce(into: Int64(0)) { result, id in
+            guard let input = payerAmountInputs[id],
+                  let amount = CountryDecimalInput.parse(input, countryCode: appCountry),
+                  let units = ExpensePayerContributionPolicy.minorUnits(amount),
+                  units > 0,
+                  result <= Int64.max - units
+            else {
+                return
+            }
+            result += units
+        }
+        let difference = totalUnits - enteredUnits
+        if difference > 0 {
+            let value = AppCurrency.format(Double(difference) / 100, fractionDigits: 2)
+            return l.tr(
+                zh: "还差 \(value)",
+                en: "\(value) remaining",
+                de: "Noch \(value)",
+                es: "Faltan \(value)",
+                pt: "Faltam \(value)",
+                fr: "Il manque \(value)",
+                ja: "あと \(value)",
+                ko: "\(value) 남음",
+                it: "Mancano \(value)"
+            )
+        }
+        if difference < 0 {
+            let value = AppCurrency.format(Double(-difference) / 100, fractionDigits: 2)
+            return l.tr(
+                zh: "超出 \(value)",
+                en: "\(value) over",
+                de: "\(value) zu viel",
+                es: "Sobran \(value)",
+                pt: "Excedeu \(value)",
+                fr: "Dépassement de \(value)",
+                ja: "\(value) 超過",
+                ko: "\(value) 초과",
+                it: "\(value) in eccesso"
+            )
+        }
+        return l.tr(
+            zh: "每位支付人的金额需大于 0",
+            en: "Each payer amount must be above zero",
+            de: "Jeder Zahlbetrag muss größer als null sein",
+            es: "Cada importe debe ser mayor que cero",
+            pt: "Cada valor deve ser maior que zero",
+            fr: "Chaque montant doit être supérieur à zéro",
+            ja: "各支払額は 0 より大きくしてください",
+            ko: "각 결제 금액은 0보다 커야 합니다",
+            it: "Ogni importo deve essere maggiore di zero"
+        )
     }
 
     func applyQuickAmount(_ amount: Double) {

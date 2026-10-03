@@ -70,7 +70,6 @@ extension AddPlantView {
             if didShowSuccess {
                 AddWizardJoinCelebrationOverlay(
                     title: l.tr(zh: "\(resolvedPlantName) 已加入植物页", en: "\(resolvedPlantName) joined Plants", de: "\(resolvedPlantName) ist bei Pflanzen"),
-                    subtitle: l.tr(zh: "植物卡片正在进入卡片堆", en: "The plant card is joining the stack", de: "Die Pflanzenkarte wird in den Stapel eingefügt"),
                     systemImage: "leaf.fill",
                     accent: Color.goTeal
                 )
@@ -104,37 +103,23 @@ extension AddPlantView {
             .accessibilityLabel(l.cancel)
             .accessibilityIdentifier("add-plant-cancel-action")
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                    .font(OhanaFont.title(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Text(plantTopChromeSubtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
+            Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
+                .font(OhanaFont.title(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
             Spacer()
         }
     }
 
-    var plantTopChromeSubtitle: String {
-        switch currentStep {
-        case .plant:
-            l.tr(zh: "先选植物、名字和房间", en: "Pick a plant, name, and room", de: "Pflanze, Name und Raum wählen")
-        case .avatar:
-            l.tr(zh: "选择自带 3D 头像或照片", en: "Choose a built-in 3D avatar or photo", de: "3D-Avatar oder Foto wählen")
-        case .care:
-            l.tr(zh: "按推荐值微调护理信息", en: "Tune the recommended care info", de: "Empfohlene Pflegeinfos anpassen")
-        case .confirm:
-            l.tr(zh: "确认后加入植物卡片堆", en: "Confirm and join the plant stack", de: "Bestätigen und Karte hinzufügen")
-        }
-    }
-
     var plantCreationCardArea: some View {
-        PlantCreationCardSurface {
+        PlantCreationCardSurface(
+            title: profilePreviewName,
+            subtitle: plantCreationCardSubtitle,
+            avatarImage: selectedAvatarSource == .customImage ? decodedAvatarImage : nil,
+            catalog: selectedCatalog,
+            layoutMode: plantCreationCardLayoutMode
+        ) {
             currentPlantStepContent
             Spacer(minLength: 2)
             PlantCreationStepIndicator(
@@ -148,13 +133,27 @@ extension AddPlantView {
     }
 
     func plantCreationCardHeight(in containerHeight: CGFloat) -> CGFloat {
-        max(
-            340,
-            MemberCreationCardLayout.cardHeight(
-                in: containerHeight,
-                includesTopChrome: true
-            ) - 84
+        MemberCreationCardLayout.cardHeight(
+            in: containerHeight,
+            includesTopChrome: true
         )
+    }
+
+    var plantCreationCardLayoutMode: PlantCreationCardLayoutMode {
+        switch currentStep {
+        case .plant:
+            .standard
+        case .avatar:
+            .avatarFocus
+        case .care, .confirm:
+            .compact
+        }
+    }
+
+    var plantCreationCardSubtitle: String {
+        let identity = selectedCatalog?.latinName ?? profilePreviewSpecies
+        guard !trimmedRoomName.isEmpty else { return identity }
+        return "\(identity) · \(trimmedRoomName)"
     }
 
     @ViewBuilder

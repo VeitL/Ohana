@@ -13,12 +13,18 @@ struct MilestoneConfig {
     let days: Int
     let emoji: String
     let accentColor: Color
+    let accentForeground: Color
 
     static let milestones: [MilestoneConfig] = [
-        MilestoneConfig(days: 100, emoji: "🎉", accentColor: .goPrimary),
-        MilestoneConfig(days: 365, emoji: "🌟", accentColor: .goYellow),
-        MilestoneConfig(days: 500, emoji: "💎", accentColor: .goCardCyan),
-        MilestoneConfig(days: 1000, emoji: "👑", accentColor: .goOrange)
+        MilestoneConfig(days: 100, emoji: "🎉", accentColor: .goPrimary, accentForeground: .ohanaPrimaryActionText),
+        MilestoneConfig(days: 365, emoji: "🌟", accentColor: .goYellow, accentForeground: .arkInk),
+        MilestoneConfig(days: 500, emoji: "💎", accentColor: .goCardCyan, accentForeground: .arkInk),
+        MilestoneConfig(
+            days: 1000,
+            emoji: "👑",
+            accentColor: .goOrange,
+            accentForeground: OhanaResolvedPrimaryAccent(customHex: "FF8C42")?.actionTextColor ?? .arkInk
+        )
     ]
 
     static func match(days: Int) -> MilestoneConfig? {
@@ -194,7 +200,7 @@ struct MilestoneCelebrationOverlay: View {
                 Button(action: onDismiss) {
                     Text(l.tr(zh: "太棒了！", en: "Wonderful!", de: "Wunderbar!"))
                         .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(milestone.accentForeground)
                         .padding(.horizontal, 48).padding(.vertical, 16)
                         .background(milestone.accentColor, in: Capsule())
                         .shadow(color: milestone.accentColor.opacity(0.6), radius: 16, x: 0, y: 6) // ui-v4: allow celebratory reward CTA lift

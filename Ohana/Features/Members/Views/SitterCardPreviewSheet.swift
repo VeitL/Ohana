@@ -129,7 +129,10 @@ struct SitterCardPreviewSheet: View {
                 if !pet.birthCountry.isEmpty {
                     sitterRow(icon: "globe", color: Color.goMint,
                               label: l.tr(zh: "出生地", en: "Birthplace", de: "Geburtsort"),
-                              value: pet.birthCountry + (pet.birthCity.isEmpty ? "" : " · \(pet.birthCity)"))
+                              value: [pet.birthCountry, pet.birthCity]
+                                  .filter { !$0.isEmpty }
+                                  .map { PetBreedDatabase.localizedRegionName($0, l: l) }
+                                  .joined(separator: " · "))
                     GoDashedDivider().padding(.leading, 52)
                 }
                 sitterRow(icon: "fork.knife", color: Color.goOrange,
@@ -234,21 +237,21 @@ struct SitterCardPreviewSheet: View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 6) {
                 capsuleTag(pet.localizedSpeciesName(l: l))
-                if !pet.breed.isEmpty { capsuleTag(pet.breed) }
+                if !pet.breed.isEmpty { capsuleTag(l.resourceName(pet.breed)) }
                 capsuleTag(neuteredTagText)
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     capsuleTag(pet.localizedSpeciesName(l: l))
-                    if !pet.breed.isEmpty { capsuleTag(pet.breed) }
+                    if !pet.breed.isEmpty { capsuleTag(l.resourceName(pet.breed)) }
                 }
                 capsuleTag(neuteredTagText)
             }
 
             VStack(alignment: .leading, spacing: 6) {
                 capsuleTag(pet.localizedSpeciesName(l: l))
-                if !pet.breed.isEmpty { capsuleTag(pet.breed) }
+                if !pet.breed.isEmpty { capsuleTag(l.resourceName(pet.breed)) }
                 capsuleTag(neuteredTagText)
             }
         }

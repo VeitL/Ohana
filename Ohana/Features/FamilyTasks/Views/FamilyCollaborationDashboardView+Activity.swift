@@ -30,7 +30,7 @@ extension FamilyCollaborationDashboardView {
             if latestActivity.isEmpty {
                 compactEmpty(
                     icon: "clock",
-                    text: l.tr(zh: "完成一次照护后会出现在这里。", en: "Care check-ins will appear here.", de: "Pflegeeinträge erscheinen hier.")
+                    text: l.tr(zh: "暂无动态", en: "No activity", de: "Keine Aktivität")
                 )
             } else {
                 VStack(spacing: 8) {

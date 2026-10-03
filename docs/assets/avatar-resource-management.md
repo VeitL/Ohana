@@ -320,14 +320,14 @@ file Resources/Avatars/HumanAvatarAssets/* \
 ### 9.4 目标测试
 
 ```bash
-scripts/test-simulator.sh \
-  -only-testing:OhanaTests/HumanAvatarAssetCatalogTests
+scripts/xcode-test.sh \
+  --only-testing OhanaTests/HumanAvatarAssetCatalogTests
 
-scripts/test-simulator.sh \
-  -only-testing:OhanaTests/PetAvatarAssetCatalogTests
+scripts/xcode-test.sh \
+  --only-testing OhanaTests/PetAvatarAssetCatalogTests
 
-scripts/test-simulator.sh \
-  -only-testing:OhanaTests/PlantLaunchTests
+scripts/xcode-test.sh \
+  --only-testing OhanaTests/PlantLaunchTests
 ```
 
 涉及用户头像持久化、备份或缓存时，再按改动范围运行：

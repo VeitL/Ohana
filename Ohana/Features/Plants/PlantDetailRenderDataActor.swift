@@ -14,60 +14,73 @@ enum PlantDetailRenderDataBuildError: Error {
 
 @ModelActor
 actor PlantDetailRenderDataActor {
+    private static let recentLogLimit = 80
+    private static let photoPreviewLimit = 120
+    private static let healthReviewTypes: [PlantCareType] = [
+        .pestCheck,
+        .pestFound,
+        .yellowLeaf,
+        .newLeaf,
+        .leafCleaning,
+        .photo,
+        .customNote
+    ]
+
     func build(request: PlantDetailRenderDataRequest) throws -> PlantDetailRenderData {
         try Task.checkCancellation()
         guard let plant = modelContext.model(for: request.plantModelID) as? Plant else {
             throw PlantDetailRenderDataBuildError.missingPlant
         }
 
-        let logs = plant.careLogs
-            .sorted { $0.date > $1.date }
-            .map { PlantDetailLogSnapshot(log: $0) }
+        let plantID = plant.id
+        var recentDescriptor = Self.visibleLogDescriptor(plantID: plantID, sortOrder: .reverse)
+        recentDescriptor.fetchLimit = Self.recentLogLimit
+        let recentLogs: [PlantDetailLogSnapshot] = try modelContext.fetch(recentDescriptor).compactMap { log in
+            guard !PlantCareHistoryPolicy.isInternalFeedback(log) else { return nil }
+            return PlantDetailLogSnapshot(log: log)
+        }
         try Task.checkCancellation()
 
+        let planningHistory = try PlantCarePlanningHistoryQuery.build(
+            plantID: plantID,
+            context: modelContext
+        )
         let tasks = PlantCarePlanService.tasks(
             for: plant,
+            history: planningHistory,
             now: request.now,
             calendar: .current
         )
+        var photoDescriptor = Self.visiblePhotoLogDescriptor(plantID: plantID)
+        photoDescriptor.fetchLimit = Self.photoPreviewLimit
+        let photoLogs: [PlantDetailLogSnapshot] = try modelContext.fetch(photoDescriptor).compactMap { log in
+            guard !PlantCareHistoryPolicy.isInternalFeedback(log) else { return nil }
+            return PlantDetailLogSnapshot(log: log)
+        }
         let photos = Self.galleryPhotoItems(
             for: plant,
-            logs: logs,
+            logs: photoLogs,
             languageCode: request.languageCode
         )
         let taskSummary = Self.taskSummary(
             for: plant,
             tasks: tasks
         )
-        let logSummary = Self.logSummary(
-            logs: logs,
+        let logSummary = try buildLogSummary(
+            plantID: plantID,
+            recentLogs: recentLogs,
             now: request.now
         )
-        let logPhotoCount = photos.count {
-            if case .careLog = $0.source { return true }
-            return false
-        }
-        let diaryMarkdown = PlantDetailGrowthDiaryMarkdownBuilder.markdown(
-            plantID: plant.id,
-            plantName: plant.name,
-            species: plant.species,
-            location: plant.location,
-            createdAt: plant.createdAt,
-            acquiredDate: plant.acquiredDate,
-            healthStatusRaw: plant.healthStatusRaw,
-            logs: logs,
-            languageCode: request.languageCode
-        )
+        let logPhotoCount = try modelContext.fetchCount(Self.visiblePhotoLogDescriptor(plantID: plantID))
 
         return PlantDetailRenderData(
             revision: request.revision,
             careTasks: tasks,
-            recentLogs: logs,
+            recentLogs: recentLogs,
             taskSummary: taskSummary,
             logSummary: logSummary,
             galleryPhotoItems: photos,
-            growthDiaryPhotoCount: logPhotoCount,
-            growthDiaryMarkdown: diaryMarkdown
+            growthDiaryPhotoCount: logPhotoCount
         )
     }
 
@@ -89,40 +102,138 @@ actor PlantDetailRenderDataActor {
         )
     }
 
-    private static func logSummary(
-        logs: [PlantDetailLogSnapshot],
+    private func buildLogSummary(
+        plantID: UUID,
+        recentLogs: [PlantDetailLogSnapshot],
         now: Date
-    ) -> PlantDetailLogSummary {
-        let reviewTypes: Set<PlantCareType> = [
-            .pestCheck,
-            .pestFound,
-            .yellowLeaf,
-            .newLeaf,
-            .leafCleaning,
-            .photo,
-            .customNote
-        ]
+    ) throws -> PlantDetailLogSummary {
         let windowStart = Calendar.current.date(byAdding: .day, value: -30, to: now) ?? now.addingTimeInterval(-30 * 86400)
-        let latestHealthReviewLog = logs.first { reviewTypes.contains($0.careType) }
-        var recentStressSignalCount = 0
-        var recentObservationLogCount = 0
-        for log in logs where log.date >= windowStart {
-            if log.careType == .yellowLeaf || log.careType == .pestFound {
-                recentStressSignalCount += 1
-            }
-            if reviewTypes.contains(log.careType) {
-                recentObservationLogCount += 1
-            }
+        let logCount = try modelContext.fetchCount(Self.visibleLogDescriptor(plantID: plantID, sortOrder: .reverse))
+        let firstLog = try fetchOne(Self.visibleLogDescriptor(plantID: plantID, sortOrder: .forward))
+        let latestLog = try recentLogs.first ?? fetchOne(Self.visibleLogDescriptor(plantID: plantID, sortOrder: .reverse))
+        let latestHealthReviewLog = try Self.healthReviewTypes.compactMap { careType in
+            try fetchOne(Self.visibleLogDescriptor(plantID: plantID, careType: careType, sortOrder: .reverse))
+        }.max { lhs, rhs in lhs.date < rhs.date }
+        let recentStressSignalCount = try [.yellowLeaf, .pestFound].reduce(into: 0) { count, careType in
+            count += try modelContext.fetchCount(
+                Self.visibleLogDescriptor(plantID: plantID, careType: careType, since: windowStart)
+            )
+        }
+        let recentObservationLogCount = try Self.healthReviewTypes.reduce(into: 0) { count, careType in
+            count += try modelContext.fetchCount(
+                Self.visibleLogDescriptor(plantID: plantID, careType: careType, since: windowStart)
+            )
         }
 
         return PlantDetailLogSummary(
-            logCount: logs.count,
-            firstLogDate: logs.last?.date,
-            latestLogDate: logs.first?.date,
-            latestLog: logs.first,
+            logCount: logCount,
+            firstLogDate: firstLog?.date,
+            latestLogDate: latestLog?.date,
+            latestLog: latestLog,
             latestHealthReviewLog: latestHealthReviewLog,
             recentStressSignalCount: recentStressSignalCount,
             recentObservationLogCount: recentObservationLogCount
+        )
+    }
+
+    private func fetchOne(_ descriptor: FetchDescriptor<PlantCareLog>) throws -> PlantDetailLogSnapshot? {
+        var descriptor = descriptor
+        descriptor.fetchLimit = 1
+        guard let log = try modelContext.fetch(descriptor).first,
+              !PlantCareHistoryPolicy.isInternalFeedback(log) else {
+            return nil
+        }
+        return PlantDetailLogSnapshot(log: log)
+    }
+
+    private static func visibleLogDescriptor(
+        plantID: UUID,
+        sortOrder: SortOrder
+    ) -> FetchDescriptor<PlantCareLog> {
+        let customNoteRaw = PlantCareType.customNote.rawValue
+        let deferPrefix = PlantCareHistoryPolicy.internalDeferPrefix
+        let skipPrefix = PlantCareHistoryPolicy.internalSkipPrefix
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID &&
+                    (log.careTypeRaw != customNoteRaw ||
+                        (!log.note.starts(with: deferPrefix) && !log.note.starts(with: skipPrefix)))
+            },
+            sortBy: [SortDescriptor(\PlantCareLog.date, order: sortOrder)]
+        )
+    }
+
+    private static func visibleLogDescriptor(
+        plantID: UUID,
+        careType: PlantCareType,
+        sortOrder: SortOrder
+    ) -> FetchDescriptor<PlantCareLog> {
+        let typeRaw = careType.rawValue
+        let sortBy = [SortDescriptor(\PlantCareLog.date, order: sortOrder)]
+        guard careType == .customNote else {
+            return FetchDescriptor<PlantCareLog>(
+                predicate: #Predicate<PlantCareLog> { log in
+                    log.plant?.id == plantID && log.careTypeRaw == typeRaw
+                },
+                sortBy: sortBy
+            )
+        }
+
+        let deferPrefix = PlantCareHistoryPolicy.internalDeferPrefix
+        let skipPrefix = PlantCareHistoryPolicy.internalSkipPrefix
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID &&
+                    log.careTypeRaw == typeRaw &&
+                    !log.note.starts(with: deferPrefix) &&
+                    !log.note.starts(with: skipPrefix)
+            },
+            sortBy: sortBy
+        )
+    }
+
+    private static func visibleLogDescriptor(
+        plantID: UUID,
+        careType: PlantCareType,
+        since startDate: Date
+    ) -> FetchDescriptor<PlantCareLog> {
+        let typeRaw = careType.rawValue
+        guard careType == .customNote else {
+            return FetchDescriptor<PlantCareLog>(
+                predicate: #Predicate<PlantCareLog> { log in
+                    log.plant?.id == plantID &&
+                        log.careTypeRaw == typeRaw &&
+                        log.date >= startDate
+                }
+            )
+        }
+
+        let deferPrefix = PlantCareHistoryPolicy.internalDeferPrefix
+        let skipPrefix = PlantCareHistoryPolicy.internalSkipPrefix
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID &&
+                    log.careTypeRaw == typeRaw &&
+                    log.date >= startDate &&
+                    !log.note.starts(with: deferPrefix) &&
+                    !log.note.starts(with: skipPrefix)
+            }
+        )
+    }
+
+    private static func visiblePhotoLogDescriptor(plantID: UUID) -> FetchDescriptor<PlantCareLog> {
+        let customNoteRaw = PlantCareType.customNote.rawValue
+        let absentStateRaw = PlantCarePhotoAttachmentState.absent.rawValue
+        let deferPrefix = PlantCareHistoryPolicy.internalDeferPrefix
+        let skipPrefix = PlantCareHistoryPolicy.internalSkipPrefix
+        return FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.plant?.id == plantID &&
+                    log.photoAttachmentStateRaw != absentStateRaw &&
+                    (log.careTypeRaw != customNoteRaw ||
+                        (!log.note.starts(with: deferPrefix) && !log.note.starts(with: skipPrefix)))
+            },
+            sortBy: [SortDescriptor(\PlantCareLog.date, order: .reverse)]
         )
     }
 
@@ -161,7 +272,7 @@ actor PlantDetailRenderDataActor {
             )
         }
 
-        return items
+        return Array(items.prefix(photoPreviewLimit))
     }
 
     private static func placementSummary(for plant: Plant, l: L10n) -> String {

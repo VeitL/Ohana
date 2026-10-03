@@ -63,6 +63,7 @@ nonisolated enum TaskCareAssignmentError: LocalizedError, Equatable, Sendable {
     case unavailableSubject
     case unavailableAssignee
     case unauthorized
+    case personalUpgradeRequired(PersonalFreeLimitDenial)
     case persistenceFailed(String?)
 
     var errorDescription: String? {
@@ -75,6 +76,8 @@ nonisolated enum TaskCareAssignmentError: LocalizedError, Equatable, Sendable {
             "当前成员或执行人不可用。"
         case .unauthorized:
             "无法创建这项家庭分工。"
+        case let .personalUpgradeRequired(denial):
+            "Ohana Free supports up to \(denial.limit) active ordinary plans. Ohana Personal removes this limit."
         case let .persistenceFailed(reason):
             reason.map { "保存照顾待办失败：\($0)" } ?? "保存照顾待办失败，请稍后重试。"
         }
@@ -99,6 +102,7 @@ struct TaskCareAssignmentCommandExecutor {
         guard subjectIsAvailable(command.preset) else {
             throw TaskCareAssignmentError.unavailableSubject
         }
+        try requirePersonalAccess(for: command)
 
         let collaboration = try collaborationMembers(for: command)
         let occurrenceDates = occurrenceDates(for: command)
@@ -168,6 +172,27 @@ struct TaskCareAssignmentCommandExecutor {
             affectedSubjectID: command.preset.subjectID,
             scheduledNotifications: shouldSchedule
         )
+    }
+
+    private func requirePersonalAccess(for command: TaskCareAssignmentCommand) throws {
+        let usage: PersonalUsageSnapshot
+        do {
+            usage = try PersonalUsageSnapshotReader.snapshot(context: modelContext)
+        } catch {
+            throw TaskCareAssignmentError.persistenceFailed(
+                "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+            )
+        }
+        let quotaClass = PersonalPlanQuotaClassifier.quotaClass(for: command.preset.careKind.eventType)
+        let disposition = PersonalAccessPolicy.disposition(
+            level: services.commerce.personalAccessLevel,
+            usage: usage,
+            request: .createPlan(quotaClass)
+        )
+        guard case let .deny(denial) = disposition,
+              case let .wouldExceedFreeLimit(limitDenial) = denial.reason
+        else { return }
+        throw TaskCareAssignmentError.personalUpgradeRequired(limitDenial)
     }
 
     private func occurrenceDates(for command: TaskCareAssignmentCommand) -> [Date] {

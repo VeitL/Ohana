@@ -130,7 +130,7 @@ Start with the narrowest trustworthy command and escalate by risk:
 
 ```bash
 scripts/dev-check-changed.sh
-scripts/test-simulator.sh -only-testing:OhanaTests/<RelevantTests>
+scripts/xcode-test.sh --only-testing OhanaTests/<RelevantTests>
 scripts/build-debug-fast.sh
 scripts/module-exit-gate.sh
 scripts/module-exit-gate.sh --test OhanaTests/<RelevantTests>

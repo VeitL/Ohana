@@ -1,10 +1,10 @@
 {
   "brand": "Ohana",
-  "sourceReference": "/Users/guanchenli/Documents/Space/Ohana/Icon.png",
+  "sourceReference": "input/Icon.png",
   "generatedAt": "2026-06-09",
   "colorRule": "Only #000000 and #FFFFFF are used in opaque app icon PNGs.",
   "extraction": {
-    "method": "Icon.png alpha channel to binary mask",
+    "method": "input/Icon.png alpha channel to binary mask",
     "alphaThreshold": 16,
     "canvas": [
       1024,

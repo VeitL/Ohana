@@ -67,6 +67,12 @@ struct MemberDeletionCommandResult: Equatable {
 enum MemberDeletionCommandService {
     private static let quickActionItemsKey = "quickActionItems_v2"
 
+    private struct HumanDeletionPlan {
+        let hasRemainingHuman: Bool
+        let deletedCurrentHuman: Bool
+        let requiresAccountSwitch: Bool
+    }
+
     @discardableResult
     @MainActor
     static func deletePet(
@@ -133,35 +139,66 @@ enum MemberDeletionCommandService {
         _ human: Human,
         activeHumanID: String,
         context: ModelContext,
+        userDefaults: UserDefaults = .standard,
         notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
         attachmentStorage: HumanNoteAttachmentStorage = .live,
         saveChanges: (ModelContext) -> ModelContextSaveResult = {
             $0.safeSaveResult(publishFailureEvent: true)
-        }
+        },
+        requiredHealthRowsLoader: PhysicalDeletionService.HumanDeletionRequiredHealthRowsLoader =
+            PhysicalDeletionService.loadRequiredHumanHealthRows
     ) -> MemberDeletionCommandResult {
         // member-lifecycle-gate: allow physical deletion is an explicit data-removal boundary, not an active member write.
         let humanID = human.id
         let humanIDString = humanID.uuidString
-        let remainingHumanDescriptor = FetchDescriptor<Human>(
-            predicate: #Predicate<Human> { candidate in
-                candidate.id != humanID && candidate.passedAwayDate == nil
-            }
+        guard !PhysicalDeletionService.hasUnsettledShopPurchaseReference(
+            humanID: humanID,
+            context: context
+        ) else {
+            return MemberDeletionCommandResult(
+                entityID: humanID,
+                kind: EntityKind.human.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: "Settle or refund the pending shop purchase before deleting this member."
+            )
+        }
+        let plan = humanDeletionPlan(
+            humanID: humanID,
+            activeHumanID: activeHumanID,
+            context: context
         )
-        let remainingHumans = fetchMemberDeletionModelsOrLog(
-            remainingHumanDescriptor,
-            context: context,
-            operation: "fetch remaining humans for deletion"
-        )
-        let hasRemainingHuman = !remainingHumans.isEmpty
-        let deletedCurrentHuman = activeHumanID == humanIDString
-        // D17 keeps Human optional. Deleting the last Human clears local
-        // identity state but must not force a replacement profile.
-        let requiresReplacementHuman = false
-        let requiresAccountSwitch = deletedCurrentHuman && hasRemainingHuman
 
         let now = Date()
+        do {
+            try PhysicalDeletionService.stageGuardianOwnerUnavailableIfNeeded(
+                ownerHumanID: humanID,
+                occurredAt: now,
+                context: context
+            )
+        } catch {
+            context.rollback()
+            return MemberDeletionCommandResult(
+                entityID: humanID,
+                kind: EntityKind.human.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
         let relatedEvents = fetchHumanOwnedEvents(humanId: humanIDString, context: context)
         let notificationCancels = DeferredNotificationCancellationScheduler(delegate: notifications)
+        notificationCancels.cancelPendingNotifications(withPrefixes: [
+            MedicationNotificationIdentifierPolicy.humanReminderPrefix(for: humanID)
+        ])
         for event in relatedEvents {
             PhysicalDeletionService.deleteEvent(
                 event,
@@ -171,13 +208,29 @@ enum MemberDeletionCommandService {
                 notifications: notificationCancels
             )
         }
-        PhysicalDeletionService.deleteHuman(
-            human,
-            context: context,
-            deletedAt: now,
-            deletedByHumanId: activeHumanID,
-            notifications: notificationCancels
-        )
+        do {
+            try PhysicalDeletionService.deleteHumanFailClosed(
+                human,
+                context: context,
+                deletedAt: now,
+                deletedByHumanId: activeHumanID,
+                notifications: notificationCancels,
+                requiredHealthRowsLoader: requiredHealthRowsLoader
+            )
+        } catch {
+            context.rollback()
+            return MemberDeletionCommandResult(
+                entityID: humanID,
+                kind: EntityKind.human.rawValue,
+                removedRelatedEventIDs: [],
+                removedQuickActionCount: 0,
+                requiresReplacementHuman: false,
+                requiresAccountSwitch: false,
+                clearsActiveHumanID: false,
+                didPersist: false,
+                persistenceErrorDescription: error.localizedDescription
+            )
+        }
         let saveResult = saveChanges(context)
         guard saveResult.didSave else {
             context.rollback()
@@ -193,6 +246,8 @@ enum MemberDeletionCommandService {
                 persistenceErrorDescription: saveResult.errorDescription
             )
         }
+        HumanAppleHealthBindingStore.invalidateIfBound(to: humanID, defaults: userDefaults)
+        MedicationNotificationMutationFence.invalidateHuman(humanID)
         notificationCancels.flush()
         let attachmentCleanup = cleanDeletedHumanAttachments(
             humanID: humanID,
@@ -205,12 +260,38 @@ enum MemberDeletionCommandService {
             kind: EntityKind.human.rawValue,
             removedRelatedEventIDs: relatedEvents.map(\.id),
             removedQuickActionCount: 0,
-            requiresReplacementHuman: requiresReplacementHuman,
-            requiresAccountSwitch: requiresAccountSwitch,
-            clearsActiveHumanID: deletedCurrentHuman || !hasRemainingHuman,
+            requiresReplacementHuman: false,
+            requiresAccountSwitch: plan.requiresAccountSwitch,
+            clearsActiveHumanID: plan.deletedCurrentHuman || !plan.hasRemainingHuman,
             didPersist: true,
             persistenceErrorDescription: nil,
             attachmentCleanup: attachmentCleanup
+        )
+    }
+
+    @MainActor
+    private static func humanDeletionPlan(
+        humanID: UUID,
+        activeHumanID: String,
+        context: ModelContext
+    ) -> HumanDeletionPlan {
+        let descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { candidate in
+                candidate.id != humanID && candidate.passedAwayDate == nil
+            }
+        )
+        let hasRemainingHuman = !fetchMemberDeletionModelsOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch remaining humans for deletion"
+        ).isEmpty
+        let deletedCurrentHuman = activeHumanID == humanID.uuidString
+        // D17 keeps Human optional. Deleting the last Human clears local
+        // identity state but must not force a replacement profile.
+        return HumanDeletionPlan(
+            hasRemainingHuman: hasRemainingHuman,
+            deletedCurrentHuman: deletedCurrentHuman,
+            requiresAccountSwitch: deletedCurrentHuman && hasRemainingHuman
         )
     }
 
@@ -306,7 +387,10 @@ enum MemberDeletionCommandService {
             FetchDescriptor<HumanMedication>(),
             context: context,
             operation: "fetch human medications for deletion event resolution"
-        ).filter { $0.humanId == humanId }
+        ).filter {
+            UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines))
+                == UUID(uuidString: humanId)
+        }
 
         return fetchEvents(context: context, operation: "fetch human-owned events for deletion").filter { event in
             MemberLifecycleActiveScheduleResolver.eventOwnedByHuman(
@@ -367,6 +451,7 @@ private struct QuickAccessRemovalPlan {
 private final class DeferredNotificationCancellationScheduler: ReminderNotificationScheduling, @unchecked Sendable {
     private let scheduler: ReminderNotificationScheduling
     private var pendingCancelIds: [String] = []
+    private var pendingCancelPrefixes: [String] = []
 
     init(delegate: ReminderNotificationScheduling) {
         scheduler = delegate
@@ -415,6 +500,10 @@ private final class DeferredNotificationCancellationScheduler: ReminderNotificat
         pendingCancelIds.append(notificationId)
     }
 
+    func cancelPendingNotifications(withPrefixes prefixes: [String]) {
+        pendingCancelPrefixes.append(contentsOf: prefixes.filter { !$0.isEmpty })
+    }
+
     func cancelAll(for pet: Pet, reminders: [Reminder]) {
         for reminder in reminders {
             cancel(notificationId: reminder.notificationId)
@@ -429,6 +518,11 @@ private final class DeferredNotificationCancellationScheduler: ReminderNotificat
         for notificationId in Set(pendingCancelIds) {
             scheduler.cancel(notificationId: notificationId)
         }
+        let prefixes = Set(pendingCancelPrefixes).sorted()
+        if !prefixes.isEmpty {
+            scheduler.cancelPendingNotifications(withPrefixes: prefixes)
+        }
         pendingCancelIds.removeAll()
+        pendingCancelPrefixes.removeAll()
     }
 }

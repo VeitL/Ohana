@@ -21,7 +21,7 @@ nonisolated struct PetMedicationDoseActorSelectionContext: Equatable, Sendable {
     let eligibleHumanCount: Int
     let defaultExecutorID: UUID?
 
-    var needsConfirmation: Bool { eligibleHumanCount > 1 }
+    var needsConfirmation: Bool { eligibleHumanCount > 1 && defaultExecutorID == nil }
 }
 
 @MainActor
@@ -140,7 +140,7 @@ struct PetMedicationActionHumanConfirmationSheet: View {
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(Color.goPrimary, in: Capsule())
                 }

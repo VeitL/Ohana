@@ -49,29 +49,14 @@ enum Avatar2DCandidateProvider {
     }
 
     private static func petCandidates(for draft: MemberCreationDraft, l: L10n) -> [Avatar2DCandidate] {
-        let defaultFilename = PetAvatarAssetCatalog.avatarFilename(
-            species: draft.species,
+        guard let defaultFilename = PetAvatarAssetCatalog.avatarFilename(
+            species: draft.resolvedSpecies,
             breed: draft.resolvedBreed,
             gender: draft.petGender,
             coatColor: draft.coatColor
-        )
-        let allFilenames = bundledFilenames(directory: PetAvatarAssetCatalog.assetDirectory)
-        let speciesPrefix = petSpeciesPrefix(draft.species)
-        let breedPrefix = defaultFilename.flatMap { petBreedPrefix(from: $0) }
-        var matches: [String] = []
-        if let breedPrefix {
-            matches = allFilenames.filter { $0.hasPrefix(breedPrefix) }
-        }
-        if matches.count < 4 {
-            matches += allFilenames.filter { $0.hasPrefix(speciesPrefix) && !matches.contains($0) }
-        }
-        if let defaultFilename {
-            matches.removeAll { $0 == defaultFilename }
-            matches.insert(defaultFilename, at: 0)
-        }
-        let limited = Array(matches.prefix(6))
+        ) else { return [] }
         return makeCandidates(
-            filenames: limited,
+            filenames: [defaultFilename],
             defaultFilename: defaultFilename,
             directory: PetAvatarAssetCatalog.assetDirectory,
             titlePrefix: l.tr(zh: "2.5D 宠物", en: "2.5D Pet", de: "2,5D Tier")
@@ -112,53 +97,11 @@ enum Avatar2DCandidateProvider {
         return PetAvatarAssetCatalog.avatarData(filename: filename)
     }
 
-    private static func bundledFilenames(directory: String) -> [String] {
-        let pngURLs = Bundle.main.urls(forResourcesWithExtension: "png", subdirectory: directory) ?? []
-        let webpURLs = Bundle.main.urls(forResourcesWithExtension: "webp", subdirectory: directory) ?? []
-        var filenamesByStem: [String: String] = [:]
-        for url in pngURLs {
-            let name = (url.lastPathComponent as NSString).deletingPathExtension
-            filenamesByStem[name] = "\(name).png"
-        }
-        for url in webpURLs {
-            let name = (url.lastPathComponent as NSString).deletingPathExtension
-            filenamesByStem[name] = "\(name).webp"
-        }
-        return filenamesByStem.values
-            .filter { filename in
-                let name = (filename as NSString).deletingPathExtension
-                return name.contains("_")
-                    && name.trimmingCharacters(in: .whitespacesAndNewlines) == name
-            }
-            .sorted()
-    }
-
     private static func humanGenderSlug(_ gender: String) -> String {
         switch HumanProfileOptions.normalizedGender(gender) {
         case "男": "male"
         case "女": "female"
         default: "nonbinary"
         }
-    }
-
-    private static func petSpeciesPrefix(_ species: String) -> String {
-        switch Pet.canonicalSpeciesKey(species) {
-        case "cat": "cat_"
-        case "dog": "dog_"
-        case "bird": "bird_"
-        case "fish": "fish_"
-        case "rabbit": "rabbit_"
-        case "reptile": "reptile_"
-        case "hamster": "hamster_"
-        default: "pet_"
-        }
-    }
-
-    private static func petBreedPrefix(from filename: String) -> String? {
-        let stem = (filename as NSString).deletingPathExtension
-        let parts = stem.split(separator: "_")
-        guard parts.count >= 4 else { return nil }
-        if parts[1] == "boy" || parts[1] == "girl" { return "\(parts[0])_" }
-        return parts.dropLast(2).joined(separator: "_") + "_"
     }
 }

@@ -43,11 +43,6 @@ extension PlantDashboardView {
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
-                    Text(dashboardStatusLine)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaTertiaryText)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer(minLength: 8)
@@ -55,7 +50,6 @@ extension PlantDashboardView {
                 dashboardActionCapsule
             }
 
-            dashboardStatusRibbon
             dashboardQuickActionRail
 
             if let nextTask = upcomingTasks.first {
@@ -117,7 +111,7 @@ extension PlantDashboardView {
             dashboardHeaderIconButton(
                 id: "add",
                 icon: "plus",
-                tint: Color.arkInk,
+                tint: Color.ohanaPrimaryActionText,
                 label: l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"),
                 fill: Color.goPrimary
             ) {
@@ -154,89 +148,11 @@ extension PlantDashboardView {
         .accessibilityIdentifier(id == "search" ? "plant-dashboard-open-search" : id == "filters" ? "plant-dashboard-open-filters" : "plant-dashboard-add-action")
     }
 
-    var dashboardStatusRibbon: some View {
-        LazyVGrid(columns: dashboardStatusColumns, spacing: 8) {
-            dashboardStatusChip(
-                id: "tasks",
-                icon: "calendar.badge.clock",
-                title: dueTasks.isEmpty
-                    ? l.tr(zh: "今日清爽", en: "Clear today", de: "Heute frei")
-                    : l.tr(zh: "\(dueTasks.count) 项任务", en: "\(dueTasks.count) tasks", de: "\(dueTasks.count) Aufgaben"),
-                tint: dueTasks.isEmpty ? Color.goTeal : Color.goYellow
-            )
-
-            dashboardStatusChip(
-                id: "watch",
-                icon: "eye.fill",
-                title: watchedPlantsCount == 0
-                    ? l.tr(zh: "状态稳定", en: "Stable", de: "Stabil")
-                    : l.tr(zh: "\(watchedPlantsCount) 株观察", en: "\(watchedPlantsCount) watch", de: "\(watchedPlantsCount) beobachten"),
-                tint: watchedPlantsCount == 0 ? Color.goPrimary : Color.goYellow
-            )
-
-            dashboardStatusChip(
-                id: "sites",
-                icon: "house.fill",
-                title: l.tr(zh: "\(roomCareSummaries.count) 个位置", en: "\(roomCareSummaries.count) sites", de: "\(roomCareSummaries.count) Orte"),
-                tint: Color.goTeal
-            )
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-dashboard-status-ribbon")
-    }
-
-    var dashboardStatusColumns: [GridItem] {
-        [GridItem(.adaptive(minimum: 108), spacing: 8)]
-    }
-
-    func dashboardStatusChip(id: String, icon: String, title: String, tint: Color) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
-            Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 38)
-        .padding(.horizontal, 8)
-        .background(Color.ohanaCardSurface, in: Capsule())
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("plant-dashboard-status-chip-\(id)")
-    }
-
     var plantCollectionSummaryLine: String {
         l.tr(
-            zh: "\(plants.count) 株植物 · \(roomCareSummaries.count) 个位置",
-            en: "\(plants.count) plants · \(roomCareSummaries.count) sites",
-            de: "\(plants.count) Pflanzen · \(roomCareSummaries.count) Orte"
-        )
-    }
-
-    var dashboardStatusLine: String {
-        if !dueTasks.isEmpty {
-            return l.tr(
-                zh: "\(dueTasks.count) 项照护今天到期，先处理 \(plantsNeedingCareCount) 株植物",
-                en: "\(dueTasks.count) care tasks due today across \(plantsNeedingCareCount) plants",
-                de: "\(dueTasks.count) Pflegeaufgaben heute für \(plantsNeedingCareCount) Pflanzen"
-            )
-        }
-        if let nextTask = upcomingTasks.first {
-            return l.tr(
-                zh: "下一项：\(nextTask.title)，\(dueText(for: nextTask))",
-                en: "Next: \(nextTask.title), \(dueText(for: nextTask))",
-                de: "Als Nächstes: \(nextTask.title), \(dueText(for: nextTask))"
-            )
-        }
-        return l.tr(
-            zh: "本周节奏稳定，适合记录观察和整理护理计划",
-            en: "This week is calm: note observations and tidy the care plan",
-            de: "Diese Woche ist ruhig: Beobachtungen notieren und Pflegeplan ordnen"
+            zh: "\(plants.count) 株植物",
+            en: "\(plants.count) plants",
+            de: "\(plants.count) Pflanzen"
         )
     }
 
@@ -251,7 +167,7 @@ extension PlantDashboardView {
                 } label: {
                     Text(mode.title(l))
                         .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(selectedDashboardMode == mode ? Color.arkInk : Color.ohanaSecondaryText)
+                        .foregroundStyle(selectedDashboardMode == mode ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .frame(minWidth: 86)
                         .frame(height: 44)
                         .background(
@@ -381,15 +297,9 @@ extension PlantDashboardView {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(minHeight: 82, alignment: .center)
+            .frame(minHeight: 70, alignment: .center)
             .padding(.horizontal, 10)
             .background(Color.ohanaControlFill.opacity(0.54), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         }
@@ -484,38 +394,10 @@ extension PlantDashboardView {
     }
 
     var sitesModeHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "位置", en: "Sites", de: "Orte"))
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                Text(l.tr(
-                    zh: "按摆放空间查看植物和待办",
-                    en: "Browse plants and care tasks by where they live",
-                    de: "Pflanzen und Pflege nach Standort durchsuchen"
-                ))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
-            }
-
-            Spacer(minLength: 8)
-
-            HStack(spacing: 6) {
-                Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative sites count glyph; adjacent text gives the count.
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
-                    .accessibilityHidden(true)
-                Text(l.tr(zh: "\(roomCareSummaries.count) 个", en: "\(roomCareSummaries.count)", de: "\(roomCareSummaries.count)"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                    .lineLimit(1)
-            }
-            .foregroundStyle(Color.arkInk)
-            .padding(.horizontal, 11)
-            .frame(minHeight: 34)
-            .background(Color.goPrimary, in: Capsule())
-        }
-        .accessibilityElement(children: .combine)
+        Text(l.tr(zh: "位置", en: "Sites", de: "Orte"))
+            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .lineLimit(1)
         .accessibilityIdentifier("plant-dashboard-sites-header")
     }
 
@@ -526,7 +408,7 @@ extension PlantDashboardView {
             HStack(spacing: 12) {
                 Image(systemName: dueTasks.isEmpty ? "checkmark.seal.fill" : "calendar.badge.clock")
                     .font(OhanaFont.adaptive(size: 20, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(plantsModeBannerForeground)
                     .frame(width: 44, height: 44)
                     .background(Color.arkInk.opacity(0.08), in: Circle())
                     .accessibilityHidden(true)
@@ -534,12 +416,12 @@ extension PlantDashboardView {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plantsModeBannerTitle)
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(plantsModeBannerForeground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
                     Text(plantsModeBannerSubtitle)
                         .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.arkInk.opacity(0.76))
+                        .foregroundStyle(plantsModeBannerForeground)
                         .lineLimit(2)
                 }
 
@@ -547,7 +429,7 @@ extension PlantDashboardView {
 
                 Image(systemName: "arrow.right") // a11y: allow decorative banner navigation glyph; the button has a full label.
                     .font(OhanaFont.adaptive(size: 17, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(plantsModeBannerForeground)
                     .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
             }
@@ -559,24 +441,28 @@ extension PlantDashboardView {
         .accessibilityIdentifier("plant-dashboard-plants-banner")
     }
 
+    var plantsModeBannerForeground: Color {
+        dueTasks.isEmpty ? Color.ohanaPrimaryActionText : Color.arkInk
+    }
+
     var plantsModeBannerTitle: String {
         dueTasks.isEmpty
-            ? l.tr(zh: "今天没有到期护理", en: "No care due today", de: "Heute keine Pflege fällig")
+            ? l.tr(zh: "未来 7 天计划", en: "Next 7 days", de: "Nächste 7 Tage")
             : l.tr(zh: "今天有 \(dueTasks.count) 项护理", en: "\(dueTasks.count) care tasks today", de: "\(dueTasks.count) Pflegeaufgaben heute")
     }
 
     var plantsModeBannerSubtitle: String {
         if dueTasks.isEmpty {
             return l.tr(
-                zh: "可以补照片、整理档案，或查看未来 7 天计划",
-                en: "Add photos, tidy profiles, or review the 7-day plan",
-                de: "Fotos ergänzen, Profile ordnen oder den 7-Tage-Plan prüfen"
+                zh: "今天无到期",
+                en: "Nothing due today",
+                de: "Heute nichts fällig"
             )
         }
         return l.tr(
-            zh: "点这里打开护理计划，或在列表里逐株完成",
-            en: "Open the care plan here or complete items from the list",
-            de: "Plan hier öffnen oder Aufgaben in der Liste erledigen"
+            zh: "查看护理计划",
+            en: "View care plan",
+            de: "Pflegeplan ansehen"
         )
     }
 
@@ -658,7 +544,7 @@ extension PlantDashboardView {
                         openCareAggregate(feature)
                     }
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(minWidth: 50, minHeight: 44)
                     .background(Color.goPrimary, in: Capsule())
                     .buttonStyle(ScaleButtonStyle())
@@ -712,7 +598,7 @@ extension PlantDashboardView {
                     } label: {
                         Text(l.tr(zh: "全部", en: "All", de: "Alle"))
                             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 11)
                             .frame(minHeight: 34)
                             .background(Color.goPrimary, in: Capsule())
@@ -725,9 +611,9 @@ extension PlantDashboardView {
 
             if careWindowTasks.isEmpty {
                 Text(l.tr(
-                    zh: "未来 7 天没有植物任务，适合补照片或整理档案",
-                    en: "No plant tasks in the next 7 days. Add photos or tidy profiles.",
-                    de: "Keine Pflanzenaufgaben in den nächsten 7 Tagen. Fotos oder Profile ergänzen."
+                    zh: "未来 7 天没有植物任务",
+                    en: "No plant tasks in the next 7 days",
+                    de: "Keine Pflanzenaufgaben in den nächsten 7 Tagen"
                 ))
                 .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -738,23 +624,13 @@ extension PlantDashboardView {
                     }
                 }
 
-                if dueTasks.isEmpty {
-                    Text(l.tr(
-                        zh: "今天没有到期任务，以上是本周护理节奏。",
-                        en: "Nothing is due today. This is the care rhythm for the week.",
-                        de: "Heute ist nichts fällig. Das ist der Pflegerhythmus der Woche."
-                    ))
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                }
-
                 if !dueTasks.isEmpty {
                     HStack(spacing: 10) {
                         Button(l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen")) {
                             completeDueTasks()
                         }
                         .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
@@ -787,7 +663,7 @@ extension PlantDashboardView {
                     } label: {
                         Text(filter.title(l))
                             .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(selectedFilter == filter ? Color.arkInk : Color.ohanaPrimaryText)
+                            .foregroundStyle(selectedFilter == filter ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
                             .background(
@@ -821,10 +697,6 @@ extension PlantDashboardView {
                     .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
-                Text(task.explanation)
-                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
             }
             Spacer()
             Button {
@@ -832,7 +704,7 @@ extension PlantDashboardView {
             } label: {
                 Image(systemName: "checkmark") // a11y: allow decorative icon; button has explicit completion label.
                     .font(OhanaFont.adaptive(size: 12, weight: .bold))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)

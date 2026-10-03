@@ -63,6 +63,11 @@ struct PetHealthArchiveView: View {
 
     private var isDark: Bool { colorScheme == .dark }
     private var accent: Color { isDark ? Color.goPrimary : Color(hex: pet.themeColorHex) }
+    private var accentForeground: Color {
+        isDark
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText)
+    }
     private var l: L10n { L10n(appLanguage) }
 
     private var items: [PetHealthArchiveItem] {
@@ -141,7 +146,7 @@ struct PetHealthArchiveView: View {
                 } label: {
                     Text(filterTitle(option))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(filter == option ? Color.arkInk : .primary.opacity(0.68))
+                        .foregroundStyle(filter == option ? accentForeground : .primary.opacity(0.68))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
                         .background(filter == option ? accent : Color.primary.opacity(isDark ? 0.10 : 0.06), in: Capsule())

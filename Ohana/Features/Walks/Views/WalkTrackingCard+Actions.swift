@@ -36,7 +36,7 @@ extension WalkTrackingCard {
                 } label: {
                     Label(L10n(appLanguage).tr(zh: "出发", en: "Start", de: "Starten"), systemImage: "figure.walk")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -65,13 +65,45 @@ extension WalkTrackingCard {
                 } label: {
                     Label(L10n(appLanguage).tr(zh: "再来", en: "Again", de: "Nochmal"), systemImage: "arrow.clockwise")
                         .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 16).padding(.vertical, 8)
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityIdentifier("walk-tracking-restart-action")
             }
+        }
+    }
+
+    var activeWalkerPicker: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(walkEligibleHumans) { human in
+                    let selected = mgr.activeWalkExecutorIds.contains(human.id.uuidString)
+                    Button {
+                        if mgr.selectActiveWalker(id: human.id) {
+                            selectedSharedWalkExecutorIds = [human.id.uuidString]
+                            OhanaFeedback.selection()
+                        } else {
+                            OhanaFeedback.error()
+                        }
+                    } label: {
+                        VStack(spacing: 4) {
+                            HumanAvatarPipelineView(human: human, size: 44)
+                                .background(selected ? Color.goPrimary.opacity(0.18) : Color.ohanaControlFill, in: Circle())
+                                .overlay(Circle().strokeBorder(selected ? Color.goPrimary : Color.clear, lineWidth: 2))
+                            Text(displayWalkHumanName(human))
+                                .font(OhanaFont.caption2(.semibold))
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(displayWalkHumanName(human))
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    .accessibilityIdentifier("walk-tracking-walker-\(human.id.uuidString)")
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
         }
     }
 
@@ -204,7 +236,7 @@ extension WalkTrackingCard {
             if mgr.poopCount > 0 {
                 Text("\(mgr.poopCount)")
                     .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.goCardWhite)
+                    .foregroundStyle(Color.arkInk)
                     .frame(width: 15, height: 15) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goOrange, in: Circle())
                     .offset(x: 3, y: -3)
@@ -277,7 +309,14 @@ extension WalkTrackingCard {
         isClosingSummaryBack = true
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         if let onCloseSummaryToPetCard {
+            showSummaryBack = false
+            withAnimation(GoMotion.page) {
+                summaryRotation = 0
+            }
             onCloseSummaryToPetCard()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                isClosingSummaryBack = false
+            }
             return
         }
         withAnimation(GoMotion.page) {

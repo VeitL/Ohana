@@ -8,7 +8,8 @@ import UIKit
 @Suite(.serialized)
 struct MemberCreationServiceTests {
     @Test func newHumanDraftRequiresOnlyNameAndPersistsOptionalFieldsAsNil() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         var draft = MemberCreationDraft(kind: .human)
         #expect(draft.hasBirthday == false)
         #expect(draft.humanGender.isEmpty)
@@ -30,7 +31,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func firstPetSaves2DAvatarWithoutConsumingInventoryPass() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
 
@@ -51,13 +53,15 @@ struct MemberCreationServiceTests {
         #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
     }
 
-    @Test func petCreationRequiresNameSpeciesAndBreedWhileOtherProfileFieldsRemainOptional() throws {
-        resetGlobalState()
+    @Test func petCreationRequiresNameSpeciesBreedAndGenderWhileCoatRemainsOptional() throws {
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         var draft = MemberCreationDraft(kind: .pet)
         draft.name = "Momo"
         draft.species = "dog"
         draft.breed = "柴犬"
+        draft.petGender = "boy"
 
         let pet = try #require(saveMember(
             draft: draft,
@@ -70,12 +74,91 @@ struct MemberCreationServiceTests {
         #expect(pet.name == "Momo")
         #expect(pet.species == "dog")
         #expect(pet.breed == "柴犬")
-        #expect(pet.gender == "unknown")
+        #expect(pet.gender == "boy")
         #expect(pet.coatColor.isEmpty)
     }
 
+    @Test func petCreationWithoutExplicitDatesDoesNotCreateCalendarPlans() throws {
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        _ = try saveMember(
+            draft: petDraft(name: "Momo", source: .placeholder),
+            existingPets: [],
+            existingHumans: [],
+            context: context,
+            countryCode: "CN"
+        )
+
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<FamilyTaskPlan>()).isEmpty)
+    }
+
+    @Test func petProfileEditDoesNotMaterializeCareOrCalendarPlans() throws {
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
+        let container = try makeContainer()
+        let context = container.mainContext
+        let pet = Pet(name: "Momo", species: "cat")
+        context.insert(pet)
+        try context.save()
+
+        let result = MemberProfileCommandService.updatePet(
+            pet,
+            input: PetProfileCommandInput(
+                name: "Momo",
+                avatarImageData: nil,
+                species: "cat",
+                breed: "Domestic Shorthair",
+                gender: "girl",
+                isNeutered: true,
+                birthday: Date(timeIntervalSince1970: 1_600_000_000),
+                homeDate: Date(timeIntervalSince1970: 1_700_000_000),
+                themeHex: pet.safeThemeColorHex,
+                notes: ""
+            ),
+            context: context
+        )
+
+        #expect(result.didPersist)
+        #expect(try context.fetch(FetchDescriptor<Event>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<FamilyTaskPlan>()).isEmpty)
+    }
+
+    @Test func petCreationRejectsMissingGender() throws {
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
+        let container = try makeContainer()
+        var draft = MemberCreationDraft(kind: .pet)
+        draft.name = "Momo"
+        draft.species = "dog"
+        draft.breed = "柴犬"
+
+        do {
+            _ = try saveMember(
+                draft: draft,
+                existingPets: [],
+                existingHumans: [],
+                context: container.mainContext,
+                countryCode: "CN"
+            )
+            Issue.record("Expected missing Pet gender to be rejected")
+        } catch let error as MemberCreationService.ServiceError {
+            guard case .incompletePetProfile = error else {
+                Issue.record("Expected incomplete Pet profile error")
+                return
+            }
+        }
+        #expect(try container.mainContext.fetch(FetchDescriptor<Pet>()).isEmpty)
+    }
+
     @Test func petCreationStillRejectsMissingSpecies() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         var draft = MemberCreationDraft(kind: .pet)
         draft.name = "Momo"
@@ -99,7 +182,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func petCreationRejectsMissingBreedAndPersistsCustomSpeciesAndBreed() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         var missingBreed = MemberCreationDraft(kind: .pet)
         missingBreed.name = "Momo"
@@ -128,6 +212,7 @@ struct MemberCreationServiceTests {
         custom.customSpecies = "Capybara"
         custom.isCustomBreed = true
         custom.customBreed = "Short-haired"
+        custom.petGender = "girl"
 
         let pet = try #require(saveMember(
             draft: custom,
@@ -141,7 +226,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func petCreationAllowsNoPersonalityAndLimitsPersistedSelectionToThree() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         var optionalDraft = petDraft(name: "Momo", source: .placeholder)
         optionalDraft.personalityTagIds = []
@@ -167,7 +253,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func petCreationSanitizesLargeAvatarBeforePersistence() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let originalAvatar = largeOpaqueAvatarData(width: 1800, height: 1400)
@@ -252,7 +339,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func firstPetCreationDoesNotAwardStarterGiftBeforeConfirmation() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Ava")
@@ -280,7 +368,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func firstPetInitialWeightRecordsCareFactWithoutWalletReward() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Ava")
@@ -311,7 +400,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func firstPetWelcomeRewardSkipsWalletWhenNoActiveHumanExists() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         UserDefaults.standard.removeObject(forKey: "currentActiveHumanId")
@@ -331,7 +421,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func secondHumanUsingInventoryPassConsumesOnePass() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         Avatar2DAccess.addExtraPasses(1)
         let container = try makeContainer()
         let context = container.mainContext
@@ -354,7 +445,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func secondMemberCannotSave2DAvatarWithoutPass() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let existing = Human(name: "Ava")
@@ -381,7 +473,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func duplicateHumanNameIsRejectedWhenViewSnapshotIsStale() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let existing = Human(name: "Ava")
@@ -409,7 +502,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func cardPurchaseDeductsCoconutsRecordsLedgerAndSaveConsumesPass() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let payer = Human(name: "Ava")
@@ -443,7 +537,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func purchaseThenCancelLeavesPassInInventory() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let payer = Human(name: "Ava")
@@ -462,7 +557,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func insufficientBalanceDoesNotChangeCoconutsLedgerOrInventory() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let payer = Human(name: "Ava")
@@ -491,7 +587,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func customImageCreationDoesNotConsumeAvatarPass() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         Avatar2DAccess.addExtraPasses(1)
         let container = try makeContainer()
         let context = container.mainContext
@@ -511,7 +608,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func placeholderAvatarDoesNotAutoConsumePurchasedPass() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         Avatar2DAccess.addExtraPasses(1)
         let container = try makeContainer()
         let context = container.mainContext
@@ -535,7 +633,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func humanRoleDefaultsRemainForPermissionsButHomeCardHidesRole() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         UserDefaults.standard.set("zh", forKey: "appLanguage")
         let container = try makeContainer()
         let context = container.mainContext
@@ -564,7 +663,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func explicitHumanRoleDraftCanRespectWizardSelection() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let existing = Human(name: "Existing")
@@ -588,7 +688,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func homeVisibleCardsIncludeSeventhMemberAndPromotePreferredMember() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         UserDefaults.standard.set("zh", forKey: "appLanguage")
         let humans = (0 ..< 7).map { index in
             let human = Human(name: "Member \(index)")
@@ -620,7 +721,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func focusHomeCardUsesExplicitWalkDistanceInsteadOfPetWalkRelationship() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let pet = Pet(name: "Momo", species: "Dog")
         pet.walkLogs.append(PetWalkLog(pet: pet))
         pet.walkLogs[0].distanceMeters = 1500
@@ -633,7 +735,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func homeCardSelectionReconciliationClearsDeletedSelectedCard() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let remaining = FocusCard.from(Human(name: "Remaining"))
         let deletedID = UUID()
 
@@ -655,7 +758,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func crewRosterInlineAddCompletionTargetsHomeInsteadOfSelection() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let pet = Pet(name: "Inline Pet", species: "Dog")
         let human = Human(name: "Inline Human")
 
@@ -665,7 +769,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func deceasedHumanDoesNotAppearOnHomeCards() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let livingHuman = Human(name: "Living")
         let memorialHuman = Human(name: "Memorial")
         memorialHuman.passedAwayDate = Date()
@@ -684,7 +789,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func newHumanRemainsVisibleBeyondFirstScreenMediaBudget() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let humans = makeVisibleHumans(count: FocusHomeCardDataSource.firstScreenMediaBudget)
@@ -703,7 +809,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func newPetRemainsVisibleBeyondFirstScreenMediaBudget() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let humans = makeVisibleHumans(count: FocusHomeCardDataSource.firstScreenMediaBudget)
@@ -725,7 +832,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func petCreationWritesBirthdayHomeMilestonesAndRevision() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         let birthday = makeDate(year: 2025, month: 6, day: 8)
@@ -757,7 +865,7 @@ struct MemberCreationServiceTests {
         let birthdayEvent = try #require(events.first { $0.eventType == EventType.birthday.rawValue })
         let anniversaryEvent = try #require(events.first { $0.eventType == EventType.anniversary.rawValue })
 
-        #expect(events.count >= 2)
+        #expect(events.count == 2)
         #expect(birthdayEvent.relatedEntityId == pet.id.uuidString)
         #expect(birthdayEvent.recurrenceDays == 365)
         #expect(reminders.count == 1)
@@ -777,7 +885,8 @@ struct MemberCreationServiceTests {
     }
 
     @Test func humanCreationWritesBirthdayEventCloudSyncState() throws {
-        resetGlobalState()
+        let restoreGlobalState = isolateGlobalState()
+        defer { restoreGlobalState() }
         let container = try makeContainer()
         let context = container.mainContext
         var draft = humanDraft(name: "Ava", source: .placeholder)
@@ -897,7 +1006,7 @@ struct MemberCreationServiceTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV85.models)
+        let schema = Schema(ArkSchemaV94.models)
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [config])
     }
@@ -920,9 +1029,17 @@ struct MemberCreationServiceTests {
         Calendar(identifier: .gregorian).date(from: DateComponents(year: year, month: month, day: day)) ?? .distantPast
     }
 
-    private func resetGlobalState() {
-        [
+    private func isolateGlobalState() -> () -> Void {
+        let defaults = UserDefaults.standard
+        let manager = TestQuestManagerProjection.manager
+        let previousProjection = (
+            count: manager.coconutCount, logs: manager.coconutLogs,
+            petWizard: manager.isPetWizardCompleted,
+            firstMeal: manager.isFirstMealRecorded, theme: manager.isThemeColorSet
+        )
+        let resetKeys = [
             "inventory_avatar2d_extra_count",
+            ShopInventoryDefaultsKeys.durableStateV2,
             "avatar2d_free_human_used",
             "avatar2d_free_pet_used",
             "currentActiveHumanId",
@@ -936,7 +1053,15 @@ struct MemberCreationServiceTests {
             StarterGiftStorageKey.ceremonySeen,
             StarterGiftStorageKey.oasisTabPromptPending,
             HomeCardVisibility.hiddenPetIDsKey
-        ].forEach { UserDefaults.standard.removeObject(forKey: $0) }
+        ]
+        // Inventory reads can migrate companion scalar keys as a side effect.
+        // Also restore the language changed by two tests in this suite.
+        let restoreKeys = resetKeys + [
+            "appLanguage", CheckInStreakStore.makeupPackKey,
+            ShopInventoryDefaultsKeys.doubleRewardBoost, ShopInventoryDefaultsKeys.streakShieldExpiry
+        ]
+        let previousDefaults = restoreKeys.map { defaults.object(forKey: $0) }
+        resetKeys.forEach { defaults.removeObject(forKey: $0) }
 
         TestQuestManagerProjection.manager.coconutCount = 0
         TestQuestManagerProjection.manager.coconutLogs = []
@@ -944,5 +1069,16 @@ struct MemberCreationServiceTests {
         TestQuestManagerProjection.manager.isFirstMealRecorded = false
         TestQuestManagerProjection.manager.isThemeColorSet = false
         TestQuestManagerProjection.manager.persistQuestFlags()
+        return {
+            manager.coconutCount = previousProjection.count
+            manager.coconutLogs = previousProjection.logs
+            manager.isPetWizardCompleted = previousProjection.petWizard
+            manager.isFirstMealRecorded = previousProjection.firstMeal
+            manager.isThemeColorSet = previousProjection.theme
+            for (key, previous) in zip(restoreKeys, previousDefaults) {
+                if let previous { defaults.set(previous, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
+        }
     }
 }

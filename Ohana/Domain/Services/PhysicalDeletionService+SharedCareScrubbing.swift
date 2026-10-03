@@ -87,6 +87,10 @@ extension PhysicalDeletionService {
             var changed = clearSharedSessionIdIfNeeded(log.sharedSessionId, clearsSessionLink: clearsSessionLink) {
                 log.sharedSessionId = $0
             }
+            if let deletedHumanUUID = UUID(uuidString: deletedHumanId),
+               log.anonymizePayer(deletedHumanUUID) {
+                changed = true
+            }
             if let scrubbedExecutorId = executorIdAfterRemovingHuman(
                 log.executorId,
                 deletedHumanId: deletedHumanId,
@@ -267,6 +271,10 @@ extension PhysicalDeletionService {
         humanId: String
     ) -> Bool {
         var didChange = false
+        if let humanUUID = UUID(uuidString: humanId),
+           log.anonymizePayer(humanUUID) {
+            didChange = true
+        }
         if sharedCareIdsMatch(log.executorId, humanId) {
             log.executorId = nil
             didChange = true

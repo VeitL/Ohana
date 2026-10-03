@@ -202,7 +202,7 @@ struct AddInsuranceClaimSheet: View {
                                 Text(isSaving ? l.tr(zh: "提交中", en: "Submitting", de: "Wird gesendet") : l.tr(zh: "提交报销申请", en: "Submit claim", de: "Erstattung einreichen"))
                                     .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                             .frame(maxWidth: .infinity).padding(.vertical, 16)
                             .background(
                                 canSave && !isSaving ? Color.goPrimary : Color.primary.opacity(0.15),

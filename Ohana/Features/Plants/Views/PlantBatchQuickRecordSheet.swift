@@ -194,7 +194,7 @@ struct PlantBatchQuickRecordSheet: View {
         } label: {
             Label(type.displayName(l: l), systemImage: careSymbol(for: type))
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(selectedCareType == type ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                .foregroundStyle(selectedCareType == type ? careForeground(for: type) : Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -315,7 +315,7 @@ struct PlantBatchQuickRecordSheet: View {
                 if isRecording {
                     HStack(spacing: 8) {
                         ProgressView()
-                            .tint(Color.ohanaPrimaryActionText)
+                            .tint(careForeground(for: selectedCareType))
                             .accessibilityHidden(true)
                         Text(recordingTitle)
                     }
@@ -324,7 +324,7 @@ struct PlantBatchQuickRecordSheet: View {
                 }
             }
                 .font(OhanaFont.callout(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
+                .foregroundStyle(careForeground(for: selectedCareType))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -422,6 +422,17 @@ struct PlantBatchQuickRecordSheet: View {
         case .pruning: Color.goOrange
         case .pestCheck, .yellowLeaf, .pestFound: Color.goRed
         case .photo: Color.goPurple
+        }
+    }
+
+    private func careForeground(for type: PlantCareType) -> Color {
+        switch type {
+        case .watering, .misting, .fertilizing, .newLeaf, .leafCleaning, .pruning:
+            Color.arkInk
+        case .repotting, .rotating, .customNote:
+            Color.ohanaPrimaryActionText
+        case .pestCheck, .yellowLeaf, .pestFound, .photo:
+            Color.goCardWhite
         }
     }
 }

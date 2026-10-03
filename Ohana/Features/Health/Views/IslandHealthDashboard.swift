@@ -7,12 +7,17 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 private enum HealthDashboardRange: Hashable, CaseIterable {
     case days7
     case days30
     case days90
     case all
+
+    var requiresPersonal: Bool {
+        self == .days90 || self == .all
+    }
 
     func title(_ l: L10n) -> String {
         switch self {
@@ -65,10 +70,12 @@ struct IslandHealthDashboardContentView: View {
     let healthLogsByPetID: [UUID: [PetHealthLog]]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
     @State private var selectedRange: HealthDashboardRange = .days30
+    @State private var showingPersonalPlan = false
     @State private var sheetPet: Pet? = nil
     @State private var chartProgress: Double = 0
 
@@ -176,6 +183,15 @@ struct IslandHealthDashboardContentView: View {
         dashboardBody
             .sheet(item: $sheetPet) { pet in
                 PetHealthDetailView(pet: pet, isModal: false)
+            }
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    selectedRange = .days30
+                }
             }
             .onAppear { playChartEntrance() }
             .onChange(of: selectedPetId) { _, _ in playChartEntrance() }
@@ -306,7 +322,11 @@ struct IslandHealthDashboardContentView: View {
                     .font(OhanaFont.subheadline(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: HealthDashboardRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: HealthDashboardRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -314,7 +334,7 @@ struct IslandHealthDashboardContentView: View {
             if dayPoints.allSatisfy({ $0.count == 0 }) {
                 emptyState(
                     icon: "cross.case",
-                    text: l.tr(zh: "添加疫苗、体检或用药后会显示趋势", en: "Vaccines, checkups, or meds will show here", de: "Impfungen, Checks oder Medikamente erscheinen hier")
+                    text: l.tr(zh: "暂无健康趋势", en: "No health trend yet", de: "Noch kein Gesundheitstrend")
                 )
             } else {
                 OhanaMinimalBarChart(
@@ -329,6 +349,20 @@ struct IslandHealthDashboardContentView: View {
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+    }
+
+    private var personalRangeSelection: Binding<HealthDashboardRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
     }
 
     private var healthBadgeStrip: some View {
@@ -389,7 +423,7 @@ struct IslandHealthDashboardContentView: View {
             if petSummaries.isEmpty {
                 emptyState(
                     icon: "pawprint",
-                    text: l.tr(zh: "添加宠物后会显示健康档案", en: "Add pets to see health files", de: "Füge Tiere hinzu, um Akten zu sehen")
+                    text: l.tr(zh: "暂无宠物健康档案", en: "No pet health files", de: "Keine Tiergesundheitsakten")
                 )
             } else {
                 VStack(spacing: 0) {
@@ -482,7 +516,7 @@ struct IslandHealthDashboardContentView: View {
                 Text(title)
                     .font(OhanaFont.caption(.black))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 36)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

@@ -16,7 +16,8 @@ Usage:
 
 Purpose:
   Run the canonical local release-hardening lane. The default runs full static
-  audits and the complete unit suite. --with-ui appends sequential UI shards.
+  audits and the complete unit suite. --with-ui collects all sequential UI
+  shards once and returns failure after collection if any shard failed.
   Signing, Archive validation, and physical-device acceptance remain separate.
 
 Options:
@@ -81,6 +82,9 @@ scripts/tests/run-ci-policy-tests.sh
 section "UI test shard completeness"
 scripts/audit-ui-test-shards.sh
 
+section "Release test surface"
+scripts/audit-release-test-surface.sh --all
+
 section "Runtime guardrails"
 scripts/audit-runtime-guardrails.sh --all
 
@@ -143,7 +147,7 @@ else
 
   section "Full sequential UI shards"
   if [[ "${RUN_UI}" == "1" ]]; then
-    scripts/test-ui-nightly.sh
+    scripts/test-ui-nightly.sh --continue-after-failure
   else
     echo "Not selected. Use --with-ui for RC UI regression."
   fi

@@ -228,7 +228,7 @@ struct HealthLogListView: View {
         Button(action: action) {
             Text(label)
                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? Color.arkInk : .primary.opacity(0.7))
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : .primary.opacity(0.7))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(isSelected ? Color.goPrimary : .clear, in: Capsule())

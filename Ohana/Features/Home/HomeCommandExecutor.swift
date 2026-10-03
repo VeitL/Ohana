@@ -497,41 +497,22 @@ struct HomeCommandExecutor {
     }
 
     @discardableResult
-    func recordPlantCare(
-        _ type: PlantCareType,
-        plantIDs: [UUID],
-        executorId: String?,
-        careNote: String = "",
-        photoData: Data? = nil,
-        healthStatus: PlantHealthStatus? = nil
-    ) -> [UUID] {
-        var recordedIDs: [UUID] = []
-        for plantID in plantIDs {
-            guard let plant = fetchPlant(id: plantID) else {
-                publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
-                continue
-            }
-            let result = recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
-            if result.didPersist {
-                recordedIDs.append(plantID)
-            }
-        }
-        return recordedIDs
-    }
-
-    @discardableResult
     func completePlantBatchCare(
         selections: [PlantBatchCareSelection],
         executorId: String?,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init
     ) -> PlantBatchCareCommandResult {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).completeBatchCare(
             selections: selections,
             executorId: resolvedExecutorId(executorId),
             note: "home.plantCare.batchCare",
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            operationID: operationID,
+            clock: clock
         )
     }
 
@@ -540,14 +521,18 @@ struct HomeCommandExecutor {
         selections: [PlantBatchCareSelection],
         executorId: String?,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init
     ) -> PlantBatchCareCommandResult {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordBatchQuickCare(
             selections: selections,
             executorId: resolvedExecutorId(executorId),
             note: "home.plantCare.batchQuickRecord",
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            operationID: operationID,
+            clock: clock
         )
     }
 

@@ -61,6 +61,10 @@ final nonisolated class DataBackupMediaPackageWriter: DataBackupMediaWriting, @u
 
     func write(_ data: Data?, purpose: DataBackupMediaPurpose, id: String) throws -> BackupMediaReference? {
         guard let data, !data.isEmpty else { return nil }
+        guard data.count <= DataBackupRestoreLimits.maximumMediaItemBytes,
+              data.count <= DataBackupRestoreLimits.maximumMediaBytes - mediaBytes else {
+            throw BackupError.invalidRestoreData(.sizeLimit)
+        }
         sequence += 1
         let fileName = "\(purpose.rawValue)-\(Self.safeFileComponent(id))-\(sequence).bin"
         let relativePath = "\(DataBackupManager.mediaDirectoryName)/\(fileName)"
@@ -69,6 +73,9 @@ final nonisolated class DataBackupMediaPackageWriter: DataBackupMediaWriting, @u
             try DataBackupEncryption.encrypt(data, password: password)
         } else {
             data
+        }
+        guard payload.count <= DataBackupRestoreLimits.maximumEncryptedMediaItemBytes else {
+            throw BackupError.invalidRestoreData(.sizeLimit)
         }
         try payload.write(to: url, options: [.atomic, .completeFileProtection])
         mediaCount += 1
@@ -111,7 +118,7 @@ final nonisolated class DataBackupMediaPackageReader: DataBackupMediaResolving {
         guard values.isRegularFile == true,
               let fileSize = values.fileSize,
               fileSize >= 0,
-              fileSize <= DataBackupRestoreLimits.maximumMediaItemBytes + DataBackupRestoreLimits.maximumEncryptionOverheadBytes else {
+              fileSize <= DataBackupRestoreLimits.maximumEncryptedMediaItemBytes else {
             throw BackupError.invalidRestoreData(.media)
         }
         let fileData = try Data(contentsOf: url)

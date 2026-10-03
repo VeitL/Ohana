@@ -80,7 +80,11 @@ struct FeatureAggregateView: View {
         .onDisappear {
             avatarPipeline.cancel(key: humanAvatarCacheKey)
         }
-        .accessibilityIdentifier("function-menu-aggregate-\(feature.rawValue)")
+        .accessibilityIdentifier(
+            feature == .achievements
+                ? "achievement-unified-wall"
+                : "function-menu-aggregate-\(feature.rawValue)"
+        )
     }
 
     private var pageHeader: some View {
@@ -235,6 +239,8 @@ struct FeatureAggregateView: View {
             IslandExpenseDashboard(standalone: false)
         case .walks:
             IslandExplorationDashboard(standalone: false)
+        case .achievements:
+            AchievementUnifiedWallView(pets: activePets, humans: visibleHumans)
         default:
             summaryList
         }
@@ -303,7 +309,9 @@ struct FeatureAggregateView: View {
         let summary = petAggregateSummaries[pet.id] ?? .empty
         switch feature {
         case .basicInfo:
-            return pet.breed.isEmpty ? Pet.localizedSpeciesName(pet.species, l: l) : pet.breed
+            return pet.breed.isEmpty
+                ? Pet.localizedSpeciesName(pet.species, l: l)
+                : l.resourceName(pet.breed)
         case .documents:
             return l.tr(zh: "\(summary.documentCount) 份证件", en: "\(summary.documentCount) documents", de: "\(summary.documentCount) Dokumente")
         case .moments:

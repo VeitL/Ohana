@@ -2,7 +2,7 @@
 //  CheckInStreakStore.swift
 //  Ohana
 //
-//  User-scoped daily check-in streak persistence.
+//  Read-only compatibility bridge for the retired UserDefaults streak store.
 //
 
 import Foundation
@@ -57,17 +57,9 @@ enum CheckInStreakStore {
         return Set(UserDefaults.standard.stringArray(forKey: checkedInKey(for: humanId)) ?? [])
     }
 
-    static func setCheckedInDates(_ dates: Set<String>, for humanId: String) {
-        UserDefaults.standard.set(Array(dates).sorted(), forKey: checkedInKey(for: humanId))
-    }
-
     static func makeupDates(for humanId: String) -> Set<String> {
         migrateLegacyIfNeeded(for: humanId)
         return Set(UserDefaults.standard.stringArray(forKey: makeupDatesKey(for: humanId)) ?? [])
-    }
-
-    static func setMakeupDates(_ dates: Set<String>, for humanId: String) {
-        UserDefaults.standard.set(Array(dates).sorted(), forKey: makeupDatesKey(for: humanId))
     }
 
     static func lastClaimedMilestone(for humanId: String) -> Int {
@@ -75,24 +67,17 @@ enum CheckInStreakStore {
         return UserDefaults.standard.integer(forKey: milestoneKey(for: humanId))
     }
 
-    static func setLastClaimedMilestone(_ days: Int, for humanId: String) {
-        UserDefaults.standard.set(days, forKey: milestoneKey(for: humanId))
-    }
-
-    static func dateString(_ date: Date = Date()) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.timeZone = TimeZone.current
-        return formatter.string(from: date)
-    }
-
-    static func currentStreak(for humanId: String, calendar: Calendar = .current, from date: Date = Date()) -> Int {
-        let checkedInDates = checkedInDates(for: humanId)
+    /// Frozen read helpers keep legacy Standard-mode presentation source
+    /// compatible for one transition version. No caller can mutate this store.
+    static func currentStreak(
+        for humanId: String,
+        calendar: Calendar = .current,
+        from date: Date = Date()
+    ) -> Int {
+        let dates = checkedInDates(for: humanId)
         var streak = 0
         var day = date
-        while true {
-            let value = dateString(day)
-            guard checkedInDates.contains(value) else { break }
+        while dates.contains(dateString(day)) {
             streak += 1
             guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
             day = previous
@@ -117,5 +102,12 @@ enum CheckInStreakStore {
             }
         }
         return longest
+    }
+
+    private static func dateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone.current
+        return formatter.string(from: date)
     }
 }

@@ -142,33 +142,26 @@ struct VerticalSolidHomeExpandedCardActions: View {
     }
 
     private func buildCurrentItems() -> [QuickActionItem] {
-        actionSnapshot.currentItems.isEmpty ? fallbackItems : actionSnapshot.currentItems
+        actionSnapshot.currentItems
     }
 
     private func buildCandidateItems() -> [QuickActionItem] {
         actionSnapshot.candidateItems
     }
 
-    private var fallbackItems: [QuickActionItem] {
-        let entityID = card.id
-        if card.isHuman {
-            return [
-                QuickActionItem(id: "human-\(entityID)-weight", label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA", actionType: "humanWeight", entityId: entityID, entityKind: .human),
-                QuickActionItem(id: "human-\(entityID)-expense", label: l.expense, icon: "creditcard.fill", colorHex: "F59E0B", actionType: "humanExpense", entityId: entityID, entityKind: .human),
-                QuickActionItem(id: "human-\(entityID)-medication", label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A", actionType: "humanMedication", entityId: entityID, entityKind: .human)
-            ]
-        }
-        return [
-            QuickActionItem(id: "pet-\(entityID)-feed", label: l.homeQAFeed, icon: "fork.knife", colorHex: "FFDD44", petId: entityID, actionType: "feed", entityId: entityID, entityKind: .pet),
-            QuickActionItem(id: "pet-\(entityID)-water", label: l.homeQAWater, icon: "drop.fill", colorHex: "00D4AA", petId: entityID, actionType: "water", entityId: entityID, entityKind: .pet),
-            QuickActionItem(id: "pet-\(entityID)-play", label: l.homeQAPlay, icon: "tennisball.fill", colorHex: "FF6B6B", petId: entityID, actionType: "play", entityId: entityID, entityKind: .pet),
-            QuickActionItem(id: "pet-\(entityID)-allFeatures", label: l.tr(zh: "全部", en: "All", de: "Alle"), icon: "square.grid.2x2.fill", colorHex: "5B6AFF", petId: entityID, actionType: "allFeatures", entityId: entityID, entityKind: .pet)
-        ]
-    }
-
     private func makeEmbeddedAction(_ item: QuickActionItem) -> VerticalHomeEmbeddedAction {
         let state = actionSnapshot.state(for: item)
-        let options = menuOptions(for: item)
+        let options = HomeQuickActionOptionCatalog.options(
+            for: item.actionType,
+            localization: l
+        ).map {
+            VerticalHomeEmbeddedActionOption(
+                id: $0.id,
+                icon: $0.icon,
+                title: $0.title,
+                tint: $0.colorToken.color
+            )
+        }
         let menuPolicy = state.isLocked ? .none : state.menuPolicy.expandedPolicy
         let actionUsesQuickPath = menuPolicy.showsQuickButton
         let title = item.displayLabel(localization: l)
@@ -356,34 +349,6 @@ struct VerticalSolidHomeExpandedCardActions: View {
 
     private func isPrimaryDisabled(item: QuickActionItem, state: HomeQuickActionRenderSnapshot) -> Bool {
         ExpandedQuickActionLogic.singleUseLabel(for: item.actionType) != nil && state.isCompleted
-    }
-
-    private func menuOptions(for item: QuickActionItem) -> [VerticalHomeEmbeddedActionOption] {
-        switch item.actionType {
-        case "groom":
-            [
-                VerticalHomeEmbeddedActionOption(id: "bath", icon: "drop.fill", title: l.tr(zh: "洗澡", en: "Bath", de: "Bad"), tint: Color.goBlue),
-                VerticalHomeEmbeddedActionOption(id: "teeth", icon: "mouth.fill", title: l.tr(zh: "刷牙", en: "Teeth", de: "Zähne"), tint: Color.goTeal),
-                VerticalHomeEmbeddedActionOption(id: "nails", icon: "scissors", title: l.tr(zh: "剪甲", en: "Nails", de: "Krallen"), tint: Color.goPurple),
-                VerticalHomeEmbeddedActionOption(id: "brushing", icon: "comb.fill", title: l.tr(zh: "梳毛", en: "Brush", de: "Bürsten"), tint: Color.goYellow),
-                VerticalHomeEmbeddedActionOption(id: "ears", icon: "ear.fill", title: l.tr(zh: "清耳", en: "Ears", de: "Ohren"), tint: Color.goOrange)
-            ]
-        case "potty":
-            [
-                VerticalHomeEmbeddedActionOption(id: PottyType.perfectPoop.rawValue, icon: "seal.fill", title: l.tr(zh: "完美", en: "Good", de: "Gut"), tint: Color.goYellow),
-                VerticalHomeEmbeddedActionOption(id: PottyType.softPoop.rawValue, icon: "circle.dashed", title: l.tr(zh: "软便", en: "Soft", de: "Weich"), tint: Color.goYellow),
-                VerticalHomeEmbeddedActionOption(id: PottyType.liquidPoop.rawValue, icon: "exclamationmark.triangle.fill", title: l.tr(zh: "水便", en: "Loose", de: "Flüssig"), tint: Color.goRed),
-                VerticalHomeEmbeddedActionOption(id: PottyType.pee.rawValue, icon: "drop.fill", title: l.tr(zh: "尿尿", en: "Pee", de: "Pipi"), tint: Color.goBlue)
-            ]
-        case "health":
-            [
-                VerticalHomeEmbeddedActionOption(id: "vaccine", icon: "syringe.fill", title: l.tr(zh: "疫苗", en: "Vaccine", de: "Impfung"), tint: Color.goTeal),
-                VerticalHomeEmbeddedActionOption(id: "deworming", icon: "shield.lefthalf.filled", title: l.tr(zh: "驱虫", en: "Deworm", de: "Entwurmen"), tint: Color.goPurple),
-                VerticalHomeEmbeddedActionOption(id: "visit", icon: "stethoscope", title: l.tr(zh: "体检", en: "Visit", de: "Besuch"), tint: Color.goBlue)
-            ]
-        default:
-            []
-        }
     }
 
     private func detailIcon(for actionType: String, isHuman: Bool) -> String {

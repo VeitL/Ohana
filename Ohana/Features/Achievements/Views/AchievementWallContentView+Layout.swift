@@ -428,7 +428,17 @@ extension AchievementWallContentView {
         case "human_first_record": l.tr(zh: "自己的第一条记录，也值得被纪念。", en: "Your first record deserves to be remembered too.", de: "Auch dein erster Eintrag verdient Erinnerung.")
         case "human_weight_starter": l.tr(zh: "建立基线，是照顾自己的第一步。", en: "A baseline is a gentle first step in self-care.", de: "Eine Basislinie ist ein sanfter erster Schritt.")
         case "human_weight_keeper": l.tr(zh: "趋势被看见，身体的声音就更清楚。", en: "Seeing the trend makes the body's signals clearer.", de: "Der Trend macht Körpersignale klarer.")
-        case "human_expense_tracker": l.tr(zh: "家庭里的花费，也开始有迹可循。", en: "Household spending now has a clearer trail.", de: "Familienausgaben werden nun nachvollziehbarer.")
+        case "human_expense_tracker": l.tr(
+            zh: "你参与的宠物花费，也开始有迹可循。",
+            en: "The pet spending you contribute to now has a clearer trail.",
+            de: "Deine Beiträge zu Haustierausgaben werden nachvollziehbar.",
+            es: "Tus aportes a gastos de mascotas ya quedan claros.",
+            pt: "As suas contribuições para despesas com pets ficam claras.",
+            fr: "Vos contributions aux dépenses animales sont mieux suivies.",
+            ja: "負担したペット費用が分かりやすくなりました。",
+            ko: "함께 부담한 반려동물 지출이 한눈에 보여요.",
+            it: "I tuoi contributi alle spese per animali sono più chiari."
+        )
         case "human_medication_setup": l.tr(zh: "计划建好了，照顾就少一点慌张。", en: "With a plan in place, care feels calmer.", de: "Mit Plan fühlt sich Fürsorge ruhiger an.")
         case "human_medication_keeper": l.tr(zh: "按时完成的小事，最能托住日常。", en: "Small on-time routines can hold the day together.", de: "Pünktliche kleine Routinen tragen den Alltag.")
         case "human_workout_starter": l.tr(zh: "开始活动，就是身体收到的第一封回信。", en: "Starting to move is the body's first reply.", de: "Loszugehen ist die erste Antwort des Körpers.")

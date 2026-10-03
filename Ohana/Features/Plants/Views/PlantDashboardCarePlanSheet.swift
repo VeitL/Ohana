@@ -128,7 +128,7 @@ struct PlantDashboardCarePlanSheet: View {
                     } label: {
                         Text(l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen"))
                             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
                             .background(Color.goPrimary, in: Capsule())
@@ -281,7 +281,7 @@ struct PlantDashboardCarePlanSheet: View {
                 } label: {
                     Image(systemName: "checkmark") // a11y: allow decorative log glyph; accessibility label names the care log.
                         .font(OhanaFont.adaptive(size: 12, weight: .black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 44, height: 44)
                         .background(Color.goPrimary, in: Circle())
                         .accessibilityHidden(true)

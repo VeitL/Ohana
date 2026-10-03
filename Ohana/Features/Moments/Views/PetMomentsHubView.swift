@@ -225,10 +225,9 @@ struct PetMomentsHubView: View {
                 Text(l.tr(zh: "记录中心", en: "Moments", de: "Momente"))
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text("\(pet.name) · \(l.tr(zh: "高光、时光、相册", en: "highlights, diary, album", de: "Highlights, Tagebuch, Album"))")
+                Text(pet.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
             }
 
             Spacer()
@@ -287,7 +286,7 @@ struct PetMomentsHubView: View {
         } label: {
             Label(target.title(l), systemImage: target.icon)
                 .font(OhanaFont.caption(.black))
-                .foregroundStyle(tab == target ? Color.arkInk : Color.ohanaSecondaryText)
+                .foregroundStyle(tab == target ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 38)
                 .background(tab == target ? Color.goPrimary : Color.clear, in: Capsule())
@@ -585,17 +584,13 @@ struct PetMomentsHubView: View {
             Text(emptyTitle)
                 .font(OhanaFont.title3(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-            Text(emptySubtitle)
-                .font(OhanaFont.callout(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
             if tab == .highlights {
                 Button {
                     withAnimation(GoMotion.selection) { tab = .timeline }
                 } label: {
                     Text(l.tr(zh: "去记录", en: "Add a Moment", de: "Moment speichern"))
                         .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 20)
                         .frame(height: 46)
                         .background(Color.goPrimary, in: Capsule())
@@ -605,7 +600,7 @@ struct PetMomentsHubView: View {
                 Button { showingQuickMoment = true } label: {
                     Text(l.tr(zh: "记录第一刻", en: "Add First Moment", de: "Ersten Moment speichern"))
                         .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 20)
                         .frame(height: 46)
                         .background(Color.goPrimary, in: Capsule())
@@ -626,17 +621,6 @@ struct PetMomentsHubView: View {
             l.tr(zh: "还没有时光记录", en: "No moments yet", de: "Noch keine Momente")
         case .photos:
             l.tr(zh: "还没有照片", en: "No photos yet", de: "Noch keine Fotos")
-        }
-    }
-
-    private var emptySubtitle: String {
-        switch tab {
-        case .highlights:
-            l.tr(zh: "生日、相伴日和重要记录会自动出现在这里。", en: "Birthdays, together-days, and key records appear here.", de: "Geburtstage, gemeinsame Tage und wichtige Einträge erscheinen hier.")
-        case .timeline:
-            l.tr(zh: "写一句话、拍一张照片，慢慢就会变成 \(pet.name) 的故事。", en: "A line or a photo becomes \(pet.name)'s story over time.", de: "Ein Satz oder Foto wird mit der Zeit zu \(pet.name)s Geschichte.")
-        case .photos:
-            l.tr(zh: "添加照片后会组成 \(pet.name) 的相册。", en: "Add photos to build \(pet.name)'s album.", de: "Füge Fotos hinzu, um \(pet.name)s Album aufzubauen.")
         }
     }
 
@@ -675,7 +659,7 @@ struct PetMomentsHubView: View {
             Text(title)
                 .font(OhanaFont.callout(.black))
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(.horizontal, 22)
         .frame(height: 54)
         .background(Color.goPrimary, in: Capsule())

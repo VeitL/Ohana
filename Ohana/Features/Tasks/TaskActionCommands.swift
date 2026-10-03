@@ -232,7 +232,10 @@ struct TaskActionCommandExecutor {
                 context: modelContext
             )
         } == true
+        let usesPlanOccurrenceCommand = familyTask?.planId != nil
         if let event,
+           !usesPlanOccurrenceCommand,
+           !hadCompletedPlantFact,
            !event.isOccurrenceMarkedComplete(on: command.occurrenceDate) {
             do {
                 let completion = try CalendarCommandExecutor(
@@ -243,7 +246,8 @@ struct TaskActionCommandExecutor {
                     occurrenceDate: command.occurrenceDate,
                     pets: pets,
                     executorId: activeHuman?.id.uuidString,
-                    note: "task_center.unified_action.\(command.idempotencyKey)"
+                    note: "task_center.unified_action.\(command.idempotencyKey)",
+                    allowsManagedProjection: true
                 )
                 guard completion.isCompleted else {
                     return rejected(command, event: event, familyTask: familyTask)
@@ -396,6 +400,7 @@ struct TaskActionCommandExecutor {
         switch task.status {
         case .active: .active
         case .claimed: .claimed
+        case .declined: .declined
         case .pendingReview: .pendingReview
         case .completed: .completed
         case .cancelled: .cancelled

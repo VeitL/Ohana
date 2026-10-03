@@ -159,7 +159,7 @@ struct IslandFoodDashboardContentView: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 13)
             .padding(.vertical, 8)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -180,7 +180,7 @@ struct IslandFoodDashboardContentView: View {
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.leading, 7)
             .padding(.trailing, 12)
             .padding(.vertical, 6)

@@ -12,6 +12,8 @@ struct AchievementWallView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @State private var routeData = AchievementWallRouteData()
+    @State private var achievementSnapshot = AchievementWallSnapshot.empty
+    @State private var loadErrorMessage: String?
     @State private var dataLoadTask: Task<Void, Never>?
 
     let pet: Pet
@@ -19,22 +21,39 @@ struct AchievementWallView: View {
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     var body: some View {
-        AchievementWallContentView(
-            pet: pet,
-            allPets: allPets,
-            onPresentCoconutLog: onPresentCoconutLog,
-            electronicPets: routeData.electronicPets,
-            critterFragments: routeData.critterFragments,
-            critterActionLogs: routeData.critterActionLogs,
-            gachaOwnedItems: routeData.gachaOwnedItems,
-            gachaDrawLogs: routeData.gachaDrawLogs,
-            allHumans: routeData.allHumans,
-            humanMedications: routeData.humanMedications,
-            humanMedicationLogs: routeData.humanMedicationLogs,
-            allExpenseLogs: routeData.allExpenseLogs,
-            careLedgerEvents: routeData.careLedgerEvents,
-            petActivitySummaries: routeData.petActivitySummaries
-        )
+        Group {
+            if routeData.hasLoaded {
+                AchievementWallContentView(
+                    pet: pet,
+                    allPets: allPets,
+                    onPresentCoconutLog: onPresentCoconutLog,
+                    electronicPets: routeData.electronicPets,
+                    critterFragments: routeData.critterFragments,
+                    critterActionLogs: routeData.critterActionLogs,
+                    gachaOwnedItems: routeData.gachaOwnedItems,
+                    gachaDrawLogs: routeData.gachaDrawLogs,
+                    allHumans: routeData.allHumans,
+                    humanMedications: routeData.humanMedications,
+                    humanMedicationLogs: routeData.humanMedicationLogs,
+                    allExpenseLogs: routeData.allExpenseLogs,
+                    careLedgerEvents: routeData.careLedgerEvents,
+                    petActivitySummaries: routeData.petActivitySummaries,
+                    achievementSnapshot: achievementSnapshot
+                )
+            } else if let loadErrorMessage {
+                ContentUnavailableView {
+                    Label("Unable to load achievements", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(loadErrorMessage)
+                } actions: {
+                    Button("Retry") { scheduleRouteDataLoad(force: true) }
+                }
+            } else {
+                ProgressView("Loading achievements…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(OhanaAppBackground())
+            }
+        }
         .onAppear {
             scheduleRouteDataLoad()
         }
@@ -50,8 +69,26 @@ struct AchievementWallView: View {
     private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
         guard force || !routeData.hasLoaded else { return }
         guard dataLoadTask == nil else { return }
-        dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            routeData = AchievementWallRouteData.load(from: modelContext)
+        loadErrorMessage = nil
+        dataLoadTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: delayMilliseconds)
+            guard !Task.isCancelled else { return }
+            let loaded = AchievementWallRouteData.load(from: modelContext)
+            let activePets = ([pet] + allPets).filter { !$0.hasPassedAway }
+            let scopes = activePets.map { AchievementScopeReference.pet($0.id) }
+                + loaded.allHumans.filter { !$0.hasPassedAway }.map { AchievementScopeReference.human($0.id) }
+                + [.island]
+            do {
+                let progression = AchievementProgressionActor(modelContainer: modelContext.container)
+                _ = try await progression.reconcile(
+                    AchievementProgressionRequest(affectedScopes: scopes, reason: .wallOpened)
+                )
+                let reader = AchievementWallReadActor(modelContainer: modelContext.container)
+                achievementSnapshot = try await reader.load(scopes: scopes)
+                routeData = loaded
+            } catch {
+                loadErrorMessage = error.localizedDescription
+            }
             dataLoadTask = nil
         }
     }

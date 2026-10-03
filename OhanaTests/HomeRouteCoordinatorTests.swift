@@ -103,6 +103,7 @@ struct HomeRouteCoordinatorTests {
         coordinator.openSheet(.humanWeight(human.id))
         coordinator.openSheet(.humanWorkoutDashboard(human.id))
         coordinator.openSheet(.humanMetrics(human.id))
+        coordinator.openSheet(.humanConditions(human.id))
         coordinator.openSheet(.humanReport(human.id))
         coordinator.openSheet(.humanWishlist(human.id))
 
@@ -121,6 +122,7 @@ struct HomeRouteCoordinatorTests {
             .appSheet(.humanWeight(human.id)),
             .appSheet(.humanWorkoutDashboard(human.id)),
             .appSheet(.humanMetrics(human.id)),
+            .appSheet(.humanConditions(human.id)),
             .appSheet(.humanReport(human.id)),
             .appSheet(.humanWishlist(human.id))
         ]
@@ -386,6 +388,24 @@ struct HomeRouteCoordinatorTests {
             return
         }
         #expect(destination == .featureGroup(.dailyCare))
+    }
+
+    @Test func critterCodexOpensAtLevelTenAndRedirectsEarlierLevels() {
+        let coordinator = HomeRouteCoordinator()
+
+        coordinator.openCritterCodex(currentLevel: 9)
+        guard case let .functionMenu(destination) = coordinator.modal else {
+            Issue.record("Expected the locked critter codex to redirect to the growth roadmap")
+            return
+        }
+        #expect(destination == .growthRoadmap)
+
+        coordinator.dismissModal()
+        coordinator.openCritterCodex(currentLevel: 10)
+        guard case .critterCodex = coordinator.modal else {
+            Issue.record("Expected the critter codex to open at level ten")
+            return
+        }
     }
 
     @Test func addPlantRedirectsToLocalRoadmapBeforeLevelFourWithoutAppSheetSink() {

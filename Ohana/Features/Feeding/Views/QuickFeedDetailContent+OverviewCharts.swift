@@ -14,10 +14,6 @@ extension QuickFeedDetailContent {
                     Text(l.tr(zh: "全部喂食", en: "All feeding", de: "Alle Fütterungen"))
                         .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "手动、计划、自动都会计入总览。", en: "Manual, plan, and auto logs are all included.", de: "Manuell, Plan und Auto sind enthalten."))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
                 Text(feedTaskState.todayMainFoodGrams > 0 ? formattedFoodWeight(feedTaskState.todayMainFoodGrams) : "--")
@@ -62,20 +58,34 @@ extension QuickFeedDetailContent {
     func overviewRangePicker(tint: Color) -> some View {
         HStack(spacing: 8) {
             ForEach(FeedOverviewRange.allCases) { range in
+                let isLocked = range == .days90 && !appServices.commerce.allows(.extendedTrends)
                 Button {
+                    guard !isLocked else {
+                        personalUpgradePrompt = PersonalUpgradePrompt(feature: .extendedTrends)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        return
+                    }
                     withAnimation(GoMotion.feedback) {
                         draftStore.overviewRange = range
                     }
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
-                    Text(range.title(l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    HStack(spacing: 4) {
+                        Text(range.title(l))
+                        if isLocked {
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                        }
+                    }
+                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
                         .foregroundStyle(draftStore.overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
                         .background(draftStore.overviewRange == range ? tint : tint.opacity(0.10), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityHint(isLocked
+                    ? l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Ohana Personal erforderlich")
+                    : "")
             }
         }
         .padding(5)
@@ -236,9 +246,9 @@ extension QuickFeedDetailContent {
                         .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
-                        zh: "按次数看节奏，没填克数也算",
-                        en: "Frequency rhythm; no-gram logs count",
-                        de: "Rhythmus nach Anzahl; ohne Gramm zählt"
+                        zh: "按记录次数",
+                        en: "By log count",
+                        de: "Nach Eintragszahl"
                     ))
                     .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaSecondaryText)

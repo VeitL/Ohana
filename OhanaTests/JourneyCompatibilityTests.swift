@@ -81,7 +81,7 @@ struct JourneyCompatibilityTests {
     }
 
     private func makeContainer() throws -> ModelContainer {
-        let schema = Schema(ArkSchemaV91.models)
+        let schema = Schema(ArkSchemaV94.models)
         let configuration = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         return try ModelContainer(for: schema, configurations: [configuration])
     }

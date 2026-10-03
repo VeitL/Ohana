@@ -8,7 +8,7 @@ import Foundation
 import SwiftData
 
 /// 报告类型
-enum HealthReportType: String, Codable, CaseIterable, Identifiable {
+nonisolated enum HealthReportType: String, Codable, CaseIterable, Identifiable, Sendable {
     case bloodTest = "血液检测"
     case urineTest = "尿液检测"
     case physical = "全身体检"
@@ -51,7 +51,7 @@ enum HealthReportType: String, Codable, CaseIterable, Identifiable {
 }
 
 /// 报告结论等级
-enum ReportConclusion: String, Codable, CaseIterable, Identifiable {
+nonisolated enum ReportConclusion: String, Codable, CaseIterable, Identifiable, Sendable {
     case normal = "正常"
     case attention = "注意"
     case abnormal = "异常"
@@ -69,6 +69,12 @@ enum ReportConclusion: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+/// 报告的本地创建来源。扫描仅描述录入方式，不代表结果经过医疗审核。
+nonisolated enum HumanHealthReportCaptureSource: String, Codable, CaseIterable, Sendable {
+    case manual
+    case documentScan
+}
+
 /// 身体检测报告
 @Model
 final class HumanHealthReport {
@@ -84,10 +90,13 @@ final class HumanHealthReport {
     var notes: String
     /// 本次报告由哪位本地家庭成员录入；与报告所属成员分离，可空以兼容旧数据。
     var recordedByHumanId: String?
+    /// 本地录入来源；旧数据与常规表单默认为手工录入。
+    var captureSourceRaw: String = HumanHealthReportCaptureSource.manual.rawValue
     var colorHex: String
     var createdAt: Date
 
     init(
+        id: UUID = UUID(),
         humanId: String,
         reportType: HealthReportType = .physical,
         conclusion: ReportConclusion = .normal,
@@ -98,9 +107,10 @@ final class HumanHealthReport {
         summary: String = "",
         notes: String = "",
         recordedByHumanId: String? = nil,
+        captureSource: HumanHealthReportCaptureSource = .manual,
         colorHex: String = "00D4AA"
     ) {
-        self.id = UUID()
+        self.id = id
         self.humanId = humanId
         self.reportTypeRaw = reportType.rawValue
         self.conclusionRaw = conclusion.rawValue
@@ -111,6 +121,7 @@ final class HumanHealthReport {
         self.summary = summary
         self.notes = notes
         self.recordedByHumanId = recordedByHumanId
+        self.captureSourceRaw = captureSource.rawValue
         self.colorHex = colorHex
         self.createdAt = Date()
     }
@@ -123,6 +134,11 @@ final class HumanHealthReport {
     var conclusion: ReportConclusion {
         get { ReportConclusion(rawValue: conclusionRaw) ?? .normal }
         set { conclusionRaw = newValue.rawValue }
+    }
+
+    var captureSource: HumanHealthReportCaptureSource {
+        get { HumanHealthReportCaptureSource(rawValue: captureSourceRaw) ?? .manual }
+        set { captureSourceRaw = newValue.rawValue }
     }
 
     var daysUntilNextCheck: Int? {

@@ -165,6 +165,7 @@ TOMBSTONE_HINT_RE = re.compile(
 ENUM_DELETE_CASE_RE = re.compile(r"^\s*case\s+(?:let\s+)?\.delete\b")
 DELEGATED_DELETE_BOUNDARY_RE = re.compile(
     r"\b(?:FamilyTaskService|familyTasks)\.delete\s*\("
+    r"|\bPlantCareHistoryCommandService\.delete\s*\("
     r"|\b[A-Za-z_][A-Za-z0-9_]*CommandExecutor\s*\([^)]*\)\.delete\s*\(",
 )
 

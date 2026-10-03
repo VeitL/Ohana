@@ -116,10 +116,7 @@ struct AutomaticBackupServiceTests {
         let (suiteName, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
         let store = AutomaticBackupStatusStore(defaults: defaults)
-        let exporter = try FakeAutomaticBackupExporter(
-            data: Data("{\"schemaVersion\":1}".utf8),
-            delayNanoseconds: 50_000_000
-        )
+        let exporter = try PausingAutomaticBackupExporter(data: Data("{\"schemaVersion\":1}".utf8))
         let fileStore = FakeAutomaticBackupFileStore()
         let service = AutomaticBackupService(
             statusStore: store,
@@ -132,8 +129,13 @@ struct AutomaticBackupServiceTests {
         let first = Task { @MainActor in
             await service.runNow(container: container, trigger: .settingsManual)
         }
-        await Task.yield()
+        defer {
+            first.cancel()
+            exporter.release()
+        }
+        await exporter.waitUntilStarted()
         let second = await service.runNow(container: container, trigger: .settingsManual)
+        exporter.release()
         _ = await first.value
 
         #expect(second == .skipped(.alreadyRunning))
@@ -159,11 +161,16 @@ struct AutomaticBackupServiceTests {
         let context = container.mainContext
         context.insert(Pet(name: "Miso"))
         try context.save()
+        var didPrepareRuntimeForReset = false
+        var didFinishRuntimeAfterReset = false
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
             defaults: defaults,
-            deletePersistentData: scopedPetDeletion(in: context)
+            deletePersistentData: scopedPetDeletion(in: context),
+            systemSurfaceSnapshotSanitizer: {},
+            prepareRuntimeForReset: { didPrepareRuntimeForReset = true },
+            finishRuntimeAfterReset: { didFinishRuntimeAfterReset = true }
         )
 
         let oldRun = Task { @MainActor in
@@ -177,6 +184,8 @@ struct AutomaticBackupServiceTests {
         )
 
         #expect(resetResult.automaticBackupCleanup == .removed)
+        #expect(didPrepareRuntimeForReset)
+        #expect(didFinishRuntimeAfterReset)
         #expect(try context.fetch(FetchDescriptor<Pet>()).isEmpty)
         #expect(fileStore.cleanupCount == 1)
         #expect(fileStore.writeCount == 0)
@@ -201,6 +210,50 @@ struct AutomaticBackupServiceTests {
         #expect(statusStore.snapshot(now: now).lastSuccessAt == now)
     }
 
+    @Test func persistentResetFailureReleasesFenceAndRefreshesExistingProjection() async throws {
+        let (suiteName, defaults) = try isolatedDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let statusStore = AutomaticBackupStatusStore(defaults: defaults)
+        let service = AutomaticBackupService(
+            statusStore: statusStore,
+            exporter: try FakeAutomaticBackupExporter(data: Data("{}".utf8)),
+            fileStore: FakeAutomaticBackupFileStore(),
+            now: { Date(timeIntervalSince1970: 1_800_000_000) }
+        )
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        context.insert(Pet(name: "Keep"))
+        try context.save()
+        var didPrepareRuntimeForReset = false
+        var didFinishRuntimeAfterReset = false
+        var didRecoverRuntimeAfterFailure = false
+        let resetter = StaticAppResetter(
+            questManager: QuestManager(),
+            automaticBackups: service,
+            defaults: defaults,
+            deletePersistentData: { _ in throw CocoaError(.fileWriteUnknown) },
+            systemSurfaceSnapshotSanitizer: {},
+            prepareRuntimeForReset: { didPrepareRuntimeForReset = true },
+            finishRuntimeAfterReset: { didFinishRuntimeAfterReset = true },
+            recoverRuntimeAfterFailedReset: { didRecoverRuntimeAfterFailure = true }
+        )
+        var options = resetOptions()
+        options.cleanUpAutomaticBackups = false
+
+        var didThrow = false
+        do {
+            _ = try await resetter.reset(context: context, options: options)
+        } catch {
+            didThrow = true
+        }
+
+        #expect(didThrow)
+        #expect(didPrepareRuntimeForReset)
+        #expect(didFinishRuntimeAfterReset)
+        #expect(didRecoverRuntimeAfterFailure)
+        #expect(try context.fetch(FetchDescriptor<Pet>()).count == 1)
+    }
+
     @Test func resetWaitsForAnInFlightManagedWriteThenRemovesItsFileAndStatus() async throws {
         let (suiteName, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: suiteName) }
@@ -218,24 +271,28 @@ struct AutomaticBackupServiceTests {
         let context = container.mainContext
         context.insert(Pet(name: "Miso"))
         try context.save()
+        var didStartReset = false
         let resetter = StaticAppResetter(
             questManager: QuestManager(),
             automaticBackups: service,
             defaults: defaults,
-            deletePersistentData: scopedPetDeletion(in: context)
+            deletePersistentData: scopedPetDeletion(in: context),
+            systemSurfaceSnapshotSanitizer: {},
+            prepareRuntimeForReset: { didStartReset = true }
         )
 
         let oldRun = Task { @MainActor in
             await service.runNow(container: container, trigger: .settingsManual)
         }
         await fileStore.waitUntilWriteStarted()
+        defer { fileStore.releaseWrite() }
         let reset = Task { @MainActor in
             try await resetter.reset(context: context, options: resetOptions())
         }
 
-        for _ in 0 ..< 5 {
-            await Task.yield()
-        }
+        // The reset has entered its write fence. A zero cleanup count before
+        // the reset even starts would not prove that it waits for the writer.
+        try #require(await TestObservation.wait { didStartReset })
         #expect(fileStore.cleanupCount == 0)
         #expect(!(try context.fetch(FetchDescriptor<Pet>())).isEmpty)
 
@@ -275,7 +332,8 @@ struct AutomaticBackupServiceTests {
             questManager: QuestManager(),
             automaticBackups: service,
             defaults: defaults,
-            deletePersistentData: scopedPetDeletion(in: context)
+            deletePersistentData: scopedPetDeletion(in: context),
+            systemSurfaceSnapshotSanitizer: {}
         )
 
         let result = try await resetter.reset(context: context, options: resetOptions())

@@ -125,7 +125,7 @@ struct OhanaGrowthOnboardingOverlay: View {
                         ? localized(zh: "开始", en: "Start", de: "Start")
                         : localized(zh: "下一步", en: "Next", de: "Weiter"))
                         .font(OhanaFont.callout(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity, minHeight: 44)
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -292,7 +292,7 @@ struct GrowthUnlockFlowTestView: View {
                 Spacer()
                 Text("Lv.\(simulatedLevel)")
                     .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(Color.goPrimary, in: Capsule())
@@ -312,7 +312,7 @@ struct GrowthUnlockFlowTestView: View {
                         systemImage: "arrow.up.circle.fill"
                     )
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.goPrimary, in: Capsule())
                 }
@@ -411,7 +411,7 @@ struct GrowthUnlockFlowTestView: View {
 
                 Text("Lv.\(openedRecommendationStep.requiredLevel)")
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
                     .background(Color.goPrimary, in: Capsule())
@@ -501,11 +501,12 @@ struct GrowthUnlockFlowTestView: View {
             ("每日照护", "sun.max.fill", .featureGroup(.dailyCare)),
             ("健康", "cross.fill", .featureGroup(.healthBody)),
             ("成长档案", "folder.fill", .featureGroup(.archiveMemory)),
-            ("家庭事务", "house.fill", .featureGroup(.householdHub)),
+            ("家庭洞察", "house.fill", .featureGroup(.householdHub)),
             ("Oasis 收益", "tree.fill", .wealthDashboard),
             ("椰子商店", "bag.fill", .coconutShop),
             ("扭蛋机", "circle.grid.cross.fill", .gacha),
-            ("家庭周报", "chart.bar.doc.horizontal", .familyWeeklyReport)
+            ("家庭周报", "chart.bar.doc.horizontal", .familyWeeklyReport),
+            ("长期回顾", "book.closed.fill", .familyLongTermReview)
         ]
         if PlantFeatureGate.allows(.plants) {
             destinations.insert(("植物", "leaf.fill", .plantsDashboard), at: 5)

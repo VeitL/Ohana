@@ -89,9 +89,9 @@ struct BountyBoardContentView: View {
                             } else if selectedTab == 0 {
                                 if activeTasks.isEmpty {
                                     emptyState(message: l.tr(
-                                        zh: "还没有悬赏任务\n发布第一个任务，让家人来完成吧！",
-                                        en: "No bounty tasks yet\nPost the first one for your family.",
-                                        de: "Noch keine Aufgaben\nErstelle die erste Familienaufgabe."
+                                        zh: "暂无悬赏任务",
+                                        en: "No bounty tasks",
+                                        de: "Keine Prämienaufgaben"
                                     ))
                                 } else {
                                     ForEach(activeTasks) { task in
@@ -245,11 +245,11 @@ struct BountyBoardContentView: View {
 
     private func tabButton(label: String, idx: Int) -> some View {
         Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { selectedTab = idx } // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+            selectedTab = idx
         } label: {
             Text(label)
                 .font(OhanaFont.subheadline(.bold))
-                .foregroundStyle(selectedTab == idx ? Color.arkInk : secondaryText)
+                .foregroundStyle(selectedTab == idx ? Color.ohanaPrimaryActionText : secondaryText)
                 .padding(.horizontal, 14).padding(.vertical, 7)
                 .background(
                     selectedTab == idx ? Color.goPrimary : Color.primary.opacity(colorScheme == .dark ? 0.1 : 0.08),
@@ -370,7 +370,7 @@ struct BountyBoardContentView: View {
                                 Text(l.tr(zh: "完成", en: "Done", de: "Erledigt"))
                                     .font(OhanaFont.caption(.bold))
                             }
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .background(Color.goPrimary, in: Capsule())
                         }
@@ -554,9 +554,9 @@ struct BountyBoardContentView: View {
 
             if total == 0 {
                 emptyState(message: l.tr(
-                    zh: "本周还没有打卡记录\n快去主页给宠物打卡吧！",
-                    en: "No check-ins this week\nLog care from Home to fill this report.",
-                    de: "Diese Woche noch keine Einträge\nErfasse Pflege auf der Startseite."
+                    zh: "本周暂无打卡",
+                    en: "No check-ins this week",
+                    de: "Diese Woche keine Einträge"
                 ))
             } else {
                 VStack(spacing: 10) {

@@ -208,7 +208,7 @@ extension TodayFocusCard {
     var carouselSwitchAnimation: Animation? {
         guard !freezesToFrontCard, !reduceMotion else { return nil }
         guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else { return nil }
-        return .interactiveSpring(response: 0.42, dampingFraction: 0.86, blendDuration: 0.12)
+        return GoMotion.selection
     }
 
     func carouselItemOffset(relative: Int, width: CGFloat) -> CGFloat {

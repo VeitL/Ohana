@@ -71,6 +71,7 @@ struct QuickWaterDetailSheet: View {
     @State var selectedSharedWaterPetIds: Set<UUID> = []
     @State var selectedActionHumanID: UUID?
     @State var requiresActionHumanSelection = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @Namespace var waterModeSelectionNamespace
     typealias ActiveSheet = QuickWaterActiveSheet
     init(
@@ -154,7 +155,8 @@ struct QuickWaterDetailSheet: View {
             careEvents: appServices.careEvents,
             userNotifications: appServices.userNotifications,
             reminderScheduling: appServices.reminderScheduling,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -269,6 +271,9 @@ struct QuickWaterDetailSheet: View {
                 }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
+            }
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
         }
@@ -303,6 +308,11 @@ struct QuickWaterDetailSheet: View {
         .onChange(of: waterEntriesRevisionKey) { _, _ in
             scheduleWaterSnapshotRefresh()
         }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+            if !isEntitled, overviewRange == .days90 {
+                overviewRange = .days30
+            }
+        }
         .onChange(of: activeSheet?.id) { _, _ in
             adaptiveSheetHeight = activeSheet?.inlineHeight ?? 430
             inlineSheetDragOffset = 0
@@ -322,6 +332,9 @@ struct QuickWaterDetailSheet: View {
             }
         }
         .onDisappear {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan detailDisappeared isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+            #endif
             waterSnapshotRefreshTask?.cancel()
             waterModeTransitionTask?.cancel()
             waterModeMaintenanceTask?.cancel()
@@ -476,6 +489,9 @@ struct QuickWaterDetailSheet: View {
     }
 
     func closeActiveWaterSheet() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan closeSheet sheet=\(activeSheet?.id ?? "nil") returns=\(waterSheetReturnStack.count)")
+        #endif
         if nestedInlineSheet != nil {
             nestedInlineSheet = nil
             return
@@ -773,6 +789,11 @@ struct QuickWaterDetailSheet: View {
             secondaryIdentifier: "quick-water-filter-manage-action"
         )
     }
+}
+
+// MARK: - Recent Activity and Copy
+
+extension QuickWaterDetailSheet {
 
     var recentStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -812,7 +833,7 @@ struct QuickWaterDetailSheet: View {
     var toastView: some View {
         Text(saveToastMessage)
             .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())

@@ -63,25 +63,19 @@ struct PetFeatureCollectionView: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
-                        summaryPanel
-
                         if showsSharedCareActions {
                             FeatureHubSectionActionView(section: sharedCareActionSection) { destination in
                                 parentPath.append(destination)
                             }
                         }
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            featureCardsHeader
-
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(items) { item in
-                                    PetFeatureCollectionCard(
-                                        item: item,
-                                        summary: cardSummary(for: item.feature)
-                                    ) {
-                                        parentPath.append(FMDest.featureAggregate(item.feature))
-                                    }
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(items) { item in
+                                PetFeatureCollectionCard(
+                                    item: item,
+                                    summary: cardSummary(for: item.feature)
+                                ) {
+                                    parentPath.append(FMDest.featureAggregate(item.feature))
                                 }
                             }
                         }
@@ -102,9 +96,9 @@ struct PetFeatureCollectionView: View {
             id: "pet-shared-care-actions",
             title: l.tr(zh: "多宠物动作", en: "Multi-Pet Actions", de: "Mehrere Tiere"),
             subtitle: l.tr(
-                zh: "这里是执行共同打卡的入口，和下面的统计卡分开",
-                en: "Use this for shared check-ins; statistics stay below",
-                de: "Gemeinsame Einträge hier, Auswertungen darunter"
+                zh: "共同打卡", en: "Shared check-in", de: "Gemeinsamer Check-in",
+                es: "Check-in compartido", pt: "Check-in compartilhado", fr: "Check-in partagé",
+                ja: "一緒にチェックイン", ko: "함께 체크인", it: "Check-in condiviso"
             ),
             items: [
                 FeatureHubDestinationItem(
@@ -115,56 +109,25 @@ struct PetFeatureCollectionView: View {
         )
     }
 
-    private var featureCardsHeader: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(l.tr(zh: "功能数据", en: "Feature Data", de: "Funktionsdaten"))
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(l.tr(
-                zh: "点击卡片查看所有宠物的统计与比较",
-                en: "Open aggregate statistics and comparisons for all pets",
-                de: "Statistiken und Vergleiche für alle Tiere öffnen"
-            ))
-            .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .lineLimit(3)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
-    private var summaryPanel: some View {
-        FeatureHubSummaryPanel(
-            title: l.tr(zh: "家庭宠物摘要", en: "Pet Summary", de: "Tierübersicht"),
-            statusText: summaryPanelStatusText,
-            statusTint: summary.healthSignalCount > 0 ? Color.goYellow : Color.goTeal,
-            metrics: [
-                FeatureHubMetric(id: "pets", title: l.tr(zh: "活跃宠物", en: "Active pets", de: "Aktive Tiere"), value: "\(summary.activePetCount)"),
-                FeatureHubMetric(id: "today", title: l.tr(zh: "今日记录", en: "Today logs", de: "Heute"), value: "\(summary.todayFoodLogs + summary.todayPottyLogs + summary.todayWalkCount)"),
-                FeatureHubMetric(id: "expense", title: l.tr(zh: "本月花费", en: "This month", de: "Diesen Monat"), value: expenseAmountText),
-                FeatureHubMetric(id: "archive", title: l.tr(zh: "成长档案", en: "Archive", de: "Archiv"), value: "\(summary.archiveItemCount)")
-            ]
-        )
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("pet-feature-collection-summary")
-    }
-
-    private var summaryPanelStatusText: String {
-        summary.healthSignalCount > 0
-            ? l.tr(zh: "\(summary.healthSignalCount) 项需关注", en: "\(summary.healthSignalCount) signals", de: "\(summary.healthSignalCount) Signale")
-            : l.tr(zh: "状态稳定", en: "Steady", de: "Stabil")
-    }
-
     private var sharedCheckInActionData: FeatureHubTileData {
         FeatureHubTileData(
             id: "pet-shared-check-in",
-            title: l.tr(zh: "多宠物打卡", en: "Multi-Pet Check-in", de: "Mehrere Tiere"),
+            title: l.tr(
+                zh: "多宠物打卡", en: "Multi-Pet Check-in", de: "Mehrere Tiere",
+                es: "Check-in de varias mascotas", pt: "Check-in de vários pets", fr: "Check-in multi-animaux",
+                ja: "複数ペットのチェックイン", ko: "여러 반려동물 체크인", it: "Check-in multi-animale"
+            ),
             value: "\(summary.activePetCount)",
             subtitle: l.tr(
-                zh: "共同喂食、喂水、猫砂等动作入口",
-                en: "Shared feeding, water, litter and care actions",
-                de: "Gemeinsame Futter-, Wasser- und Streuaktionen"
+                zh: "喂食 · 喂水 · 猫砂",
+                en: "Food · Water · Litter",
+                de: "Futter · Wasser · Streu",
+                es: "Comida · Agua · Arena",
+                pt: "Comida · Água · Areia",
+                fr: "Repas · Eau · Litière",
+                ja: "食事 · 水 · トイレ",
+                ko: "식사 · 물 · 배변",
+                it: "Cibo · Acqua · Lettiera"
             ),
             icon: "checklist.checked",
             tint: Color.goPrimary,
@@ -191,22 +154,15 @@ struct PetFeatureCollectionView: View {
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame.
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(l.tr(
-                    zh: "\(summary.activePetCount) 只宠物 · 聚合数据",
-                    en: "\(summary.activePetCount) pets · aggregate data",
-                    de: "\(summary.activePetCount) Tiere · Gesamtdaten"
-                ))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(l.tr(
+                zh: "宠物功能", en: "Pet Features", de: "Tierfunktionen",
+                es: "Funciones de mascotas", pt: "Funcionalidades dos pets", fr: "Fonctions des animaux",
+                ja: "ペットの機能", ko: "반려동물 기능", it: "Funzioni degli animali"
+            ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            }
 
             Spacer(minLength: 54)
         }
@@ -215,17 +171,22 @@ struct PetFeatureCollectionView: View {
         .padding(.bottom, 6)
     }
 
+    private var foodCoverageText: String {
+        let covered = "\(summary.todayFoodPetCount)/\(max(summary.activePetCount, 1))"
+        return l.tr(
+            zh: "覆盖 \(covered)", en: "Covered \(covered)", de: "Versorgt \(covered)",
+            es: "Cobertura \(covered)", pt: "Cobertura \(covered)", fr: "Couverture \(covered)",
+            ja: "記録済み \(covered)", ko: "기록 \(covered)", it: "Copertura \(covered)"
+        )
+    }
+
     private func cardSummary(for feature: PetFeature) -> PetFeatureCardSummary {
         switch feature {
         case .food:
             PetFeatureCardSummary(
                 value: "\(summary.todayFoodLogs)",
                 label: l.tr(zh: "今日记录", en: "today logs", de: "heute"),
-                detail: l.tr(
-                    zh: "覆盖 \(summary.todayFoodPetCount)/\(max(summary.activePetCount, 1)) 只宠物",
-                    en: "\(summary.todayFoodPetCount)/\(max(summary.activePetCount, 1)) pets covered",
-                    de: "\(summary.todayFoodPetCount)/\(max(summary.activePetCount, 1)) Tiere versorgt"
-                ),
+                detail: foodCoverageText,
                 caption: l.tr(zh: "饮食聚合", en: "Food aggregate", de: "Futterübersicht"),
                 chart: FeatureHubMiniChartData(
                     points: FeatureHubChartPointFactory.bars(
@@ -239,7 +200,7 @@ struct PetFeatureCollectionView: View {
             PetFeatureCardSummary(
                 value: "\(summary.hygieneLogsLast7Days)",
                 label: l.tr(zh: "近 7 天", en: "last 7 days", de: "7 Tage"),
-                detail: l.tr(zh: "清洁与护理记录", en: "hygiene and care logs", de: "Pflegeeinträge"),
+                detail: l.tr(zh: "近 7 天", en: "Last 7 days", de: "7 Tage"),
                 caption: l.tr(zh: "护理节奏", en: "Care rhythm", de: "Pflegerhythmus"),
                 chart: FeatureHubMiniChartData(
                     points: FeatureHubChartPointFactory.quietPlaceholder(
@@ -267,7 +228,7 @@ struct PetFeatureCollectionView: View {
             PetFeatureCardSummary(
                 value: "\(summary.todayPottyLogs)",
                 label: l.tr(zh: "今日记录", en: "today logs", de: "heute"),
-                detail: l.tr(zh: "便便与猫砂相关记录", en: "potty and litter logs", de: "Toilette und Streu"),
+                detail: l.tr(zh: "今天", en: "Today", de: "Heute"),
                 caption: l.tr(zh: "排便观察", en: "Potty signals", de: "Toiletten-Signale"),
                 chart: FeatureHubMiniChartData(
                     points: FeatureHubChartPointFactory.bars(
@@ -439,7 +400,7 @@ private struct PetFeatureCollectionCard: View {
                     id: item.id,
                     title: item.title,
                     value: summary.value,
-                    subtitle: "\(summary.label) · \(summary.detail)",
+                    subtitle: summary.detail,
                     icon: item.icon,
                     tint: summary.tint,
                     chart: summary.chart

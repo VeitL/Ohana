@@ -52,7 +52,12 @@ enum PlantBackupRestoreReconcileService {
                 scheduleNotifications: scheduleNotifications,
                 notifications: notifications,
                 defaults: defaults,
-                saveChanges: saveChanges
+                saveChanges: saveChanges,
+                // Restore already owns the committed notification dependency.
+                // Keep this synchronous and side-effect-only: the registered
+                // structured pipeline writes scheduling ledger facts and may
+                // outlive the restore context through its async dispatcher.
+                useRegisteredReminderScheduling: false
             )
             guard result.didPersist else {
                 throw DataBackupRestorePersistenceError.persistenceFailed(result.persistenceErrorDescription)

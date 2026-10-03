@@ -64,7 +64,7 @@ extension PlantDetailContentView {
                 } label: {
                     Text(PlantCareType.pestCheck.displayName(l: l))
                         .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(minHeight: 44)
@@ -218,20 +218,25 @@ extension PlantDetailContentView {
             }
 
             HStack(spacing: 10) {
-                if isRenderDataReady {
-                    ShareLink(item: growthDiaryMarkdown) { // smoothness: allow cached render-data export string prepared after visual handoff
+                Button {
+                    prepareGrowthDiaryExport()
+                } label: {
+                    ZStack {
                         growthDiaryExportButtonLabel
+                            .opacity(isPreparingGrowthDiaryExport ? 0 : 1)
+                        if isPreparingGrowthDiaryExport {
+                            ProgressView()
+                                .tint(Color.ohanaPrimaryActionText)
+                                .frame(minWidth: 44, minHeight: 44)
+                        }
                     }
-                    .accessibilityLabel(l.tr(zh: "导出\(plant.name)成长档案", en: "Export \(plant.name)'s growth diary", de: "Wachstumstagebuch von \(plant.name) exportieren"))
-                    .accessibilityIdentifier("plant-detail-growth-diary-export")
-                } else {
-                    Button {} label: {
-                        growthDiaryExportButtonLabel
-                    }
-                    .disabled(true)
-                    .accessibilityLabel(l.tr(zh: "\(plant.name)成长档案准备中", en: "\(plant.name)'s growth diary is preparing", de: "Wachstumstagebuch von \(plant.name) wird vorbereitet"))
-                    .accessibilityIdentifier("plant-detail-growth-diary-export-loading")
                 }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(isPreparingGrowthDiaryExport)
+                .accessibilityLabel(isPreparingGrowthDiaryExport
+                    ? l.tr(zh: "正在准备\(plant.name)成长档案", en: "Preparing \(plant.name)'s growth diary", de: "Wachstumstagebuch von \(plant.name) wird vorbereitet")
+                    : l.tr(zh: "导出\(plant.name)成长档案", en: "Export \(plant.name)'s growth diary", de: "Wachstumstagebuch von \(plant.name) exportieren"))
+                .accessibilityIdentifier("plant-detail-growth-diary-export")
 
                 if !photos.isEmpty {
                     Button {
@@ -303,10 +308,38 @@ extension PlantDetailContentView {
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .frame(minHeight: 44)
         .padding(.horizontal, 12)
         .background(Color.goPrimary, in: Capsule())
+    }
+
+    func prepareGrowthDiaryExport() {
+        guard !isPreparingGrowthDiaryExport else { return }
+        isPreparingGrowthDiaryExport = true
+        growthDiaryExportTask?.cancel()
+        growthDiaryExportTask = Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
+            guard !Task.isCancelled else {
+                isPreparingGrowthDiaryExport = false
+                growthDiaryExportTask = nil
+                return
+            }
+            let markdown = appServices.plantGrowthDiaryExports.markdown(
+                for: plant,
+                exportedAt: Date(),
+                includePhotoPlaceholders: true,
+                languageCode: appLanguage
+            )
+            guard !Task.isCancelled else {
+                isPreparingGrowthDiaryExport = false
+                growthDiaryExportTask = nil
+                return
+            }
+            growthDiaryShareItem = PlantGrowthDiaryShareItem(markdown: markdown)
+            isPreparingGrowthDiaryExport = false
+            growthDiaryExportTask = nil
+        }
     }
 
     var emptyPhotoGalleryHint: some View {

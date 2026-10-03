@@ -54,11 +54,11 @@ extension OasisRewardView {
     // MARK: - 打卡工具函数
 
     var currentStreak: Int {
-        CheckInStreakStore.currentStreak(for: currentActiveHumanId)
+        0
     }
 
     var longestStreak: Int {
-        CheckInStreakStore.longestStreak(for: currentActiveHumanId)
+        0
     }
 
     var monthCheckInRate: Int {

@@ -95,9 +95,6 @@ struct PetBondVaultContentView: View {
             )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(l.tr(zh: "宠物小金库", en: "Bond Vault", de: "Bindungs-Tresor"))
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
                 Text(pet.name)
                     .font(OhanaFont.title2(.black))
                     .foregroundStyle(Color.ohanaPrimaryText)
@@ -136,28 +133,12 @@ struct PetBondVaultContentView: View {
                     .font(OhanaFont.callout(.black))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
-
-            Text(l.tr(
-                zh: "只属于 \(pet.name)：用于宠物外观、成长故事和纪念装饰，不能兑换现金或转给他人。",
-                en: "Only for \(pet.name): pet cosmetics, growth stories, and memorial decor. It cannot be cashed out or transferred to others.",
-                de: "Nur für \(pet.name): Haustierdesigns, Wachstumsgeschichten und Erinnerungsdeko. Nicht auszahlbar oder übertragbar."
-            ))
-            .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
     private var unlockGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(
-                l.tr(zh: "解锁与投喂", en: "Unlocks & Treats", de: "Freischaltungen & Snacks"),
-                subtitle: l.tr(
-                    zh: "消耗该宠物自己的成长椰子",
-                    en: "Uses this pet's own bond balance",
-                    de: "Nutzt nur das eigene Haustierguthaben"
-                )
-            )
+            sectionTitle(l.tr(zh: "解锁与投喂", en: "Unlocks & Treats", de: "Freischaltungen & Snacks"))
 
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
                 ForEach(PetBondVaultCatalog.items) { item in
@@ -242,13 +223,10 @@ struct PetBondVaultContentView: View {
 
     private var recentLogs: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionTitle(
-                l.tr(zh: "最近获得", en: "Recent", de: "Zuletzt"),
-                subtitle: l.tr(zh: "只显示 \(pet.name) 的成长椰子流水", en: "Only \(pet.name)'s bond coconut activity", de: "Nur \(pet.name)s Bindungskokos-Verlauf")
-            )
+            sectionTitle(l.tr(zh: "最近获得", en: "Recent", de: "Zuletzt"))
 
             if petLogs.isEmpty {
-                Text(l.tr(zh: "还没有成长椰子记录。完成喂食、喂水、陪玩或健康护理后会出现在这里。", en: "No bond coconut activity yet. Feeding, watering, play, and health care will appear here.", de: "Noch keine Einträge. Füttern, Wasser, Spielen und Gesundheitspflege erscheinen hier."))
+                Text(l.noRecords)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .padding(14)
@@ -300,15 +278,10 @@ struct PetBondVaultContentView: View {
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
 
-    private func sectionTitle(_ title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(title)
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Text(subtitle)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-        }
+    private func sectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(OhanaFont.headline(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
     }
 
     private func actionTitle(for item: PetBondVaultItem, unlocked: Bool, balance: Int, isFrozen: Bool) -> String {
@@ -407,8 +380,7 @@ private struct PetBondVaultPreviewOverlay: View {
                         .fixedSize(horizontal: false, vertical: true)
 
                     Button(l.tr(zh: "看好了", en: "Looks good", de: "Sieht gut aus"), action: close)
-                        .buttonStyle(.borderedProminent)
-                        .tint(Color.goPrimary)
+                        .ohanaPrimaryProminentButton()
                         .controlSize(.large)
                 }
                 .padding(20)

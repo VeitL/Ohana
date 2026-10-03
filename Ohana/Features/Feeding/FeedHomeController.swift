@@ -11,8 +11,8 @@ import os
 import SwiftUI
 
 struct FeedHomeTaskViewState {
-    let manualPlanEvents: [Event]
-    let autoFeederEvents: [Event]
+    let manualPlanEvents: [QuickFeedPlanRenderEvent]
+    let autoFeederEvents: [QuickFeedPlanRenderEvent]
     let todayMainFoodGrams: Double
     let todayAutoFeedCount: Int
     let hasNextManualReminder: Bool

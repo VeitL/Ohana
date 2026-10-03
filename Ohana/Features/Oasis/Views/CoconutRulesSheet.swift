@@ -10,9 +10,11 @@ import SwiftUI
 struct CoconutRulesSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @AppStorage(AppExperienceMode.storageKey) private var experienceModeRaw = AppExperienceMode.standard.rawValue
     @State private var appeared = false
 
     private var l: L10n { L10n(appLanguage) }
+    private var isZenMode: Bool { experienceModeRaw == AppExperienceMode.zen.rawValue }
 
     private var treeInjectionRewardText: String {
         let cost = OasisTreeEnergyInjectionPolicy.starterPackageCost
@@ -34,7 +36,46 @@ struct CoconutRulesSheet: View {
     }
 
     private var earnCards: [RuleCard] {
-        [
+        if isZenMode {
+            return [
+                RuleCard(
+                    icon: "checkmark.circle.fill",
+                    title: l.tr(zh: "本人每日确认", en: "Daily owner check-in", de: "Täglicher Besitzer-Check-in"),
+                    desc: l.tr(zh: "每天首次明确确认；撤销后不重复奖励", en: "First explicit confirmation each day; undo never repeats it", de: "Erste ausdrückliche Bestätigung pro Tag; Rückgängig wiederholt sie nicht"),
+                    glowColor: Color.goPrimary,
+                    reward: l.tr(zh: "+1🥥 · +6养分", en: "+1🥥 · +6 nutrients", de: "+1🥥 · +6 Nährstoffe")
+                ),
+                RuleCard(
+                    icon: "face.smiling.inverse",
+                    title: l.tr(zh: "首次今日状态", en: "First daily status", de: "Erster Tagesstatus"),
+                    desc: l.tr(zh: "当天第一次明确记录状态；之后编辑不重复奖励", en: "First explicit status of the day; later edits do not repeat it", de: "Erster ausdrücklicher Status des Tages; spätere Änderungen wiederholen ihn nicht"),
+                    glowColor: Color(hex: "14B8A6"),
+                    reward: l.tr(zh: "+1🥥 · +2养分", en: "+1🥥 · +2 nutrients", de: "+1🥥 · +2 Nährstoffe")
+                ),
+                RuleCard(
+                    icon: "flame.fill",
+                    title: l.tr(zh: "连续确认里程碑", en: "Check-in milestones", de: "Check-in-Meilensteine"),
+                    desc: l.tr(zh: "3/7/14/30/60/100/365 天", en: "3/7/14/30/60/100/365 days", de: "3/7/14/30/60/100/365 Tage"),
+                    glowColor: Color(hex: "FB7185"),
+                    reward: l.tr(zh: "特殊椰子奖励 · 不加养分", en: "Special coconuts · no nutrients", de: "Sonder-Kokosnüsse · keine Nährstoffe")
+                ),
+                RuleCard(
+                    icon: "trophy.fill",
+                    title: l.tr(zh: "成就徽章", en: "Achievement badges", de: "Erfolgsabzeichen"),
+                    desc: l.tr(zh: "达到共享等级后手动领取", en: "Claim after reaching the shared level", de: "Nach Erreichen der gemeinsamen Stufe abholen"),
+                    glowColor: Color(hex: "FACC15"),
+                    reward: l.tr(zh: "10🥥/徽章 · 一次性", en: "10🥥/badge · one-time", de: "10🥥/Abzeichen · einmalig")
+                ),
+                RuleCard(
+                    icon: "tree.fill",
+                    title: l.tr(zh: "每日掉落", en: "Daily drop", de: "Täglicher Drop"),
+                    desc: l.tr(zh: "Lv.5 起在完整 Oasis 领取", en: "Claim in the full Oasis from Lv.5", de: "Ab Lv.5 in der vollständigen Oasis abholen"),
+                    glowColor: Color(hex: "84CC16"),
+                    reward: l.tr(zh: "共享被动收益", en: "Shared passive income", de: "Gemeinsamer passiver Ertrag")
+                )
+            ]
+        }
+        return [
             RuleCard(
                 icon: "figure.walk",
                 title: l.tr(zh: "遛狗", en: "Dog walk", de: "Gassi"),
@@ -127,7 +168,7 @@ struct CoconutRulesSheet: View {
     }
 
     private var spendCards: [RuleCard] {
-        [
+        let cards = [
             RuleCard(
                 icon: "bolt.fill",
                 title: l.tr(zh: "注入生命之树", en: "Inject energy", de: "Energie geben"),
@@ -157,6 +198,7 @@ struct CoconutRulesSheet: View {
                 reward: l.tr(zh: "本机统计", en: "Local recap", de: "Lokale Übersicht")
             )
         ]
+        return isZenMode ? Array(cards.dropLast()) : cards
     }
 
     var body: some View {
@@ -168,12 +210,8 @@ struct CoconutRulesSheet: View {
                     VStack(alignment: .leading, spacing: 24) {
                         bentoCategoryHeader(
                             icon: "leaf.fill",
-                            title: l.tr(zh: "赚取椰子", en: "Earn coconuts", de: "Kokosnüsse verdienen"),
-                            subtitle: l.tr(
-                                zh: "打卡越多，岛屿越繁荣",
-                                en: "More care logs grow the island.",
-                                de: "Mehr Pflegeeinträge stärken die Insel."
-                            )
+                            title: earningSectionTitle,
+                            subtitle: earningSectionSubtitle
                         )
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                             ForEach(Array(earnCards.enumerated()), id: \.element.id) { index, card in
@@ -198,28 +236,30 @@ struct CoconutRulesSheet: View {
 
                         bentoCategoryHeader(
                             icon: "person.2.fill",
-                            title: l.tr(zh: "双账本系统", en: "Two-ledger system", de: "Zwei-Konten-System"),
-                            subtitle: l.tr(
-                                zh: "人宠各有账户，共同建设岛屿",
-                                en: "People and pets contribute together.",
-                                de: "Menschen und Tiere bauen gemeinsam."
-                            )
+                            title: ledgerSectionTitle,
+                            subtitle: ledgerSectionSubtitle
                         )
                         VStack(spacing: 10) {
-                            doubleAccountRow(
-                                icon: "pawprint.fill",
-                                title: l.tr(zh: "宠物账户", en: "Pet ledger", de: "Tier-Konto"),
-                                desc: l.tr(zh: "记录宠物自己赚取的椰子", en: "Tracks coconuts earned by pets.", de: "Erfasst Kokosnüsse der Tiere.")
-                            )
+                            if !isZenMode {
+                                doubleAccountRow(
+                                    icon: "pawprint.fill",
+                                    title: l.tr(zh: "宠物账户", en: "Pet ledger", de: "Tier-Konto"),
+                                    desc: l.tr(zh: "记录宠物自己赚取的椰子", en: "Tracks coconuts earned by pets.", de: "Erfasst Kokosnüsse der Tiere.")
+                                )
+                            }
                             doubleAccountRow(
                                 icon: "person.fill",
                                 title: l.tr(zh: "主人账户", en: "Human ledger", de: "Menschen-Konto"),
-                                desc: l.tr(zh: "记录协助打卡的人类获得的椰子", en: "Tracks coconuts earned by caregivers.", de: "Erfasst Kokosnüsse der Betreuenden.")
+                                desc: isZenMode
+                                    ? l.tr(zh: "Zen 的每日椰子进入本人账户", en: "Zen daily coconuts enter the owner account.", de: "Tägliche Zen-Kokosnüsse gehen auf das Besitzerkonto.")
+                                    : l.tr(zh: "记录协助打卡的人类获得的椰子", en: "Tracks coconuts earned by caregivers.", de: "Erfasst Kokosnüsse der Betreuenden.")
                             )
                             doubleAccountRow(
                                 icon: "chart.pie.fill",
                                 title: l.tr(zh: "全岛总库", en: "Island total", de: "Insel-Summe"),
-                                desc: l.tr(zh: "统计全家椰子流动", en: "Summarizes family coconut flow.", de: "Fasst die Kokosnuss-Bewegung zusammen.")
+                                desc: isZenMode
+                                    ? l.tr(zh: "两种模式共享椰子余额、树等级与奖励", en: "Both modes share balances, tree levels, and rewards.", de: "Beide Modi teilen Guthaben, Baumstufen und Belohnungen.")
+                                    : l.tr(zh: "统计全家椰子流动", en: "Summarizes family coconut flow.", de: "Fasst die Kokosnuss-Bewegung zusammen.")
                             )
                         }
                         .padding(14)
@@ -228,25 +268,6 @@ struct CoconutRulesSheet: View {
                             RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                                 .strokeBorder(Color.ohanaPrimaryText.opacity(0.08), lineWidth: 1)
                         )
-
-                        HStack {
-                            Spacer()
-                            VStack(spacing: 6) {
-                                Image(systemName: "lightbulb.fill").accessibilityHidden(true)
-                                    .font(OhanaFont.adaptive(size: 24, weight: .black))
-                                    .foregroundStyle(Color.goPrimary)
-                                Text(l.tr(
-                                    zh: "真实照护获得成长 XP；椰子用于外观、玩法和轻度加速。",
-                                    en: "Real care earns Growth XP; coconuts power cosmetics, play, and light boosts.",
-                                    de: "Echte Pflege bringt Growth XP; Kokosnüsse treiben Kosmetik, Spiel und leichte Boosts an."
-                                ))
-                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
-                                .multilineTextAlignment(.center)
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, 16)
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
@@ -272,6 +293,30 @@ struct CoconutRulesSheet: View {
         .onAppear {
             withAnimation(GoMotion.page) { appeared = true }
         }
+    }
+
+    private var earningSectionTitle: String {
+        isZenMode
+            ? l.tr(zh: "Zen 每日奖励", en: "Zen daily rewards", de: "Tägliche Zen-Belohnungen")
+            : l.tr(zh: "赚取椰子", en: "Earn coconuts", de: "Kokosnüsse verdienen")
+    }
+
+    private var earningSectionSubtitle: String {
+        isZenMode
+            ? l.tr(zh: "每天最多 2🥥 与 8 点自然养分", en: "Up to 2🥥 and 8 natural nutrients each day.", de: "Bis zu 2🥥 und 8 natürliche Nährstoffe pro Tag.")
+            : l.tr(zh: "打卡越多，岛屿越繁荣", en: "More care logs grow the island.", de: "Mehr Pflegeeinträge stärken die Insel.")
+    }
+
+    private var ledgerSectionTitle: String {
+        isZenMode
+            ? l.tr(zh: "共享 Oasis 账本", en: "Shared Oasis ledger", de: "Gemeinsames Oasis-Konto")
+            : l.tr(zh: "双账本系统", en: "Two-ledger system", de: "Zwei-Konten-System")
+    }
+
+    private var ledgerSectionSubtitle: String {
+        isZenMode
+            ? l.tr(zh: "切换模式不会重置成长或资产", en: "Switching modes never resets growth or assets.", de: "Ein Moduswechsel setzt Wachstum oder Werte nie zurück.")
+            : l.tr(zh: "人宠各有账户，共同建设岛屿", en: "People and pets contribute together.", de: "Menschen und Tiere bauen gemeinsam.")
     }
 
     @ViewBuilder

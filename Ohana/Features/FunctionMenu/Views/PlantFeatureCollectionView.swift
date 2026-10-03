@@ -43,25 +43,18 @@ struct PlantFeatureCollectionView: View {
 
             VStack(spacing: 0) {
                 pageHeader
-                commandCenterPanel
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 12) {
                         batchActionPanel
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            featureCardsHeader
-
-                            LazyVGrid(columns: columns, spacing: 12) {
-                                ForEach(items) { item in
-                                    PlantFeatureCollectionCard(
-                                        item: item,
-                                        summary: cardSummary(for: item.id)
-                                    ) {
-                                        parentPath.append(item.destination)
-                                    }
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(items) { item in
+                                PlantFeatureCollectionCard(
+                                    item: item,
+                                    summary: cardSummary(for: item.id)
+                                ) {
+                                    parentPath.append(item.destination)
                                 }
                             }
                         }
@@ -88,9 +81,9 @@ struct PlantFeatureCollectionView: View {
             id: "plant-care-actions",
             title: l.tr(zh: "多植物动作", en: "Multi-Plant Actions", de: "Mehrere Pflanzen"),
             subtitle: l.tr(
-                zh: "这里负责批量执行；下面的卡片负责统计、比较和资料入口",
-                en: "Batch actions live here; statistics and profiles stay below",
-                de: "Sammelaktionen hier, Statistiken und Profile darunter"
+                zh: "批量护理", en: "Batch care", de: "Sammelpflege",
+                es: "Cuidado por lotes", pt: "Cuidados em lote", fr: "Entretien groupé",
+                ja: "まとめてケア", ko: "일괄 관리", it: "Cura in gruppo"
             ),
             items: [
                 FeatureHubDestinationItem(
@@ -105,34 +98,21 @@ struct PlantFeatureCollectionView: View {
         )
     }
 
-    private var featureCardsHeader: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(l.tr(zh: "功能数据", en: "Feature Data", de: "Funktionsdaten"))
-                .font(OhanaFont.headline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(l.tr(
-                zh: "点击卡片进入植物护理分类、成长记录或管理视图",
-                en: "Open care categories, growth records or plant management",
-                de: "Pflegekategorien, Wachstum oder Verwaltung öffnen"
-            ))
-            .font(OhanaFont.caption(.semibold))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .lineLimit(3)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
     private var dueCareActionData: FeatureHubTileData {
         FeatureHubTileData(
             id: "plant-due-care-action",
             title: l.tr(zh: "完成到期护理", en: "Complete Due Care", de: "Fällige Pflege"),
             value: "\(summary.dueTaskCount)",
             subtitle: l.tr(
-                zh: "按到期任务批量浇水、施肥和养护",
-                en: "Batch complete due watering, nutrition and care",
-                de: "Fälliges Gießen, Düngen und Pflege bündeln"
+                zh: "浇水 · 施肥 · 养护",
+                en: "Water · Feed · Care",
+                de: "Gießen · Düngen · Pflege",
+                es: "Riego · Abono · Cuidado",
+                pt: "Rega · Adubo · Cuidados",
+                fr: "Arrosage · Engrais · Entretien",
+                ja: "水やり · 施肥 · お手入れ",
+                ko: "물주기 · 비료 · 관리",
+                it: "Acqua · Concime · Cura"
             ),
             icon: "checkmark.circle.fill",
             tint: summary.dueTaskCount > 0 ? Color.goYellow : Color.goTeal,
@@ -157,9 +137,15 @@ struct PlantFeatureCollectionView: View {
             title: l.tr(zh: "多选快速记录", en: "Multi-Select Log", de: "Mehrfach erfassen"),
             value: "\(summary.plantCount)",
             subtitle: l.tr(
-                zh: "给多株植物一次记录浇水、喷雾、修剪等",
-                en: "Log water, mist, prune and more for multiple plants",
-                de: "Gießen, Besprühen, Schneiden für mehrere Pflanzen"
+                zh: "浇水 · 喷雾 · 修剪",
+                en: "Water · Mist · Prune",
+                de: "Gießen · Sprühen · Schneiden",
+                es: "Riego · Pulverización · Poda",
+                pt: "Rega · Borrifar · Podar",
+                fr: "Arroser · Vaporiser · Tailler",
+                ja: "水やり · 葉水 · 剪定",
+                ko: "물주기 · 분무 · 가지치기",
+                it: "Acqua · Nebulizza · Pota"
             ),
             icon: "checklist.checked",
             tint: Color.goPrimary,
@@ -185,22 +171,15 @@ struct PlantFeatureCollectionView: View {
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame.
                 .accessibilityHidden(true)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "植物全部功能", en: "All Plant Features", de: "Alle Pflanzenfunktionen"))
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(l.tr(
-                    zh: "\(summary.plantCount) 株植物 · 聚合入口",
-                    en: "\(summary.plantCount) plants · aggregate tools",
-                    de: "\(summary.plantCount) Pflanzen · Gesamtansicht"
-                ))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(l.tr(
+                zh: "植物功能", en: "Plant Features", de: "Pflanzenfunktionen",
+                es: "Funciones de plantas", pt: "Funcionalidades de plantas", fr: "Fonctions des plantes",
+                ja: "植物の機能", ko: "식물 기능", it: "Funzioni delle piante"
+            ))
+                .font(OhanaFont.title2(.black))
+                .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
-            }
 
             Spacer(minLength: 54)
         }
@@ -209,157 +188,12 @@ struct PlantFeatureCollectionView: View {
         .padding(.bottom, 6)
     }
 
-    private var commandCenterPanel: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    commandCenterTitle
-                    Spacer(minLength: 8)
-                    commandCenterStatus
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    commandCenterTitle
-                    commandCenterStatus
-                }
-            }
-
-            LazyVGrid(columns: commandCenterMetricColumns, alignment: .leading, spacing: 8) {
-                commandCenterMetric(
-                    icon: "leaf.fill",
-                    title: l.tr(zh: "植物", en: "Plants", de: "Pflanzen"),
-                    value: "\(summary.plantCount)",
-                    tint: Color.goTeal
-                )
-                commandCenterMetric(
-                    icon: "checkmark.circle.fill",
-                    title: l.tr(zh: "今日照护", en: "Today care", de: "Heute"),
-                    value: "\(summary.dueTaskCount)",
-                    tint: summary.dueTaskCount > 0 ? Color.goYellow : Color.goTeal
-                )
-                commandCenterMetric(
-                    icon: "house.fill",
-                    title: l.tr(zh: "位置", en: "Rooms", de: "Orte"),
-                    value: "\(summary.roomCount)",
-                    tint: Color.ohanaFunctionalIcon
-                )
-                commandCenterMetric(
-                    icon: "bell.badge.fill",
-                    title: l.tr(zh: "系统提醒", en: "Alerts", de: "Hinweise"),
-                    value: "\(summary.systemReminderEnabledCount)",
-                    tint: Color.goPrimary
-                )
-            }
-
-            LazyVGrid(columns: commandCenterPillColumns, alignment: .leading, spacing: 8) {
-                commandCenterMiniPill(
-                    icon: "drop.fill",
-                    text: l.tr(zh: "待水分 \(summary.wateringDueCount)", en: "\(summary.wateringDueCount) water", de: "\(summary.wateringDueCount) Wasser"),
-                    tint: Color.goTeal
-                )
-                commandCenterMiniPill(
-                    icon: "leaf.fill",
-                    text: l.tr(zh: "待营养 \(summary.fertilizingDueCount)", en: "\(summary.fertilizingDueCount) nutrition", de: "\(summary.fertilizingDueCount) Nährstoff"),
-                    tint: Color.goPrimary
-                )
-                commandCenterMiniPill(
-                    icon: "exclamationmark.triangle.fill",
-                    text: l.tr(zh: "关注 \(summary.healthSignalCount)", en: "\(summary.healthSignalCount) signals", de: "\(summary.healthSignalCount) Signale"),
-                    tint: summary.healthSignalCount > 0 ? Color.goYellow : Color.goTeal
-                )
-            }
-        }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("plant-feature-collection-command-center")
-    }
-
-    private var commandCenterMetricColumns: [GridItem] {
-        if dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible(), spacing: 8, alignment: .top)]
-        }
-        return [GridItem(.adaptive(minimum: 128), spacing: 8, alignment: .top)]
-    }
-
-    private var commandCenterPillColumns: [GridItem] {
-        if dynamicTypeSize.isAccessibilitySize {
-            return [GridItem(.flexible(), spacing: 8, alignment: .top)]
-        }
-        return [GridItem(.adaptive(minimum: 112), spacing: 8, alignment: .top)]
-    }
-
-    private var commandCenterTitle: some View {
-        Text(l.tr(zh: "植物中枢", en: "Plant hub", de: "Pflanzenzentrale"))
-            .font(OhanaFont.callout(.black))
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var commandCenterStatus: some View {
-        Text(commandCenterStatusText)
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(summary.dueTaskCount > 0 ? Color.goYellow : Color.goTeal)
-            .lineLimit(2)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var commandCenterStatusText: String {
-        if summary.dueTaskCount > 0 {
-            return l.tr(
-                zh: "\(summary.duePlantCount) 株待处理",
-                en: "\(summary.duePlantCount) plants due",
-                de: "\(summary.duePlantCount) Pflanzen fällig"
-            )
-        }
-        return l.tr(zh: "今天稳定", en: "Steady today", de: "Heute stabil")
-    }
-
-    private func commandCenterMetric(icon: String, title: String, value: String, tint: Color) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
-                .foregroundStyle(tint)
-                .frame(width: 24, height: 24) // a11y: allow non-interactive metric glyph; parent card owns the accessible content.
-                .background(tint.opacity(0.13), in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(title)
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(value)
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .contentTransition(.numericText())
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(Color.ohanaControlFill.opacity(0.72), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-    }
-
-    private func commandCenterMiniPill(icon: String, text: String, tint: Color) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
-                .foregroundStyle(tint)
-                .accessibilityHidden(true)
-            Text(text)
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 7)
-        .background(tint.opacity(0.11), in: Capsule())
+    private var dueCareCoverageText: String {
+        l.tr(
+            zh: "需护理：\(summary.duePlantCount)", en: "Need care: \(summary.duePlantCount)", de: "Pflege nötig: \(summary.duePlantCount)",
+            es: "Necesitan cuidado: \(summary.duePlantCount)", pt: "Precisam de cuidado: \(summary.duePlantCount)", fr: "À entretenir : \(summary.duePlantCount)",
+            ja: "要ケア：\(summary.duePlantCount)", ko: "관리 필요: \(summary.duePlantCount)", it: "Da curare: \(summary.duePlantCount)"
+        )
     }
 
     private func cardSummary(for id: String) -> PlantFeatureCardSummary {
@@ -368,11 +202,7 @@ struct PlantFeatureCollectionView: View {
             PlantFeatureCardSummary(
                 value: "\(summary.dueTaskCount)",
                 label: l.tr(zh: "今日待处理", en: "due today", de: "heute fällig"),
-                detail: l.tr(
-                    zh: "覆盖 \(summary.duePlantCount) 株植物",
-                    en: "\(summary.duePlantCount) plants need care",
-                    de: "\(summary.duePlantCount) Pflanzen brauchen Pflege"
-                ),
+                detail: dueCareCoverageText,
                 caption: l.tr(zh: "批量浇水 / 施肥", en: "Batch water and fertilize", de: "Gießen und düngen"),
                 chart: FeatureHubMiniChartData(
                     points: FeatureHubChartPointFactory.bars(
@@ -486,15 +316,27 @@ struct PlantFeatureCollectionView: View {
     private var roomSummaryText: String {
         if summary.healthSignalCount > 0 {
             return l.tr(
-                zh: "\(summary.roomCount) 个位置 · \(summary.healthSignalCount) 条需关注",
-                en: "\(summary.roomCount) rooms · \(summary.healthSignalCount) signals",
-                de: "\(summary.roomCount) Räume · \(summary.healthSignalCount) Signale"
+                zh: "位置 \(summary.roomCount) · 关注 \(summary.healthSignalCount)",
+                en: "Locations \(summary.roomCount) · Attention \(summary.healthSignalCount)",
+                de: "Orte \(summary.roomCount) · Hinweise \(summary.healthSignalCount)",
+                es: "Ubicaciones \(summary.roomCount) · Atención \(summary.healthSignalCount)",
+                pt: "Locais \(summary.roomCount) · Atenção \(summary.healthSignalCount)",
+                fr: "Emplacements \(summary.roomCount) · Alertes \(summary.healthSignalCount)",
+                ja: "場所 \(summary.roomCount) · 要確認 \(summary.healthSignalCount)",
+                ko: "위치 \(summary.roomCount) · 확인 \(summary.healthSignalCount)",
+                it: "Posizioni \(summary.roomCount) · Avvisi \(summary.healthSignalCount)"
             )
         }
         return l.tr(
-            zh: "\(summary.roomCount) 个位置 · 暂无异常",
-            en: "\(summary.roomCount) rooms · no issues",
-            de: "\(summary.roomCount) Räume · keine Auffälligkeiten"
+            zh: "位置 \(summary.roomCount) · 正常",
+            en: "Locations \(summary.roomCount) · Clear",
+            de: "Orte \(summary.roomCount) · Unauffällig",
+            es: "Ubicaciones \(summary.roomCount) · Sin alertas",
+            pt: "Locais \(summary.roomCount) · Sem alertas",
+            fr: "Emplacements \(summary.roomCount) · RAS",
+            ja: "場所 \(summary.roomCount) · 問題なし",
+            ko: "위치 \(summary.roomCount) · 이상 없음",
+            it: "Posizioni \(summary.roomCount) · Tutto bene"
         )
     }
 
@@ -587,7 +429,7 @@ private struct PlantFeatureCollectionCard: View {
                     id: item.id,
                     title: item.title,
                     value: summary.value,
-                    subtitle: "\(summary.label) · \(summary.detail)",
+                    subtitle: summary.detail,
                     icon: item.icon,
                     tint: summary.tint,
                     chart: summary.chart

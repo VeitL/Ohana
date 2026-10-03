@@ -6,6 +6,41 @@
 import Foundation
 import SwiftData
 
+@MainActor
+private enum HumanMedicationCommandOwnership {
+    static func owns(_ medication: HumanMedication, human: Human) -> Bool {
+        normalizedUUID(medication.humanId) == human.id
+    }
+
+    static func owns(
+        medicationID: UUID,
+        human: Human,
+        context: ModelContext
+    ) -> Bool {
+        let id = medicationID
+        var descriptor = FetchDescriptor<HumanMedication>(
+            predicate: #Predicate<HumanMedication> { medication in
+                medication.id == id
+            }
+        )
+        descriptor.fetchLimit = 1
+        do {
+            guard let medication = try context.fetch(descriptor).first else { return false }
+            return owns(medication, human: human)
+        } catch {
+            OhanaLog.warning(
+                "HumanMedicationCommandOwnership failed to resolve medication owner: \(error.localizedDescription)",
+                category: "Care"
+            )
+            return false
+        }
+    }
+
+    private static func normalizedUUID(_ raw: String) -> UUID? {
+        UUID(uuidString: raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+}
+
 enum HumanMedicationPlanCommandService {
     @discardableResult
     @MainActor
@@ -18,6 +53,9 @@ enum HumanMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> HumanMedicationPlanCommandResult? {
         guard !input.cleanName.isEmpty else { return nil }
+        guard existingMedication.map({ HumanMedicationCommandOwnership.owns($0, human: human) }) ?? true else {
+            return nil
+        }
         guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: input.startDate,
@@ -118,7 +156,8 @@ enum HumanMedicationPlanCommandService {
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> HumanMedicationPlanDeleteCommandResult {
         let medicationID = medication.id
-        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+        guard HumanMedicationCommandOwnership.owns(medication, human: human),
+              let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: Date(),
             writeKind: .care,
@@ -195,7 +234,8 @@ enum HumanMedicationPlanCommandService {
         scheduleReminders: Bool = true,
         medicationReminders providedMedicationReminders: MedicationReminderManaging? = nil
     ) -> HumanMedicationPlanActivationCommandResult {
-        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+        guard HumanMedicationCommandOwnership.owns(medication, human: human),
+              let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: Date(),
             writeKind: .care,
@@ -425,9 +465,10 @@ enum HumanMedicationPlanCommandService {
 
     @MainActor
     private static func fetchHumanMedications(humanID: String, context: ModelContext) -> [HumanMedication] {
+        let humanIDLower = humanID.lowercased()
         let descriptor = FetchDescriptor<HumanMedication>(
             predicate: #Predicate<HumanMedication> { medication in
-                medication.humanId == humanID
+                medication.humanId == humanID || medication.humanId == humanIDLower
             },
             sortBy: [SortDescriptor(\HumanMedication.createdAt)]
         )
@@ -499,7 +540,12 @@ enum HumanMedicationDoseCommandService {
         careLedger providedCareLedger: CareLedgerRecording? = nil
     ) -> HumanMedicationDoseCommandResult {
         let careLedger = providedCareLedger ?? CareLedgerService()
-        guard let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
+        guard HumanMedicationCommandOwnership.owns(
+            medicationID: medicationID,
+            human: human,
+            context: context
+        ),
+              let write = DomainMemberFactWriteAuthorizer.authorizeHumanFact(
             human: human,
             occurredAt: now,
             writeKind: .care,

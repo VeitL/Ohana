@@ -4,6 +4,28 @@ import Testing
 
 @MainActor
 struct HomeSurfaceInvalidationTests {
+    @Test func coveredReadyHomeRetainsAnUnfinishedRefresh() {
+        #expect(HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+            snapshotIsReady: true, refreshIsPending: true, wasPending: false
+        ))
+        #expect(!HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+            snapshotIsReady: true, refreshIsPending: false, wasPending: false
+        ))
+    }
+
+    #if DEBUG
+    @Test func committedDeveloperWalletAdjustmentInvalidatesTheHomeBalance() {
+        let center = ReadModelRevisionCenter()
+        let publisher = SharedDomainRevisionPublisher(center: center)
+        publisher.publishSettingsCoconutBalance(
+            SettingsCoconutBalanceCommandResult(humanID: UUID(), amount: 5000, legacyDelta: 5000, didApply: true),
+            note: "test.debug.balance"
+        )
+        #expect(center.homeSurfaceInvalidation.domains.contains(.economy))
+        #expect(center.homeSurfaceInvalidation.requiresFullRefresh)
+    }
+    #endif
+
     @Test func careMutationPublishesAggregateHomeTokenWithDomainAndEntities() {
         let center = ReadModelRevisionCenter()
         let petID = UUID()
@@ -112,6 +134,57 @@ struct HomeSurfaceInvalidationTests {
             HomeSurfaceRefreshPolicy.allowsReadModelRefresh(
                 isHomeSurfaceVisible: true,
                 isRuntimeRefreshAllowed: true
+            )
+        )
+    }
+
+    @Test func visibleInitialSnapshotRemainsAvailableWhenRoutineRefreshIsPaused() {
+        let policy = AppWorkloadPolicy()
+
+        #expect(policy.allowsEssentialInitialSnapshotRead(isVisible: true, isLive: true, hasSnapshot: false))
+        #expect(!policy.allowsEssentialInitialSnapshotRead(isVisible: false, isLive: true, hasSnapshot: false))
+        #expect(!policy.allowsEssentialInitialSnapshotRead(isVisible: true, isLive: false, hasSnapshot: false))
+        #expect(!policy.allowsEssentialInitialSnapshotRead(isVisible: true, isLive: true, hasSnapshot: true))
+    }
+
+    @Test func suspendingAnUnresolvedHomeSnapshotRetainsAForcedRefresh() {
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: false,
+                wasPending: false
+            )
+        )
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: true,
+                wasPending: true
+            )
+        )
+        #expect(
+            !HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuspension(
+                snapshotIsReady: true,
+                wasPending: false
+            )
+        )
+    }
+
+    @Test func suppressedRefreshRequestAlwaysQueuesAForcedRefreshForResume() {
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuppressedRequest(
+                requestWasSuppressed: true,
+                wasPending: false
+            )
+        )
+        #expect(
+            HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuppressedRequest(
+                requestWasSuppressed: true,
+                wasPending: true
+            )
+        )
+        #expect(
+            !HomeSurfaceRefreshPolicy.pendingForcedRefreshAfterSuppressedRequest(
+                requestWasSuppressed: false,
+                wasPending: false
             )
         )
     }

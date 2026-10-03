@@ -189,7 +189,7 @@ struct FamilyWeeklyReportDashboardContentView: View {
     private var shareButtonLabel: some View {
         Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color.goPrimary, in: Capsule())
@@ -257,10 +257,6 @@ struct FamilyWeeklyReportDashboardContentView: View {
                 Text(storyHeadline)
                     .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(storyBody)
-                    .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineSpacing(3)
             }
 
             LazyVGrid(columns: reportPillColumns, alignment: .leading, spacing: 8) {
@@ -535,13 +531,13 @@ struct FamilyWeeklyReportDashboardContentView: View {
             Image(systemName: "checkmark.seal.fill") // a11y: allow decorative contribution badge; row text carries the accessible meaning
                 .accessibilityHidden(true)
                 .font(OhanaFont.adaptive(size: 12, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary, in: Circle())
         } else {
             Text("\(index + 1)")
                 .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(index == 0 ? Color.ohanaPrimaryActionText : Color.arkInk)
                 .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(index == 0 ? Color.goPrimary : Color.primary.opacity(0.08), in: Circle())
         }

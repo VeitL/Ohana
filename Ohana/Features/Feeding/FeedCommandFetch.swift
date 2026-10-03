@@ -31,12 +31,12 @@ enum FeedCommandFetch {
         let descriptor = FetchDescriptor<Event>(
             sortBy: [SortDescriptor(\Event.startDate)]
         )
-        return fetchOrLog(
+        return QuickFeedModelReadability.readableEvents(fetchOrLog(
             descriptor,
             context: context,
-            fallback: fallback,
+            fallback: QuickFeedModelReadability.readableEvents(fallback),
             operation: "fetch latest events"
-        )
+        ))
     }
 
     @MainActor

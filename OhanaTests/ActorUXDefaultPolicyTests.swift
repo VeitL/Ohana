@@ -44,7 +44,7 @@ struct ActorUXDefaultPolicyTests {
         #expect(FamilyTaskRewardDraftPolicy.effectiveReward(isEnabled: true, draftReward: 50) == 50)
     }
 
-    @Test func expensePayerAndRewardEditorKeepAdvancedChoicesScoped() throws {
+    @Test func expensePayerStaysSelectableAndRewardEditorKeepsAdvancedChoicesScoped() throws {
         let rootURL = repositoryRootURL()
         let expense = try source(
             "Ohana/Features/Expenses/Views/AddExpenseSheet.swift",
@@ -69,10 +69,19 @@ struct ActorUXDefaultPolicyTests {
 
         #expect(expense.contains("var activeExpenseHumans: [Human]"))
         #expect(expense.contains("humans.filter { !$0.hasPassedAway }"))
-        #expect(expenseSections.contains("if activeExpenseHumans.count > 1"))
+        #expect(expense.contains("@State var selectedPayerIDs: [String] = []"))
+        #expect(expense.contains("payerContributionsForSave"))
+        #expect(expenseSections.contains("if !activeExpenseHumans.isEmpty"))
+        #expect(!expenseSections.contains("if activeExpenseHumans.count > 1"))
         #expect(expenseSections.contains("ForEach(activeExpenseHumans)"))
+        #expect(expenseSections.contains("payerContributionRow(human)"))
+        #expect(expenseSections.contains("expense-payer-equal-split-action"))
         #expect(expenseLogic.contains("guard !activeExpenseHumans.isEmpty"))
+        #expect(expenseLogic.contains("activeExpenseHumans.count > 1"))
+        #expect(expenseLogic.contains("resetPayerAmountsToEqual()"))
+        #expect(expenseLogic.contains("ExpensePayerContributionPolicy.equalSplit"))
         #expect(expenseCommands.contains("activeExpenseHumans.contains"))
+        #expect(expenseCommands.contains("payerContributions: payerContributions"))
 
         #expect(taskEditor.contains("@State private var includesReward: Bool"))
         #expect(taskEditor.contains("Toggle(isOn: $includesReward)"))
@@ -80,6 +89,36 @@ struct ActorUXDefaultPolicyTests {
         #expect(taskEditor.contains("reward = 0"))
         #expect(taskEditor.contains("effectiveReward"))
         #expect(!taskEditor.contains("Without a reward, the task finishes"))
+    }
+
+    @Test func expenseCreationIsPetSubjectOnlyWhileHumanPayerHistoryStaysReadOnly() throws {
+        let rootURL = repositoryRootURL()
+        let commands = try source(
+            "Ohana/Features/Expenses/ExpenseCommands.swift",
+            rootURL: rootURL
+        )
+        let humanExpenseDetail = try source(
+            "Ohana/Features/Expenses/Views/HumanExpenseDetailView.swift",
+            rootURL: rootURL
+        )
+        let humanRouteContainer = try source(
+            "Ohana/Features/Members/HumanDetailSheetRouteContainer.swift",
+            rootURL: rootURL
+        )
+        let humanQuickDefaults = try source(
+            "Ohana/Features/Home/ExpandedQuickActionDefaults.swift",
+            rootURL: rootURL
+        )
+        let humanQuickStore = try source(
+            "Ohana/Features/Home/ExpandedQuickActionStore.swift",
+            rootURL: rootURL
+        )
+
+        #expect(commands.contains("throw ExpenseSubjectPolicyError.humanSubjectNotSupported"))
+        #expect(!humanExpenseDetail.contains("QuickHumanExpenseSheet("))
+        #expect(!humanRouteContainer.contains("QuickHumanExpenseSheet("))
+        #expect(!humanQuickDefaults.contains("actionType: \"humanExpense\""))
+        #expect(humanQuickStore.contains("$0.actionType != \"humanExpense\""))
     }
 
     private func makeHuman(

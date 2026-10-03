@@ -94,7 +94,7 @@ enum Avatar2DAccess {
     private static let freeHumanUsedKey = "avatar2d_free_human_used"
     private static let freePetUsedKey = "avatar2d_free_pet_used"
     static let extraPassInventoryKey = "inventory_avatar2d_extra_count"
-    static let shopItemId = "boost_avatar2d_extra"
+    nonisolated static let shopItemId = "boost_avatar2d_extra"
 
     static func hasAccess(kind: Kind, existingCount: Int) -> Bool {
         freeSlotAvailable(kind: kind, existingCount: existingCount) || extraPassCount > 0
@@ -115,26 +115,20 @@ enum Avatar2DAccess {
         }
 
         let passes = extraPassCount
-        if passes > 0 {
-            UserDefaults.standard.set(passes - 1, forKey: extraPassInventoryKey)
-        }
+        if passes > 0 { _ = ShopInventoryStateStore.consumeAvatar2DPass() }
     }
 
     static func addExtraPasses(_ count: Int) {
-        guard count > 0 else { return }
-        UserDefaults.standard.set(extraPassCount + count, forKey: extraPassInventoryKey)
+        ShopInventoryStateStore.addAvatar2DPasses(count)
     }
 
     @discardableResult
     static func consumeExtraPass() -> Bool {
-        let passes = extraPassCount
-        guard passes > 0 else { return false }
-        UserDefaults.standard.set(passes - 1, forKey: extraPassInventoryKey)
-        return true
+        ShopInventoryStateStore.consumeAvatar2DPass()
     }
 
     static var extraPassCount: Int {
-        UserDefaults.standard.integer(forKey: extraPassInventoryKey)
+        ShopInventoryStateStore.snapshot().avatar2DExtraPassCount
     }
 
     private static func freeSlotAvailable(kind _: Kind, existingCount: Int) -> Bool {

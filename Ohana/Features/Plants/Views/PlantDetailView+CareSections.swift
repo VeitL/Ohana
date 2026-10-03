@@ -182,7 +182,7 @@ extension PlantDetailContentView {
             } label: {
                 Image(systemName: "arrow.right") // a11y: allow decorative arrow; button label names the destination.
                     .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)
@@ -206,7 +206,7 @@ extension PlantDetailContentView {
                 HStack(spacing: 10) {
                     Image(systemName: careSymbol(for: task.careType)) // a11y: allow decorative care glyph inside labeled row button.
                         .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 44, height: 44)
                         .background(careTint(for: task.careType), in: Circle())
                         .accessibilityHidden(true)
@@ -290,7 +290,7 @@ extension PlantDetailContentView {
             HStack(spacing: 10) {
                 Image(systemName: careSymbol(for: draft.careType)) // a11y: allow decorative quick-care glyph; card text names the care type.
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(careTint(for: draft.careType), in: Circle())
                     .accessibilityHidden(true)
@@ -334,7 +334,7 @@ extension PlantDetailContentView {
                 } label: {
                     Label(l.tr(zh: "快速记录", en: "Quick log", de: "Schnell erfassen"), systemImage: "bolt.fill")
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                         .frame(maxWidth: .infinity, minHeight: 44)
@@ -546,14 +546,6 @@ extension PlantDetailContentView {
     var carePlanInsightCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             detailHeader(icon: "slider.horizontal.3", title: l.tr(zh: "计划依据", en: "Plan reasoning", de: "Planlogik"))
-            Text(l.tr(
-                zh: "Ohana 会把资料库、环境、历史记录和健康状态合并成当前护理节奏。",
-                en: "Ohana combines catalog, environment, history, and health to shape the current cadence.",
-                de: "Ohana kombiniert Katalog, Umgebung, Verlauf und Zustand zum aktuellen Rhythmus."
-            ))
-            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            .fixedSize(horizontal: false, vertical: true)
 
             VStack(spacing: 10) {
                 ForEach(carePlanInsights.prefix(4)) { insight in
@@ -566,7 +558,7 @@ extension PlantDetailContentView {
             } label: {
                 Text(l.tr(zh: "调整植物档案", en: "Adjust plant profile", de: "Pflanzenprofil anpassen"))
                     .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
                     .frame(minHeight: 44)
@@ -774,23 +766,6 @@ extension PlantDetailContentView {
             ].compactMap(\.self).joined(separator: " · ")
             if !typeSummary.isEmpty {
                 detailRow(l.tr(zh: "类型", en: "Type", de: "Typ"), value: typeSummary)
-            }
-            if plant.potDiameterCm == 0,
-               plant.potMaterial.isEmpty,
-               plant.soilType.isEmpty,
-               plant.currentHeightCm == 0,
-               plant.currentSpreadCm == 0,
-               plant.acquiredDate == nil,
-               plant.acquisitionSource.isEmpty,
-               typeSummary.isEmpty {
-                Text(l.tr(
-                    zh: "还没有补充盆土、尺寸和来源信息。完善后，护理计划会更像一份真正的植物档案。",
-                    en: "Potting, size, and source details are still empty. Completing them makes this feel like a real plant profile.",
-                    de: "Topf-, Größen- und Herkunftsdetails fehlen noch. Mit ihnen wirkt das Profil wie eine echte Pflanzenakte."
-                ))
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .padding(16)

@@ -23,6 +23,7 @@ extension QuickFeedDetailContent {
 
         draftStore.inputError = nil
         draftStore.isSavingFeedPlan = true
+        runtimeState.resetPendingFeedRefresh()
         feedPlanSaveTask?.cancel()
         collapseEmbeddedPanel()
         closeActiveFeedSheet()
@@ -43,24 +44,44 @@ extension QuickFeedDetailContent {
                         allEvents: sourceEvents
                     )
                 }
-                runtimeState.latestAllEventsOverride = result.events
+                guard result.didChange,
+                      result.targetCount > 0,
+                      result.affectedPetIDs.contains(pet.id),
+                      result.mode == targetMode,
+                      FeedOperatingMode.resolved(
+                          pet: pet,
+                          allEvents: result.events,
+                          now: clockTick
+                      ) == targetMode
+                else {
+                    throw FeedCommandPersistenceError.persistenceFailed(nil)
+                }
+                runtimeState.installSuccessfulRuleWrite(
+                    events: result.events,
+                    affectedPetIDs: result.affectedPetIDs,
+                    mode: result.mode
+                )
+                performFeedModeUpdatesWithoutAnimation {
+                    feedHomeController.setModeImmediately(result.mode, pet: pet)
+                }
 
                 if kind == .manualReminder {
                     scheduleReminders(result.planReminders)
                 }
                 scheduleStockReminders(result.stockReminders)
-                var refreshRequest: QuickFeedRefreshRequest = [
-                    .reloadSnapshots,
-                    .syncDisplayedMode,
-                    .forceDisplayedMode
-                ]
+                var refreshRequest: QuickFeedRefreshRequest = [.reloadSnapshots]
                 if kind == .manualReminder {
                     refreshRequest.insert(.ensurePlanReminders)
                 }
                 scheduleDeferredFeedRefresh(refreshRequest, milliseconds: feedPlanPostSaveRefreshDelayMilliseconds)
                 triggerToast(feedPlanSavedMessage(kind: kind, targetCount: result.targetCount), tint: savingTint)
+            } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                runtimeState.resetPendingFeedRefresh()
+                scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .forceDisplayedMode])
             } catch {
                 handleFeedCommandFailure(error, command: .feedPlan(petID: pet.id, action: "save_\(kind.rawValue)"))
+                runtimeState.resetPendingFeedRefresh()
                 scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .forceDisplayedMode])
             }
             draftStore.isSavingFeedPlan = false
@@ -111,17 +132,6 @@ extension QuickFeedDetailContent {
             scheduleSettledFeedModeMaintenance(for: targetMode)
         }
         closeActiveFeedSheet()
-    }
-
-    func eventsReplacingFeedRules(kind: FeedRuleKind, with replacement: [Event]) -> [Event] {
-        allEvents.filter { event in
-            switch kind {
-            case .manualReminder:
-                !FeedRuleMetadata.isManualReminderEvent(event, pet: pet)
-            case .autoFeeder:
-                !FeedRuleMetadata.isAutoFeederEvent(event, pet: pet)
-            }
-        } + replacement
     }
 
     func setActiveFeedMode(_ mode: FeedOperatingMode) {
@@ -267,9 +277,7 @@ extension QuickFeedDetailContent {
     }
 
     func latestAllEvents() -> [Event] {
-        let events = commandExecutor.latestAllEvents(fallback: currentAllEvents)
-        runtimeState.latestAllEventsOverride = events
-        return events
+        commandExecutor.latestAllEvents(fallback: currentAllEvents)
     }
 
     func deletePlan(_ kind: FeedRuleKind) {
@@ -290,7 +298,19 @@ extension QuickFeedDetailContent {
                         allEvents: latestAllEvents()
                     )
                 }
-                runtimeState.latestAllEventsOverride = latestAllEvents()
+                let latestEvents = latestAllEvents()
+                let resolvedMode = result.shouldSwitchToManual ? FeedOperatingMode.manual : FeedOperatingMode.resolved(
+                    pet: pet,
+                    allEvents: latestEvents,
+                    now: clockTick
+                )
+                if result.didChange {
+                    runtimeState.installSuccessfulRuleWrite(
+                        events: latestEvents,
+                        affectedPetIDs: [pet.id],
+                        mode: resolvedMode
+                    )
+                }
                 scheduleStockReminders(result.stockReminders)
                 if result.shouldSwitchToManual {
                     setActiveFeedMode(.manual)

@@ -20,14 +20,21 @@ extension FamilyCollaborationDashboardView {
             }
 
             HStack(spacing: 8) {
-                mapScopeButton(.mine, title: l.tr(zh: "待我", en: "Mine", de: "Meine"), count: assignedFamilyTasks.count, icon: "person.crop.circle.badge.clock", tint: Color.goPurple)
-                mapScopeButton(.bounty, title: l.tr(zh: "悬赏", en: "Bounty", de: "Prämie"), count: bountyFamilyTasks.count, icon: "target", tint: Color.goTeal)
+                mapScopeButton(.mine, title: l.tr(zh: "待我", en: "Mine", de: "Meine"), count: assignedFamilyTasks.count, icon: "person.crop.circle.badge.clock", tint: Color.goPurple, selectedForeground: Color.goCardWhite)
+                mapScopeButton(.bounty, title: l.tr(zh: "悬赏", en: "Bounty", de: "Prämie"), count: bountyFamilyTasks.count, icon: "target", tint: Color.goTeal, selectedForeground: Color.arkInk)
                 progressScopePill
             }
         }
     }
 
-    func mapScopeButton(_ scope: TaskScope, title: String, count: Int, icon: String, tint: Color) -> some View {
+    func mapScopeButton(
+        _ scope: TaskScope,
+        title: String,
+        count: Int,
+        icon: String,
+        tint: Color,
+        selectedForeground: Color
+    ) -> some View {
         let selected = selectedTaskScope == scope
         return Button {
             UISelectionFeedbackGenerator().selectionChanged()
@@ -43,7 +50,7 @@ extension FamilyCollaborationDashboardView {
                     .font(OhanaFont.caption2(.black))
                     .monospacedDigit()
             }
-            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
+            .foregroundStyle(selected ? selectedForeground : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 9)
             .background(selected ? tint : Color.ohanaControlFill, in: Capsule())
@@ -156,6 +163,15 @@ extension FamilyCollaborationDashboardView {
         let rewards = familyTasks(for: pet).filter(\.hasReward).count
         let count = assigned + open + rewards
         let tint: Color = assigned > 0 ? Color.goPurple : (rewards > 0 ? Color.goTeal : (open > 0 ? Color.goYellow : Color.goPrimary))
+        let badgeForeground: Color = {
+            if assigned > 0 {
+                return OhanaResolvedPrimaryAccent(customHex: "A855F7")?.actionTextColor ?? Color.ohanaPrimaryText
+            }
+            if rewards > 0 || open > 0 {
+                return Color.arkInk
+            }
+            return Color.ohanaPrimaryActionText
+        }()
 
         return Button {
             UISelectionFeedbackGenerator().selectionChanged()
@@ -170,7 +186,7 @@ extension FamilyCollaborationDashboardView {
                     if count > 0 {
                         Text("\(count)")
                             .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(badgeForeground)
                             .monospacedDigit()
                             .frame(width: 23, height: 23) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(tint, in: Circle())

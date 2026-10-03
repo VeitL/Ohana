@@ -5,12 +5,14 @@
 //  N2: 遛狗详情页 — 交互式地图 + 路径 + Apple Maps 跳转
 
 import MapKit
+import SwiftData
 import SwiftUI
 
 struct WalkDetailView: View {
     let walk: PetWalkLog
     let pet: Pet
 
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.dismiss) private var dismiss
     @AppStorage(RainbowWalkEffectKeys.route) private var equipFxRainbow: Bool = false
     @AppStorage(RainbowWalkEffectKeys.poop) private var equipFxRainbowPoop: Bool = false
@@ -19,7 +21,7 @@ struct WalkDetailView: View {
     @State private var isSharing = false
     @State private var isRendering = false
     @State private var rainbowRoutePhase: CGFloat = 0
-    private let l = L10n()
+    private var l: L10n { L10n(appLanguage) }
 
     // 解码路径坐标
     private var routeCoordinates: [CLLocationCoordinate2D] {
@@ -84,6 +86,9 @@ struct WalkDetailView: View {
                     VStack(spacing: 18) {
                         pageChrome
                         heroSummary
+                        WalkExecutorNamesDataContainer(executorIds: walk.executorIds) { namesByID in
+                            executorSummary(namesByID: namesByID)
+                        }
                         mapSection
                         metricStrip
                         detailTimeline
@@ -152,6 +157,8 @@ struct WalkDetailView: View {
             }
             .background(Color.ohanaControlFill, in: Circle())
             .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+            .accessibilityIdentifier("walk-detail-close")
         }
     }
 
@@ -185,6 +192,27 @@ struct WalkDetailView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
+    }
+
+    private func executorSummary(namesByID: [UUID: String]) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "person.fill")
+                .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(WalkExecutorDisplay.title(l))
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                Text(WalkExecutorDisplay.names(for: walk.executorIds, namesByID: namesByID, l: l))
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("walk-detail-executor")
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge))
     }
 
     // MARK: - Map Section
@@ -289,7 +317,7 @@ struct WalkDetailView: View {
                 if walk.coconutsEarned > 0 {
                     Text("+\(walk.coconutsEarned)🥥")
                         .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .background(Color.goPrimary, in: Capsule())
@@ -512,4 +540,37 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_: UIActivityViewController, context _: Context) {}
+}
+
+/// Display only recorded participants; missing historical attribution never falls back to the current member.
+enum WalkExecutorDisplay {
+    static func descriptor(for executorIds: [String]) -> FetchDescriptor<Human> {
+        let ids = Array(Set(executorIds.compactMap(UUID.init(uuidString:))))
+        var descriptor = FetchDescriptor<Human>(predicate: #Predicate { ids.contains($0.id) })
+        descriptor.fetchLimit = max(1, ids.count)
+        return descriptor
+    }
+
+    static func title(_ l: L10n) -> String {
+        l.tr(zh: "执行人", en: "Walked by", de: "Begleitet von", es: "Paseo con", pt: "Passeio com",
+             fr: "Promenade avec", ja: "散歩の担当者", ko: "산책 담당자", it: "Passeggiata con")
+    }
+
+    static func names(for executorIds: [String], namesByID: [UUID: String], l: L10n) -> String {
+        guard !executorIds.isEmpty else {
+            return l.tr(zh: "未记录", en: "Not recorded", de: "Nicht erfasst", es: "Sin registrar", pt: "Não registrado",
+                        fr: "Non renseigné", ja: "記録なし", ko: "기록 없음", it: "Non registrato")
+        }
+        return executorIds.map { executorId in
+            guard let id = UUID(uuidString: executorId), let name = namesByID[id] else {
+                return l.tr(zh: "成员已不可用", en: "Member unavailable", de: "Mitglied nicht verfügbar", es: "Miembro no disponible",
+                            pt: "Membro indisponível", fr: "Membre indisponible", ja: "メンバーが見つかりません", ko: "구성원 정보 없음", it: "Membro non disponibile")
+            }
+            let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmedName.isEmpty
+                ? l.tr(zh: "未命名成员", en: "Unnamed member", de: "Unbenanntes Mitglied", es: "Miembro sin nombre", pt: "Membro sem nome",
+                       fr: "Membre sans nom", ja: "名前のないメンバー", ko: "이름 없는 구성원", it: "Membro senza nome")
+                : trimmedName
+        }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ", es: ", ", pt: ", ", fr: ", ", ja: "、", ko: ", ", it: ", "))
+    }
 }

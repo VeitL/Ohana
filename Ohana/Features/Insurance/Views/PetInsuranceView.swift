@@ -123,13 +123,13 @@ struct PetInsuranceContentView: View {
 
     private var embeddedEmpty: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(l.tr(zh: "暂无保单，可记录续期与保额", en: "No policies yet. Track renewals and coverage.", de: "Noch keine Police. Erneuerung und Deckung erfassen."))
+            Text(l.tr(zh: "暂无保单", en: "No policies yet", de: "Noch keine Police"))
                 .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Button { showingAdd = true } label: {
                 Text(l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"))
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 16).padding(.vertical, 8)
                     .background(Color.goPrimary, in: Capsule())
             }
@@ -145,14 +145,10 @@ struct PetInsuranceContentView: View {
             Text("🛡️").font(OhanaFont.adaptive(size: 56))
             Text(l.tr(zh: "暂无保险记录", en: "No insurance records", de: "Keine Versicherungen"))
                 .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-            Text(l.tr(zh: "记录宠物保险保单，轻松追踪续期日期", en: "Save policies and keep renewal dates easy to track.", de: "Policen speichern und Erneuerungen im Blick behalten."))
-                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
             Button { showingAdd = true } label: {
                 Text(l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"))
                     .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 28).padding(.vertical, 12)
                     .background(Color.goPrimary, in: Capsule())
             }.buttonStyle(ScaleButtonStyle())
@@ -172,7 +168,10 @@ struct PetInsuranceContentView: View {
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(renewalStatusLabel(for: ins))
                                     .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.arkInk)
+                                    .foregroundStyle(
+                                        OhanaResolvedPrimaryAccent(customHex: ins.renewalStatusColor)?.actionTextColor
+                                            ?? Color.ohanaPrimaryText
+                                    )
                                     .padding(.horizontal, 8).padding(.vertical, 3)
                                     .background(Color(hex: ins.renewalStatusColor), in: Capsule())
                             }

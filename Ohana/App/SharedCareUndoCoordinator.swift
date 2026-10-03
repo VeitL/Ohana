@@ -192,8 +192,7 @@ struct SharedCareUndoBannerView: View {
                 Text(L10n.current.tr(zh: "撤销", en: "Undo", de: "Rückgängig"))
                     .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.goPrimary)
+            .ohanaPrimaryProminentButton()
             .accessibilityHint(
                 L10n.current.tr(
                     zh: "删除这一次共享铲砂记录",

@@ -154,6 +154,7 @@ private struct HumanProfileRouteData {
 
     static func load(id: UUID, from context: ModelContext) -> HumanProfileRouteData {
         let humanKey = id.uuidString
+        let humanKeyLower = humanKey.lowercased()
         return HumanProfileRouteData(
             human: fetchOne(
                 FetchDescriptor<Human>(
@@ -182,7 +183,9 @@ private struct HumanProfileRouteData {
             ),
             allMeds: fetch(
                 FetchDescriptor<HumanMedication>(
-                    predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
+                    predicate: #Predicate<HumanMedication> {
+                        $0.humanId == humanKey || $0.humanId == humanKeyLower
+                    },
                     sortBy: [SortDescriptor(\.createdAt)]
                 ),
                 context: context,
@@ -190,7 +193,9 @@ private struct HumanProfileRouteData {
             ),
             allReports: fetch(
                 FetchDescriptor<HumanHealthReport>(
-                    predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
+                    predicate: #Predicate<HumanHealthReport> {
+                        $0.humanId == humanKey || $0.humanId == humanKeyLower
+                    },
                     sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
                 ),
                 context: context,

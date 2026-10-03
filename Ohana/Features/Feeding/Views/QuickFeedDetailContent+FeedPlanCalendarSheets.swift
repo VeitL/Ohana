@@ -6,7 +6,7 @@ extension QuickFeedDetailContent {
         HStack(spacing: 12) {
             Image(systemName: pet.mainFoodKind.systemIconName)
                 .font(OhanaFont.adaptive(size: 17, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
@@ -25,7 +25,7 @@ extension QuickFeedDetailContent {
             } label: {
                 Image(systemName: "slider.horizontal.3").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: Circle())
             }

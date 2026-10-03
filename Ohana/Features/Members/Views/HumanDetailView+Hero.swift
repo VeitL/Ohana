@@ -39,8 +39,18 @@ extension HumanDetailView {
                         if !human.bloodType.isEmpty {
                             humanChip(l.tr(zh: "血型 \(human.bloodType)", en: "Blood \(human.bloodType)", de: "Blut \(human.bloodType)"), color: Color.goRed)
                         }
-                        if !human.nationality.isEmpty { humanChip("🌍 \(human.nationality)", color: Color(hex: "6B82C4")) }
-                        if !human.city.isEmpty { humanChip("📍 \(human.city)", color: Color(hex: "6B82C4")) }
+                        if !human.nationality.isEmpty {
+                            humanChip(
+                                "🌍 \(PetBreedDatabase.localizedRegionName(human.nationality, l: l))",
+                                color: Color(hex: "6B82C4")
+                            )
+                        }
+                        if !human.city.isEmpty {
+                            humanChip(
+                                "📍 \(MemberResidenceValue(storedValue: human.city).localized(l: l))",
+                                color: Color(hex: "6B82C4")
+                            )
+                        }
                         if human.heightCm > 0, human.heightCm.isFinite { humanChip(String(format: "%.0f cm", human.heightCm), color: Color.goTeal) }
                     }
                     .padding(.horizontal, 4)

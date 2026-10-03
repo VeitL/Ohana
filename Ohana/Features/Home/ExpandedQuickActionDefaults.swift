@@ -12,8 +12,6 @@ nonisolated enum ExpandedQuickActionDefaults {
         [
             QuickActionItem(label: l.homeQAWeight, icon: "scalemass.fill", colorHex: "80FFEA",
                             actionType: "humanWeight", entityId: human.id, entityKind: .human),
-            QuickActionItem(label: l.expense, icon: "creditcard.fill", colorHex: "F59E0B",
-                            actionType: "humanExpense", entityId: human.id, entityKind: .human),
             QuickActionItem(label: l.homeQAMeds, icon: "pill.fill", colorHex: "FF6B8A",
                             actionType: "humanMedication", entityId: human.id, entityKind: .human),
             QuickActionItem(label: l.homeQASport, icon: "figure.run", colorHex: "F97316",
@@ -120,7 +118,7 @@ nonisolated enum ExpandedQuickActionDefaults {
         _ actions: [DefaultAction]
     ) -> [QuickActionItem] {
         var orderedActions = actions.filter { $0 != .allFeatures }
-        orderedActions.insert(.allFeatures, at: min(3, orderedActions.count))
+        orderedActions.append(.allFeatures)
         return orderedActions.map { item($0, for: pet, localization: l, waterManagementLabel: waterManagementLabel) }
     }
 

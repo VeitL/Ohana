@@ -103,7 +103,7 @@ struct HumanAccountSecuritySheet: View {
                 Spacer()
                 Text(hasPasscode ? l.tr(zh: "隐私", en: "Private", de: "Privat") : l.tr(zh: "公开", en: "Open", de: "Offen"))
                     .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(hasPasscode ? Color.goYellow : Color.arkInk)
+                    .foregroundStyle(hasPasscode ? Color.goYellow : Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(hasPasscode ? Color.goYellow.opacity(0.14) : Color.goPrimary, in: Capsule())
@@ -114,7 +114,7 @@ struct HumanAccountSecuritySheet: View {
             } label: {
                 Label(hasPasscode ? l.tr(zh: "修改或关闭密码", en: "Change or turn off PIN", de: "PIN ändern oder deaktivieren") : l.tr(zh: "设置 4 位密码", en: "Set 4-digit PIN", de: "4-stellige PIN festlegen"), systemImage: "key.fill")
                     .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -322,7 +322,7 @@ struct HumanAccountSecuritySheet: View {
     private func localizedFieldTitle(_ field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

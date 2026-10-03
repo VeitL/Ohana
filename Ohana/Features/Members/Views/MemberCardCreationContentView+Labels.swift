@@ -17,6 +17,14 @@ extension MemberCardCreationContentView {
         Pet.localizedSpeciesName(species, l: l)
     }
 
+    func breedLabel(_ breed: String) -> String {
+        l.resourceName(breed)
+    }
+
+    func coatLabel(_ coat: String) -> String {
+        l.resourceName(coat)
+    }
+
     func personalityLabel(_ id: String) -> String {
         guard let tag = PetPersonalityTag.lookup(id) else { return id }
         return l.tr(zh: tag.titleZh, en: tag.titleEn, de: tag.titleDe)

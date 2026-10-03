@@ -1,8 +1,8 @@
-/* English fallback for protected-resource prompts until reviewed Korean copy is approved. */
-"NSCameraUsageDescription" = "Used when you choose to take a member or pet avatar, Moment photo, or receipt attachment.";
-"NSPhotoLibraryUsageDescription" = "Used to import avatars, Moment images, or receipt attachments that you select.";
-"NSHealthShareUsageDescription" = "Used when you set up Apple Health to read steps, distance, active energy, exercise and stand time, activity goals, and workouts for this member's local summary.";
-"NSLocationWhenInUseUsageDescription" = "Used when you add a location to a Moment or start a walk so Ohana can record that route.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";
-"NSLocationAlwaysUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";
-"NSFaceIDUsageDescription" = "Used to verify protected member switching with Face ID instead of entering the local PIN.";
+/* 권한 사용 설명 현지화(한국어) */
+"NSCameraUsageDescription" = "아바타, 모먼트, 영수증 또는 건강 보고서를 촬영할 때 사용합니다. 건강 보고서의 텍스트는 이 기기에서만 처리됩니다.";
+"NSPhotoLibraryUsageDescription" = "선택한 아바타, 모먼트, 영수증 또는 건강 보고서를 가져올 때 사용합니다. 건강 보고서의 텍스트 인식은 이 기기에서만 이루어집니다.";
+"NSHealthShareUsageDescription" = "Apple Health를 설정하면 이 구성원의 기기 내 요약에 걸음 수, 거리, 활동 에너지, 운동 및 일어서기 시간, 활동 목표와 운동 기록을 표시하기 위해 읽습니다.";
+"NSLocationWhenInUseUsageDescription" = "모먼트에 위치를 추가하거나 산책을 시작해 Ohana가 경로를 기록할 때 사용합니다.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "산책 중에만 앱이 백그라운드에 있거나 화면이 잠겨 있을 때도 현재 경로를 계속 기록하기 위해 사용합니다.";
+"NSLocationAlwaysUsageDescription" = "산책 중에만 앱이 백그라운드에 있거나 화면이 잠겨 있을 때도 현재 경로를 계속 기록하기 위해 사용합니다.";
+"NSFaceIDUsageDescription" = "로컬 PIN을 입력하는 대신 보호된 구성원 전환을 Face ID로 확인하기 위해 사용합니다.";

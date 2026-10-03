@@ -63,7 +63,7 @@ extension PlantDashboardView {
             }
         }
         .labelsHidden()
-        .pickerStyle(.segmented)
+        .ohanaContentTabsPickerStyle()
         .frame(width: 88, height: 44)
         .accessibilityIdentifier("plant-dashboard-view-switcher-rail")
     }

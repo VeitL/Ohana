@@ -76,9 +76,10 @@ struct PetMedicationRouteData {
 struct IslandMedicationRouteData {
     var pets: [Pet] = []
     var medicationsByPetID: [UUID: [PetMedication]] = [:]
+    var todayDoseCounts: [UUID: Int] = [:]
     var hasLoaded = false
 
-    static func load(from context: ModelContext) -> IslandMedicationRouteData {
+    static func load(from context: ModelContext, now: Date = Date(), calendar: Calendar = .current) -> IslandMedicationRouteData {
         let pets = fetch(
             FetchDescriptor<Pet>(sortBy: [SortDescriptor(\.name)]),
             context: context,
@@ -94,9 +95,25 @@ struct IslandMedicationRouteData {
             guard let petID = medication.pet?.id else { continue }
             medicationsByPetID[petID, default: []].append(medication)
         }
+        let start = calendar.startOfDay(for: now)
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? now.addingTimeInterval(86400)
+        let eventType = EventType.petMedicationDose.rawValue
+        let todayEvents = fetch(
+            FetchDescriptor<Event>(predicate: #Predicate<Event> { event in
+                event.eventType == eventType && event.startDate >= start && event.startDate < end
+            }),
+            context: context,
+            name: "Event"
+        )
+        var todayDoseCounts: [UUID: Int] = [:]
+        for event in todayEvents {
+            guard let medicationID = PetMedicationDoseLogging.doseMedicationId(for: event) else { continue }
+            todayDoseCounts[medicationID, default: 0] += 1
+        }
         return IslandMedicationRouteData(
             pets: pets,
             medicationsByPetID: medicationsByPetID,
+            todayDoseCounts: todayDoseCounts,
             hasLoaded: true
         )
     }

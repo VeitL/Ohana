@@ -31,6 +31,9 @@ struct QuickWeightSheet: View {
     }
 
     private var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
+    private var themeActionForeground: Color {
+        OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText
+    }
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
@@ -73,6 +76,7 @@ struct QuickWeightSheet: View {
                 unit: "kg",
                 maxFractionDigits: 1,
                 accent: themeColor,
+                accentForeground: themeActionForeground,
                 step: 0.1,
                 valueFont: .system(size: 58, weight: .black, design: .rounded),
                 unitFont: .system(size: 24, weight: .black, design: .rounded),
@@ -134,7 +138,11 @@ struct QuickWeightSheet: View {
                     Text(didSave ? l.tr(zh: "已保存 ✓", en: "Saved ✓", de: "Gespeichert ✓") : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag sichern"))
                         .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                 }
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(
+                    didSave
+                        ? Color.arkInk
+                        : (isValid ? themeActionForeground : Color.ohanaSecondaryText)
+                )
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(

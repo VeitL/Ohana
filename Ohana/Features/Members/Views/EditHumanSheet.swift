@@ -39,7 +39,6 @@ struct EditHumanSheet: View {
         OhanaSheetWrapper(title: l.tr(zh: "编辑成员", en: "Edit Member", de: "Mitglied bearbeiten"), onDismiss: { dismiss() }) {
             VStack(spacing: 16) {
                 formField(l.tr(zh: "姓名", en: "Name", de: "Name"), text: $name)
-                formField(l.tr(zh: "头像 Emoji", en: "Avatar Emoji", de: "Avatar-Emoji"), text: $avatarEmoji)
 
                 Toggle(l.tr(zh: "设置生日", en: "Set Birthday", de: "Geburtstag festlegen"), isOn: $hasBirthday)
                     .tint(Color.goPrimary)
@@ -47,15 +46,37 @@ struct EditHumanSheet: View {
 
                 if hasBirthday {
                     DatePicker(l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), selection: $birthday, displayedComponents: .date)
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                            .foregroundStyle(Color.goPrimary)
+                            .accessibilityHidden(true)
+                        Text(l.tr(
+                            zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                            es: "Signo", pt: "Signo", fr: "Signe",
+                            ja: "星座", ko: "별자리", it: "Segno"
+                        ))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                        Spacer(minLength: 8)
+                        Text(Human.westernZodiacDisplay(for: birthday, l: l))
+                            .font(OhanaFont.callout(.black))
+                            .foregroundStyle(Color.ohanaPrimaryText)
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("edit-human-zodiac")
                 }
 
                 formField(l.tr(zh: "血型", en: "Blood Type", de: "Blutgruppe"), text: $bloodType)
                 formField(l.tr(zh: "国籍", en: "Nationality", de: "Nationalität"), text: $nationality)
                 formField(l.tr(zh: "城市", en: "City", de: "Stadt"), text: $city)
 
-                Picker(l.tr(zh: "角色", en: "Role", de: "Rolle"), selection: $role) {
-                    Text(l.tr(zh: "管理者", en: "Owner", de: "Verwaltung")).tag("owner")
-                    Text(l.tr(zh: "成员", en: "Member", de: "Mitglied")).tag("member")
+                Picker(l.tr(
+                    zh: "家庭角色", en: "Household role", de: "Rolle im Haushalt",
+                    es: "Rol en el hogar", pt: "Papel na família", fr: "Rôle dans le foyer",
+                    ja: "家族での役割", ko: "가족 역할", it: "Ruolo familiare"
+                ), selection: $role) {
+                    ForEach(HumanProfileOptions.permissionRoles, id: \.key) { option in
+                        Text(HumanProfileOptions.localizedRoleTitle(option.key, l: l)).tag(option.key)
+                    }
                 }
                 .pickerStyle(.segmented)
 
@@ -127,7 +148,7 @@ struct EditHumanSheet: View {
                 .font(OhanaFont.subheadline())
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                .textFieldStyle(.roundedBorder)
+                .ohanaRoundedTextFieldStyle()
         }
     }
 

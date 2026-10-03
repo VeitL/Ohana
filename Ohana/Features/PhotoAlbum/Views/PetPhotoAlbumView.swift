@@ -77,6 +77,7 @@ struct PetPhotoAlbumView: View {
                                         .foregroundStyle(Color.goPrimary)
                                         .font(OhanaFont.title2(.bold))
                                 }
+                                .accessibilityLabel(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
                             }
                         }
                 }
@@ -126,52 +127,57 @@ struct PetPhotoAlbumView: View {
     }
 
     private var albumCore: some View {
-        ZStack {
-            if !isHubEmbedded {
-                OhanaAppBackground()
-            }
+        GeometryReader { viewport in
+            ZStack {
+                if !isHubEmbedded {
+                    OhanaAppBackground()
+                }
 
-            if renderData.isEmpty {
-                emptyState
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        ForEach(renderData.groups) { group in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(group.title)
-                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                                    .padding(.horizontal, 16)
+                if renderData.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(renderData.groups) { group in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(group.title)
+                                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
+                                        .padding(.horizontal, 16)
 
-                                LazyVGrid(columns: columns, spacing: 3) {
-                                    ForEach(group.photos) { photo in
-                                        Button {
-                                            selectedPhoto = photo
-                                            showingPhotoDetail = true
-                                        } label: {
-                                            photoThumbnail(photo)
-                                        }
-                                        .buttonStyle(ScaleButtonStyle())
-                                        .contextMenu {
+                                    LazyVGrid(columns: columns, spacing: 3) {
+                                        ForEach(group.photos) { photo in
                                             Button {
-                                                sharePhoto(photo)
+                                                selectedPhoto = photo
+                                                showingPhotoDetail = true
                                             } label: {
-                                                Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
+                                                photoThumbnail(
+                                                    photo,
+                                                    side: max(1, (viewport.size.width - 6) / 3)
+                                                )
                                             }
-                                            Divider()
-                                            Button(role: .destructive) {
-                                                deletePhoto(photo)
-                                            } label: {
-                                                Label(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), systemImage: "trash")
+                                            .buttonStyle(ScaleButtonStyle())
+                                            .contextMenu {
+                                                Button {
+                                                    sharePhoto(photo)
+                                                } label: {
+                                                    Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
+                                                }
+                                                Divider()
+                                                Button(role: .destructive) {
+                                                    deletePhoto(photo)
+                                                } label: {
+                                                    Label(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), systemImage: "trash")
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                            Spacer(minLength: 40)
                         }
-                        Spacer(minLength: 40)
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
                 }
             }
         }
@@ -184,19 +190,6 @@ struct PetPhotoAlbumView: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(l.tr(zh: "暂无照片", en: "No photos yet", de: "Noch keine Fotos"))
                 .font(OhanaFont.title3(.black))
-            Text(l.tr(
-                zh: "记录\(pet.name)的每一个精彩瞬间",
-                en: "Capture every lovely moment with \(pet.name)",
-                de: "Halte jeden schoenen Moment mit \(pet.name) fest"
-            ))
-            .font(OhanaFont.subheadline(.medium))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
-                Text(l.tr(zh: "添加第一张照片", en: "Add the first photo", de: "Erstes Foto hinzufuegen"))
-                    .font(OhanaFont.body(.black)).foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 28).padding(.vertical, 12)
-                    .background(Color.goPrimary, in: Capsule())
-            }
         }
         .padding(.top, 60)
     }
@@ -247,8 +240,7 @@ struct PetPhotoAlbumView: View {
     }
 
     @ViewBuilder
-    private func photoThumbnail(_ photo: PetPhotoAlbumPhotoItem) -> some View {
-        let side = (ScreenCompat.width - 6) / 3
+    private func photoThumbnail(_ photo: PetPhotoAlbumPhotoItem, side: CGFloat) -> some View {
         AsyncDecodedImageView(
             cacheID: "pet-photo-thumbnail-\(photo.id.uuidString)",
             sourceSignature: photo.imageSignature,

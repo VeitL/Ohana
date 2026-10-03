@@ -15,11 +15,14 @@ struct PlantCareCommandResult: Equatable, Sendable {
     let ledgerEventID: UUID
     let careType: PlantCareType
     let coconutDelta: Int
+    let didWrite: Bool
+    let wasReplay: Bool
+    let rewardFinalizationPending: Bool
     let didPersist: Bool
     let persistenceError: String?
 
     var affectedEntityIDs: Set<UUID> {
-        didPersist ? [plantID, logID, eventID, ledgerEventID] : []
+        didPersist && didWrite ? [plantID, logID, eventID, ledgerEventID] : []
     }
 
     static func failed(
@@ -34,6 +37,9 @@ struct PlantCareCommandResult: Equatable, Sendable {
             ledgerEventID: UUID(),
             careType: careType,
             coconutDelta: 0,
+            didWrite: false,
+            wasReplay: false,
+            rewardFinalizationPending: false,
             didPersist: false,
             persistenceError: error
         )
@@ -50,6 +56,16 @@ enum PlantCareCommandService {
         careTransactionId: String? = nil
     ) -> PlantCareCommandResult {
         let plant = request.plant
+        let resolvedTransactionID = careTransactionId ?? request.operationID.uuidString
+        if careTransactionId == nil,
+           let replay = replayResultIfPresent(
+               request: request,
+               transactionID: resolvedTransactionID,
+               context: context,
+               options: options
+           ) {
+            return replay
+        }
         guard !plant.isArchived else {
             return .failed(
                 plantID: plant.id,
@@ -66,40 +82,64 @@ enum PlantCareCommandService {
         }
 
         let authorizedExecutorID = plan.intent.assigneeId
-        let wasRewardEligible = isRewardEligible(request.careType, for: plant, now: request.now)
+        let wasRewardEligible: Bool
+        do {
+            wasRewardEligible = try isRewardEligible(
+                request.careType,
+                for: plant,
+                context: context,
+                now: request.now
+            )
+        } catch {
+            return .failed(
+                plantID: plant.id,
+                careType: request.careType,
+                error: "plantCareRewardEligibilityLookupFailed: \(error.localizedDescription)"
+            )
+        }
+        let originalCareFact = PlantCareFactSnapshot(plant: plant)
         applyCareFact(request)
         let persistedPhotoData = sanitizedPhotoData(for: request)
         let log = makeCareLog(
             request,
             authorizedExecutorID: authorizedExecutorID,
             photoData: persistedPhotoData,
-            careTransactionId: careTransactionId
+            careTransactionId: resolvedTransactionID
         )
         log.plant = plant
         context.insert(log)
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: request.now)
 
         let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
-        let reward = rewardOutcome(
-            for: request,
-            authorizedExecutorID: authorizedExecutorID,
-            persistedPhotoData: persistedPhotoData,
-            wasEligible: wasRewardEligible,
-            context: context,
-            options: options
-        )
         let ledgerEvent = recordLedgerEvent(
             for: request,
             log: log,
             event: event,
             authorizedExecutorID: authorizedExecutorID,
-            reward: reward,
+            rewardState: rewardState(
+                for: request.careType,
+                wasEligible: wasRewardEligible,
+                options: options
+            ),
             context: context,
             options: options
         )
+        let carePlanResult = syncCarePlanIfNeeded(for: request, context: context, options: options)
+        if let carePlanResult, !carePlanResult.didPersist {
+            originalCareFact.restore(on: plant)
+            context.rollback()
+            return persistenceFailureResult(
+                for: request,
+                log: log,
+                event: event,
+                ledgerEvent: ledgerEvent,
+                errorDescription: carePlanResult.persistenceErrorDescription
+            )
+        }
         if options.saveChanges {
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
+            let saveResult = options.persistChanges(context)
             guard saveResult.didSave else {
+                originalCareFact.restore(on: plant)
                 context.rollback()
                 return persistenceFailureResult(
                     for: request,
@@ -109,33 +149,493 @@ enum PlantCareCommandService {
                     errorDescription: saveResult.errorDescription
                 )
             }
-        }
-        if options.syncCarePlan {
-            PlantCarePlanScheduleService.sync(
-                plant: plant,
-                context: context,
-                now: request.now,
-                scheduleNotifications: options.scheduleNotifications,
-                reminderScheduling: options.reminderScheduling,
-                saveChanges: options.saveChanges
-            )
+            if let carePlanResult {
+                PlantCarePlanScheduleService.commitSideEffects(
+                    for: carePlanResult,
+                    context: context
+                )
+            }
         }
 
-        return PlantCareCommandResult(
-            plantID: plant.id,
+        let rewardFinalization = options.saveChanges
+            ? finalizeRewardIfNeeded(
+                request: request,
+                log: log,
+                ledgerEvent: ledgerEvent,
+                authorizedExecutorID: authorizedExecutorID,
+                wasEligible: wasRewardEligible,
+                context: context,
+                options: options
+            )
+            : RewardFinalization(coconutDelta: 0, isPending: false, errorDescription: nil)
+
+        return successResult(
+            for: request,
+            log: log,
+            event: event,
+            ledgerEvent: ledgerEvent,
+            rewardFinalization: rewardFinalization
+        )
+    }
+
+    private static func successResult(
+        for request: PlantCareCommandRequest,
+        log: PlantCareLog,
+        event: Event,
+        ledgerEvent: CareLedgerEvent,
+        rewardFinalization: RewardFinalization
+    ) -> PlantCareCommandResult {
+        PlantCareCommandResult(
+            plantID: request.plant.id,
             logID: log.id,
             eventID: event.id,
             ledgerEventID: ledgerEvent.id,
             careType: request.careType,
-            coconutDelta: reward.coconutDelta,
+            coconutDelta: rewardFinalization.coconutDelta,
+            didWrite: true,
+            wasReplay: false,
+            rewardFinalizationPending: rewardFinalization.isPending,
             didPersist: true,
-            persistenceError: nil
+            persistenceError: rewardFinalization.errorDescription
         )
     }
 
-    private struct RewardOutcome {
+    @MainActor
+    private static func syncCarePlanIfNeeded(
+        for request: PlantCareCommandRequest,
+        context: ModelContext,
+        options: PlantCareCommandOptions
+    ) -> PlantCarePlanScheduleResult? {
+        guard options.syncCarePlan else { return nil }
+        return PlantCarePlanScheduleService.sync(
+            plant: request.plant,
+            context: context,
+            now: request.now,
+            scheduleNotifications: options.scheduleNotifications,
+            reminderScheduling: options.reminderScheduling,
+            saveChanges: false
+        )
+    }
+
+    private struct RewardFinalization {
         let coconutDelta: Int
-        let metadata: String
+        let isPending: Bool
+        let errorDescription: String?
+    }
+
+    private struct PlantCareFactSnapshot {
+        let lastWateredDate: Date?
+        let lastFertilizedDate: Date?
+        let lastHealthCheckDate: Date?
+        let healthStatus: PlantHealthStatus
+
+        init(plant: Plant) {
+            lastWateredDate = plant.lastWateredDate
+            lastFertilizedDate = plant.lastFertilizedDate
+            lastHealthCheckDate = plant.lastHealthCheckDate
+            healthStatus = plant.healthStatus
+        }
+
+        @MainActor
+        func restore(on plant: Plant) {
+            plant.lastWateredDate = lastWateredDate
+            plant.lastFertilizedDate = lastFertilizedDate
+            plant.lastHealthCheckDate = lastHealthCheckDate
+            plant.healthStatus = healthStatus
+        }
+    }
+
+    static let rewardStateMetadataKey = "plantCareRewardState"
+    static let rewardStatePending = "pending"
+    static let rewardStateSettled = "settled"
+    static let rewardStateNotEligible = "notEligible"
+    static let rewardStateDisabled = "disabled"
+    static let rewardStateInvalid = "invalid"
+    static let rewardOperationDateMetadataKey = "plantCareRewardOperationDate"
+
+    @MainActor
+    private static func replayResultIfPresent(
+        request: PlantCareCommandRequest,
+        transactionID: String,
+        context: ModelContext,
+        options: PlantCareCommandOptions
+    ) -> PlantCareCommandResult? {
+        var descriptor = FetchDescriptor<PlantCareLog>(
+            predicate: #Predicate<PlantCareLog> { log in
+                log.careTransactionId == transactionID
+            },
+            sortBy: [SortDescriptor(\PlantCareLog.date)]
+        )
+        descriptor.fetchLimit = 2
+        let logs: [PlantCareLog]
+        do {
+            logs = try context.fetch(descriptor)
+        } catch {
+            return .failed(
+                plantID: request.plant.id,
+                careType: request.careType,
+                error: "plantCareOperationLookupFailed: \(error.localizedDescription)"
+            )
+        }
+        guard !logs.isEmpty else { return nil }
+        guard logs.count == 1, let log = logs.first else {
+            return .failed(
+                plantID: request.plant.id,
+                careType: request.careType,
+                error: "plantCareOperationConflict"
+            )
+        }
+
+        let replayLinks: PlantCareReplayLinks
+        do {
+            replayLinks = try validatedReplayLinks(
+                log: log,
+                request: request,
+                transactionID: transactionID,
+                context: context
+            )
+        } catch let failure as PlantCareReplayValidationFailure {
+            return .failed(
+                plantID: request.plant.id,
+                careType: request.careType,
+                error: failure.description
+            )
+        } catch {
+            return .failed(
+                plantID: request.plant.id,
+                careType: request.careType,
+                error: "plantCareOperationLookupFailed: \(error.localizedDescription)"
+            )
+        }
+
+        let rewardIsPending = CareLedgerMetadata.stringValue(
+            named: rewardStateMetadataKey,
+            in: replayLinks.ledgerEvent.metadataJSON
+        ) == rewardStatePending
+        let finalization = rewardIsPending && options.awardRewards
+            ? finalizeRewardIfNeeded(
+                request: request,
+                log: log,
+                ledgerEvent: replayLinks.ledgerEvent,
+                authorizedExecutorID: replayLinks.canonicalExecutorID,
+                wasEligible: true,
+                context: context,
+                options: options
+            )
+            : RewardFinalization(
+                coconutDelta: replayLinks.ledgerEvent.coconutDelta,
+                isPending: rewardIsPending,
+                errorDescription: nil
+            )
+        return PlantCareCommandResult(
+            plantID: request.plant.id,
+            logID: log.id,
+            eventID: replayLinks.event.id,
+            ledgerEventID: replayLinks.ledgerEvent.id,
+            careType: log.careType,
+            coconutDelta: finalization.coconutDelta,
+            didWrite: false,
+            wasReplay: true,
+            rewardFinalizationPending: finalization.isPending,
+            didPersist: true,
+            persistenceError: finalization.errorDescription
+        )
+    }
+
+    private struct PlantCareReplayLinks {
+        let ledgerEvent: CareLedgerEvent
+        let event: Event
+        let canonicalExecutorID: String?
+    }
+
+    private enum PlantCareReplayValidationFailure: Error {
+        case incomplete
+        case conflict
+
+        var description: String {
+            switch self {
+            case .incomplete:
+                "plantCareOperationIncomplete"
+            case .conflict:
+                "plantCareOperationConflict"
+            }
+        }
+    }
+
+    @MainActor
+    private static func validatedReplayLinks(
+        log: PlantCareLog,
+        request: PlantCareCommandRequest,
+        transactionID: String,
+        context: ModelContext
+    ) throws -> PlantCareReplayLinks {
+        guard let plant = log.plant else {
+            throw PlantCareReplayValidationFailure.incomplete
+        }
+        guard replayPayloadMatches(log, plant: plant, request: request) else {
+            throw PlantCareReplayValidationFailure.conflict
+        }
+
+        let requestedExecutorID = try resolvedReplayExecutorID(
+            request.executorID,
+            context: context
+        )
+        let persistedExecutorID = try canonicalPersistedExecutorID(log.executorId)
+        guard persistedExecutorID == requestedExecutorID else {
+            throw PlantCareReplayValidationFailure.conflict
+        }
+
+        let ledgers = try replayLedgerEvents(for: log, context: context)
+        guard ledgers.count == 1, let ledgerEvent = ledgers.first else {
+            throw PlantCareReplayValidationFailure.incomplete
+        }
+        let ledgerActorID = try canonicalPersistedExecutorID(ledgerEvent.actorId)
+        let expectedActorKind = persistedExecutorID == nil
+            ? CareLedgerActorKind.unknown.rawValue
+            : CareLedgerActorKind.human.rawValue
+        guard ledgerEvent.actorKind == expectedActorKind,
+              ledgerActorID == persistedExecutorID,
+              ledgerEvent.subjectKind == CareLedgerSubjectKind.plant.rawValue,
+              ledgerEvent.subjectId == plant.id.uuidString,
+              ledgerEvent.eventKind == CareLedgerEventKind.plantCare.rawValue,
+              ledgerEvent.actionType == log.careType.rawValue,
+              ledgerEvent.occurredAt == log.date,
+              ledgerEvent.amountValue == 0,
+              ledgerEvent.amountUnit.isEmpty,
+              ledgerEvent.note == log.note,
+              ledgerEvent.source == CareLedgerSource.detail.rawValue,
+              ledgerEvent.sourceReminderId == nil,
+              ledgerEvent.legacyModelName == String(describing: PlantCareLog.self),
+              ledgerEvent.legacyModelId == log.id.uuidString else {
+            throw PlantCareReplayValidationFailure.conflict
+        }
+
+        guard let metadataTransactionID = CareLedgerMetadata.stringValue(
+            named: CareLedgerMetadata.careTransactionId,
+            in: ledgerEvent.metadataJSON
+        ),
+        let rawRewardOperationDate = CareLedgerMetadata.stringValue(
+            named: rewardOperationDateMetadataKey,
+            in: ledgerEvent.metadataJSON
+        ),
+        let rewardOperationTimestamp = TimeInterval(rawRewardOperationDate),
+        rewardOperationTimestamp.isFinite,
+        let rewardState = CareLedgerMetadata.stringValue(
+            named: rewardStateMetadataKey,
+            in: ledgerEvent.metadataJSON
+        ),
+        [
+            rewardStatePending,
+            rewardStateSettled,
+            rewardStateNotEligible,
+            rewardStateDisabled,
+            rewardStateInvalid
+        ].contains(rewardState) else {
+            throw PlantCareReplayValidationFailure.incomplete
+        }
+        guard metadataTransactionID == transactionID,
+              Date(timeIntervalSince1970: rewardOperationTimestamp)
+              .timeIntervalSince(request.rewardOperationDate).magnitude < 0.001 else {
+            throw PlantCareReplayValidationFailure.conflict
+        }
+        let metadata = CalendarTaskCompletionSyncService.metadataDictionary(
+            from: ledgerEvent.metadataJSON
+        )
+        if let generatedBy = metadata["generatedBy"] as? String,
+           generatedBy != "PlantCareCommandService" {
+            throw PlantCareReplayValidationFailure.conflict
+        }
+
+        guard let sourceEventID = ledgerEvent.sourceEventId.flatMap(UUID.init(uuidString:)) else {
+            throw PlantCareReplayValidationFailure.incomplete
+        }
+        let events = try replayEvents(id: sourceEventID, context: context)
+        guard events.count == 1, let event = events.first else {
+            throw PlantCareReplayValidationFailure.incomplete
+        }
+        let eventAssigneeID = try canonicalPersistedExecutorID(event.assigneeId)
+        guard event.relatedEntityType == EntityKind.plant.rawValue,
+              event.relatedEntityId == plant.id.uuidString,
+              event.eventType == log.careType.eventType.rawValue,
+              event.startDate == log.date,
+              event.recurrenceDays == 0,
+              !event.isAllDay,
+              eventAssigneeID == persistedExecutorID else {
+            throw PlantCareReplayValidationFailure.conflict
+        }
+
+        return PlantCareReplayLinks(
+            ledgerEvent: ledgerEvent,
+            event: event,
+            canonicalExecutorID: persistedExecutorID
+        )
+    }
+
+    @MainActor
+    private static func replayPayloadMatches(
+        _ log: PlantCareLog,
+        plant: Plant,
+        request: PlantCareCommandRequest
+    ) -> Bool {
+        guard plant.id == request.plant.id,
+              log.careType == request.careType,
+              log.date == request.now,
+              log.note == request.careNote,
+              log.healthStatusRaw == (request.healthStatus?.rawValue ?? "") else {
+            return false
+        }
+        let sanitizedPhotoSignature = sanitizedPhotoData(for: request)
+            .map(MediaPayloadSignature.signature(for:)) ?? ""
+        let alreadySanitizedPhotoSignature = request.photoData
+            .map(MediaPayloadSignature.signature(for:)) ?? ""
+        return log.photoImageSignature == sanitizedPhotoSignature ||
+            log.photoImageSignature == alreadySanitizedPhotoSignature
+    }
+
+    @MainActor
+    private static func replayLedgerEvents(
+        for log: PlantCareLog,
+        context: ModelContext
+    ) throws -> [CareLedgerEvent] {
+        let modelName = String(describing: PlantCareLog.self)
+        let modelID = log.id.uuidString
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
+            predicate: #Predicate<CareLedgerEvent> { ledger in
+                ledger.legacyModelName == modelName && ledger.legacyModelId == modelID
+            }
+        )
+        descriptor.fetchLimit = 2
+        return try context.fetch(descriptor)
+    }
+
+    @MainActor
+    private static func replayEvents(
+        id: UUID,
+        context: ModelContext
+    ) throws -> [Event] {
+        var descriptor = FetchDescriptor<Event>(
+            predicate: #Predicate<Event> { event in event.id == id }
+        )
+        descriptor.fetchLimit = 2
+        return try context.fetch(descriptor)
+    }
+
+    @MainActor
+    private static func resolvedReplayExecutorID(
+        _ requestedExecutorID: String?,
+        context: ModelContext
+    ) throws -> String? {
+        guard let raw = requestedExecutorID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              let humanID = UUID(uuidString: raw) else {
+            return nil
+        }
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in human.id == humanID }
+        )
+        descriptor.fetchLimit = 1
+        guard let human = try context.fetch(descriptor).first,
+              !human.hasPassedAway else {
+            return nil
+        }
+        return human.id.uuidString
+    }
+
+    private static func canonicalPersistedExecutorID(_ rawExecutorID: String?) throws -> String? {
+        guard let rawExecutorID else { return nil }
+        guard let executorID = UUID(uuidString: rawExecutorID) else {
+            throw PlantCareReplayValidationFailure.incomplete
+        }
+        return executorID.uuidString
+    }
+
+    private static func rewardState(
+        for careType: PlantCareType,
+        wasEligible: Bool,
+        options: PlantCareCommandOptions
+    ) -> String {
+        guard options.saveChanges, options.awardRewards else { return rewardStateDisabled }
+        guard wasEligible, rewardAction(for: careType) != nil else { return rewardStateNotEligible }
+        return rewardStatePending
+    }
+
+    @MainActor
+    private static func finalizeRewardIfNeeded(
+        request: PlantCareCommandRequest,
+        log: PlantCareLog,
+        ledgerEvent: CareLedgerEvent,
+        authorizedExecutorID: String?,
+        wasEligible: Bool,
+        context: ModelContext,
+        options: PlantCareCommandOptions
+    ) -> RewardFinalization {
+        guard options.awardRewards,
+              wasEligible,
+              let action = rewardAction(for: log.careType) else {
+            return RewardFinalization(coconutDelta: ledgerEvent.coconutDelta, isPending: false, errorDescription: nil)
+        }
+        let economy = options.economy ?? DomainServiceDependencyRegistry.careEventEconomy()
+        let idempotencyKey = "plantCareReward:\(log.careTransactionId)"
+        let reward = economy.awardIdempotentCareAction(
+            type: action,
+            pet: nil,
+            context: context,
+            quality: DomainCareRewardQuality.compose(
+                precise: false,
+                hasNote: !log.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                hasPhoto: log.hasPhotoAttachment
+            ),
+            date: request.rewardOperationDate,
+            executorId: authorizedExecutorID,
+            careObjectKey: request.plant.id,
+            idempotencyKey: idempotencyKey,
+            idempotencyID: request.operationID
+        )
+        guard reward.didPersist else {
+            return RewardFinalization(
+                coconutDelta: 0,
+                isPending: true,
+                errorDescription: "plantCareRewardFinalizationPending"
+            )
+        }
+        let rewardPair = (humanGot: reward.humanGot, petGot: reward.petGot)
+        let coconutDelta = max(0, reward.humanGot) + max(0, reward.petGot)
+        ledgerEvent.coconutDelta = coconutDelta
+        ledgerEvent.metadataJSON = settledRewardMetadata(
+            existingMetadata: ledgerEvent.metadataJSON,
+            rewardMetadata: economy.rewardMetadata(for: rewardPair),
+            transactionID: log.careTransactionId
+        )
+        CloudSyncMutationRecorder.markModified(ledgerEvent, context: context, modifiedAt: request.now)
+        let saveResult = options.persistChanges(context)
+        guard saveResult.didSave else {
+            context.rollback()
+            economy.refreshProjectionAfterRollback(context: context)
+            return RewardFinalization(
+                coconutDelta: coconutDelta,
+                isPending: true,
+                errorDescription: saveResult.errorDescription ?? "plantCareRewardLedgerPending"
+            )
+        }
+        return RewardFinalization(coconutDelta: coconutDelta, isPending: false, errorDescription: nil)
+    }
+
+    private static func settledRewardMetadata(
+        existingMetadata: String,
+        rewardMetadata: String,
+        transactionID: String
+    ) -> String {
+        var object = CalendarTaskCompletionSyncService.metadataDictionary(from: existingMetadata)
+        object.merge(CalendarTaskCompletionSyncService.metadataDictionary(from: rewardMetadata)) { _, rewardValue in
+            rewardValue
+        }
+        object[CareLedgerMetadata.careTransactionId] = transactionID
+        object[rewardStateMetadataKey] = rewardStateSettled
+        object["generatedBy"] = "PlantCareCommandService"
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+              let json = String(data: data, encoding: .utf8) else {
+            return existingMetadata
+        }
+        return json
     }
 
     @MainActor
@@ -219,54 +719,30 @@ enum PlantCareCommandService {
     }
 
     @MainActor
-    private static func rewardOutcome(
-        for request: PlantCareCommandRequest,
-        authorizedExecutorID: String?,
-        persistedPhotoData: Data?,
-        wasEligible: Bool,
-        context: ModelContext,
-        options: PlantCareCommandOptions
-    ) -> RewardOutcome {
-        guard options.awardRewards,
-              wasEligible,
-              let action = rewardAction(for: request.careType) else {
-            return RewardOutcome(coconutDelta: 0, metadata: "")
-        }
-        let economy = options.economy ?? DomainServiceDependencyRegistry.careEventEconomy()
-        let reward = economy.awardCareAction(
-            type: action,
-            pet: nil,
-            context: context,
-            quality: DomainCareRewardQuality.compose(
-                precise: false,
-                hasNote: !request.careNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                hasPhoto: persistedPhotoData != nil
-            ),
-            date: request.now,
-            executorId: authorizedExecutorID,
-            careObjectKey: request.plant.id
-        )
-        return RewardOutcome(
-            coconutDelta: max(0, reward.humanGot) + max(0, reward.petGot),
-            metadata: economy.rewardMetadata(for: reward)
-        )
-    }
-
-    @MainActor
     private static func recordLedgerEvent(
         for request: PlantCareCommandRequest,
         log: PlantCareLog,
         event: Event,
         authorizedExecutorID: String?,
-        reward: RewardOutcome,
+        rewardState: String,
         context: ModelContext,
         options: PlantCareCommandOptions
     ) -> CareLedgerEvent {
         let careLedger = options.careLedger ?? CareLedgerService()
-        let metadataJSON = CareLedgerMetadata.addingString(
+        let transactionMetadata = CareLedgerMetadata.addingString(
             CareLedgerMetadata.careTransactionId,
             value: log.careTransactionId,
-            to: reward.metadata
+            to: ""
+        )
+        let operationDateMetadata = CareLedgerMetadata.addingString(
+            rewardOperationDateMetadataKey,
+            value: String(request.rewardOperationDate.timeIntervalSince1970),
+            to: transactionMetadata
+        )
+        let metadataJSON = CareLedgerMetadata.addingString(
+            rewardStateMetadataKey,
+            value: rewardState,
+            to: operationDateMetadata
         )
         return careLedger.record(
             occurredAt: log.date,
@@ -284,7 +760,7 @@ enum PlantCareCommandService {
             sourceReminderId: nil,
             legacyModelName: "PlantCareLog",
             legacyModelId: log.id.uuidString,
-            coconutDelta: reward.coconutDelta,
+            coconutDelta: 0,
             rewardLogId: nil,
             privacyFieldRaw: nil,
             metadataJSON: metadataJSON,
@@ -307,9 +783,27 @@ enum PlantCareCommandService {
             ledgerEventID: ledgerEvent.id,
             careType: request.careType,
             coconutDelta: 0,
+            didWrite: false,
+            wasReplay: false,
+            rewardFinalizationPending: false,
             didPersist: false,
             persistenceError: errorDescription
         )
+    }
+
+    static func rewardOperationDate(
+        in ledger: CareLedgerEvent,
+        fallback: Date
+    ) -> Date {
+        guard let raw = CareLedgerMetadata.stringValue(
+            named: rewardOperationDateMetadataKey,
+            in: ledger.metadataJSON
+        ),
+        let timestamp = TimeInterval(raw),
+        timestamp.isFinite else {
+            return fallback
+        }
+        return Date(timeIntervalSince1970: timestamp)
     }
 
     static func rewardAction(for type: PlantCareType) -> DomainCareRewardAction? {
@@ -323,14 +817,27 @@ enum PlantCareCommandService {
         }
     }
 
-    private static func isRewardEligible(_ type: PlantCareType, for plant: Plant, now: Date) -> Bool {
+    private static func isRewardEligible(
+        _ type: PlantCareType,
+        for plant: Plant,
+        context: ModelContext,
+        now: Date
+    ) throws -> Bool {
         switch type {
         case .watering, .fertilizing:
-            PlantCarePlanService.tasks(for: plant, now: now).contains { task in
+            let history = try PlantCarePlanningHistoryQuery.build(
+                plantID: plant.id,
+                context: context
+            )
+            return PlantCarePlanService.tasks(
+                for: plant,
+                history: history,
+                now: now
+            ).contains { task in
                 task.careType == type && task.daysUntilDue <= 0
             }
         default:
-            false
+            return false
         }
     }
 
@@ -466,17 +973,20 @@ struct PlantCreationCommandResult: Equatable {
     let kind: String
     let didPersist: Bool
     let persistenceErrorDescription: String?
+    let personalDenial: PersonalFreeLimitDenial?
 
     init(
         plantID: UUID,
         kind: String,
         didPersist: Bool = true,
-        persistenceErrorDescription: String? = nil
+        persistenceErrorDescription: String? = nil,
+        personalDenial: PersonalFreeLimitDenial? = nil
     ) {
         self.plantID = plantID
         self.kind = kind
         self.didPersist = didPersist
         self.persistenceErrorDescription = persistenceErrorDescription
+        self.personalDenial = personalDenial
     }
 }
 
@@ -771,9 +1281,35 @@ enum PlantCreationCommandService {
     static func createPlant(
         input: PlantCreationCommandInput,
         context: ModelContext,
+        personalAccessLevel: PersonalAccessLevel = .personal,
         scheduleNotifications: Bool = true,
         reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
     ) -> PlantCreationCommandResult {
+        do {
+            let usage = try PersonalUsageSnapshotReader.snapshot(context: context)
+            let disposition = PersonalAccessPolicy.disposition(
+                level: personalAccessLevel,
+                usage: usage,
+                request: .addActivePlant()
+            )
+            if case let .deny(denial) = disposition,
+               case let .wouldExceedFreeLimit(limitDenial) = denial.reason {
+                return PlantCreationCommandResult(
+                    plantID: input.id,
+                    kind: EntityKind.plant.rawValue,
+                    didPersist: false,
+                    personalDenial: limitDenial
+                )
+            }
+        } catch {
+            return PlantCreationCommandResult(
+                plantID: input.id,
+                kind: EntityKind.plant.rawValue,
+                didPersist: false,
+                persistenceErrorDescription: "Could not verify the current Ohana Personal allowance: \(error.localizedDescription)"
+            )
+        }
+
         let trimmedName = input.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let plant = Plant(
             name: trimmedName.isEmpty ? "Plant" : trimmedName,
@@ -843,47 +1379,5 @@ enum PlantCreationCommandService {
             plantID: plant.id,
             kind: EntityKind.plant.rawValue
         )
-    }
-}
-
-@MainActor
-struct PlantCreationCommandExecutor {
-    let context: ModelContext
-    let revisions: DomainRevisionPublishing
-
-    init(context: ModelContext) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher())
-    }
-
-    init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
-    }
-
-    init(context: ModelContext, services: AppServices) {
-        self.init(context: context, revisions: services.domainRevisions)
-    }
-
-    init(context: ModelContext, revisions: DomainRevisionPublishing) {
-        self.context = context
-        self.revisions = revisions
-    }
-
-    @discardableResult
-    func createPlant(
-        input: PlantCreationCommandInput,
-        note: String,
-        scheduleNotifications: Bool = true,
-        reminderScheduling providedReminderScheduling: ReminderSchedulingManaging? = nil
-    ) -> PlantCreationCommandResult {
-        let result = PlantCreationCommandService.createPlant(
-            input: input,
-            context: context,
-            scheduleNotifications: scheduleNotifications,
-            reminderScheduling: providedReminderScheduling
-        )
-        if result.didPersist {
-            revisions.publishMemberCreation(result, note: note)
-        }
-        return result
     }
 }

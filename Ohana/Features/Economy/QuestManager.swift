@@ -91,6 +91,8 @@ final class QuestManager: CoconutProjectionManaging {
         static let cooldownLogs = "quest_cooldownLogs"
     }
 
+    static let cooldownHistoryLimit = 64
+
     // MARK: - 冷却规则
 
     /// 返回该动作的冷却秒数（nil = 无冷却）
@@ -137,20 +139,28 @@ final class QuestManager: CoconutProjectionManaging {
 
     /// 是否在冷却期内
     func isOnCooldown(petId: UUID?, type: OhanaActionType) -> Bool {
+        isOnCooldown(petId: petId, type: type, at: Date())
+    }
+
+    /// Evaluates cooldown at the reward operation time. A later reward must not
+    /// change the answer when an older durable operation is replayed.
+    func isOnCooldown(petId: UUID?, type: OhanaActionType, at operationDate: Date) -> Bool {
         guard let duration = Self.cooldownDuration(for: type) else { return false }
-        let key = cooldownKey(petId: petId, type: type)
-        guard let dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs),
-              let ts = dict[key] as? Double else { return false }
-        return Date().timeIntervalSince1970 - ts < duration
+        guard let timestamp = cooldownTimestamp(
+            petId: petId,
+            type: type,
+            at: operationDate
+        ) else { return false }
+        let elapsed = operationDate.timeIntervalSince1970 - timestamp
+        return elapsed >= 0 && elapsed < duration
     }
 
     /// 冷却剩余秒数（0 = 已结束）
     func cooldownRemaining(petId: UUID?, type: OhanaActionType) -> TimeInterval {
         guard let duration = Self.cooldownDuration(for: type) else { return 0 }
-        let key = cooldownKey(petId: petId, type: type)
-        guard let dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs),
-              let ts = dict[key] as? Double else { return 0 }
-        return max(0, duration - (Date().timeIntervalSince1970 - ts))
+        let now = Date()
+        guard let timestamp = cooldownTimestamp(petId: petId, type: type, at: now) else { return 0 }
+        return max(0, duration - (now.timeIntervalSince1970 - timestamp))
     }
 
     /// 记录本次奖励时间戳
@@ -159,10 +169,53 @@ final class QuestManager: CoconutProjectionManaging {
     }
 
     func recordCooldown(petId: UUID?, type: OhanaActionType, occurredAt: Date) {
+        let timestamp = occurredAt.timeIntervalSince1970
+        guard timestamp.isFinite else { return }
         let key = cooldownKey(petId: petId, type: type)
         var dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs) ?? [:]
-        dict[key] = occurredAt.timeIntervalSince1970
+        var history = Self.cooldownHistory(from: dict[key])
+        history.append(timestamp)
+        history = Array(Set(history)).sorted()
+        if history.count > Self.cooldownHistoryLimit {
+            history.removeFirst(history.count - Self.cooldownHistoryLimit)
+        }
+        dict[key] = history
         Self.defaults.set(dict, forKey: Keys.cooldownLogs)
+    }
+
+    private func cooldownTimestamp(
+        petId: UUID?,
+        type: OhanaActionType,
+        at operationDate: Date
+    ) -> TimeInterval? {
+        let operationTimestamp = operationDate.timeIntervalSince1970
+        guard operationTimestamp.isFinite,
+              let dict = Self.defaults.dictionary(forKey: Keys.cooldownLogs) else {
+            return nil
+        }
+        let key = cooldownKey(petId: petId, type: type)
+        return Self.cooldownHistory(from: dict[key]).last { timestamp in
+            timestamp <= operationTimestamp
+        }
+    }
+
+    private static func cooldownHistory(from storedValue: Any?) -> [TimeInterval] {
+        let timestamps: [TimeInterval] = switch storedValue {
+        case let number as NSNumber:
+            [number.doubleValue]
+        case let numbers as [NSNumber]:
+            numbers.map(\.doubleValue)
+        case let values as [Double]:
+            values
+        case let values as [Any]:
+            values.compactMap { value in
+                if let number = value as? NSNumber { return number.doubleValue }
+                return value as? Double
+            }
+        default:
+            []
+        }
+        return Array(Set(timestamps.filter(\.isFinite))).sorted()
     }
 
     func clearCooldown(petId: UUID?, type: OhanaActionType) {

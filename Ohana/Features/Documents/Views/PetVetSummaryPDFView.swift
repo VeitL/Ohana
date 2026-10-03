@@ -374,7 +374,10 @@ struct PetVetSummaryPDFView: View {
                 Text(snapshot.name)
                     .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
                     .foregroundStyle(Color(hex: "1A1A2E"))
-                Text("\(snapshot.species) · \(snapshot.breed.isEmpty ? l.tr(zh: "未知品种", en: "Unknown breed", de: "Unbekannte Rasse") : snapshot.breed) · \(snapshot.genderSymbol)")
+                Text(
+                    "\(Pet.localizedSpeciesName(snapshot.species, l: l)) · " +
+                        "\(localizedSnapshotBreed) · \(snapshot.genderSymbol)"
+                )
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.gray.opacity(0.7))
             }
@@ -420,6 +423,12 @@ struct PetVetSummaryPDFView: View {
                 }
             }
         }
+    }
+
+    private var localizedSnapshotBreed: String {
+        snapshot.breed.isEmpty
+            ? l.tr(zh: "未知品种", en: "Unknown breed", de: "Unbekannte Rasse")
+            : l.resourceName(snapshot.breed)
     }
 
     // MARK: - 过敏 & 备注
@@ -621,7 +630,7 @@ struct PetVetPDFShareSheet: View {
                             Text(l.tr(zh: "分享 / 保存 PDF", en: "Share / save PDF", de: "PDF teilen / sichern"))
                                 .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
                         }
-                        .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

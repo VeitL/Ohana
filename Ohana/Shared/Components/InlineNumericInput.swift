@@ -14,6 +14,7 @@ struct InlineNumericInput: View {
     var countryCode: String = AppCountry.code
     var maxFractionDigits: Int = 0
     var accent: Color = .goPrimary
+    var accentForeground: Color = .ohanaPrimaryActionText
     var step: Double?
     var minValue: Double = 0
     var valueFont: Font = OhanaFont.title3(.black)
@@ -126,7 +127,7 @@ struct InlineNumericInput: View {
         } label: {
             Image(systemName: systemName)
                 .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .foregroundStyle(accentForeground)
                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(accent, in: Circle())
         }

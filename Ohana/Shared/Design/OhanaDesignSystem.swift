@@ -187,6 +187,7 @@ struct GoGlassBackground<S: InsettableShape>: ViewModifier {
             .background(Color.ohanaControlFill.opacity(colorScheme == .dark ? 0.92 : 0.86), in: shape)
             .overlay {
                 shape.strokeBorder(Color.ohanaGlassStroke, lineWidth: 1)
+                    .allowsHitTesting(false)
             }
     }
 }

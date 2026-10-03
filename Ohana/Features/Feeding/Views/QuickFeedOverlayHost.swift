@@ -36,6 +36,8 @@ struct QuickFeedOverlayHost: View {
                 Text(message)
                     .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("quick-feed-toast")
             .foregroundStyle(Color.arkInk)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)

@@ -21,11 +21,11 @@ struct IslandMedicationDashboardContentView: View {
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
     let medicationsByPetID: [UUID: [PetMedication]]
+    var todayDoseCounts: [UUID: Int] = [:]
     var onMedicationDataChanged: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
@@ -43,8 +43,8 @@ struct IslandMedicationDashboardContentView: View {
     private var summaries: [MedicationPetSummary] {
         selectedPets.map { pet in
             let meds = medications(for: pet).filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
-            let due = meds.reduce(0) { $0 + max(0, $1.frequency.dosesPerDay) }
-            let taken = meds.reduce(0) { $0 + min(appServices.medicationReminders.dosesTakenToday(for: $1.id), max(0, $1.frequency.dosesPerDay)) }
+            let due = meds.reduce(0) { $0 + requiredToday(for: $1) }
+            let taken = meds.reduce(0) { $0 + min(todayDoseCounts[$1.id] ?? 0, requiredToday(for: $1)) }
             _ = doseRefreshToken
             return MedicationPetSummary(id: pet.id, pet: pet, activeMeds: meds, dueDoses: due, takenDoses: taken)
         }
@@ -67,14 +67,18 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var dueDoses: Int {
-        activeMeds.reduce(0) { $0 + max(0, $1.frequency.dosesPerDay) }
+        activeMeds.reduce(0) { $0 + requiredToday(for: $1) }
     }
 
     private var takenDoses: Int {
         _ = doseRefreshToken
         return activeMeds.reduce(0) { total, med in
-            total + min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(0, med.frequency.dosesPerDay))
+            total + min(todayDoseCounts[med.id] ?? 0, requiredToday(for: med))
         }
+    }
+
+    private func requiredToday(for medication: PetMedication) -> Int {
+        max(0, PetMedicationDoseLogging.requiredDoses(on: Date(), for: medication))
     }
 
     private var completion: Double {
@@ -224,9 +228,9 @@ struct IslandMedicationDashboardContentView: View {
 
             if activeMeds.isEmpty {
                 emptyState(l.tr(
-                    zh: "暂无当前用药\n进入成员页添加药物计划",
-                    en: "No active medications yet\nOpen a member page to add a medication plan",
-                    de: "Noch keine aktiven Medikamente\nOeffne eine Mitgliederseite, um einen Plan hinzuzufuegen"
+                    zh: "暂无当前用药",
+                    en: "No active medications",
+                    de: "Keine aktiven Medikamente"
                 ))
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 10)], spacing: 10) {
@@ -241,8 +245,8 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private func pillCell(_ med: PetMedication) -> some View {
-        let need = max(0, med.frequency.dosesPerDay)
-        let taken = min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(need, 1))
+        let need = requiredToday(for: med)
+        let taken = min(todayDoseCounts[med.id] ?? 0, max(need, 1))
         let done = need > 0 && taken >= need
         _ = doseRefreshToken
         return VStack(spacing: 8) {
@@ -316,7 +320,7 @@ struct IslandMedicationDashboardContentView: View {
                 Text(title)
                     .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

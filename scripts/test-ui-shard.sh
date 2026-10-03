@@ -17,11 +17,10 @@ Usage:
 
 Runs one UI-test shard sequentially on the disposable iPhone 17 Tests device.
 Normal mode builds once and then tests without rebuilding. --without-building
-reuses a preceding build-for-testing run. Every run writes a distinct xcresult.
+reuses a preceding build-for-testing run. Successful xcresults are deleted;
+the shared lifecycle keeps at most three failures for seven days.
 
 Environment:
-  OHANA_UI_TEST_RESULT_ROOT        Default xcresult directory
-  OHANA_RESULT_BUNDLE_PATH         Exact xcresult path override
   OHANA_UI_TEST_SHARD_MANIFEST     Alternate shard manifest
 USAGE
 }
@@ -98,7 +97,7 @@ selectors=()
 while IFS=$'\t' read -r manifest_shard selector extra; do
   [[ -z "${manifest_shard}" || "${manifest_shard}" =~ ^[[:space:]]*# ]] && continue
   if [[ "${manifest_shard}" == "${shard}" ]]; then
-    selectors+=("-only-testing:${selector}")
+    selectors+=("${selector}")
   fi
 done < "${MANIFEST}"
 
@@ -109,29 +108,24 @@ if [[ ${#selectors[@]} -eq 0 ]]; then
   exit 2
 fi
 
-timestamp="$(date +%Y%m%d-%H%M%S)"
-result_root="${OHANA_UI_TEST_RESULT_ROOT:-${REPO_ROOT}/.build/TestResults/ui-shards}"
-result_bundle="${OHANA_RESULT_BUNDLE_PATH:-${result_root}/${timestamp}-${shard}-$$.xcresult}"
-derived_data_root="${REPO_ROOT}/.build/DerivedData/tests"
-
-command=(scripts/test-simulator.sh -parallel-testing-enabled NO)
-command+=("${selectors[@]}")
+command=(scripts/xcode-test.sh)
+if [[ "${action}" == "test-without-building" ]]; then
+  command+=(--without-building)
+fi
+for selector in "${selectors[@]}"; do
+  command+=(--only-testing "${selector}")
+done
+if [[ "${mode}" == "print" ]]; then
+  command+=(--print)
+fi
 if [[ ${#xcode_args[@]} -gt 0 ]]; then
-  command+=("${xcode_args[@]}")
+  command+=(-- "${xcode_args[@]}")
 fi
 
 if [[ "${mode}" == "print" ]]; then
-  printf 'OHANA_TEST_ACTION=%q DERIVED_DATA_PATH=%q OHANA_RESULT_BUNDLE_PATH=%q' \
-    "${action}" "${derived_data_root}" "${result_bundle}"
-  printf ' %q' "${command[@]}"
-  printf '\n'
+  "${command[@]}"
   exit 0
 fi
 
-export OHANA_TEST_ACTION="${action}"
-export DERIVED_DATA_PATH="${derived_data_root}"
-export OHANA_RESULT_BUNDLE_PATH="${result_bundle}"
-
 echo "UI shard: ${shard} (${#selectors[@]} tests)"
-echo "Result bundle: ${result_bundle}"
 exec "${command[@]}"

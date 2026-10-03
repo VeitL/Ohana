@@ -8,6 +8,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 // MARK: - Time Range
 
@@ -17,6 +18,10 @@ enum ExploreTimeRange: String, CaseIterable, Identifiable {
     case year = "年"
     case all = "全部"
     var id: String { rawValue }
+
+    var requiresPersonal: Bool {
+        self == .year || self == .all
+    }
 
     func title(_ l: L10n) -> String {
         switch self {
@@ -59,8 +64,10 @@ struct IslandExplorationDashboardContentView: View {
     let allWalkLogs: [PetWalkLog]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var appServices
 
     @State private var timeRange: ExploreTimeRange = .month
+    @State private var showingPersonalPlan = false
     @State private var animationProgress: Double = 0.0
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -189,6 +196,15 @@ struct IslandExplorationDashboardContentView: View {
 
     var body: some View {
         dashboardBody
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if timeRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    timeRange = .month
+                }
+            }
             .onAppear { triggerAnimation() }
             .onChange(of: timeRange) { _, _ in
                 animationProgress = 0
@@ -258,9 +274,14 @@ struct IslandExplorationDashboardContentView: View {
     private var heroDisplay: some View {
         VStack(alignment: .leading, spacing: 12) {
             // 时间 filter
-            Picker("", selection: $timeRange) {
+            Picker("", selection: personalRangeSelection) {
                 ForEach(ExploreTimeRange.allCases) { r in
-                    Text(r.title(l)).tag(r)
+                    Text(
+                        r.requiresPersonal && !appServices.commerce.allows(.extendedTrends)
+                            ? "\(r.title(l)) · Personal"
+                            : r.title(l)
+                    )
+                    .tag(r)
                 }
             }
             .pickerStyle(.segmented)
@@ -306,6 +327,20 @@ struct IslandExplorationDashboardContentView: View {
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    private var personalRangeSelection: Binding<ExploreTimeRange> {
+        Binding(
+            get: { timeRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                timeRange = range
+            }
+        )
     }
 
     // MARK: - 模块B：荣誉看板 Fun Bento

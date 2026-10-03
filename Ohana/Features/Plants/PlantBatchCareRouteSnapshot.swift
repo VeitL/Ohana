@@ -151,7 +151,23 @@ actor PlantBatchCareRouteSnapshotActor {
         try Task.checkCancellation()
         let plants = fetchPlants()
         let plantByID = Dictionary(plants.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let tasks = PlantCarePlanService.tasks(for: plants, days: input.days, now: input.now)
+        let calendar = Calendar.current
+        let end = calendar.date(byAdding: .day, value: input.days, to: input.now)
+            ?? input.now.addingTimeInterval(Double(input.days) * 86400)
+        let tasks = try plants.flatMap { plant in
+            try Task.checkCancellation()
+            let planningHistory = try PlantCarePlanningHistoryQuery.build(
+                plantID: plant.id,
+                context: modelContext
+            )
+            return PlantCarePlanService.tasks(
+                for: plant,
+                history: planningHistory,
+                now: input.now,
+                calendar: calendar
+            )
+            .filter { $0.dueDate <= end }
+        }
             .filter { $0.daysUntilDue <= 0 }
             .filter { input.careType == nil || $0.careType == input.careType }
             .compactMap { task -> PlantBatchCareSheetTask? in

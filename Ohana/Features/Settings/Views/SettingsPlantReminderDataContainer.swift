@@ -74,6 +74,7 @@ private struct SettingsPlantReminderPanelContent: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage("currentActiveHumanId") private var currentActiveHumanId = ""
+    @AppStorage("notif_plant_care_enabled") private var plantCareRemindersEnabled = true
     @State private var plantReminderDisplayState: [UUID: Bool] = [:]
     @State private var pendingPlantReminderUpdates: [UUID: PendingPlantReminderUpdate] = [:]
     @State private var statusMessage: String?
@@ -90,7 +91,7 @@ private struct SettingsPlantReminderPanelContent: View {
             reminderOverview
             sectionDivider
             masterRow
-            if NotificationPreferenceStore.isEnabled(.plantCare) {
+            if plantCareRemindersEnabled {
                 sectionDivider
                 timeWindowRow
                 sectionDivider
@@ -239,10 +240,22 @@ private struct SettingsPlantReminderPanelContent: View {
                 de: "Steuert Pflanzenpflegepläne, Erinnerungen und Mitteilungen"
             ),
             isOn: Binding(
-                get: { NotificationPreferenceStore.isEnabled(.plantCare) },
+                get: { plantCareRemindersEnabled },
                 set: { value in
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record(
+                        "plant-reminders-master setter requested=\(value) previous=\(plantCareRemindersEnabled) "
+                            + "persistedBefore=\(NotificationPreferenceStore.isEnabled(.plantCare))"
+                    )
+                    #endif
                     NotificationPreferenceStore.set(value, for: .plantCare)
                     applyPreferenceChange()
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record(
+                        "plant-reminders-master setter returned=\(plantCareRemindersEnabled) "
+                            + "persistedAfter=\(NotificationPreferenceStore.isEnabled(.plantCare))"
+                    )
+                    #endif
                 }
             )
         )
@@ -657,6 +670,12 @@ private struct SettingsPlantReminderPanelContent: View {
     }
 
     private func setPlantRemindersEnabled(_ enabled: Bool, for plant: Plant) {
+        #if DEBUG
+        OhanaUITestTouchTrace.record(
+            "plantReminder binding requested=\(enabled) persisted=\(plant.remindersEnabled) "
+                + "displayBefore=\(plantRemindersEnabled(for: plant)) pendingBefore=\(pendingPlantReminderUpdates[plant.id]?.enabled.description ?? "nil")"
+        )
+        #endif
         plantReminderDisplayState[plant.id] = enabled
         if plant.remindersEnabled == enabled {
             pendingPlantReminderUpdates.removeValue(forKey: plant.id)
@@ -669,6 +688,9 @@ private struct SettingsPlantReminderPanelContent: View {
     }
 
     private func flushPendingPlantReminderUpdates() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("plantReminder flush pendingCount=\(pendingPlantReminderUpdates.count)")
+        #endif
         guard !pendingPlantReminderUpdates.isEmpty else { return }
 
         let updates = pendingPlantReminderUpdates
@@ -690,10 +712,12 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private func performBulkDefer() {
         guard !isBulkDeferPending else { return }
-        guard !SettingsDebugTools.isRunningUITests else {
-            statusMessage = bulkDeferUITestMessage()
-            return
-        }
+        #if DEBUG
+            guard !SettingsDebugTools.isRunningUITests else {
+                statusMessage = bulkDeferUITestMessage()
+                return
+            }
+        #endif
 
         isBulkDeferPending = true
         statusMessage = bulkDeferInProgressMessage()

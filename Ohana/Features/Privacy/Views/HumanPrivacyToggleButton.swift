@@ -139,7 +139,7 @@ private extension HumanPrivateField {
     func localizedTitle(_ l: L10n) -> String {
         switch self {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

@@ -30,9 +30,25 @@ extension CalendarEventCommandService {
         now: Date = Date(),
         options: CalendarEventCompletionOptions = CalendarEventCompletionOptions()
     ) throws -> CalendarEventCompletionResult {
+        guard options.allowsManagedProjection || CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else {
+            throw CalendarCommandError.familyTaskProjectionRequiresCollaboration
+        }
         let reminderCompletion = options.reminderCompletion ?? ReminderCompletionService()
-        let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
+        let hasGeneratedPlantCareFact = PlantCareScheduleSyncService.hasCompletedCareFact(
+            for: event,
+            occurrenceDate: occurrenceDate,
+            context: context
+        )
+        let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate) &&
+            !hasGeneratedPlantCareFact
         let affectedSubjectIDs = affectedSubjectIDs(for: event, context: context)
+        try requirePersonalAccessForReopenedPlan(
+            event: event,
+            shouldComplete: shouldComplete,
+            context: context,
+            options: options,
+            now: now
+        )
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
             event: event,
             writeKind: writeKind(for: event),
@@ -76,14 +92,16 @@ extension CalendarEventCommandService {
         )
         if let blockedResult = plantPreparation.blockedResult { return blockedResult }
         let plantCareSyncResult = plantPreparation.syncResult
-        guard DomainScheduleWriter.setEventOccurrenceCompletion(
+        let didChangeSchedule = DomainScheduleWriter.setEventOccurrenceCompletion(
             event,
             occurrenceDate: occurrenceDate,
             isCompleted: shouldComplete,
             mutation: mutation,
             context: context,
             modifiedAt: now
-        ) else {
+        )
+        let didRemovePlantCareFact = plantCareSyncResult?.didRemoveCareFact == true
+        guard didChangeSchedule || didRemovePlantCareFact else {
             return unchangedCompletionResult(
                 event: event,
                 occurrenceDate: occurrenceDate,
@@ -128,11 +146,39 @@ extension CalendarEventCommandService {
             isCompleted: shouldComplete,
             syncedReminderCount: remindersToSync.count,
             affectedSubjectIDs: affectedSubjectIDs,
-            didChange: true,
+            didChange: didChangeSchedule || didRemovePlantCareFact,
             didWriteFact: petTaskSyncResult?.didWriteFact ?? plantCareSyncResult?.didWriteCareFact ?? true,
             allowsDerivedEffects: petTaskSyncResult?.allowsDerivedEffects ?? plantCareSyncResult?.allowsScheduleCompletion ?? true,
             factDate: occurrenceDate,
             operationDate: now
+        )
+    }
+
+    private static func requirePersonalAccessForReopenedPlan(
+        event: Event,
+        shouldComplete: Bool,
+        context: ModelContext,
+        options: CalendarEventCompletionOptions,
+        now: Date
+    ) throws {
+        guard !shouldComplete,
+              try PersonalUsageSnapshotReader.isOrdinaryUserPlanCandidate(
+                  event,
+                  context: context,
+                  now: now
+              ),
+              try !PersonalUsageSnapshotReader.countsAsOrdinaryActiveUserPlan(
+                  event,
+                  context: context,
+                  now: now
+              ) else {
+            return
+        }
+        try PersonalPlanQuotaCommandGate.requirePlanChange(
+            context: context,
+            personalAccessLevel: options.personalAccessLevel,
+            addingActivePlanCount: 1,
+            now: now
         )
     }
 
@@ -199,21 +245,32 @@ extension CalendarEventCommandService {
         scheduleNotifications: Bool,
         affectedSubjectIDs: Set<UUID>
     ) -> PlantCareCompletionPreparation {
-        guard shouldComplete, PlantCareScheduleSyncService.isPlantCareEvent(event) else {
+        guard PlantCareScheduleSyncService.isPlantCareEvent(event) else {
             return PlantCareCompletionPreparation(syncResult: nil, blockedResult: nil)
         }
         let sourceReminder = reminders.first
-        let syncResult = PlantCareScheduleSyncService.syncCompletedEvent(
-            event,
-            occurrenceDate: occurrenceDate,
-            executorId: executorID,
-            context: context,
-            source: sourceReminder == nil ? .calendar : .reminder,
-            sourceReminderId: sourceReminder?.id,
-            now: now,
-            scheduleNotifications: scheduleNotifications,
-            syncPlanSchedule: false
-        )
+        let syncResult = if shouldComplete {
+            PlantCareScheduleSyncService.syncCompletedEvent(
+                event,
+                occurrenceDate: occurrenceDate,
+                executorId: executorID,
+                context: context,
+                source: sourceReminder == nil ? .calendar : .reminder,
+                sourceReminderId: sourceReminder?.id,
+                now: now,
+                scheduleNotifications: scheduleNotifications,
+                syncPlanSchedule: false
+            )
+        } else {
+            PlantCareScheduleSyncService.syncReopenedEvent(
+                event,
+                occurrenceDate: occurrenceDate,
+                executorId: executorID,
+                context: context,
+                now: now,
+                saveChanges: false
+            )
+        }
         let blockedResult = syncResult.allowsScheduleCompletion ? nil : unchangedCompletionResult(
             event: event,
             occurrenceDate: occurrenceDate,

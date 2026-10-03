@@ -24,7 +24,7 @@ struct PlantActionHumanAttributionTests {
         #expect(quickBatch.contains("requiresExecutorSelection"))
     }
 
-    @Test func sheetlessPlantCareOnlyAddsConfirmationForMultipleEligibleHumans() throws {
+    @Test func sheetlessPlantCareUsesCurrentMemberWithoutExtraConfirmation() throws {
         let rootURL = repositoryRootURL()
         let confirmation = try source(
             "Ohana/Features/Plants/Views/PlantQuickCareActorConfirmationSheet.swift",
@@ -39,7 +39,11 @@ struct PlantActionHumanAttributionTests {
             rootURL: rootURL
         )
 
-        #expect(confirmation.contains("var needsConfirmation: Bool { eligibleHumanCount > 1 }"))
+        #expect(!PlantActionHumanSelectionContext(eligibleHumanCount: 2, defaultHumanID: UUID()).needsConfirmation)
+        #expect(PlantActionHumanSelectionContext(eligibleHumanCount: 2, defaultHumanID: nil).needsConfirmation)
+        #expect(!PlantActionHumanSelectionContext(eligibleHumanCount: 0, defaultHumanID: nil).needsConfirmation)
+        #expect(!PetMedicationDoseActorSelectionContext(eligibleHumanCount: 2, defaultExecutorID: UUID()).needsConfirmation)
+        #expect(PetMedicationDoseActorSelectionContext(eligibleHumanCount: 2, defaultExecutorID: nil).needsConfirmation)
         #expect(confirmation.contains("QuickCareActionHumanPickerContainer("))
         #expect(dashboardActions.contains("if humanContext.needsConfirmation"))
         #expect(feature.contains("if humanContext.needsConfirmation"))
@@ -49,7 +53,10 @@ struct PlantActionHumanAttributionTests {
 
     @Test func plantCommandCallsitesUseTheSelectedDraftActor() throws {
         let rootURL = repositoryRootURL()
-        let dashboard = try source("Ohana/Features/Plants/Views/PlantDashboardView.swift", rootURL: rootURL)
+        let dashboard = try source(
+            "Ohana/Features/Plants/Views/PlantDashboardView+Actions.swift",
+            rootURL: rootURL
+        )
         let detail = try source("Ohana/Features/Plants/Views/PlantDetailView+Actions.swift", rootURL: rootURL)
         let homeRoute = try source("Ohana/Features/Home/HomePlantCareLogRouteContainer.swift", rootURL: rootURL)
 

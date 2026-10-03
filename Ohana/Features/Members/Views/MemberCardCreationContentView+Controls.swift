@@ -13,7 +13,71 @@ import SwiftUI
 import UIKit
 
 extension MemberCardCreationContentView {
-    func humanNameInput(width: CGFloat) -> some View {
+    var petSpeciesGridColumns: [GridItem] {
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 4
+        return Array(repeating: GridItem(.flexible(), spacing: 7), count: count)
+    }
+
+    @ViewBuilder
+    func petSpeciesButton(_ species: String) -> some View {
+        let key = Pet.canonicalSpeciesKey(species)
+        let isSelected = !draft.species.isEmpty &&
+            Pet.canonicalSpeciesKey(draft.species) == key
+        let button = Button {
+            selectPetSpecies(species)
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: Pet.speciesSilhouetteSymbol(forSpecies: species))
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold))
+                    .accessibilityHidden(true)
+                Text(speciesLabel(species))
+                    .font(OhanaFont.caption2(.bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+            }
+            .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+            .frame(maxWidth: .infinity, minHeight: 48)
+        }
+        .buttonBorderShape(.roundedRectangle(radius: OhanaRadius.control))
+        .accessibilityIdentifier("member-pet-species-option-\(key)")
+        .accessibilityLabel(speciesLabel(species))
+        .accessibilityValue(
+            isSelected
+                ? l.tr(zh: "已选择", en: "Selected", de: "Ausgewählt")
+                : l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt")
+        )
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+        if isSelected {
+            button
+                .buttonStyle(.borderedProminent)
+                .tint(cardAccent)
+        } else {
+            button
+                .buttonStyle(.bordered)
+                .tint(cardForeground)
+        }
+    }
+
+    func selectPetSpecies(_ species: String) {
+        let nextKey = Pet.canonicalSpeciesKey(species)
+        let currentKey = draft.species.isEmpty ? "" : Pet.canonicalSpeciesKey(draft.species)
+        guard currentKey != nextKey else { return }
+
+        // Switching the native bordered style while animating this state can
+        // leave both button representations in the iOS 26 accessibility tree.
+        // Commit the selection immediately so the grid has one stable control.
+        draft.species = species
+        draft.isCustomSpecies = nextKey == "other"
+        draft.customSpecies = ""
+        draft.breed = ""
+        draft.customBreed = ""
+        draft.isCustomBreed = false
+        draft.coatColor = ""
+        UISelectionFeedbackGenerator().selectionChanged()
+    }
+
+    func humanNameInput(width: CGFloat? = nil) -> some View {
         OhanaTextField(
             placeholder: l.tr(zh: "名字", en: "Name", de: "Name"),
             text: $draft.name,
@@ -21,6 +85,50 @@ extension MemberCardCreationContentView {
         )
         .frame(width: width, height: 44)
         .accessibilityIdentifier("member-name-input")
+    }
+
+    func compactHumanGenderGrid(
+        options: [String],
+        selection: Binding<String>,
+        label: @escaping (String) -> String
+    ) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: dynamicTypeSize.isAccessibilitySize ? 150 : 92), spacing: 7)],
+            spacing: 7
+        ) {
+            ForEach(options, id: \.self) { option in
+                let isSelected = selection.wrappedValue == option
+                Button {
+                    withAnimation(GoMotion.selection) {
+                        selection.wrappedValue = option
+                    }
+                    OhanaFeedback.selection()
+                } label: {
+                    HStack(spacing: 5) {
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selected-state icon; the button exposes label, value, and selected trait
+                                .accessibilityHidden(true)
+                        }
+                        Text(label(option))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                    }
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 6)
+                    .background(isSelected ? cardSelectedFill : cardControlFill, in: Capsule())
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(isSelected ? cardAccent.opacity(0.62) : cardControlStroke, lineWidth: 1)
+                    }
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("member-gender-\(option)")
+                .accessibilityLabel(label(option))
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
+            }
+        }
     }
 
     func petNameInput() -> some View {
@@ -113,15 +221,6 @@ extension MemberCardCreationContentView {
         case "boy", "male", "男": "♂"
         case "girl", "female", "女": "♀"
         default: ""
-        }
-    }
-
-    func humanGenderIcon(_ gender: String) -> String {
-        switch HumanProfileOptions.normalizedGender(gender) {
-        case "男": "♂"
-        case "女": "♀"
-        case "非二元": "⚧"
-        default: "•"
         }
     }
 
@@ -249,7 +348,10 @@ extension MemberCardCreationContentView {
 
     func flatTextField(_ title: String, text: Binding<String>) -> some View { // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
         TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
+            .focused($petCustomValueFieldFocused)
             .textInputAutocapitalization(.words)
+            .submitLabel(.done)
+            .onSubmit { petCustomValueFieldFocused = false }
             .font(OhanaFont.caption(.bold))
             .foregroundStyle(cardForeground)
             .padding(.horizontal, 12)
@@ -335,7 +437,7 @@ extension MemberCardCreationContentView {
                     } label: {
                         Text(label(option))
                             .font(OhanaFont.caption(.black))
-                            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+                            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .padding(.horizontal, 12)
                             .frame(height: 34)
                             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())

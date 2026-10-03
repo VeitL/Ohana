@@ -79,9 +79,11 @@ private struct OhanaGlassProminentButtonModifier: ViewModifier {
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.capsule)
                 .tint(tint)
+                .foregroundStyle(Color.ohanaPrimaryActionText)
         } else {
             content
                 .buttonStyle(ScaleButtonStyle())
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .background(tint, in: Capsule())
         }
     }
@@ -122,6 +124,14 @@ extension View {
 
     func ohanaGlassProminentButton(tint: Color = Color.goPrimary) -> some View {
         modifier(OhanaGlassProminentButtonModifier(tint: tint))
+    }
+
+    /// Native primary CTA chrome with the foreground paired to Ohana's
+    /// adaptive primary accent instead of SwiftUI's fixed prominent-button ink.
+    func ohanaPrimaryProminentButton() -> some View {
+        buttonStyle(.borderedProminent)
+            .tint(Color.goPrimary)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
     }
 
     func ohanaGlassToolbarSurface(cornerRadius: CGFloat = 28) -> some View {

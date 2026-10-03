@@ -149,11 +149,13 @@ struct GenericWeightEntrySheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier(sheetAccessibilityIdentifier)
             .navigationTitle(l.tr(zh: "记录体重", en: "Record weight", de: "Gewicht erfassen"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(l.cancel, role: .cancel) { closeSheet() }
+                        .accessibilityIdentifier("ohana-sheet-close-action")
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
@@ -436,7 +438,7 @@ struct GenericWeightEntrySheet: View {
                 )
                 .font(OhanaFont.callout(.black))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(isValid && !isSaving ? accentColor : accentColor.opacity(0.38), in: Capsule())

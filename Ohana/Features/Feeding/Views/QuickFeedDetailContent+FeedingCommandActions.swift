@@ -57,7 +57,7 @@ extension QuickFeedDetailContent {
                 foodKind: foodKind,
                 saveAsDefault: saveAsDefault,
                 foodRecords: observedFoodRecords,
-                allEvents: allEvents,
+                allEvents: latestAllEvents(),
                 executorId: executorId,
                 date: date
             )
@@ -107,7 +107,7 @@ extension QuickFeedDetailContent {
                 pet: pet,
                 reminder: reminder,
                 foodRecords: observedFoodRecords,
-                allEvents: allEvents,
+                allEvents: latestAllEvents(),
                 executorId: executorId
             )
             guard result.didPersist else {

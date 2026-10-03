@@ -68,7 +68,9 @@ struct HomePlantCareLogRouteContainer: View {
                 }
             )
             descriptor.fetchLimit = 1
-            let plant = try context.fetch(descriptor).first // route-first-frame: allow deferred-fetch
+            let plant = try context.fetch(descriptor).first.flatMap { candidate in // route-first-frame: allow deferred-fetch
+                candidate.isArchived ? nil : candidate
+            }
             return HomePlantCareLogRouteData(plant: plant, hasLoaded: true)
         } catch {
             OhanaLog.warning(

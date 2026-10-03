@@ -86,25 +86,37 @@ extension QuickPottyDetailSheet {
     }
 
     func syncScoopPlan(for targets: [Pet], showToast: Bool) {
-        var scheduledReminders: [Reminder] = []
-        for target in targets {
-            persistScoopSettings(for: target)
-            if let event = CarePlanCalendarSync.syncScoopPlan(
-                pet: target,
-                context: modelContext,
+        do {
+            let events = try pottyCommandExecutor.syncScoopPlans(
+                pets: targets,
+                allEvents: allEvents,
                 intervalDays: scoopIntervalDays,
                 enabled: scoopReminderOn,
                 anchor: scoopAnchorDate
-            ) {
-                scheduledReminders.append(contentsOf: event.reminders)
+            )
+            for target in targets {
+                persistScoopSettings(for: target)
             }
-        }
-        if scoopReminderOn {
-            scheduleCarePlanReminders(scheduledReminders)
-        }
-        if showToast {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(scoopReminderOn ? l.tr(zh: "铲砂提醒已保存", en: "Scoop reminder saved", de: "Klo-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            if scoopReminderOn {
+                scheduleCarePlanReminders(events.flatMap(\.reminders))
+            }
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showSaveConfirmation(scoopReminderOn ? l.tr(zh: "铲砂提醒已保存", en: "Scoop reminder saved", de: "Klo-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            }
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            }
+        } catch {
+            if showToast {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "scoopPlan"),
+                    error: error
+                )
+                showSaveConfirmation(l.tr(zh: "保存失败，请重试", en: "Save failed. Please try again.", de: "Speichern fehlgeschlagen. Bitte erneut versuchen."))
+            }
         }
     }
 
@@ -113,25 +125,37 @@ extension QuickPottyDetailSheet {
     }
 
     func syncLitterChangePlan(for targets: [Pet], showToast: Bool) {
-        var scheduledReminders: [Reminder] = []
-        for target in targets {
-            persistLitterChangeSettings(for: target)
-            if let event = CarePlanCalendarSync.syncLitterFullChangePlan(
-                pet: target,
-                context: modelContext,
+        do {
+            let events = try pottyCommandExecutor.syncLitterFullChangePlans(
+                pets: targets,
+                allEvents: allEvents,
                 intervalDays: litterChangeIntervalDays,
                 enabled: litterReminderOn,
                 cycleAnchor: litterCycleAnchorDate
-            ) {
-                scheduledReminders.append(contentsOf: event.reminders)
+            )
+            for target in targets {
+                persistLitterChangeSettings(for: target)
             }
-        }
-        if litterReminderOn {
-            scheduleCarePlanReminders(scheduledReminders)
-        }
-        if showToast {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(litterReminderOn ? l.tr(zh: "换砂提醒已保存", en: "Litter reminder saved", de: "Streu-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            if litterReminderOn {
+                scheduleCarePlanReminders(events.flatMap(\.reminders))
+            }
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showSaveConfirmation(litterReminderOn ? l.tr(zh: "换砂提醒已保存", en: "Litter reminder saved", de: "Streu-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            }
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            }
+        } catch {
+            if showToast {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "litterChangePlan"),
+                    error: error
+                )
+                showSaveConfirmation(l.tr(zh: "保存失败，请重试", en: "Save failed. Please try again.", de: "Speichern fehlgeschlagen. Bitte erneut versuchen."))
+            }
         }
     }
 

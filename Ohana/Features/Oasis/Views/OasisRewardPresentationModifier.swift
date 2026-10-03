@@ -11,6 +11,7 @@ struct OasisRewardPresentationModifier: ViewModifier {
     @Binding var sheetRoute: OasisSheetRoute?
     @Binding var fullScreenRoute: OasisFullScreenRoute?
     let pets: [Pet]
+    let humans: [Human]
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     @Environment(AppServices.self) private var appServices
@@ -54,16 +55,12 @@ struct OasisRewardPresentationModifier: ViewModifier {
             .ohanaSheetPagePresentation() // ui-v4: allow long growth roadmap overview
         case .achievements:
             if AppFeatureRouteGuard.allowsOasisSheetRoute(route, currentLevel: currentFeatureLevel) {
-                if let pet = pets.first {
-                    AchievementWallView(
-                        pet: pet,
-                        allPets: pets,
-                        onPresentCoconutLog: onPresentCoconutLog
-                    )
-                    .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
-                } else {
-                    emptyOasisRoute
+                NavigationStack {
+                    AchievementUnifiedWallView(pets: pets, humans: humans)
+                        .navigationTitle(L10n(appLanguage).tr(zh: "成就", en: "Achievements", de: "Erfolge"))
+                        .navigationBarTitleDisplayMode(.inline)
                 }
+                .ohanaSheetPagePresentation() // ui-v4: allow long achievement overview
             } else {
                 lockedOasisRoute(route)
             }

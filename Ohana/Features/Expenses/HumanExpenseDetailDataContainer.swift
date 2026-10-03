@@ -9,9 +9,13 @@ struct HumanExpenseDetailView: View {
     init(human: Human) {
         self.human = human
         let humanKey = human.id.uuidString
+        let humanKeyLower = humanKey.lowercased()
         _allExpenses = Query(
             filter: #Predicate<PetExpenseLog> { log in
-                log.executorId == humanKey
+                log.executorId == humanKey ||
+                    log.executorId == humanKeyLower ||
+                    log.payerContributionsJSON.contains(humanKey) ||
+                    log.payerContributionsJSON.contains(humanKeyLower)
             },
             sort: \.date,
             order: .reverse
@@ -21,7 +25,7 @@ struct HumanExpenseDetailView: View {
     var body: some View {
         HumanExpenseDetailContentView(
             human: human,
-            allExpenses: allExpenses
+            allExpenses: ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
         )
     }
 }

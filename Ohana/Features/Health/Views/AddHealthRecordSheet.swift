@@ -230,6 +230,7 @@ struct AddHealthRecordSheet: View {
                                     placeholder: "0",
                                     maxFractionDigits: 2,
                                     accent: Color.goYellow,
+                                    accentForeground: Color.arkInk,
                                     step: 10,
                                     valueFont: .system(size: 15, weight: .medium, design: .rounded),
                                     valueAlignment: .leading,
@@ -274,7 +275,7 @@ struct AddHealthRecordSheet: View {
                                     : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
                                     .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(isSaving ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(
@@ -348,7 +349,7 @@ struct AddHealthRecordSheet: View {
                         } label: {
                             Text(label)
                                 .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(selectedType == t ? Color.arkInk : .primary)
+                                .foregroundStyle(selectedType == t ? Color.ohanaPrimaryActionText : .primary)
                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                 .background(selectedType == t ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
                         }

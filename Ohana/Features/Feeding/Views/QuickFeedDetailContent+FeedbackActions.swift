@@ -107,10 +107,15 @@ extension QuickFeedDetailContent {
     }
 
     func refreshOverviewSnapshot(force: Bool = false) {
+        let latestRules = FeedRuleState(
+            pet: pet,
+            allEvents: currentAllEvents,
+            now: clockTick
+        )
         overviewSnapshotStore.rebuild(
             pet: pet,
-            manualPlanEvents: feedScheduleEvents,
-            autoFeederEvents: autoFeederEvents,
+            manualPlanEvents: latestRules.manualReminderEvents,
+            autoFeederEvents: latestRules.autoFeederEvents,
             feedingLedgerEntries: observedFeedingLedgerEntries,
             range: draftStore.overviewRange,
             activeMode: activeFeedingMode,
@@ -121,9 +126,14 @@ extension QuickFeedDetailContent {
     }
 
     func refreshPlanCalendarSnapshot(force: Bool = false) {
+        let latestRules = FeedRuleState(
+            pet: pet,
+            allEvents: currentAllEvents,
+            now: clockTick
+        )
         planCalendarSnapshotStore.rebuild(
-            manualEvents: feedScheduleEvents,
-            autoEvents: autoFeederEvents,
+            manualEvents: latestRules.manualReminderEvents,
+            autoEvents: latestRules.autoFeederEvents,
             feedingLedgerEntries: observedFeedingLedgerEntries,
             activeMode: activeFeedingMode,
             month: draftStore.feedPlanCalendarMonth,

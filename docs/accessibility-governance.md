@@ -53,8 +53,8 @@ safety before it ships.
   Oasis), use path-scoped accessibility checks by default. When an explicit
   visual/flow or release request needs Simulator interaction, use the disposable
   `iPhone 17 Tests` environment for clean/destructive journeys and the pinned
-  Dogfood phone through `scripts/run-dogfood-simulator.sh` for non-destructive
-  existing-data journeys. Physical-device acceptance still owns final VoiceOver,
+  `iPhone 17 Dogfood` synthetic user through `scripts/run-dogfood-simulator.sh`
+  for non-destructive existing-data journeys. Physical-device acceptance still owns final VoiceOver,
   Voice Control, Switch Control, touch, and largest-Dynamic-Type evidence.
 - Use `// a11y: allow <reason>` only for genuinely decorative or non-interactive
   exceptions.

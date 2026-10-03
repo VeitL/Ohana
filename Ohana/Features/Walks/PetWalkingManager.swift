@@ -168,7 +168,9 @@ final class PetWalkingManager {
     private var walkStopStartedAt: CFAbsoluteTime?
     private var mapSnapshotTask: Task<Void, Never>?
     private var mapSnapshotGeneration = 0
+    private var activeSystemSurfaceSessionID: UUID?
     private let locationManager: any WalkLocationManaging
+    private let activityPresenter: any WalkActivityPresenting
     private let questManager: QuestManager
     private let careEconomy: CareEventEconomyAwarding
     private let careLedger: CareLedgerRecording
@@ -183,15 +185,21 @@ final class PetWalkingManager {
         careLedger: CareLedgerRecording = CareLedgerService(),
         walkCareEvents: WalkCareEventManaging? = nil,
         revisions: DomainRevisionPublishing? = nil,
-        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection()
+        activeHumanSelection: ActiveHumanSelecting = UserDefaultsActiveHumanSelection(),
+        activityPresenter: (any WalkActivityPresenting)? = nil
     ) {
         self.locationManager = locationManager
+        self.activityPresenter = activityPresenter ?? NoopWalkActivityPresenter()
         self.questManager = questManager
         self.careEconomy = careEconomy ?? StaticCareEventEconomyAwarder(questManager: questManager)
         self.careLedger = careLedger
         self.walkCareEvents = walkCareEvents ?? StaticWalkCareEventManager()
         self.revisions = revisions ?? SharedDomainRevisionPublisher()
         self.activeHumanSelection = activeHumanSelection
+        locationManager.setWalkMetricsUpdateHandler { [weak self] _ in
+            guard let self, case .running = self.phase else { return }
+            self.activityPresenter.update(self.makeActivityState(phase: .running), force: false)
+        }
     }
 
     convenience init(locationManager: any WalkLocationManaging) {
@@ -244,11 +252,18 @@ final class PetWalkingManager {
         recoveredRouteLocations = []
         recoveredDistanceMeters = 0
         restoredCheckpointNeedsLocationStart = false
+        activeSystemSurfaceSessionID = UUID()
 
         AppFlowPerformance.start(AppPerformanceFlows.walkSession, note: ["action": "start"])
         createRecoveryCheckpointIfPossible(modelContext: modelContext, pet: pet)
         locationManager.startWalkSession()
         startTimer()
+        if let attributes = makeActivityAttributes() {
+            activityPresenter.start(
+                attributes: attributes,
+                state: makeActivityState(phase: .running)
+            )
+        }
     }
 
     func restore(checkpoint: PetWalkLog, modelContext: ModelContext) {
@@ -279,9 +294,16 @@ final class PetWalkingManager {
         recoveredRouteLocations = routeLocations(from: checkpoint.routeLocationsData)
         recoveredDistanceMeters = max(0, checkpoint.distanceMeters)
         restoredCheckpointNeedsLocationStart = true
+        activeSystemSurfaceSessionID = WalkRecoveryCheckpoint.sessionID(from: checkpoint) ?? UUID()
 
         locationManager.stopAllLocationActivity()
         checkpointActiveWalk(reason: "restore", force: true)
+        if let attributes = makeActivityAttributes() {
+            activityPresenter.restore(
+                attributes: attributes,
+                state: makeActivityState(phase: .paused)
+            )
+        }
     }
 
     func discardRecoveryCheckpoint(_ checkpoint: PetWalkLog, modelContext: ModelContext) {
@@ -292,13 +314,20 @@ final class PetWalkingManager {
             modelContext.rollback()
             return
         }
+        if let checkpointSessionID = WalkRecoveryCheckpoint.sessionID(from: checkpoint) {
+            activityPresenter.endSession(checkpointSessionID, immediate: true)
+        }
         if activeRecoveryCheckpointID == checkpoint.id {
+            if WalkRecoveryCheckpoint.sessionID(from: checkpoint) == nil {
+                activityPresenter.end(makeActivityState(phase: .finished), immediate: true)
+            }
             activeRecoveryCheckpointID = nil
             activeWalkModelContext = nil
             lastRecoveryCheckpointAt = nil
             recoveredRouteLocations = []
             recoveredDistanceMeters = 0
             restoredCheckpointNeedsLocationStart = false
+            activeSystemSurfaceSessionID = nil
         }
     }
 
@@ -317,6 +346,7 @@ final class PetWalkingManager {
         checkpointActiveWalk(reason: "pause", force: true)
         locationManager.pauseWalkSession()
         stopTimer()
+        activityPresenter.update(makeActivityState(phase: .paused), force: true)
     }
 
     func resume() {
@@ -335,6 +365,7 @@ final class PetWalkingManager {
         }
         checkpointActiveWalk(reason: "resume", force: true)
         startTimer()
+        activityPresenter.update(makeActivityState(phase: .running), force: true)
     }
 
     @discardableResult
@@ -387,6 +418,9 @@ final class PetWalkingManager {
     }
 
     func reset() {
+        if activeSystemSurfaceSessionID != nil {
+            activityPresenter.end(makeActivityState(phase: .finished), immediate: true)
+        }
         mapSnapshotTask?.cancel()
         mapSnapshotTask = nil
         mapSnapshotGeneration &+= 1
@@ -413,6 +447,7 @@ final class PetWalkingManager {
         recoveredRouteLocations = []
         recoveredDistanceMeters = 0
         restoredCheckpointNeedsLocationStart = false
+        activeSystemSurfaceSessionID = nil
     }
 
     func pauseForAppBackground() {
@@ -428,6 +463,7 @@ final class PetWalkingManager {
             phase = .paused
             checkpointActiveWalk(reason: "backgroundPause", force: true)
             stopTimer()
+            activityPresenter.update(makeActivityState(phase: .paused), force: true)
         }
         locationManager.stopAllLocationActivity()
     }
@@ -481,6 +517,7 @@ final class PetWalkingManager {
         let location = locationManager.currentLocation ?? locationManager.collectedLocations.last
         activePoopMarkers.append(WalkPoopMarker(location: location, type: type))
         checkpointActiveWalk(reason: "poop", force: true)
+        activityPresenter.update(makeActivityState(), force: true)
     }
 
     // MARK: - Timer
@@ -514,7 +551,9 @@ final class PetWalkingManager {
             pet: pet,
             executorId: activeWalkExecutorIds.first,
             executorIds: activeWalkExecutorIds,
-            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID()
+            sharedSessionId: WalkRecoveryCheckpoint.makeSharedSessionID(
+                id: activeSystemSurfaceSessionID ?? UUID()
+            )
         )
         checkpoint.behaviorNotes = WalkRecoveryCheckpoint.encodeMetadata(
             WalkRecoveryCheckpoint.metadata(elapsedTime: elapsedTime, poopMarkers: activePoopMarkers)
@@ -527,6 +566,28 @@ final class PetWalkingManager {
         if saveResult.didSave {
             lastRecoveryCheckpointAt = Date()
         }
+    }
+
+    /// Updates the running session and its recovery checkpoint together. The
+    /// final record uses this selection, independent of later Settings changes.
+    @discardableResult
+    func selectActiveWalker(id: UUID) -> Bool {
+        guard phase == .running || phase == .paused,
+              let context = activeWalkModelContext,
+              let checkpoint = activeRecoveryCheckpoint(modelContext: context) else { return false }
+        var descriptor = FetchDescriptor<Human>(predicate: #Predicate<Human> { $0.id == id })
+        descriptor.fetchLimit = 1
+        guard let human = try? context.fetch(descriptor).first,
+              MemberWritePolicy.disposition(human: human, intent: .activeOnly).isAllowed else { return false }
+        let previous = checkpoint.executorIds
+        checkpoint.setExecutorIds([id.uuidString], primaryExecutorId: id.uuidString)
+        CloudSyncMutationRecorder.markModified(checkpoint, context: context)
+        guard context.safeSaveResult(publishFailureEvent: true).didSave else {
+            checkpoint.setExecutorIds(previous, primaryExecutorId: previous.first)
+            return false
+        }
+        activeWalkExecutorIds = [id.uuidString]
+        return true
     }
 
     private func checkpointActiveWalk(reason _: String, force: Bool) {
@@ -735,6 +796,47 @@ final class PetWalkingManager {
 
     var distanceText: String {
         AppMeasurementSystem.formatDistanceMeters(locationManager.totalDistance, fractionDigits: 2)
+    }
+
+    private func makeActivityAttributes() -> WalkActivityAttributes? {
+        guard let sessionID = activeSystemSurfaceSessionID,
+              let pet = currentPet,
+              let startedAt = startTime
+        else { return nil }
+        return WalkActivityAttributes(
+            sessionID: sessionID,
+            petID: pet.id,
+            petName: pet.name,
+            startedAt: startedAt,
+            languageCode: AppLanguage.normalize(AppLanguage.code)
+        )
+    }
+
+    private func makeActivityState(
+        phase overridePhase: WalkActivityPhase? = nil,
+        now: Date = Date()
+    ) -> WalkActivityAttributes.ContentState {
+        let elapsed: TimeInterval = if case .running = phase, let resumeTime {
+            pausedElapsed + max(0, now.timeIntervalSince(resumeTime))
+        } else {
+            max(elapsedTime, pausedElapsed)
+        }
+        let surfacePhase: WalkActivityPhase = overridePhase ?? {
+            switch phase {
+            case .running: .running
+            case .paused, .idle: .paused
+            case .finished: .finished
+            }
+        }()
+        return WalkActivityAttributes.ContentState(
+            phase: surfacePhase,
+            elapsedSeconds: elapsed,
+            elapsedReferenceDate: now.addingTimeInterval(-elapsed),
+            distanceMeters: recoveredDistanceMeters + locationManager.totalDistance,
+            poopCount: poopCount,
+            measurementSystemCode: AppMeasurementSystem.code,
+            updatedAt: now
+        )
     }
 }
 
@@ -1049,6 +1151,7 @@ private extension PetWalkingManager {
             startedAt: walkStopStartedAt,
             note: stopPerformanceNote(draft)
         )
+        activityPresenter.update(makeActivityState(phase: .paused), force: true)
         walkStopStartedAt = nil
         return .failed(errorDescription)
     }
@@ -1060,6 +1163,8 @@ private extension PetWalkingManager {
         lastCompletedPoopMarkers = draft.poopMarkers
         phase = .finished(elapsed: draft.elapsed, poopCount: draft.poopCount)
         showSummary = true
+        activityPresenter.end(makeActivityState(phase: .finished), immediate: false)
+        activeSystemSurfaceSessionID = nil
 
         var note = stopPerformanceNote(draft)
         note["rewarded"] = draft.isTooShortForReward ? "false" : "true"

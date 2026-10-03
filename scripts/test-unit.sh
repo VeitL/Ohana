@@ -8,6 +8,4 @@ cd "${REPO_ROOT}"
 
 export SCHEME="${SCHEME:-OhanaUnitTests}"
 
-exec scripts/test-simulator.sh \
-  '-only-testing:OhanaTests' \
-  "$@"
+exec scripts/xcode-test.sh --unit -- "$@"

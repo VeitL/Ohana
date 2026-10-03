@@ -186,9 +186,18 @@ struct FamilyCollaborationPlaygroundView: View {
                 Circle()
                     .stroke(Color.ohanaCardStroke, lineWidth: 1)
                     .frame(height: 238)
-                petNode(id: "lilo", emoji: "🐱", name: "Lilo", badge: "2", x: -92, y: -54, tint: Color.goYellow)
-                petNode(id: "momo", emoji: "🐶", name: "Momo", badge: "1", x: 88, y: -18, tint: Color.goPurple)
-                petNode(id: "rio", emoji: "🐟", name: "Rio", badge: "✓", x: -20, y: 82, tint: Color.goTeal)
+                petNode(id: "lilo", emoji: "🐱", name: "Lilo", badge: "2", x: -92, y: -54, tint: Color.goYellow, tintForeground: Color.arkInk)
+                petNode(
+                    id: "momo",
+                    emoji: "🐶",
+                    name: "Momo",
+                    badge: "1",
+                    x: 88,
+                    y: -18,
+                    tint: Color.goPurple,
+                    tintForeground: OhanaResolvedPrimaryAccent(customHex: "A855F7")?.actionTextColor ?? Color.ohanaPrimaryText
+                )
+                petNode(id: "rio", emoji: "🐟", name: "Rio", badge: "✓", x: -20, y: 82, tint: Color.goTeal, tintForeground: Color.arkInk)
                 VStack(spacing: 3) {
                     Image(systemName: "house.fill").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 24, weight: .black))
@@ -203,7 +212,16 @@ struct FamilyCollaborationPlaygroundView: View {
         }
     }
 
-    private func petNode(id: String, emoji: String, name: String, badge: String, x: CGFloat, y: CGFloat, tint: Color) -> some View {
+    private func petNode(
+        id: String,
+        emoji: String,
+        name: String,
+        badge: String,
+        x: CGFloat,
+        y: CGFloat,
+        tint: Color,
+        tintForeground: Color
+    ) -> some View {
         Button {
             UISelectionFeedbackGenerator().selectionChanged()
             withAnimation(GoMotion.feedback) { selectedPetID = id }
@@ -217,7 +235,7 @@ struct FamilyCollaborationPlaygroundView: View {
                         .overlay(Circle().strokeBorder(selectedPetID == id ? tint : Color.ohanaCardStroke, lineWidth: selectedPetID == id ? 2 : 1))
                     Text(badge)
                         .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(tintForeground)
                         .frame(width: 22, height: 22) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(tint, in: Circle())
                         .offset(x: 2, y: -2)

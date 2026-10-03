@@ -64,6 +64,17 @@ struct ExpenseAmountPolicyTests {
                 )
             }
             expectInvalidUserExpense {
+                _ = try ExpenseCommandService.recordSharedPetExpense(
+                    sourcePet: pet,
+                    targets: [pet, secondPet],
+                    amount: 100_000_000_000_000_000,
+                    date: Date(),
+                    category: .other,
+                    note: "too large to distribute",
+                    context: context
+                )
+            }
+            expectInvalidUserExpense {
                 _ = try ExpenseCommandService.recordHumanExpense(
                     human: human,
                     amount: -1,

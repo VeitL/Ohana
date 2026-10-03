@@ -8,7 +8,7 @@ import SwiftUI
 extension OasisRewardView {
     // MARK: - Star positions (deterministic)
     var starPositions: [(CGFloat, CGFloat)] {
-        (0 ..< 24).map { i in
+        (0 ..< 8).map { i in
             let x = CGFloat((i * 53) % 320) - 160
             let y = CGFloat((i * 37) % 220) - 160
             return (x, y)
@@ -88,6 +88,7 @@ extension OasisRewardView {
                         sheetRoute: $activeSheetRoute,
                         fullScreenRoute: $activeFullScreenRoute,
                         pets: pets,
+                        humans: humans,
                         onPresentCoconutLog: onPresentCoconutLog
                     )
                 )
@@ -293,8 +294,6 @@ extension OasisRewardView {
         coconutBalanceVisualOverride = nil
         isInjecting = false
         treeInjectionLocked = false
-        treeInjectionProgress = 0
-        treeInjectionBoost = 0.026
         preparedWorkTask?.cancel()
         preparedWorkTask = nil
         visibleWorkTask?.cancel()
@@ -312,8 +311,6 @@ extension OasisRewardView {
         critterNestCloseTask = nil
         critterNestOpenTask?.cancel()
         critterNestOpenTask = nil
-        injectionResetTask?.cancel()
-        injectionResetTask = nil
         levelUpFeedbackTask?.cancel()
         levelUpFeedbackTask = nil
         particleCleanupTask?.cancel()

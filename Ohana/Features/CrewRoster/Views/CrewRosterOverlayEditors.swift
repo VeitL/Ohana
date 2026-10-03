@@ -29,6 +29,7 @@ struct CrewRosterProfilePanel: View {
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
 
     @State private var isEditing = false
+    @State private var showsSavedFeedback = false
     @State private var showingPetPassedAlert = false
     @State private var showingPetUndoPassedAlert = false
     @State private var showingPetClearAlert = false
@@ -38,6 +39,7 @@ struct CrewRosterProfilePanel: View {
     @State private var showingHumanDeleteSheet = false
     @State private var showingPlantDeleteAlert = false
     @State private var passedDate = Date()
+    @State private var personalUpgradePrompt: PersonalUpgradePrompt?
 
     @State private var name = ""
     @State private var avatarImageData: Data?
@@ -67,11 +69,14 @@ struct CrewRosterProfilePanel: View {
     @State private var humanAvatarCacheKey = "crew-roster-profile-human-avatar-empty"
     @State private var avatarImageRevision = 0
 
-    private let speciesOptions = ["狗", "猫", "鱼", "鸟", "兔子", "爬宠", "仓鼠", "其他"]
     private let bloodTypeOptions = ["未填写", "A", "B", "AB", "O"]
     private let mbtiOptions = ["未填写", "INTJ", "INTP", "ENTJ", "ENTP", "INFJ", "INFP", "ENFJ", "ENFP", "ISTJ", "ISFJ", "ESTJ", "ESFJ", "ISTP", "ISFP", "ESTP", "ESFP"]
 
     private var tint: Color { Color(hex: resolvedThemeHex) }
+    private var tintActionText: Color {
+        OhanaResolvedPrimaryAccent(customHex: resolvedThemeHex)?.actionTextColor
+            ?? Color.ohanaPrimaryText
+    }
     private var resolvedThemeHex: String {
         if !themeHex.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return themeHex }
         if let pet { return pet.safeThemeColorHex }
@@ -81,6 +86,15 @@ struct CrewRosterProfilePanel: View {
     }
 
     private var l: L10n { L10n(appLanguage) }
+    private var speciesOptions: [String] {
+        var options = Pet.canonicalSpeciesOptions
+        if !species.isEmpty, !options.contains(species) {
+            options.append(species)
+        }
+        return l.sortedCatalogKeys(options, otherKey: "other") {
+            Pet.localizedSpeciesName($0, l: l)
+        }
+    }
     private var detailReveal: CGFloat { min(max(detailProgress, 0), 1) }
     private var controlReveal: CGFloat { WalletHeroTimeline.smooth(detailProgress, 0.12, 0.34) }
     private var summarySnapshot: CrewRosterProfileSummarySnapshot {
@@ -123,7 +137,11 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将进入纪念模式，并让未来照护安排退出活跃提醒。原有数据会保留，此操作可撤销。", en: "This pet will enter memorial mode and future care plans will leave active reminders. Existing data stays, and this can be undone.", de: "Dieses Haustier wechselt in den Gedenkmodus und kuenftige Pflegeplaene verlassen aktive Erinnerungen. Bestehende Daten bleiben erhalten und die Aktion kann rueckgaengig gemacht werden."))
+            Text(l.tr(
+                zh: "进入纪念模式并停止未来照护提醒；数据保留，可撤销。",
+                en: "Enters memorial mode and stops future care reminders. Data stays, and this can be undone.",
+                de: "Wechselt in den Gedenkmodus und stoppt künftige Pflegehinweise. Daten bleiben erhalten; dies ist widerrufbar."
+            ))
         }
         .alert(l.tr(zh: "撤销离世标记", en: "Undo passed-away mark?", de: "Verstorben-Markierung rueckgaengig machen?"), isPresented: $showingPetUndoPassedAlert) {
             Button(l.tr(zh: "撤销", en: "Undo", de: "Rueckgaengig"), role: .destructive) {
@@ -131,7 +149,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将清除离世日期，恢复为在世状态。", en: "This clears the passed-away date and restores active status.", de: "Das Sterbedatum wird geloescht und der aktive Status wiederhergestellt."))
+            Text(l.tr(zh: "清除离世日期并恢复活跃状态。", en: "Clears the passed-away date and restores active status.", de: "Löscht das Sterbedatum und stellt den aktiven Status wieder her."))
         }
         .alert(l.tr(zh: "仅清空所有记录", en: "Clear records only?", de: "Nur Eintraege loeschen?"), isPresented: $showingPetClearAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -147,7 +165,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将把该成员设为纪念模式。", en: "This member will be moved into memorial mode.", de: "Dieses Mitglied wird in den Gedenkmodus versetzt."))
+            Text(l.tr(zh: "资料保留，可撤销。", en: "Profile data stays, and this can be undone.", de: "Profildaten bleiben erhalten; dies ist widerrufbar."))
         }
         .alert(l.tr(zh: "撤销纪念模式", en: "Undo memorial mode?", de: "Gedenkmodus zuruecknehmen?"), isPresented: $showingHumanUndoPassedAlert) {
             Button(l.tr(zh: "撤销", en: "Undo", de: "Zuruecknehmen"), role: .destructive) {
@@ -155,7 +173,7 @@ struct CrewRosterProfilePanel: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         } message: {
-            Text(l.tr(zh: "将清除该成员的纪念模式日期。", en: "This will clear the member's memorial-mode date.", de: "Das Datum fuer den Gedenkmodus dieses Mitglieds wird geloescht."))
+            Text(l.tr(zh: "清除纪念日期并恢复活跃状态。", en: "Clears the memorial date and restores active status.", de: "Löscht das Gedenkdatum und stellt den aktiven Status wieder her."))
         }
         .alert(l.tr(zh: "确认删除植物", en: "Delete plant?", de: "Pflanze loeschen?"), isPresented: $showingPlantDeleteAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
@@ -172,7 +190,11 @@ struct CrewRosterProfilePanel: View {
             }
         } message: {
             let plantName = plant?.name ?? l.tr(zh: "这株植物", en: "this plant", de: "diese Pflanze")
-            Text(l.tr(zh: "确定要删除 \(plantName) 吗？", en: "Delete \(plantName)?", de: "\(plantName) loeschen?"))
+            Text(l.tr(
+                zh: "将删除 \(plantName) 的档案和全部记录，无法撤销。",
+                en: "Deletes \(plantName)'s profile and all records. This cannot be undone.",
+                de: "Löscht das Profil und alle Einträge von \(plantName). Dies kann nicht rückgängig gemacht werden."
+            ))
         }
         .sheet(isPresented: $showingPetDeleteSheet) {
             let petName = pet?.name ?? l.tr(zh: "宠物", en: "pet", de: "Haustier")
@@ -196,8 +218,16 @@ struct CrewRosterProfilePanel: View {
             )
             .ohanaCompactSheetPresentation(detents: [.height(360), .medium])
         }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
+        }
     }
+}
 
+// MARK: - Profile Content
+
+extension CrewRosterProfilePanel {
     private var detailScroll: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(spacing: 12) {
@@ -222,12 +252,13 @@ struct CrewRosterProfilePanel: View {
                     saveChanges()
                 } else {
                     loadEditState(includeAvatarData: true)
+                    showsSavedFeedback = false
                     withAnimation(GoMotion.feedback) { isEditing = true }
                 }
             } label: {
                 Image(systemName: isEditing ? "checkmark" : "pencil")
                     .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.arkInk)
+                    .foregroundStyle(tintActionText)
                     .frame(width: 44, height: 44)
                     .background(tint, in: Circle())
                     .contentShape(Circle())
@@ -235,15 +266,24 @@ struct CrewRosterProfilePanel: View {
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(isEditing ? l.save : l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(displayName)
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.goCardWhite)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.70)
-                Text(isEditing ? l.tr(zh: "编辑基本信息", en: "Editing basic info", de: "Basisdaten bearbeiten") : l.tr(zh: "基本信息", en: "Basic info", de: "Basisdaten"))
-                    .font(OhanaFont.caption2(.bold))
-                    .foregroundStyle(Color.goCardWhite.opacity(0.64))
+            Text(displayName)
+                .font(OhanaFont.title3(.black))
+                .foregroundStyle(Color.goCardWhite)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
+            if showsSavedFeedback {
+                Label(
+                    l.tr(
+                        zh: "已保存", en: "Saved", de: "Gespeichert",
+                        es: "Guardado", pt: "Salvo", fr: "Enregistré",
+                        ja: "保存済み", ko: "저장됨", it: "Salvato"
+                    ),
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(OhanaFont.caption2(.black))
+                .foregroundStyle(Color.goTeal)
+                .transition(.opacity)
+                .accessibilityIdentifier("crew-roster-profile-saved-feedback")
             }
             Spacer(minLength: 8)
             Button(action: onClose) {
@@ -290,7 +330,10 @@ struct CrewRosterProfilePanel: View {
         VStack(spacing: 12) {
             profileSection(l.tr(zh: "身份", en: "Identity", de: "Identitaet"), icon: "pawprint.fill") {
                 infoRow(l.tr(zh: "物种", en: "Species", de: "Art"), emptyText(pet.localizedSpeciesName(l: l)))
-                infoRow(l.tr(zh: "品种", en: "Breed", de: "Rasse"), emptyText(pet.breed))
+                infoRow(
+                    l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+                    pet.breed.isEmpty ? localizedEmptyValue : l.resourceName(pet.breed)
+                )
                 infoRow(l.tr(zh: "年龄", en: "Age", de: "Alter"), pet.hasPassedAway ? pet.ageAtPassingText : pet.ageText)
                 infoRow(l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), petGenderSummary(pet))
                 infoRow(l.tr(zh: "主题色", en: "Accent color", de: "Akzentfarbe"), "#\(pet.safeThemeColorHex.uppercased())")
@@ -332,8 +375,18 @@ struct CrewRosterProfilePanel: View {
                 infoRow("MBTI", human.mbti.isEmpty ? localizedEmptyValue : human.mbti.uppercased())
             }
             profileSection(l.tr(zh: "家庭", en: "Family", de: "Familie"), icon: "house.fill") {
-                infoRow(l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"), emptyText(human.nationality))
-                infoRow(l.tr(zh: "现居地", en: "Current city", de: "Aktueller Ort"), emptyText(human.city))
+                infoRow(
+                    l.tr(zh: "国籍", en: "Nationality", de: "Nationalitaet"),
+                    human.nationality.isEmpty
+                        ? localizedEmptyValue
+                        : PetBreedDatabase.localizedRegionName(human.nationality, l: l)
+                )
+                infoRow(
+                    l.tr(zh: "现居地", en: "Residence", de: "Wohnort"),
+                    human.city.isEmpty
+                        ? localizedEmptyValue
+                        : MemberResidenceValue(storedValue: human.city).localized(l: l)
+                )
                 if HumanLocalPrivacyPolicy.isEnabled {
                     infoRow(l.tr(zh: "隐私项目", en: "Private fields", de: "Private Felder"), privacySummary(for: human))
                 }
@@ -383,7 +436,13 @@ struct CrewRosterProfilePanel: View {
     private var petEditContent: some View {
         VStack(spacing: 10) {
             CrewRosterEditorTextField(title: l.tr(zh: "名字", en: "Name", de: "Name"), text: $name, icon: "text.cursor") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            CrewRosterEditorMenuRow(title: l.tr(zh: "物种", en: "Species", de: "Art"), icon: "pawprint.fill", selection: $species, options: speciesOptions)
+            CrewRosterEditorMenuRow(
+                title: l.tr(zh: "物种", en: "Species", de: "Art"),
+                icon: "pawprint.fill",
+                selection: $species,
+                options: speciesOptions,
+                optionTitle: { Pet.localizedSpeciesName($0, l: l) }
+            )
             CrewRosterEditorTextField(title: l.tr(zh: "品种", en: "Breed", de: "Rasse"), text: $breed, icon: "tag.fill") // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
             CrewRosterEditorSegmentedRow(title: l.tr(zh: "性别", en: "Gender", de: "Geschlecht"), selection: $gender, options: [
                 ("male", l.tr(zh: "男孩", en: "Boy", de: "Junge")),
@@ -406,14 +465,14 @@ struct CrewRosterProfilePanel: View {
                 ("owner", localizedRoleText(for: "owner")),
                 ("member", localizedRoleText(for: "member"))
             ])
-            CrewRosterEditorMenuRow(
-                title: l.tr(zh: "性别/身份", en: "Gender / identity", de: "Geschlecht / Identitaet"),
-                icon: "person.fill",
+            CrewRosterHumanGenderGrid(
                 selection: $gender,
-                options: HumanProfileOptions.genderOptions.map(\.key),
-                optionTitle: { l.humanGenderDisplay($0) }
+                l: l
             )
             CrewRosterEditorDateToggleRow(title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"), icon: "gift.fill", isOn: $hasBirthday, date: $birthday, upperBound: Date())
+            if hasBirthday {
+                CrewRosterZodiacRow(date: birthday, l: l)
+            }
             CrewRosterEditorMenuRow(
                 title: l.tr(zh: "血型", en: "Blood type", de: "Blutgruppe"),
                 icon: "drop.fill",
@@ -594,7 +653,11 @@ struct CrewRosterProfilePanel: View {
             }
         }
     }
+}
 
+// MARK: - Profile Formatting and Actions
+
+extension CrewRosterProfilePanel {
     private var displayName: String {
         if isEditing, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return name }
         return pet?.name ?? human?.name ?? plant?.name ?? card.name
@@ -711,7 +774,7 @@ struct CrewRosterProfilePanel: View {
             avatarImageData = includeAvatarData ? pet.avatarImageData : nil
             avatarImageRevision &+= 1
             avatarEmoji = pet.avatarEmoji
-            species = pet.species.isEmpty ? "其他" : pet.species
+            species = Pet.normalizedSpeciesStorageValue(pet.species)
             breed = pet.breed
             gender = pet.gender.isEmpty ? "unknown" : pet.gender
             isNeutered = pet.isNeutered
@@ -816,7 +879,7 @@ struct CrewRosterProfilePanel: View {
                 }
                 warmAvatarCache(id: result.entityID, data: result.persistedAvatarImageData)
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
-                withAnimation(GoMotion.feedback) { isEditing = false }
+                withAnimation(GoMotion.feedback) { showsSavedFeedback = true }
                 onSaved(result.entityID, result.kind)
             }
         } else if let plant {
@@ -886,6 +949,11 @@ struct CrewRosterProfilePanel: View {
                 pet,
                 note: "crew.member.lifecycle.pet.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             guard result.didPersist else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
@@ -935,6 +1003,11 @@ struct CrewRosterProfilePanel: View {
                 human,
                 note: "crew.member.lifecycle.human.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             guard result.didPersist else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
@@ -1024,5 +1097,111 @@ struct CrewRosterProfilePanel: View {
                 )
             )
         }
+    }
+}
+
+private struct CrewRosterHumanGenderGrid: View {
+    @Binding var selection: String
+    let l: L10n
+
+    private var options: [(key: String, icon: String)] {
+        HumanProfileOptions.genderOptions.filter { !$0.key.isEmpty }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            CrewRosterEditorLabel(
+                title: l.tr(
+                    zh: "性别/身份", en: "Gender / identity", de: "Geschlecht / Identität",
+                    es: "Género o identidad", pt: "Gênero ou identidade", fr: "Genre ou identité",
+                    ja: "性別・アイデンティティ", ko: "성별 또는 정체성", it: "Genere o identità"
+                ),
+                icon: "person.fill"
+            )
+
+            LazyVGrid(
+                columns: [GridItem(.flexible()), GridItem(.flexible())],
+                spacing: 8
+            ) {
+                ForEach(options, id: \.key) { option in
+                    let isSelected = HumanProfileOptions.storedGenderIdentity(selection) == option.key
+                    Button {
+                        selection = option.key
+                        OhanaFeedback.selection()
+                    } label: {
+                        HStack(spacing: 7) {
+                            Text(option.icon)
+                                .accessibilityHidden(true)
+                            Text(HumanProfileOptions.localizedGenderTitle(option.key, l: l))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            Spacer(minLength: 0)
+                            if isSelected {
+                                Image(systemName: "checkmark") // a11y: allow decorative selected-state glyph hidden below
+                                    .font(OhanaFont.caption(.black))
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .font(OhanaFont.caption(.bold))
+                        .foregroundStyle(Color.goCardWhite)
+                        .padding(.horizontal, 10)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            isSelected ? Color.goPrimary.opacity(0.28) : Color.goCardWhite.opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+                                .strokeBorder(
+                                    isSelected ? Color.goPrimary.opacity(0.78) : Color.goCardWhite.opacity(0.14),
+                                    lineWidth: 1
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(HumanProfileOptions.localizedGenderTitle(option.key, l: l))
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                    .accessibilityIdentifier("crew-roster-human-gender-\(option.key)")
+                }
+            }
+        }
+        .padding(12)
+        .background(
+            Color.goCardWhite.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+        )
+        .accessibilityIdentifier("crew-roster-human-gender-grid")
+    }
+}
+
+private struct CrewRosterZodiacRow: View {
+    let date: Date
+    let l: L10n
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                .foregroundStyle(Color.goPrimary)
+                .accessibilityHidden(true)
+            Text(l.tr(
+                zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                es: "Signo", pt: "Signo", fr: "Signe",
+                ja: "星座", ko: "별자리", it: "Segno"
+            ))
+            .foregroundStyle(Color.goCardWhite.opacity(0.82))
+            Spacer(minLength: 8)
+            Text(Human.westernZodiacDisplay(for: date, l: l))
+                .font(OhanaFont.caption(.black))
+                .foregroundStyle(Color.goCardWhite)
+        }
+        .font(OhanaFont.caption(.bold))
+        .padding(12)
+        .frame(minHeight: 56)
+        .background(
+            Color.goCardWhite.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("crew-roster-human-zodiac")
     }
 }

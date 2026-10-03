@@ -13,6 +13,9 @@ enum CarePlanCalendarSync {
 
     struct PendingSideEffects {
         fileprivate var userDefaultsSets: [(key: String, value: String)] = []
+        fileprivate var userDefaultsBooleanSets: [(key: String, value: Bool)] = []
+        fileprivate var userDefaultsRemovals: [String] = []
+        fileprivate var scheduleEffects = DomainSchedulePendingEffects.none
 
         static let none = PendingSideEffects()
 
@@ -20,14 +23,38 @@ enum CarePlanCalendarSync {
             userDefaultsSets.append((key, value))
         }
 
-        fileprivate mutating func merge(_ other: PendingSideEffects) {
-            userDefaultsSets.append(contentsOf: other.userDefaultsSets)
+        fileprivate mutating func set(_ value: Bool, forKey key: String) {
+            userDefaultsBooleanSets.append((key, value))
         }
 
-        func commit() {
+        fileprivate mutating func removeValue(forKey key: String) {
+            userDefaultsRemovals.append(key)
+        }
+
+        fileprivate mutating func stage(delete result: DomainScheduleDeleteResult) {
+            scheduleEffects.stage(delete: result)
+        }
+
+        mutating func merge(_ other: PendingSideEffects) {
+            userDefaultsSets.append(contentsOf: other.userDefaultsSets)
+            userDefaultsBooleanSets.append(contentsOf: other.userDefaultsBooleanSets)
+            userDefaultsRemovals.append(contentsOf: other.userDefaultsRemovals)
+            scheduleEffects.merge(other.scheduleEffects)
+        }
+
+        func commit(
+            notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        ) {
+            for key in userDefaultsRemovals {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
             for item in userDefaultsSets {
                 UserDefaults.standard.set(item.value, forKey: item.key)
             }
+            for item in userDefaultsBooleanSets {
+                UserDefaults.standard.set(item.value, forKey: item.key)
+            }
+            scheduleEffects.commit(notifications: notifications)
         }
     }
 
@@ -66,7 +93,8 @@ enum CarePlanCalendarSync {
     private static func tombstoneAndDelete(
         _ event: Event,
         context: ModelContext,
-        deletedAt: Date = Date()
+        deletedAt: Date = Date(),
+        dispatchEffects: Bool = true
     ) -> DomainScheduleDeleteResult {
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingEventMutation(
             event: event,
@@ -75,7 +103,9 @@ enum CarePlanCalendarSync {
             context: context
         ) else { return .notDeleted }
         let result = DomainScheduleWriter.deleteEvent(event, mutation: mutation, context: context, deletedAt: deletedAt)
-        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        if dispatchEffects {
+            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        }
         return result
     }
 
@@ -83,7 +113,8 @@ enum CarePlanCalendarSync {
     private static func tombstoneAndDelete(
         _ reminder: Reminder,
         context: ModelContext,
-        deletedAt: Date = Date()
+        deletedAt: Date = Date(),
+        dispatchEffects: Bool = true
     ) -> DomainScheduleDeleteResult {
         guard let mutation = DomainScheduleWriteAuthorizer.authorizeExistingReminderMutation(
             reminder: reminder,
@@ -92,7 +123,9 @@ enum CarePlanCalendarSync {
             context: context
         ) else { return .notDeleted }
         let result = DomainScheduleWriter.deleteReminder(reminder, mutation: mutation, context: context, deletedAt: deletedAt)
-        DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        if dispatchEffects {
+            DomainScheduleEffectsDispatcher.dispatch(delete: result)
+        }
         return result
     }
 
@@ -135,6 +168,47 @@ enum CarePlanCalendarSync {
         UserDefaults.standard.set(true, forKey: defaultSuppressionKey(kind: kind, petKey: petKey))
         removeCalendarPlan(kind: "default_\(kind)", petKey: petKey, context: context)
         removeLegacyDefaultPlanEvents(kind: kind, pet: pet, context: context)
+    }
+
+    static func stageDefaultPlanSuppression(
+        kind: String,
+        pet: Pet,
+        context: ModelContext
+    ) -> PendingSideEffects {
+        var sideEffects = PendingSideEffects()
+        let petKey = pet.id.uuidString
+        sideEffects.set(true, forKey: defaultSuppressionKey(kind: kind, petKey: petKey))
+        stageCalendarPlanRemoval(
+            kind: "default_\(kind)",
+            petKey: petKey,
+            context: context,
+            sideEffects: &sideEffects
+        )
+        sideEffects.merge(stageLegacyDefaultPlanRemoval(
+            kind: kind,
+            pet: pet,
+            context: context
+        ))
+        return sideEffects
+    }
+
+    private static func stageCalendarPlanRemoval(
+        kind: String,
+        petKey: String,
+        context: ModelContext,
+        sideEffects: inout PendingSideEffects
+    ) {
+        let key = eventStorageKey(kind: kind, petKey: petKey)
+        if let idString = UserDefaults.standard.string(forKey: key),
+           let eventID = UUID(uuidString: idString),
+           let event = existingEvent(uuid: eventID, context: context) {
+            sideEffects.stage(delete: tombstoneAndDelete(
+                event,
+                context: context,
+                dispatchEffects: false
+            ))
+        }
+        sideEffects.removeValue(forKey: key)
     }
 
     static func reconcileDefaultPlanOverrides(for pet: Pet, context: ModelContext) {
@@ -235,6 +309,19 @@ enum CarePlanCalendarSync {
         return waterMaintenanceKind(for: event, petKey: petKey)
     }
 
+    /// Stable identity check for an explicit feature plan persisted through
+    /// this service. Default recommendation keys use the `default_` prefix and
+    /// remain distinguishable from user-enabled plans.
+    nonisolated static func isStoredPlan(_ event: Event, kind: String, pet: Pet) -> Bool {
+        guard MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+            event,
+            petId: pet.id.uuidString
+        ) else { return false }
+        return UserDefaults.standard.string(
+            forKey: eventStorageKey(kind: kind, petKey: pet.id.uuidString)
+        ) == event.id.uuidString
+    }
+
     nonisolated static func waterMaintenanceKind(for event: Event) -> String? {
         guard let petId = DomainEntityLinkRegistry.resolvedId(for: DomainEntityLink(event: event), role: .directPet) else {
             return nil
@@ -275,7 +362,12 @@ enum CarePlanCalendarSync {
         }
     }
 
-    private static func removeLegacyDefaultPlanEvents(kind: String, pet: Pet, context: ModelContext) {
+    private static func removeLegacyDefaultPlanEvents(
+        kind: String,
+        pet: Pet,
+        context: ModelContext,
+        saveChanges: Bool = true
+    ) {
         let petKey = pet.id.uuidString
         let titles = defaultPlanTitleCandidates(kind: kind, pet: pet)
         guard !titles.isEmpty else { return }
@@ -288,9 +380,31 @@ enum CarePlanCalendarSync {
                 didDelete = true
             }
         }
-        if didDelete {
+        if didDelete, saveChanges {
             _ = saveCalendarSyncChanges(context: context)
         }
+    }
+
+    private static func stageLegacyDefaultPlanRemoval(
+        kind: String,
+        pet: Pet,
+        context: ModelContext
+    ) -> PendingSideEffects {
+        let petKey = pet.id.uuidString
+        let titles = defaultPlanTitleCandidates(kind: kind, pet: pet)
+        guard !titles.isEmpty else { return .none }
+
+        let descriptor = FetchDescriptor<Event>()
+        let events = fetchOrLog(descriptor, context: context, operation: "fetch legacy default plan events")
+        var sideEffects = PendingSideEffects.none
+        for event in events where MemberLifecycleActiveScheduleResolver.eventBelongsToPet(event, petId: petKey) && titles.contains(event.title) {
+            sideEffects.stage(delete: tombstoneAndDelete(
+                event,
+                context: context,
+                dispatchEffects: false
+            ))
+        }
+        return sideEffects
     }
 
     private static func defaultPlanTitleCandidates(kind: String, pet: Pet) -> Set<String> {
@@ -846,7 +960,8 @@ enum CarePlanCalendarSync {
     private nonisolated static func containsAny(_ text: String, _ needles: [String]) -> Bool {
         needles.contains { text.contains($0.lowercased()) }
     }
-
+}
+extension CarePlanCalendarSync {
     /// 与铲屎计划一致：「起算日」与最近一次换水记录取较晚者为基准，再按间隔推算下次。
     static func syncWaterChangePlan(pet: Pet, context: ModelContext, intervalDays: Int, enabled: Bool, cycleAnchor: Date) {
         let petKey = pet.id.uuidString
@@ -1019,8 +1134,30 @@ enum CarePlanCalendarSync {
         )
     }
 }
-
 extension CarePlanCalendarSync {
+    nonisolated static func storedDefaultCalendarPlanEventIDs(for petID: UUID) -> [UUID] {
+        storedCalendarPlanEventIDs(kinds: knownDefaultPlanKinds, petID: petID)
+    }
+
+    nonisolated static func storedExplicitCalendarPlanEventIDs(for petID: UUID) -> [UUID] {
+        storedCalendarPlanEventIDs(kinds: storedGeneratedPlanKinds, petID: petID)
+    }
+
+    nonisolated static func defaultGeneratedCalendarPlanTitles(for pet: Pet) -> Set<String> {
+        Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
+    }
+
+    private nonisolated static func storedCalendarPlanEventIDs(
+        kinds: Set<String>,
+        petID: UUID
+    ) -> [UUID] {
+        let petKey = petID.uuidString
+        return kinds.sorted().compactMap { kind in
+            UserDefaults.standard.string(forKey: eventStorageKey(kind: kind, petKey: petKey))
+                .flatMap(UUID.init(uuidString:))
+        }
+    }
+
     /// Calendar display boundary: default recommendation events are implementation
     /// scaffolding, while explicit feature plans remain user-visible.
     nonisolated static func isDefaultGeneratedCalendarPlan(_ event: Event, pets: [Pet]) -> Bool {
@@ -1040,7 +1177,7 @@ extension CarePlanCalendarSync {
             return true
         }
         guard event.recurrenceDays > 0, event.feedRuleKindRaw.isEmpty, !hasReminder else { return false }
-        let generatedTitles = Set(defaultPlanItems(for: pet).map { eventTitle(pet: pet, title: $0.title) })
+        let generatedTitles = defaultGeneratedCalendarPlanTitles(for: pet)
         return generatedTitles.contains(event.title)
     }
 

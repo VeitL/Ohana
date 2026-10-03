@@ -7,9 +7,32 @@
 
 import Foundation
 
+nonisolated struct QuickFeedPlanRenderEvent: Equatable, Identifiable, Sendable {
+    let id: UUID
+    let startDate: Date
+    let recurrenceDays: Int
+    let recurrenceEndDate: Date?
+    let foodKindRaw: String
+    let amountGrams: Double
+
+    @MainActor
+    init(event: Event) {
+        id = event.id
+        startDate = event.startDate
+        recurrenceDays = event.recurrenceDays
+        recurrenceEndDate = event.recurrenceEndDate
+        foodKindRaw = event.foodKind.rawValue
+        amountGrams = FeedRuleMetadata.amountGrams(from: event)
+    }
+
+    var foodKind: FeedFoodKind {
+        FeedFoodKind(rawValue: foodKindRaw) ?? .dry
+    }
+}
+
 struct QuickFeedHomeSnapshot {
-    let manualPlanEvents: [Event]
-    let autoFeederEvents: [Event]
+    let manualPlanEvents: [QuickFeedPlanRenderEvent]
+    let autoFeederEvents: [QuickFeedPlanRenderEvent]
     let todayMainFoodGrams: Double
     let todayDryFoodGrams: Double
     let todayWetFoodGrams: Double

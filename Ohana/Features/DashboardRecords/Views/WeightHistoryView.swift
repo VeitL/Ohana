@@ -42,7 +42,6 @@ struct WeightHistoryView: View {
                 .zIndex(20)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .accessibilityIdentifier("pet-weight-detail-screen")
     }
 }

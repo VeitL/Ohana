@@ -19,7 +19,7 @@ struct WeightDeltaPoint: Identifiable {
     let isHuman: Bool
 }
 
-struct WeightAbsolutePoint: Identifiable {
+nonisolated struct WeightAbsolutePoint: Identifiable, Equatable, Sendable {
     /// 对应 `PetWeightLog.id` / `HumanWeightLog.id`，图表 ForEach 稳定标识
     let id: UUID
     let date: Date
@@ -52,6 +52,13 @@ private struct PetLedgerMetricEntry {
     let value: Double
 }
 
+private struct HumanWeightMetricEntry {
+    let id: UUID
+    let humanID: UUID
+    let date: Date
+    let value: Double
+}
+
 // MARK: - ViewModel
 
 @Observable
@@ -62,6 +69,7 @@ final class IslandUnifiedStatsViewModel {
     var explorations: [ExplorationPoint] = []
     var totalWeeklyExplorationKm: Double = 0
     var totalMonthlyExplorationKm: Double = 0
+    private(set) var isWeightDataTruncated = false
 
     // 趣味排行
     var gainChampion: FameRanking? // 🏆 干饭王
@@ -73,25 +81,70 @@ final class IslandUnifiedStatsViewModel {
     // MARK: - Load
 
     func load(modelContext: ModelContext, pets: [Pet], humans: [Human]) {
-        let petWeightEntriesByPetId = Self.fetchPetLedgerMetricEntries(
+        let petWeightFetch = Self.fetchPetLedgerMetricEntries(
             modelContext: modelContext,
             pets: pets,
             eventKind: .weight,
             valueTransform: { $0.amountValue }
         )
-        let petWalkEntriesByPetId = Self.fetchPetLedgerMetricEntries(
+        let humanWeightFetch = Self.fetchHumanWeightEntries(
             modelContext: modelContext,
-            pets: pets,
-            eventKind: .walk,
-            valueTransform: { max(0, $0.amountValue) }
-        )
-        loadWeightDeltas(pets: pets, humans: humans, petWeightEntriesByPetId: petWeightEntriesByPetId)
-        loadExplorations(
-            petWalkEntriesByPetId: petWalkEntriesByPetId,
-            pets: pets,
             humans: humans
         )
-        computeWeeklyExplorationCount(petWalkEntriesByPetId: petWalkEntriesByPetId, humans: humans)
+        isWeightDataTruncated = petWeightFetch.isTruncated || humanWeightFetch.isTruncated
+        loadWeightDeltas(
+            pets: pets,
+            humans: humans,
+            petWeightEntriesByPetId: petWeightFetch.entries,
+            humanWeightEntriesByHumanId: humanWeightFetch.entries
+        )
+    }
+
+    func applyWeightInsightSnapshot(
+        _ snapshot: WeightInsightSnapshot,
+        pets: [Pet],
+        humans: [Human]
+    ) {
+        weightAbsolutes = snapshot.points.sorted { $0.date < $1.date }
+        isWeightDataTruncated = snapshot.isTruncated
+
+        let petBySeries = Dictionary(uniqueKeysWithValues: pets.map {
+            ("pet:\($0.id.uuidString)", (name: $0.name, emoji: $0.avatarEmoji, isHuman: false))
+        })
+        let humanBySeries = Dictionary(uniqueKeysWithValues: humans.map {
+            ("human:\($0.id.uuidString)", (name: $0.name, emoji: $0.avatarEmoji, isHuman: true))
+        })
+        let subjectBySeries = petBySeries.merging(humanBySeries) { current, _ in current }
+
+        var deltas: [WeightDeltaPoint] = []
+        var rankings: [FameRanking] = []
+        for (seriesID, points) in Dictionary(grouping: weightAbsolutes, by: \.seriesID) {
+            let sorted = points.sorted { $0.date < $1.date }
+            guard let first = sorted.first, first.weight > 0,
+                  let subject = subjectBySeries[seriesID] else { continue }
+            for point in sorted {
+                deltas.append(WeightDeltaPoint(
+                    date: point.date,
+                    entityName: subject.name,
+                    percentChange: (point.weight - first.weight) / first.weight * 100,
+                    isHuman: subject.isHuman
+                ))
+            }
+            guard let last = sorted.last, last.id != first.id else { continue }
+            rankings.append(FameRanking(
+                entityName: subject.name,
+                emoji: subject.emoji,
+                deltaPercent: (last.weight - first.weight) / first.weight * 100,
+                isHuman: subject.isHuman
+            ))
+        }
+        weightDeltas = deltas.sorted { $0.date < $1.date }
+        gainChampion = rankings.filter { $0.deltaPercent > 0 }
+            .max(by: { $0.deltaPercent < $1.deltaPercent })
+        let gainName = gainChampion?.entityName
+        lossChampion = rankings
+            .filter { $0.deltaPercent < 0 && $0.entityName != gainName }
+            .min(by: { $0.deltaPercent < $1.deltaPercent })
     }
 
     // MARK: - Weight Gravity（变动百分比，消除量纲差异）
@@ -99,7 +152,8 @@ final class IslandUnifiedStatsViewModel {
     private func loadWeightDeltas(
         pets: [Pet],
         humans: [Human],
-        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]]
+        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]],
+        humanWeightEntriesByHumanId: [UUID: [HumanWeightMetricEntry]]
     ) {
         var points: [WeightDeltaPoint] = []
 
@@ -120,10 +174,10 @@ final class IslandUnifiedStatsViewModel {
 
         // 人类体重
         for human in humans {
-            let sorted = human.weightLogs.sorted { $0.date < $1.date }
-            guard let baseline = sorted.first?.weight, baseline > 0 else { continue }
+            let sorted = humanWeightEntriesByHumanId[human.id] ?? []
+            guard let baseline = sorted.first?.value, baseline > 0 else { continue }
             for log in sorted {
-                let pct = (log.weight - baseline) / baseline * 100
+                let pct = (log.value - baseline) / baseline * 100
                 points.append(WeightDeltaPoint(
                     date: log.date,
                     entityName: human.name,
@@ -136,16 +190,27 @@ final class IslandUnifiedStatsViewModel {
         weightDeltas = points.sorted { $0.date < $1.date }
 
         // F4: 加载实际体重绝对值
-        loadWeightAbsolutes(pets: pets, humans: humans, petWeightEntriesByPetId: petWeightEntriesByPetId)
+        loadWeightAbsolutes(
+            pets: pets,
+            humans: humans,
+            petWeightEntriesByPetId: petWeightEntriesByPetId,
+            humanWeightEntriesByHumanId: humanWeightEntriesByHumanId
+        )
 
         // 计算排行榜（本月）
-        computeRankings(pets: pets, humans: humans, petWeightEntriesByPetId: petWeightEntriesByPetId)
+        computeRankings(
+            pets: pets,
+            humans: humans,
+            petWeightEntriesByPetId: petWeightEntriesByPetId,
+            humanWeightEntriesByHumanId: humanWeightEntriesByHumanId
+        )
     }
 
     private func loadWeightAbsolutes(
         pets: [Pet],
         humans: [Human],
-        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]]
+        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]],
+        humanWeightEntriesByHumanId: [UUID: [HumanWeightMetricEntry]]
     ) {
         var pts: [WeightAbsolutePoint] = []
         for pet in pets {
@@ -163,13 +228,13 @@ final class IslandUnifiedStatsViewModel {
         }
         for human in humans {
             let sid = "human:\(human.id.uuidString)"
-            for log in human.weightLogs {
+            for log in humanWeightEntriesByHumanId[human.id] ?? [] {
                 pts.append(WeightAbsolutePoint(
                     id: log.id,
                     date: log.date,
                     seriesID: sid,
                     displayName: human.name,
-                    weight: log.weight,
+                    weight: log.value,
                     isHuman: true
                 ))
             }
@@ -189,7 +254,8 @@ final class IslandUnifiedStatsViewModel {
     private func computeRankings(
         pets: [Pet],
         humans: [Human],
-        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]]
+        petWeightEntriesByPetId: [UUID: [PetLedgerMetricEntry]],
+        humanWeightEntriesByHumanId: [UUID: [HumanWeightMetricEntry]]
     ) {
         let cal = Calendar.current
         let now = Date()
@@ -207,11 +273,11 @@ final class IslandUnifiedStatsViewModel {
         }
 
         for human in humans {
-            let sorted = human.weightLogs.sorted { $0.date < $1.date }
-            guard let baseline = sorted.first?.weight, baseline > 0 else { continue }
+            let sorted = humanWeightEntriesByHumanId[human.id] ?? []
+            guard let baseline = sorted.first?.value, baseline > 0 else { continue }
             let monthLogs = sorted.filter { $0.date >= startOfMonth }
             guard let latest = monthLogs.last else { continue }
-            let pct = (latest.weight - baseline) / baseline * 100
+            let pct = (latest.value - baseline) / baseline * 100
             entries.append(FameRanking(entityName: human.name, emoji: human.avatarEmoji, deltaPercent: pct, isHuman: true))
         }
 
@@ -313,20 +379,24 @@ final class IslandUnifiedStatsViewModel {
         pets: [Pet],
         eventKind: CareLedgerEventKind,
         valueTransform: (CareLedgerEvent) -> Double
-    ) -> [UUID: [PetLedgerMetricEntry]] {
+    ) -> (entries: [UUID: [PetLedgerMetricEntry]], isTruncated: Bool) {
         let petSubjectKind = CareLedgerSubjectKind.pet.rawValue
         let eventKindRaw = eventKind.rawValue
         let petIDs = Set(pets.map(\.id.uuidString))
-        guard !petIDs.isEmpty else { return [:] }
-        let descriptor = FetchDescriptor<CareLedgerEvent>(
+        guard !petIDs.isEmpty else { return ([:], false) }
+        let maximumResultCount = 20000
+        var descriptor = FetchDescriptor<CareLedgerEvent>(
             predicate: #Predicate<CareLedgerEvent> { event in
                 event.subjectKind == petSubjectKind &&
                     event.eventKind == eventKindRaw
             },
-            sortBy: [SortDescriptor(\.occurredAt, order: .forward)]
+            sortBy: [SortDescriptor(\.occurredAt, order: .reverse)]
         )
+        descriptor.fetchLimit = maximumResultCount + 1
         do {
-            let entries = try modelContext.fetch(descriptor).compactMap { event -> PetLedgerMetricEntry? in
+            let fetched = try modelContext.fetch(descriptor)
+            let isTruncated = fetched.count > maximumResultCount
+            let entries = fetched.prefix(maximumResultCount).compactMap { event -> PetLedgerMetricEntry? in
                 guard let subjectId = event.subjectId,
                       petIDs.contains(subjectId),
                       let petID = UUID(uuidString: subjectId) else { return nil }
@@ -339,13 +409,52 @@ final class IslandUnifiedStatsViewModel {
                     value: value
                 )
             }
-            return Dictionary(grouping: entries, by: \.petID)
+            let grouped = Dictionary(grouping: entries, by: \.petID)
+                .mapValues { $0.sorted { $0.date < $1.date } }
+            return (grouped, isTruncated)
         } catch {
             OhanaLog.warning(
                 "Island unified stats failed to fetch pet \(eventKind.rawValue) ledger events: \(error.localizedDescription)",
                 category: "DashboardRecords"
             )
-            return [:]
+            return ([:], false)
+        }
+    }
+
+    private static func fetchHumanWeightEntries(
+        modelContext: ModelContext,
+        humans: [Human]
+    ) -> (entries: [UUID: [HumanWeightMetricEntry]], isTruncated: Bool) {
+        let humanIDs = Set(humans.map(\.id))
+        guard !humanIDs.isEmpty else { return ([:], false) }
+        let maximumResultCount = 20000
+        var descriptor = FetchDescriptor<HumanWeightLog>(
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+        descriptor.fetchLimit = maximumResultCount + 1
+        do {
+            let fetched = try modelContext.fetch(descriptor)
+            let isTruncated = fetched.count > maximumResultCount
+            let entries = fetched.prefix(maximumResultCount).compactMap { log -> HumanWeightMetricEntry? in
+                guard let humanID = log.human?.id,
+                      humanIDs.contains(humanID),
+                      log.weight > 0 else { return nil }
+                return HumanWeightMetricEntry(
+                    id: log.id,
+                    humanID: humanID,
+                    date: log.date,
+                    value: log.weight
+                )
+            }
+            let grouped = Dictionary(grouping: entries, by: \.humanID)
+                .mapValues { $0.sorted { $0.date < $1.date } }
+            return (grouped, isTruncated)
+        } catch {
+            OhanaLog.warning(
+                "Island unified stats failed to fetch human weight records: \(error.localizedDescription)",
+                category: "DashboardRecords"
+            )
+            return ([:], false)
         }
     }
 
