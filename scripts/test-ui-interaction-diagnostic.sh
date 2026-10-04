@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <failed-journeys-control|failed-journeys-observed|record-input-control|record-input-observed|unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <remaining-switches-tap|remaining-switches-swipe|remaining-switches-tap-observed|remaining-switches-swipe-observed|plant-master-control|plant-master-observed|failed-journeys-control|failed-journeys-observed|record-input-control|record-input-observed|unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,42 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  remaining-switches-tap)
+    # Uninstrumented pair: preserve normal bindings and input dispatch.
+    # The long prefix includes every original pre-failure care step.
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticLongSessionLitterPrefix
+      OhanaUITests/OhanaUITests/testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu
+    )
+    ;;
+  remaining-switches-swipe)
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticLongSessionLitterPrefixWithSwitchSwipe
+      OhanaUITests/OhanaUITests/testDiagnosticPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithSwitchSwipe
+    )
+    ;;
+  remaining-switches-tap-observed)
+    # Logging can affect timing. Keep this pair separate from normal bindings
+    # so an observer-sensitive pass cannot be called a repaired control.
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticLongSessionLitterPrefixWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithReceivedInputTrace
+    )
+    ;;
+  remaining-switches-swipe-observed)
+    # One directional native switch gesture is the only experimental variable.
+    # No second input, direct binding/store writes, or full-release credit.
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticLongSessionLitterPrefixWithSwitchSwipeWithReceivedInputTrace
+      OhanaUITests/OhanaUITests/testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithSwitchSwipeWithReceivedInputTrace
+    )
+    ;;
+  plant-master-control)
+    selectors=(OhanaUITests/OhanaUITests/testDiagnosticPlantMasterRoundTripAndColdReadback)
+    ;;
+  plant-master-observed)
+    selectors=(OhanaUITests/OhanaUITests/testDiagnosticPlantMasterRoundTripAndColdReadbackWithReceivedInputTrace)
+    ;;
   failed-journeys-control)
     # Same eight complete original journeys and normal inputs.
     # Observation adds receipts only; this is not full release acceptance.

@@ -113,7 +113,8 @@ enum UITestInteraction {
         _ element: XCUIElement,
         in app: XCUIApplication? = nil,
         timeout: TimeInterval,
-        diagnosticPressDuration: TimeInterval?
+        diagnosticPressDuration: TimeInterval?,
+        diagnosticSwipeToState: Bool? = nil
     ) -> Bool {
         let application = app ?? XCUIApplication()
         let windowFrame = application.frame
@@ -131,7 +132,15 @@ enum UITestInteraction {
             recordFailure("Semantic tap target did not become ready", element: element)
             return false
         }
-        if let duration = diagnosticPressDuration {
+        if let enabled = diagnosticSwipeToState {
+            // Opt-in input comparison only. Use one public native gesture on
+            // the same switch; default release journeys continue to tap.
+            if enabled {
+                element.swipeRight()
+            } else {
+                element.swipeLeft()
+            }
+        } else if let duration = diagnosticPressDuration {
             // Opt-in controlled diagnostic only: one normal press, no extra
             // input or elapsed-time wait. Original journeys still use tap().
             element.press(forDuration: duration)
@@ -312,7 +321,8 @@ enum UITestInteraction {
         _ element: XCUIElement,
         enabled: Bool,
         timeout: TimeInterval,
-        diagnosticPressDuration: TimeInterval? = nil
+        diagnosticPressDuration: TimeInterval? = nil,
+        diagnosticUsesDirectionalSwipe: Bool = false
     ) -> Bool {
         var initial: Bool?
         guard wait(timeout: timeout, condition: {
@@ -326,7 +336,8 @@ enum UITestInteraction {
         guard sendSemanticInput(
             switchControl(element),
             timeout: timeout,
-            diagnosticPressDuration: diagnosticPressDuration
+            diagnosticPressDuration: diagnosticPressDuration,
+            diagnosticSwipeToState: diagnosticUsesDirectionalSwipe ? enabled : nil
         ) else { return false }
         // A second tap could undo a delayed first transition. Observe the one
         // requested action and let an unchanged state fail the journey.
@@ -342,15 +353,16 @@ enum UITestInteraction {
             return state == enabled
         }
         if !changed {
-            XCTContext.runActivity(named: "One-tap switch state observation") { activity in
+            let input = diagnosticUsesDirectionalSwipe ? "swipe" : "tap"
+            XCTContext.runActivity(named: "One-\(input) switch state observation") { activity in
                 let attachment = XCTAttachment(
                     string: "initial=\(label(initial)); expected=\(label(enabled)); observed=\(observedStates.joined(separator: " → "))"
                 )
-                attachment.name = "Switch state after one tap"
+                attachment.name = "Switch state after one \(input)"
                 attachment.lifetime = .keepAlways
                 activity.add(attachment)
             }
-            recordFailure("Switch did not reach requested state after one tap", element: element)
+            recordFailure("Switch did not reach requested state after one \(input)", element: element)
         }
         return changed
     }

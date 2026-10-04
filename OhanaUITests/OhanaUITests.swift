@@ -11,6 +11,7 @@ final class OhanaUITests: XCTestCase {
     private var seededHumanBaselineName: String?
     private var observesReceivedInput = false
     private var diagnosticSwitchPressDuration: TimeInterval?
+    private var diagnosticSwitchUsesDirectionalSwipe = false
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
@@ -97,6 +98,24 @@ final class OhanaUITests: XCTestCase {
     func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
+        try testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu()
+    }
+
+    @MainActor
+    func testDiagnosticPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithSwitchSwipe() throws {
+        diagnosticSwitchUsesDirectionalSwipe = true
+        defer { diagnosticSwitchUsesDirectionalSwipe = false }
+        try testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu()
+    }
+
+    @MainActor
+    func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithSwitchSwipeWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        diagnosticSwitchUsesDirectionalSwipe = true
+        defer {
+            observesReceivedInput = false
+            diagnosticSwitchUsesDirectionalSwipe = false
+        }
         try testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu()
     }
 
@@ -6082,6 +6101,65 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testDiagnosticPlantMasterRoundTripAndColdReadback() throws {
+        // Only the household prerequisite is seeded. Every preference change
+        // uses the real Settings route and the original single-input helper.
+        // This short diagnostic is excluded from the 132-case release gate.
+        let petName = "Codex Plant Master Diagnostic"
+        let app = launchEnglishApp(
+            matureHouseholdPetName: petName,
+            enableProductionOverlays: true,
+            extraLaunchArguments: ["-OHANA_UI_TEST_ENABLE_ANIMATIONS"]
+        )
+        guard let humanName = seededHumanBaselineName else {
+            return XCTFail("The plant master fixture did not retain its Human name.")
+        }
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        XCTAssertTrue(app.buttons["home-card-pet-\(petName)"].waitForExistence(timeout: 12))
+        openSettingsFromHomeChrome(in: app)
+        openSettingsCategory("settings-destination-notifications", in: app)
+
+        let plantToggle = app.switches.matching(identifier: "settings-notification-plantCare-toggle").firstMatch
+        scrollToElement(plantToggle, in: app, maxSwipes: 6)
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(plantToggle) == true }, "Fresh fixture did not start with plant reminders enabled.")
+        XCTAssertTrue(setToggle(plantToggle, enabled: false, in: app), "Category input did not disable plant reminders.")
+        let plantDetails = app.buttons["settings-plant-reminders-details"]
+        scrollToElement(plantDetails, in: app, maxSwipes: 6)
+        tapWhenHittable(plantDetails, timeout: 8)
+        let overview = app.descendants(matching: .any)["settings-plant-reminders-overview"]
+        XCTAssertTrue(overview.waitForExistence(timeout: 8), "Plant details did not mount.")
+        let master = app.switches.matching(identifier: "settings-plant-reminders-master-toggle").firstMatch
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(master) == false }, "Plant master did not read the category's disabled state.")
+        XCTAssertTrue(setToggle(master, enabled: true, in: app), "Plant master input did not enable reminders.")
+        tapWhenHittable(app.navigationBars.buttons["BackButton"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["settings-notifications-screen"].waitForExistence(timeout: 8))
+        XCTAssertFalse(overview.exists, "Plant controls remained mounted after returning.")
+        scrollToElement(plantToggle, in: app, maxSwipes: 6)
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(plantToggle) == true }, "Category did not reflect the master change.")
+
+        let medicationToggle = app.switches.matching(identifier: "settings-notification-medication-toggle").firstMatch
+        XCTAssertTrue(setToggle(medicationToggle, enabled: false, in: app))
+        tapWhenHittable(app.buttons["settings-close-action"], timeout: 8)
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openSettingsFromHomeChrome(in: app)
+        openSettingsCategory("settings-destination-notifications", in: app)
+        XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(medicationToggle) == false }, "Medication did not survive cold launch.")
+        for group in ["calendar", "feeding", "hygiene", "plantCare", "checkIn"] {
+            let toggle = app.switches.matching(identifier: "settings-notification-\(group)-toggle").firstMatch
+            scrollToElement(toggle, in: app, maxSwipes: 6)
+            XCTAssertTrue(waitUntil(timeout: 8) { UITestInteraction.toggleState(toggle) == true }, "Unexpected \(group) state after cold launch.")
+        }
+    }
+
+    @MainActor
+    func testDiagnosticPlantMasterRoundTripAndColdReadbackWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testDiagnosticPlantMasterRoundTripAndColdReadback()
+    }
+
+    @MainActor
     func testSettingsNotificationCategoriesAndPlantDetailsUseSeparatePages() throws {
         let app = launchEnglishApp(
             enableProductionOverlays: true,
@@ -7598,8 +7676,12 @@ final class OhanaUITests: XCTestCase {
         stopWalkFromVisibleHomeControls(in: app, petName: petName)
     }
 
+    // The original long journey and the paired input diagnostics share this
+    // exact prefix, including every care step before the failed reminder input.
     @MainActor
-    func testPetRealUserLongSessionCoversCareCalendarEconomyAndSafeguards() throws {
+    private func prepareLongSessionThroughLitterReminderReadback() -> (
+        app: XCUIApplication, humanName: String, petName: String, calendarTitle: String
+    ) {
         let app = launchEnglishApp(enableProductionOverlays: true)
         let humanName = createFirstHuman(from: app)
         let timestamp = Int(Date().timeIntervalSince1970)
@@ -7671,6 +7753,58 @@ final class OhanaUITests: XCTestCase {
             message: "Saving litter settings did not persist the long-session reminder state."
         )
         cancelLitterSettings(in: app)
+
+        return (app, humanName, petName, calendarTitle)
+    }
+
+    @MainActor
+    func testDiagnosticLongSessionLitterPrefix() throws {
+        verifyLongSessionLitterPrefixAndColdReadback()
+    }
+
+    @MainActor
+    func testDiagnosticLongSessionLitterPrefixWithSwitchSwipe() throws {
+        diagnosticSwitchUsesDirectionalSwipe = true
+        defer { diagnosticSwitchUsesDirectionalSwipe = false }
+        verifyLongSessionLitterPrefixAndColdReadback()
+    }
+
+    @MainActor
+    func testDiagnosticLongSessionLitterPrefixWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        verifyLongSessionLitterPrefixAndColdReadback()
+    }
+
+    @MainActor
+    func testDiagnosticLongSessionLitterPrefixWithSwitchSwipeWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        diagnosticSwitchUsesDirectionalSwipe = true
+        defer {
+            observesReceivedInput = false
+            diagnosticSwitchUsesDirectionalSwipe = false
+        }
+        verifyLongSessionLitterPrefixAndColdReadback()
+    }
+
+    @MainActor
+    private func verifyLongSessionLitterPrefixAndColdReadback() {
+        let (app, humanName, petName, _) = prepareLongSessionThroughLitterReminderReadback()
+        relaunchPreservingPersistentState(in: app)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        openPetPottyDetailFromHome(in: app, petName: petName, humanName: humanName)
+        openLitterSettings(in: app)
+        assertLitterSettingsStatus(
+            in: app,
+            containsAny: ["Reminder on", "提醒已开启", "Erinnerung an"],
+            message: "The saved litter reminder was not readable after cold relaunch."
+        )
+        cancelLitterSettings(in: app)
+    }
+
+    @MainActor
+    func testPetRealUserLongSessionCoversCareCalendarEconomyAndSafeguards() throws {
+        let (app, humanName, petName, calendarTitle) = prepareLongSessionThroughLitterReminderReadback()
 
         let scoopAction = app.buttons["quick-potty-scoop-primary-action"]
         scrollToElement(scoopAction, in: app, maxSwipes: 6)
@@ -9804,21 +9938,23 @@ final class OhanaUITests: XCTestCase {
         )
         tapWhenHittable(app.buttons["coconut-shop-confirm-purchase-fx_lime_glow"], timeout: 8)
 
-        XCTAssertTrue(
-            app.descendants(matching: .any)["coconut-shop-toast"].waitForExistence(timeout: 4),
-            "Coconut Shop did not show purchase feedback after the effect purchase."
-        )
-        let didSpend = waitUntil(timeout: 12) {
-            Int(numericLabel(accessibilityText(for: balance))) == startingBalance - 300
-        }
-        XCTAssertTrue(didSpend, "Purchasing Lime Glow did not spend 300 human coconuts through the shop GUI.")
-
+        // Success feedback also remains visible as Owned after the four-second
+        // toast expires. CI video confirms the toast can come and go during an
+        // AX query. Keep durable feedback separate from exact spend/readback.
         XCTAssertTrue(
             waitUntil(timeout: 12) {
                 accessibilityText(for: limeGlow).contains("Owned")
             },
             "Purchased Lime Glow did not become an owned shop item."
         )
+        XCTAssertFalse(
+            app.descendants(matching: .any)["coconut-shop-purchase-popup-fx_lime_glow"].exists,
+            "The successful effect purchase did not close its confirmation popup."
+        )
+        let didSpend = waitUntil(timeout: 12) {
+            Int(numericLabel(accessibilityText(for: balance))) == startingBalance - 300
+        }
+        XCTAssertTrue(didSpend, "Purchasing Lime Glow did not spend 300 human coconuts through the shop GUI.")
 
         let treasureBoxMetric = app.descendants(matching: .any)["coconut-shop-owned-count"]
         tapWhenHittable(treasureBoxMetric, timeout: 8)
@@ -14986,7 +15122,8 @@ final class OhanaUITests: XCTestCase {
             toggle,
             enabled: expectedState,
             timeout: 5,
-            diagnosticPressDuration: diagnosticSwitchPressDuration
+            diagnosticPressDuration: diagnosticSwitchPressDuration,
+            diagnosticUsesDirectionalSwipe: diagnosticSwitchUsesDirectionalSwipe
         )
     }
 

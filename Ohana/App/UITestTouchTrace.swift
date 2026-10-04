@@ -86,11 +86,15 @@ private extension UIWindow {
         for (touch, phase, timestamp, point, touchType, assignedGestures, recipient, recipientPath) in samples {
             let receiver = touch.view.map { String(describing: type(of: $0)) } ?? "nil"
             let recipientPathAfter = ohana_viewPath(recipient)
+            // Unified logging can truncate this diagnostic's long message.
+            // Keep the real recipient and native state ahead of optional
+            // gesture details so a crowded Form still identifies the input.
             OhanaUITestTouchTrace.record(
                 "touch=\(ObjectIdentifier(touch)) phase=\(phase) timestamp=\(timestamp) "
-                    + "point=\(point) type=\(touchType) assignedGesturesBefore=[\(assignedGestures)] "
+                    + "point=\(point) type=\(touchType) "
                     + "window=\(ObjectIdentifier(self)) receiverAfter=\(receiver) "
-                    + "recipientPathBefore=\(recipientPath) recipientPathAfter=\(recipientPathAfter)"
+                    + "recipientPathBefore=\(recipientPath) recipientPathAfter=\(recipientPathAfter) "
+                    + "assignedGesturesBefore=[\(assignedGestures)]"
             )
         }
     }
