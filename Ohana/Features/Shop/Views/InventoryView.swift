@@ -418,7 +418,18 @@ struct InventoryContentView: View {
             set: { val in
                 OhanaFeedback.light()
                 switch item.id {
-                case "fx_lime_glow": equipFxLimeGlow = val
+                case "fx_lime_glow":
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record(
+                        "inventory-fx-lime-glow setter requested=\(val) previous=\(equipFxLimeGlow)"
+                    )
+                    #endif
+                    equipFxLimeGlow = val
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record(
+                        "inventory-fx-lime-glow setter returned=\(equipFxLimeGlow)"
+                    )
+                    #endif
                 case "fx_rainbow": equipFxRainbow = val
                 case "fx_rainbow_poop": equipFxRainbowPoop = val
                 case "fx_popout_card":

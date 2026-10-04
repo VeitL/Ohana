@@ -163,9 +163,19 @@ extension PetBasicInfoDetailView {
     }
 
     func deletePetWithCascade(_ p: Pet) {
+        guard !isDeleting, PetDetailModelReadability.isReadable(p) else { return }
         let command = DomainCommand.memberDeletion(entityID: p.id, kind: EntityKind.pet.rawValue)
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
+        // Retire model-reading content before the domain command invalidates it.
+        isDeleting = true
+        healthSummaryLoadTask?.cancel()
+        savedFeedbackTask?.cancel()
+        presentedSheet = nil
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
         commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deletePet(
                 p,

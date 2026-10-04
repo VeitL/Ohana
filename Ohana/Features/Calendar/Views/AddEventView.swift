@@ -488,6 +488,18 @@ extension AddEventContentView {
                 rewardCoconuts = 0
             }
         }
+        #if DEBUG
+        .onChange(of: titleFocused) { _, focused in
+            OhanaUITestTouchTrace.record(
+                "add-event-title focus=\(focused) titleLength=\(title.count) canSave=\(canSave)"
+            )
+        }
+        .onChange(of: title) { _, value in
+            OhanaUITestTouchTrace.record(
+                "add-event-title changed length=\(value.count) focused=\(titleFocused) canSave=\(canSave)"
+            )
+        }
+        #endif
         .onAppear {
             if !isEditing,
                assigneeId == nil,

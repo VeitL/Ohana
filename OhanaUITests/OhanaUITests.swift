@@ -80,6 +80,48 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testPetHomeQuickActionDetailRoutesOpenAndCancelWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetHomeQuickActionDetailRoutesOpenAndCancel()
+    }
+
+    @MainActor
+    func testPetLitterScoopPersistsAndRepeatSubmitIsBlockedWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetLitterScoopPersistsAndRepeatSubmitIsBlocked()
+    }
+
+    @MainActor
+    func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu()
+    }
+
+    @MainActor
+    func testPetPermanentDeleteFromBasicInfoSmokeWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetPermanentDeleteFromBasicInfoSmoke()
+    }
+
+    @MainActor
+    func testCalendarAddEventKeyboardKeepsEditorControlsVisibleWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testCalendarAddEventKeyboardKeepsEditorControlsVisible()
+    }
+
+    @MainActor
+    func testPetRealUserLongSessionCoversCareCalendarEconomyAndSafeguardsWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPetRealUserLongSessionCoversCareCalendarEconomyAndSafeguards()
+    }
+
+    @MainActor
     func testDiagnosticAuthorizationMatcherRejectsUnrelatedPrompts() {
         XCTAssertEqual(UITestInteraction.authorizationKind(text: "“Ohana” Would Like to Send You Notifications"), .notifications)
         XCTAssertEqual(UITestInteraction.authorizationKind(text: "„Ohana“ möchte dir Mitteilungen senden"), .notifications)
@@ -9994,15 +10036,17 @@ final class OhanaUITests: XCTestCase {
         XCTAssertTrue(keyboard.waitForExistence(timeout: 5), "System keyboard did not appear after focusing the event title.")
         titleField.typeText(eventTitle)
 
-        var visibleSaveAction: XCUIElement?
+        var lastObservedSaveFrame: CGRect?
+        var lastObservedKeyboardFrame: CGRect?
         let didKeepSaveAboveKeyboard = waitUntil(timeout: 6) {
             guard
                 let saveAction = firstHittableButton(identifier: "add-event-keyboard-save-action", in: app),
                 keyboard.exists
             else { return false }
-            visibleSaveAction = saveAction
             let saveFrame = saveAction.frame
             let keyboardFrame = keyboard.frame
+            lastObservedSaveFrame = saveFrame
+            lastObservedKeyboardFrame = keyboardFrame
             let windowFrame = app.windows.firstMatch.frame
             return isFiniteFrame(saveFrame) &&
                 isFiniteFrame(keyboardFrame) &&
@@ -10013,7 +10057,7 @@ final class OhanaUITests: XCTestCase {
         }
         XCTAssertTrue(
             didKeepSaveAboveKeyboard,
-            "Calendar add-event save action should be a compact keyboard toolbar action, not a full-width overlay. save=\(visibleSaveAction?.frame.debugDescription ?? "nil"), keyboard=\(keyboard.frame)"
+            "Calendar add-event save action should be a compact keyboard toolbar action, not a full-width overlay. last observed save=\(lastObservedSaveFrame?.debugDescription ?? "nil"), last observed keyboard=\(lastObservedKeyboardFrame?.debugDescription ?? "nil")"
         )
 
         tapFirstHittableButton(identifier: "add-event-keyboard-save-action", in: app, timeout: 8, context: "keyboard-visible calendar save")

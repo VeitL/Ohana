@@ -6,6 +6,8 @@
 import XCTest
 
 final class PlantModuleUITests: XCTestCase {
+    private var observesReceivedInput = false
+
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
@@ -16,6 +18,13 @@ final class PlantModuleUITests: XCTestCase {
             UITestInteraction.captureFailureSnapshot()
             UITestInteraction.respondToPendingAuthorization(assertDismissal: false)
         }
+    }
+
+    @MainActor
+    func testPlantModuleUnlockCreateCareReminderCalendarAndDeleteWithReceivedInputTrace() throws {
+        observesReceivedInput = true
+        defer { observesReceivedInput = false }
+        try testPlantModuleUnlockCreateCareReminderCalendarAndDelete()
     }
 
     @MainActor
@@ -534,6 +543,9 @@ final class PlantModuleUITests: XCTestCase {
             ]
         }
         app.launchArguments += extraLaunchArguments
+        if observesReceivedInput {
+            app.launchArguments += ["-OHANA_UI_TEST_TRACE_TOUCHES"]
+        }
         UITestInteraction.installAuthorizationMonitor(on: self)
         UITestInteraction.respondToPendingAuthorization()
         app.launch()

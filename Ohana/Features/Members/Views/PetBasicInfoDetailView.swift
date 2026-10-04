@@ -33,6 +33,7 @@ struct PetBasicInfoDetailView: View {
     @State var presentedSheet: PetProfilePresentedSheet?
     @State var showingDiscardConfirmation = false
     @State var isSaving = false
+    @State var isDeleting = false
     @State var saveErrorMessage: String?
     @State var showsSavedFeedback = false
     @State var savedFeedbackTask: Task<Void, Never>?
@@ -94,7 +95,7 @@ struct PetBasicInfoDetailView: View {
     }
 
     var body: some View {
-        if PetDetailModelReadability.isReadable(pet) {
+        if !isDeleting, PetDetailModelReadability.isReadable(pet) {
             profileContent
         }
     }
