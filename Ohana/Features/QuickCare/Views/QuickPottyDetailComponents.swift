@@ -898,6 +898,9 @@ struct PoopCycleSettingsSheet: View {
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
                 PoopPrimaryButton(title: l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"), icon: "checkmark", tint: tint) {
+                    #if DEBUG
+                    OhanaUITestTouchTrace.record("\(accessibilityIDPrefix ?? "potty-plan") saveAction draftReminder=\(draftReminderOn)")
+                    #endif
                     intervalDays = draftIntervalDays
                     anchorDate = draftAnchorDate
                     reminderOn = draftReminderOn
@@ -921,6 +924,11 @@ struct PoopCycleSettingsSheet: View {
             .padding(20)
         }
         .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-sheet" } ?? "")
+        #if DEBUG
+        .onChange(of: draftReminderOn) { _, value in
+            OhanaUITestTouchTrace.record("\(accessibilityIDPrefix ?? "potty-plan") draftReminderChanged=\(value)")
+        }
+        #endif
         .onAppear {
             #if DEBUG
             OhanaUITestTouchTrace.record(

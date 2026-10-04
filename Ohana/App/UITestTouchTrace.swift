@@ -4,12 +4,14 @@ import OSLog
 import SwiftUI
 import UIKit
 
-/// Opt-in observation of received touches. Input synthesis and dispatch stay unchanged.
+/// Opt-in diagnostics. Window observation adds work around dispatch and can
+/// perturb timing; action-boundary observation leaves dispatch and bindings alone.
 @MainActor
 enum OhanaUITestTouchTrace {
     private static let logger = Logger(subsystem: "com.guanchen.li.Ohana", category: "UITestTouchTrace")
     private static var touchObservationInstalled = false
     private static var controlStateObservationEnabled = false
+    private static var actionBoundaryObservationEnabled = false
 
     static func installIfRequested() {
         let arguments = ProcessInfo.processInfo.arguments
@@ -27,16 +29,22 @@ enum OhanaUITestTouchTrace {
             controlStateObservationEnabled = true
             logger.notice("Control-state observation enabled")
         }
+        if arguments.contains("-OHANA_UI_TEST_TRACE_ACTION_BOUNDARIES"), !actionBoundaryObservationEnabled {
+            actionBoundaryObservationEnabled = true
+            logger.notice("Action-boundary observation enabled; no window hook or binding wrapper")
+        }
     }
 
-    static func record(_ message: String) {
-        guard touchObservationInstalled || controlStateObservationEnabled else { return }
-        logger.notice("\(message, privacy: .public)")
+    static func record(_ message: @autoclosure () -> String) {
+        guard touchObservationInstalled || controlStateObservationEnabled || actionBoundaryObservationEnabled else { return }
+        let value = message()
+        logger.notice("\(value, privacy: .public)")
     }
 
     /// Forward the real setter once. Unobserved controls retain their original
     /// binding; the diagnostic never substitutes an expected state or action.
     static func observingToggle(_ binding: Binding<Bool>, identifier: String) -> Binding<Bool> {
+        // The action-boundary diagnostic must keep the original native binding.
         guard touchObservationInstalled || controlStateObservationEnabled else { return binding }
         return Binding(
             get: { binding.wrappedValue },

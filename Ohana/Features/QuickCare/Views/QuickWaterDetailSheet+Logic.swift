@@ -130,6 +130,9 @@ extension QuickWaterDetailSheet {
                 waterEntries: waterEntries
             )
             waterSnapshot = snapshot
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord snapshotBuilt entries=\(waterEntries.count) watering=\(snapshot.waterLogs.count) today=\(snapshot.todayWaterLogs.count)")
+            #endif
             if !snapshot.rule.planEvents.isEmpty {
                 optimisticWaterPlanEvents = []
             }
@@ -686,18 +689,40 @@ extension QuickWaterDetailSheet {
     }
 
     func commitWater() {
-        guard validateActionHumanSelection() else { return }
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord commitRequested actionPending=\(waterActionTask != nil) requiresExecutor=\(requiresActionHumanSelection) targets=\(selectedWaterTargets.count)")
+        #endif
+        guard validateActionHumanSelection() else {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord selectionRejected")
+            #endif
+            return
+        }
         let executorId = selectedActionExecutorId
-        guard scheduleDeferredWaterAction({ commitWaterBusiness(executorId: executorId) }) else { return }
+        guard scheduleDeferredWaterAction({ commitWaterBusiness(executorId: executorId) }) else {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord scheduled=false")
+            #endif
+            return
+        }
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord scheduled=true")
+        #endif
     }
 
     func commitWaterBusiness(executorId: String?) {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord commandBegin")
+        #endif
         let result = commandExecutor.recordWater(
             pet: pet,
             targets: selectedWaterTargets,
             amountMl: defaultWaterAmountMl ?? 0,
             executorId: executorId
         )
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord commandReturned didRecord=\(result.didRecord) allowsDerivedEffects=\(result.allowsDerivedEffects) targets=\(result.targetCount) entries=\(waterEntries.count)")
+        #endif
         guard result.didRecord else { return }
         selectedActionHumanID = nil
         guard result.allowsDerivedEffects else { return }

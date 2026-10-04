@@ -11,7 +11,7 @@ on:
         description: Focused diagnostic set to run on the disposable Tests Simulator
         required: true
         type: choice
-        options: [all, remaining-switches, plant-master, failed-journeys, record-input, unresolved-controls, unresolved-controls-context, unresolved-controls-switch-input, notifications-context, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
+        options: [all, action-boundaries, remaining-switches, plant-master, failed-journeys, record-input, unresolved-controls, unresolved-controls-context, unresolved-controls-switch-input, notifications-context, ci-preflight, ci-repair-preflight, historical-failures, regression-failures, current-failures, keyboard-dismissal, water-plan-control, crew, crew-long, crew-onboarding, home-date, home-date-long, home-date-control, zen-private]
         default: all
 
 concurrency:
@@ -26,6 +26,7 @@ jobs:
       matrix:
         scenario: >-
           ${{ fromJSON(
+            inputs.scenario == 'action-boundaries' && '["action-boundaries"]' ||
             inputs.scenario == 'remaining-switches' && '["remaining-switches-tap","remaining-switches-swipe","remaining-switches-tap-observed","remaining-switches-swipe-observed"]' ||
             inputs.scenario == 'plant-master' && '["plant-master-control","plant-master-observed"]' ||
             inputs.scenario == 'failed-journeys' && '["failed-journeys-control","failed-journeys-observed"]' ||
@@ -73,10 +74,10 @@ jobs:
       - name: Run focused governed UI diagnostics
         env:
           OHANA_LOCAL_BUILD_CACHE_PARENT: ${{ runner.temp }}/OhanaLocalBuild
-          OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ (startsWith(matrix.scenario, 'remaining-switches-') || startsWith(matrix.scenario, 'plant-master-') || startsWith(matrix.scenario, 'failed-journeys-') || startsWith(matrix.scenario, 'record-input-') || startsWith(matrix.scenario, 'unresolved-controls-') || matrix.scenario == 'home-date-control' || matrix.scenario == 'water-plan-control' || matrix.scenario == 'ci-repair-preflight') && '1' || '0' }}
+          OHANA_KEEP_TEST_SIMULATOR_BOOTED: ${{ (startsWith(matrix.scenario, 'remaining-switches-') || startsWith(matrix.scenario, 'plant-master-') || startsWith(matrix.scenario, 'failed-journeys-') || startsWith(matrix.scenario, 'record-input-') || startsWith(matrix.scenario, 'unresolved-controls-') || matrix.scenario == 'action-boundaries' || matrix.scenario == 'home-date-control' || matrix.scenario == 'water-plan-control' || matrix.scenario == 'ci-repair-preflight') && '1' || '0' }}
         run: bash scripts/test-ui-interaction-diagnostic.sh '${{ matrix.scenario }}'
       - name: Export received-touch and control-state log
-        if: always() && (startsWith(matrix.scenario, 'remaining-switches-') || startsWith(matrix.scenario, 'plant-master-') || startsWith(matrix.scenario, 'failed-journeys-') || startsWith(matrix.scenario, 'record-input-') || startsWith(matrix.scenario, 'unresolved-controls-') || startsWith(matrix.scenario, 'ci-preflight-') || matrix.scenario == 'ci-repair-preflight' || matrix.scenario == 'water-plan-control' || matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'current-failures' || matrix.scenario == 'keyboard-dismissal' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'home-date-control')
+        if: always() && (startsWith(matrix.scenario, 'remaining-switches-') || startsWith(matrix.scenario, 'plant-master-') || startsWith(matrix.scenario, 'failed-journeys-') || startsWith(matrix.scenario, 'record-input-') || startsWith(matrix.scenario, 'unresolved-controls-') || startsWith(matrix.scenario, 'ci-preflight-') || matrix.scenario == 'ci-repair-preflight' || matrix.scenario == 'water-plan-control' || matrix.scenario == 'crew' || matrix.scenario == 'historical-failures' || matrix.scenario == 'regression-failures' || matrix.scenario == 'current-failures' || matrix.scenario == 'keyboard-dismissal' || matrix.scenario == 'crew-long' || matrix.scenario == 'crew-onboarding' || matrix.scenario == 'action-boundaries' || matrix.scenario == 'home-date-control')
         env:
           RUNNER_TEMP: ${{ runner.temp }}
           DIAGNOSTIC_SCENARIO: ${{ matrix.scenario }}

@@ -306,6 +306,9 @@ struct QuickWaterDetailSheet: View {
             scheduleWaterPlanMaintenance(delayMilliseconds: maintenanceDelay)
         }
         .onChange(of: waterEntriesRevisionKey) { _, _ in
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord queryChanged entries=\(waterEntries.count)")
+            #endif
             scheduleWaterSnapshotRefresh()
         }
         .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
@@ -334,6 +337,7 @@ struct QuickWaterDetailSheet: View {
         .onDisappear {
             #if DEBUG
             OhanaUITestTouchTrace.record("waterPlan detailDisappeared isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+            OhanaUITestTouchTrace.record("waterRecord detailDisappeared actionPending=\(waterActionTask != nil)")
             #endif
             waterSnapshotRefreshTask?.cancel()
             waterModeTransitionTask?.cancel()
@@ -697,6 +701,9 @@ struct QuickWaterDetailSheet: View {
             primaryTitle: waterPrimaryTitle,
             primaryIcon: waterPrimaryIcon,
             primaryAction: {
+                #if DEBUG
+                OhanaUITestTouchTrace.record("waterRecord primaryAction reminderMode=\(waterMode == .reminder) aquatic=\(isAquatic) memorial=\(pet.hasPassedAway)")
+                #endif
                 guard !pet.hasPassedAway else {
                     openRootWaterSheet(.waterOverview)
                     return

@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 usage() {
-  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <remaining-switches-tap|remaining-switches-swipe|remaining-switches-tap-observed|remaining-switches-swipe-observed|plant-master-control|plant-master-observed|failed-journeys-control|failed-journeys-observed|record-input-control|record-input-observed|unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
+  echo "Usage: scripts/test-ui-interaction-diagnostic.sh <action-boundaries|remaining-switches-tap|remaining-switches-swipe|remaining-switches-tap-observed|remaining-switches-swipe-observed|plant-master-control|plant-master-observed|failed-journeys-control|failed-journeys-observed|record-input-control|record-input-observed|unresolved-controls-switch-input-control|unresolved-controls-switch-input-press|unresolved-controls-context-launch-onboarding|unresolved-controls-context-pet-care-hygiene|unresolved-controls-context-pet-long-session|unresolved-controls-observed|unresolved-controls-control|permission-policy|water-plan-control|ci-repair-preflight|ci-preflight-permissions|ci-preflight-interactions|historical-failures|regression-failures|current-failures|keyboard-dismissal|crew|crew-long|crew-onboarding|home-date|home-date-long|home-date-control|plant-reminder|zen-private> [--print]" >&2
 }
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
@@ -23,6 +23,14 @@ if [[ $# -eq 2 ]]; then
 fi
 
 case "${scenario}" in
+  action-boundaries)
+    # Same complete Shop journey and original Long pre-failure context. Default
+    # tap/native bindings; passive receipts only, never release-pass credit.
+    selectors=(
+      OhanaUITests/OhanaUITests/testDiagnosticLongSessionLitterPrefixWithPassiveActionBoundaries
+      OhanaUITests/OhanaUITests/testDiagnosticPetCoconutShopWithPassiveActionBoundaries
+    )
+    ;;
   remaining-switches-tap)
     # Uninstrumented pair: preserve normal bindings and input dispatch.
     # The long prefix includes every original pre-failure care step.

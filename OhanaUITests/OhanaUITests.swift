@@ -10,6 +10,7 @@ import XCTest
 final class OhanaUITests: XCTestCase {
     private var seededHumanBaselineName: String?
     private var observesReceivedInput = false
+    private var observesActionBoundaries = false
     private var diagnosticSwitchPressDuration: TimeInterval?
     private var diagnosticSwitchUsesDirectionalSwipe = false
 
@@ -98,6 +99,13 @@ final class OhanaUITests: XCTestCase {
     func testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenuWithReceivedInputTrace() throws {
         observesReceivedInput = true
         defer { observesReceivedInput = false }
+        try testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu()
+    }
+
+    @MainActor
+    func testDiagnosticPetCoconutShopWithPassiveActionBoundaries() throws {
+        observesActionBoundaries = true
+        defer { observesActionBoundaries = false }
         try testPetCoconutShopEffectPurchaseSpendsHumanBalanceFromFunctionMenu()
     }
 
@@ -7763,6 +7771,13 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testDiagnosticLongSessionLitterPrefixWithPassiveActionBoundaries() throws {
+        observesActionBoundaries = true
+        defer { observesActionBoundaries = false }
+        verifyLongSessionLitterPrefixAndColdReadback()
+    }
+
+    @MainActor
     func testDiagnosticLongSessionLitterPrefixWithSwitchSwipe() throws {
         diagnosticSwitchUsesDirectionalSwipe = true
         defer { diagnosticSwitchUsesDirectionalSwipe = false }
@@ -10600,6 +10615,11 @@ final class OhanaUITests: XCTestCase {
             app.launchArguments += ["-OHANA_UI_TEST_RESET_ECONOMY_BUDGET"]
         }
         app.launchArguments += extraLaunchArguments
+        if observesActionBoundaries {
+            // Keep native bindings and default semantic inputs. This diagnostic
+            // records action/command/state boundaries without a UIWindow hook.
+            app.launchArguments += ["-OHANA_UI_TEST_TRACE_ACTION_BOUNDARIES"]
+        }
         if observesReceivedInput {
             // The paired diagnostic changes only opt-in observation. Original
             // inputs, fixture lifecycle and business assertions stay intact.
