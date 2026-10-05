@@ -482,7 +482,6 @@ struct QuickHumanMedicationSheet: View {
         let shouldScheduleReminders = reminderEnabled
         let command = DomainCommand.quickHumanMedication(humanID: human.id)
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
             guard HumanCareCommandExecutor(context: modelContext, services: appServices).createQuickMedication(
                 human: human,
@@ -499,6 +498,7 @@ struct QuickHumanMedicationSheet: View {
                 isSaving = false
                 return
             }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved?()
             close()
         }

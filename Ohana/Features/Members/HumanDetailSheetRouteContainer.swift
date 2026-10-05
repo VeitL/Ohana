@@ -40,6 +40,7 @@ extension AppHumanDetailSheetDestination {
 }
 
 struct HumanAllFeaturesRouteContainer: View {
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @State private var routeData = HumanAllFeaturesRouteData()
@@ -61,19 +62,7 @@ struct HumanAllFeaturesRouteContainer: View {
 
     var body: some View {
         if let human = routeData.human {
-            HumanAllFeaturesSheet(
-                human: human,
-                allMeds: routeData.allMeds,
-                allReports: routeData.allReports,
-                allExpenses: routeData.allExpenses,
-                summary: routeData.summary,
-                onOpenDestination: { destination in
-                    guard !human.hasPassedAway || destination.isAvailableInMemorialMode else {
-                        return
-                    }
-                    onOpenDestination(human.id, destination)
-                }
-            )
+            memberHome(human)
             .onAppear {
                 scheduleRouteDataLoad()
             }
@@ -89,13 +78,41 @@ struct HumanAllFeaturesRouteContainer: View {
                 .onAppear(perform: onMissing)
         } else {
             HumanRouteLoadingEntityView(kind: "human")
-                .onAppear {
-                    scheduleRouteDataLoad()
+                .onAppear { scheduleRouteDataLoad() }
+                .onDisappear { dataLoadTask?.cancel()
+                dataLoadTask = nil
                 }
-                .onDisappear {
-                    dataLoadTask?.cancel()
-                    dataLoadTask = nil
+        }
+    }
+
+    @ViewBuilder
+    private func memberHome(_ human: Human) -> some View {
+        if !human.hasPassedAway {
+            NavigationStack {
+                HumanHealthSummaryView(human: human, onOpenAchievements: {
+                    onOpenDestination(human.id, .achievements)
+                })
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
+                            .accessibilityIdentifier("human-all-features-close-action")
+                    }
                 }
+            }
+        } else {
+            HumanAllFeaturesSheet(
+                human: human,
+                allMeds: routeData.allMeds,
+                allReports: routeData.allReports,
+                allExpenses: routeData.allExpenses,
+                summary: routeData.summary,
+                onOpenDestination: { destination in
+                    guard !human.hasPassedAway || destination.isAvailableInMemorialMode else {
+                        return
+                    }
+                    onOpenDestination(human.id, destination)
+                }
+            )
         }
     }
 
@@ -103,7 +120,10 @@ struct HumanAllFeaturesRouteContainer: View {
         guard force || !routeData.hasLoaded else { return }
         guard dataLoadTask == nil else { return }
         dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            routeData = HumanAllFeaturesRouteData.load(id: id, from: modelContext)
+            let identity = HumanAllFeaturesRouteData.loadIdentity(id: id, from: modelContext)
+            routeData = identity.human?.hasPassedAway == true
+                ? HumanAllFeaturesRouteData.load(id: id, from: modelContext)
+                : identity
             dataLoadTask = nil
         }
     }
@@ -175,13 +195,11 @@ struct AppHumanDetailSheetRouteContainer: View {
             case .basicInfo:
                 NavigationStack { HumanBasicInfoDetailView(human: human, onClose: onDismiss) }
             case .medicationQuick:
-                QuickHumanMedicationSheet(
-                    human: human,
-                    onManage: {
-                        onOpenDestination?(human.id, .medication)
-                    },
-                    onDismiss: onDismiss
-                )
+                NavigationStack {
+                    HumanMedicationView(human: human, showsDoneButton: true, onDoseTaken: {
+                        onHumanDoseTaken(human.id)
+                    })
+                }
             case .medication:
                 NavigationStack {
                     HumanMedicationView(
@@ -256,6 +274,13 @@ private struct HumanAllFeaturesRouteData {
     var allExpenses: [PetExpenseLog] = []
     var summary: HumanAllFeaturesActivitySummary = .empty
     var hasLoaded = false
+
+    @MainActor
+    static func loadIdentity(id: UUID, from context: ModelContext) -> HumanAllFeaturesRouteData {
+        var descriptor = FetchDescriptor<Human>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return HumanAllFeaturesRouteData(human: fetchOne(descriptor, context: context, name: "Human"), hasLoaded: true)
+    }
 
     @MainActor
     static func load(id: UUID, from context: ModelContext) -> HumanAllFeaturesRouteData {

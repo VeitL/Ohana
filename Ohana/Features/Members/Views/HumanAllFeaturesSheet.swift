@@ -10,7 +10,9 @@ import UIKit
 
 enum HumanAllFeatureDestination: Hashable {
     case basicInfo
+    case weightQuick
     case weight
+    case workoutQuick
     case workout
     case metrics
     case conditions
@@ -18,6 +20,7 @@ enum HumanAllFeatureDestination: Hashable {
     case report
     case expense
     case wishlist
+    case noteQuick
     case notes
     case achievements
 }
@@ -26,7 +29,9 @@ extension HumanAllFeatureDestination: Identifiable {
     var id: String {
         switch self {
         case .basicInfo: "basicInfo"
+        case .weightQuick: "weightQuick"
         case .weight: "weight"
+        case .workoutQuick: "workoutQuick"
         case .workout: "workout"
         case .metrics: "metrics"
         case .conditions: "conditions"
@@ -34,6 +39,7 @@ extension HumanAllFeatureDestination: Identifiable {
         case .report: "report"
         case .expense: "expense"
         case .wishlist: "wishlist"
+        case .noteQuick: "noteQuick"
         case .notes: "notes"
         case .achievements: "achievements"
         }
@@ -43,9 +49,9 @@ extension HumanAllFeatureDestination: Identifiable {
         switch self {
         case .basicInfo, .achievements:
             nil
-        case .weight, .metrics, .conditions, .report:
+        case .weightQuick, .weight, .metrics, .conditions, .report:
             .weight
-        case .workout:
+        case .workoutQuick, .workout:
             .workout
         case .medication:
             .medication
@@ -53,16 +59,16 @@ extension HumanAllFeatureDestination: Identifiable {
             .expense
         case .wishlist:
             .wishlist
-        case .notes:
+        case .noteQuick, .notes:
             .note
         }
     }
 
     var isAvailableInMemorialMode: Bool {
         switch self {
-        case .basicInfo, .notes, .achievements:
+        case .basicInfo, .noteQuick, .notes, .achievements:
             true
-        case .weight, .workout, .metrics, .conditions, .medication, .report, .expense, .wishlist:
+        case .weightQuick, .weight, .workoutQuick, .workout, .metrics, .conditions, .medication, .report, .expense, .wishlist:
             false
         }
     }
@@ -79,6 +85,11 @@ struct HumanAllFeaturesActivitySummary: Equatable {
     var latestHealthMetricValue: Double?
     var activeHealthConditionCount: Int = 0
     var recentHealthObservationCount: Int = 0
+    var activeMedicationPlanCount: Int = 0
+    var nextScheduledDoseDate: Date?
+    var reportCount: Int = 0
+    var latestReportDate: Date?
+    var noteCount: Int = 0
     var weightChartPoints: [OhanaMinimalChartPoint] = []
     var workoutChartPoints: [OhanaMinimalChartPoint] = []
     var metricsChartPoints: [OhanaMinimalChartPoint] = []
@@ -111,12 +122,15 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         let recentDays = (0 ..< 7).compactMap {
             calendar.date(byAdding: .day, value: $0 - 6, to: todayStart)
         }
-        let myMeds = allMeds.filter {
-            UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines)) == human.id
+        let myMeds = allMeds.filter { HumanHealthSummaryOwnerIdentity.matches($0.humanId, humanID: human.id) }
+        let activeMeds = myMeds.filter {
+            let group = HumanMedicationSchedulePlan.displayGroup(for: $0, now: now, calendar: calendar)
+            return group == .current || group == .manual
         }
-        let myReports = allReports.filter {
-            UUID(uuidString: $0.humanId.trimmingCharacters(in: .whitespacesAndNewlines)) == human.id
-        }
+        let nextScheduledDoseDate = myMeds.flatMap {
+            HumanMedicationSchedulePlan.futureDoses(for: $0, from: now, days: 7, calendar: calendar)
+        }.map(\.scheduledTime).min()
+        let myReports = allReports.filter { HumanHealthSummaryOwnerIdentity.matches($0.humanId, humanID: human.id) }
         let myExpenses = ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
         let latestWeight = weightLogs.max(by: { $0.date < $1.date })
         let latestWorkout = workoutLogs.max(by: { $0.date < $1.date })
@@ -139,6 +153,11 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             latestHealthMetricValue: latestHealthMetric?.value,
             activeHealthConditionCount: healthConditions.count { $0.trackingStatus != .resolved },
             recentHealthObservationCount: healthObservations.count { $0.recordedAt >= (recentDays.first ?? todayStart) },
+            activeMedicationPlanCount: activeMeds.count,
+            nextScheduledDoseDate: nextScheduledDoseDate,
+            reportCount: myReports.count,
+            latestReportDate: myReports.map(\.reportDate).max(),
+            noteCount: visibleNotes.count,
             weightChartPoints: weightLogs
                 .sorted { $0.date < $1.date }
                 .suffix(7)
@@ -169,8 +188,8 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             ),
             medicationChartPoints: FeatureHubChartPointFactory.bars(
                 [
-                    Double(myMeds.count { $0.isActive && $0.isActiveToday }),
-                    Double(myMeds.count { !$0.isActive || !$0.isActiveToday })
+                    Double(activeMeds.count),
+                    Double(myMeds.count - activeMeds.count)
                 ],
                 idPrefix: "human-all-medication"
             ),
@@ -301,6 +320,11 @@ struct HumanAllFeaturesSheet: View {
                     HumanOwnerPrivacyHint(appLanguage: appLanguage)
                 }
 
+                if !human.hasPassedAway {
+                    healthSummaryEntry
+                    quickActions
+                }
+
                 ForEach(visibleSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
                         open(destination)
@@ -375,6 +399,138 @@ struct HumanAllFeaturesSheet: View {
             return
         }
         onOpenDestination(destination)
+    }
+
+    // Use the existing bounded health overview; its rows enforce each field's privacy.
+    private var healthSummaryEntry: some View {
+        NavigationLink {
+            HumanHealthSummaryView(human: human)
+                .toolbar(.visible, for: .navigationBar)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.text.clipboard")
+                    .foregroundStyle(Color.goTeal)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l.tr(
+                        zh: "健康摘要", en: "Health summary", de: "Gesundheitsübersicht",
+                        es: "Resumen de salud", pt: "Resumo de saúde", fr: "Résumé de santé",
+                        ja: "健康の概要", ko: "건강 요약", it: "Riepilogo salute"
+                    ))
+                    .font(OhanaFont.headline(.bold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(
+                        zh: "今日用药、复查安排与近期指标",
+                        en: "Today's medication, follow-ups and latest metrics",
+                        de: "Medikamente heute, Kontrollen und aktuelle Werte",
+                        es: "Medicación de hoy, revisiones y últimas mediciones",
+                        pt: "Medicação de hoje, consultas e medições recentes",
+                        fr: "Médicaments du jour, contrôles et dernières mesures",
+                        ja: "今日の服薬、再検査予定、最新の測定値",
+                        ko: "오늘의 복약, 재검 일정 및 최근 측정값",
+                        it: "Farmaci di oggi, controlli e ultime misurazioni"
+                    ))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-hub-health-summary")
+    }
+
+    private var quickActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(l.tr(
+                zh: "常用操作", en: "Quick actions", de: "Schnellaktionen",
+                es: "Acciones rápidas", pt: "Ações rápidas", fr: "Actions rapides",
+                ja: "クイック操作", ko: "빠른 작업", it: "Azioni rapide"
+            ))
+            .font(OhanaFont.headline(.semibold))
+            .foregroundStyle(Color.ohanaPrimaryText)
+
+            VStack(spacing: 0) {
+                quickActionButton(
+                    l.tr(
+                        zh: "记录体重", en: "Log weight", de: "Gewicht eintragen",
+                        es: "Registrar peso", pt: "Registrar peso", fr: "Noter le poids",
+                        ja: "体重を記録", ko: "체중 기록", it: "Registra peso"
+                    ),
+                    icon: "scalemass", destination: .weightQuick
+                )
+                Divider().padding(.horizontal, 14)
+                quickActionButton(
+                    l.tr(
+                        zh: "记录运动", en: "Log workout", de: "Training eintragen",
+                        es: "Registrar ejercicio", pt: "Registrar exercício", fr: "Noter une activité",
+                        ja: "運動を記録", ko: "운동 기록", it: "Registra allenamento"
+                    ),
+                    icon: "figure.run", destination: .workoutQuick
+                )
+                Divider().padding(.horizontal, 14)
+                quickActionButton(
+                    l.tr(
+                        zh: "添加备注", en: "Add note", de: "Notiz hinzufügen",
+                        es: "Añadir nota", pt: "Adicionar nota", fr: "Ajouter une note",
+                        ja: "メモを追加", ko: "메모 추가", it: "Aggiungi nota"
+                    ),
+                    icon: "square.and.pencil", destination: .noteQuick
+                )
+                Divider().padding(.horizontal, 14)
+                quickActionButton(
+                    l.tr(
+                        zh: "成员资料", en: "Member profile", de: "Mitgliederprofil",
+                        es: "Perfil del miembro", pt: "Perfil do membro", fr: "Profil du membre",
+                        ja: "メンバープロフィール", ko: "구성원 프로필", it: "Profilo del membro"
+                    ),
+                    icon: "person.crop.circle", destination: .basicInfo
+                )
+            }
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("human-hub-quick-actions")
+    }
+
+    private func quickActionButton(
+        _ title: String,
+        icon: String,
+        destination: HumanAllFeatureDestination
+    ) -> some View {
+        Button {
+            OhanaFeedback.light()
+            open(destination)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundStyle(Color.goPrimary)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-hub-quick-\(destination.id)")
     }
 
     private var headerSubtitle: String {
@@ -519,7 +675,7 @@ struct HumanAllFeaturesSheet: View {
             item(
                 id: "report",
                 title: l.tr(zh: "健康报告", en: "Reports", de: "Berichte"),
-                value: lockedValue(.weight, visible: "\(myReports.count)"),
+                value: lockedValue(.weight, visible: "\(summary.reportCount)"),
                 subtitle: lockedSubtitle(.weight, visible: reportSubtitle),
                 icon: "cross.case.fill",
                 tint: Color.goRed,
@@ -724,7 +880,7 @@ struct HumanAllFeaturesSheet: View {
         guard let latestWeightKg = summary.latestWeightKg else {
             return l.tr(zh: "未记录", en: "None", de: "Keine")
         }
-        return String(format: "%.1fkg", latestWeightKg)
+        return AppMeasurementSystem.formatWeightKilograms(latestWeightKg)
     }
 
     private var latestWeightSubtitle: String {
@@ -758,40 +914,39 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var medicationMetric: String {
-        let active = myMeds.count
+        let active = summary.activeMedicationPlanCount
         guard active > 0 else { return l.tr(zh: "无", en: "None", de: "Keine") }
         return "\(active)"
     }
 
     private var medicationSubtitle: String {
-        guard !myMeds.isEmpty else {
-            return l.tr(zh: "添加药物和提醒", en: "Add meds and reminders", de: "Medikamente und Erinnerungen")
-        }
-        if let nextDose = myMeds
-            .flatMap({ HumanMedicationSchedulePlan.futureDoses(for: $0, days: 7) })
-            .sorted(by: { $0.scheduledTime < $1.scheduledTime })
-            .first {
+        if let nextDate = summary.nextScheduledDoseDate {
+            let time = nextDate.formatted(Date.FormatStyle(
+                date: Calendar.current.isDateInToday(nextDate) ? .omitted : .abbreviated,
+                time: .shortened
+            ).locale(AppLanguage.effectiveLocale))
             return l.tr(
-                zh: "下次 \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))",
-                en: "Next \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))",
-                de: "Nächste \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))",
-                es: "Próxima: \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))", pt: "Próxima: \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))", fr: "Prochaine : \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))",
-                ja: "次回：\(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))", ko: "다음: \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))", it: "Prossima: \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))"
+                zh: "下次计划 \(time)", en: "Next scheduled \(time)", de: "Nächster Termin \(time)",
+                es: "Próxima toma programada: \(time)", pt: "Próxima dose programada: \(time)", fr: "Prochaine prise prévue : \(time)",
+                ja: "次の服薬予定：\(time)", ko: "다음 복약 예정: \(time)", it: "Prossima dose prevista: \(time)"
             )
+        }
+        guard summary.activeMedicationPlanCount > 0 else {
+            return l.tr(zh: "添加药物和提醒", en: "Add meds and reminders", de: "Medikamente und Erinnerungen")
         }
         return l.tr(zh: "按需记录", en: "As needed", de: "Nach Bedarf")
     }
 
     private var reportSubtitle: String {
-        guard let latest = myReports.max(by: { $0.reportDate < $1.reportDate }) else {
+        guard let latest = summary.latestReportDate else {
             return l.tr(zh: "体检、检查和档案", en: "Checkups and files", de: "Checks und Akten")
         }
         return l.tr(
-            zh: "上次 \(relativeDayText(latest.reportDate))",
-            en: "Last \(relativeDayText(latest.reportDate))",
-            de: "Zuletzt \(relativeDayText(latest.reportDate))",
-            es: "Último: \(relativeDayText(latest.reportDate))", pt: "Último: \(relativeDayText(latest.reportDate))", fr: "Dernier : \(relativeDayText(latest.reportDate))",
-            ja: "前回：\(relativeDayText(latest.reportDate))", ko: "최근: \(relativeDayText(latest.reportDate))", it: "Ultimo: \(relativeDayText(latest.reportDate))"
+            zh: "上次 \(relativeDayText(latest))",
+            en: "Last \(relativeDayText(latest))",
+            de: "Zuletzt \(relativeDayText(latest))",
+            es: "Último: \(relativeDayText(latest))", pt: "Último: \(relativeDayText(latest))", fr: "Dernier : \(relativeDayText(latest))",
+            ja: "前回：\(relativeDayText(latest))", ko: "최근: \(relativeDayText(latest))", it: "Ultimo: \(relativeDayText(latest))"
         )
     }
 
@@ -838,11 +993,11 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var noteMetric: String {
-        noteEntries.isEmpty ? l.tr(zh: "无", en: "None", de: "Keine") : "\(noteEntries.count)"
+        summary.noteCount == 0 ? l.tr(zh: "无", en: "None", de: "Keine") : "\(summary.noteCount)"
     }
 
     private var noteSubtitle: String {
-        noteEntries.isEmpty
+        summary.noteCount == 0
             ? l.tr(zh: "记录今天的一句话", en: "Save a quick note", de: "Kurze Notiz speichern")
             : l.tr(zh: "最近有记录", en: "Recent notes", de: "Aktuelle Notizen")
     }
@@ -871,27 +1026,12 @@ struct HumanAllFeaturesSheet: View {
         HumanProfileOptions.localizedRoleTitle(raw, l: l)
     }
 
-    private var myMeds: [HumanMedication] {
-        allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
-    }
-
-    private var myReports: [HumanHealthReport] {
-        allReports.filter { $0.humanId == human.id.uuidString }
-    }
-
     private var myExpenses: [PetExpenseLog] {
         ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
     }
 
     private var monthlyExpenses: [PetExpenseLog] {
         myExpenses.filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }
-    }
-
-    private var noteEntries: [String] {
-        human.notes
-            .components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
     }
 
     private func relativeDayText(_ date: Date) -> String {

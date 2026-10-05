@@ -154,7 +154,7 @@ struct HumanHealthReportContentView: View {
                     HStack(spacing: 8) {
                         Image(systemName: "plus").accessibilityHidden(true)
                             .font(OhanaFont.headline(.black))
-                        Text(l.tr(zh: "添加报告", en: "Add Report", de: "Bericht hinzufügen"))
+                        Text(l.tr(zh: "手动添加", en: "Add manually", de: "Manuell hinzufügen"))
                             .font(OhanaFont.headline(.black))
                     }
                     .foregroundStyle(Color.arkInk)
@@ -815,6 +815,7 @@ struct AddHumanHealthReportSheet: View {
     let human: Human
     var editing: HumanHealthReport?
     var onDeleted: (() -> Void)?
+    var onSaved: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -873,261 +874,70 @@ struct AddHumanHealthReportSheet: View {
     var body: some View {
         NavigationStack {
             editorContent
-                .toolbar(.hidden, for: .navigationBar)
         }
     }
 
     private var editorContent: some View {
-        ZStack {
-            OhanaAppBackground().ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 20) {
-                    // Title
-                    HStack {
-                        Text(sheetTitle)
-                            .font(OhanaFont.title2(.bold))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Spacer()
-                        Button(action: requestClose) {
-                            Image(systemName: "xmark").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 15, weight: .black))
-                                .foregroundStyle(Color.ohanaPrimaryText)
-                                .frame(width: 44, height: 44)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .disabled(isSaving)
-                        .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+        Form {
+            Section { Text(human.name).font(OhanaFont.headline()) }
+            if isReadOnly { sheetMemorialReadOnlyNotice }
+            if let failedAction = mutationState.failedAction { mutationFailureNotice(for: failedAction) }
+            Section {
+                Picker(l.tr(zh: "报告类型", en: "Report type", de: "Berichtstyp"), selection: $reportType) {
+                    ForEach(HealthReportType.allCases) { type in Text(type.localizedTitle(l)).tag(type) }
+                }
+                .disabled(isScannedReport)
+                DatePicker(l.tr(zh: "检测日期", en: "Report date", de: "Berichtsdatum"), selection: $reportDate, in: ...Date(), displayedComponents: .date)
+                Text(l.tr(zh: "检测摘要", en: "Summary", de: "Zusammenfassung"))
+                TextEditor(text: $summary)
+                    .frame(minHeight: 88)
+                    .accessibilityLabel(l.tr(zh: "检测摘要", en: "Summary", de: "Zusammenfassung"))
+                    .accessibilityIdentifier("add-human-health-report-summary-input")
+                Picker(l.tr(zh: "原报告结论", en: "Conclusion on report", de: "Befund im Bericht", es: "Conclusión del informe", pt: "Conclusão do relatório", fr: "Conclusion du rapport", ja: "報告書の所見", ko: "보고서의 결론", it: "Conclusione del referto"), selection: $conclusion) {
+                    ForEach(ReportConclusion.allCases) { item in Text(item.localizedTitle(l)).tag(item) }
+                }
+            }
+            .disabled(isReadOnly)
+            Section {
+                DisclosureGroup(HumanHealthHomeText.additionalInfo.title(l)) {
+                    TextField(l.tr(zh: "医院", en: "Hospital", de: "Klinik"), text: $hospitalName)
+                        .accessibilityIdentifier("add-human-health-report-hospital-input")
+                    TextField(l.tr(zh: "医生", en: "Doctor", de: "Ärztin/Arzt"), text: $doctorName)
+                        .accessibilityIdentifier("add-human-health-report-doctor-input")
+                    Toggle(l.tr(zh: "设置复查日期", en: "Set follow-up date", de: "Kontrolldatum setzen"), isOn: $hasNextCheck)
+                    if hasNextCheck {
+                        DatePicker(l.tr(zh: "复查日期", en: "Follow-up date", de: "Kontrolldatum"), selection: $nextCheckDate, in: reportDate..., displayedComponents: .date)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 24)
-
-                    if isReadOnly {
-                        sheetMemorialReadOnlyNotice
-                            .padding(.horizontal, 16)
+                    TextField(l.tr(zh: "备注", en: "Notes", de: "Notizen"), text: $notes, axis: .vertical)
+                        .lineLimit(3 ... 8)
+                        .accessibilityIdentifier("add-human-health-report-notes-input")
+                    QuickCareActionHumanPickerContainer(selectedHumanID: $selectedRecorderID, requiresSelection: $requiresRecorderSelection, role: .recorder, tint: .goTeal)
+                }
+                .accessibilityIdentifier("add-human-health-report-additional-info")
+            }
+            .disabled(isReadOnly)
+            if !isReadOnly, let report = editing {
+                Section {
+                    Button(l.tr(zh: "删除这条报告", en: "Delete this report", de: "Diesen Bericht löschen"), role: .destructive) {
+                        reportPendingDeletion = report
+                        showingDeleteConfirmation = true
                     }
-
-                    if let failedAction = mutationState.failedAction {
-                        mutationFailureNotice(for: failedAction)
-                            .padding(.horizontal, 16)
+                    .disabled(isSaving)
+                    .accessibilityIdentifier("add-human-health-report-delete-action")
+                }
+            }
+        }
+        .navigationTitle(sheetTitle)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button(l.cancel, action: requestClose).disabled(isSaving) }
+            ToolbarItem(placement: .confirmationAction) {
+                if !isReadOnly {
+                    Button(action: save) {
+                        if isSaving { ProgressView() } else { Text(l.save) }
                     }
-
-                    // Card 1: Report Type
-                    reportSheetCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "doc.text.fill", color: Color.goTeal, title: l.tr(zh: "报告类型", en: "Report Type", de: "Berichtstyp"))
-
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(HealthReportType.allCases) { type in
-                                        Button {
-                                            guard !isScannedReport else { return }
-                                            withAnimation(GoMotion.feedback) { reportType = type }
-                                        } label: {
-                                            HStack(spacing: 4) {
-                                                Text(type.emoji)
-                                                Text(type.localizedTitle(l))
-                                                    .font(OhanaFont.caption(.bold))
-                                            }
-                                            .foregroundStyle(reportType == type ? Color.arkInk : Color.ohanaPrimaryText)
-                                            .padding(.horizontal, 12).padding(.vertical, 7)
-                                            .frame(minHeight: 44)
-                                            .background(reportType == type ? Color.goTeal : Color.ohanaControlFill, in: Capsule())
-                                        }
-                                        .buttonStyle(ScaleButtonStyle())
-                                        .accessibilityLabel(type.localizedTitle(l))
-                                        .accessibilityAddTraits(reportType == type ? .isSelected : [])
-                                        .disabled(isScannedReport)
-                                    }
-                                }
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-                    .disabled(isReadOnly)
-
-                    // Card 2: Conclusion
-                    reportSheetCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "checkmark.seal.fill", color: conclusion.color, title: l.tr(zh: "报告结论", en: "Conclusion", de: "Ergebnis"))
-
-                            HStack(spacing: 8) {
-                                ForEach(ReportConclusion.allCases) { c in
-                                    Button {
-                                        withAnimation(GoMotion.feedback) { conclusion = c }
-                                    } label: {
-                                        VStack(spacing: 4) {
-                                            Text(c.emoji)
-                                                .font(OhanaFont.adaptive(size: 20))
-                                            Text(c.localizedTitle(l))
-                                                .font(OhanaFont.caption2(.bold))
-                                        }
-                                        .foregroundStyle(conclusion == c ? Color.arkInk : Color.ohanaPrimaryText)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .frame(minHeight: 54)
-                                        .background(conclusion == c ? c.color : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
-                                    }
-                                    .buttonStyle(ScaleButtonStyle())
-                                    .accessibilityLabel(c.localizedTitle(l))
-                                    .accessibilityAddTraits(conclusion == c ? .isSelected : [])
-                                }
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-                    .disabled(isReadOnly)
-
-                    // Card 3: Details
-                    reportSheetCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "building.2.fill", color: Color.goCardCyan, title: l.tr(zh: "检测详情", en: "Visit Details", de: "Untersuchungsdetails"))
-
-                            fieldRow(icon: "building.2", label: l.tr(zh: "医院名称", en: "Hospital", de: "Klinik")) {
-                                TextField(l.tr(zh: "如：北京协和医院", en: "e.g. City Hospital", de: "z. B. Stadtklinik"), text: $hospitalName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .focused($isHospitalNameFocused)
-                                    .submitLabel(.done)
-                                    .onSubmit { isHospitalNameFocused = false }
-                                    .accessibilityLabel(l.tr(zh: "医院名称", en: "Hospital", de: "Klinik"))
-                                    .accessibilityIdentifier("add-human-health-report-hospital-input")
-                            }
-                            fieldRow(icon: "person.fill", label: l.tr(zh: "医生姓名", en: "Doctor", de: "Ärztin/Arzt")) {
-                                TextField(l.tr(zh: "如：张医生", en: "e.g. Dr. Lee", de: "z. B. Dr. Lee"), text: $doctorName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .accessibilityLabel(l.tr(zh: "医生姓名", en: "Doctor", de: "Ärztin oder Arzt"))
-                                    .accessibilityIdentifier("add-human-health-report-doctor-input")
-                            }
-
-                            HStack {
-                                Label(l.tr(zh: "检测日期", en: "Report Date", de: "Berichtsdatum"), systemImage: "calendar")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                Spacer()
-                                DatePicker("", selection: $reportDate, in: ...Date(), displayedComponents: .date)
-                                    .labelsHidden()
-                                    .accessibilityLabel(l.tr(zh: "检测日期", en: "Report Date", de: "Berichtsdatum"))
-                            }
-
-                            Toggle(isOn: $hasNextCheck) {
-                                Label(l.tr(zh: "设置复查日期", en: "Set Follow-up Date", de: "Kontrolldatum setzen"), systemImage: "calendar.badge.checkmark")
-                                    .font(OhanaFont.callout(.bold))
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                            }
-                            .tint(Color.goTeal)
-
-                            if hasNextCheck {
-                                HStack {
-                                    Label(l.tr(zh: "复查日期", en: "Follow-up Date", de: "Kontrolldatum"), systemImage: "calendar.badge.clock")
-                                        .font(OhanaFont.caption(.bold))
-                                        .foregroundStyle(Color.ohanaSecondaryText)
-                                    Spacer()
-                                    DatePicker("", selection: $nextCheckDate, in: reportDate..., displayedComponents: .date)
-                                        .labelsHidden()
-                                        .accessibilityLabel(l.tr(zh: "复查日期", en: "Follow-up Date", de: "Kontrolldatum"))
-                                }
-                            }
-
-                            QuickCareActionHumanPickerContainer(
-                                selectedHumanID: $selectedRecorderID,
-                                requiresSelection: $requiresRecorderSelection,
-                                role: .recorder,
-                                tint: .goTeal
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-                    .disabled(isReadOnly)
-
-                    // Card 4: Summary & Notes
-                    reportSheetCard {
-                        VStack(alignment: .leading, spacing: 16) {
-                            cardHeader(icon: "note.text", color: Color.goYellow, title: l.tr(zh: "摘要 & 备注", en: "Summary & Notes", de: "Zusammenfassung & Notizen"))
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label(l.tr(zh: "检测摘要", en: "Summary", de: "Zusammenfassung"), systemImage: "text.alignleft")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                TextEditor(text: $summary)
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .scrollContentBackground(.hidden)
-                                    .frame(height: 60)
-                                    .padding(10)
-                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
-                                    .accessibilityLabel(l.tr(zh: "检测摘要", en: "Summary", de: "Zusammenfassung"))
-                                    .accessibilityIdentifier("add-human-health-report-summary-input")
-                            }
-
-                            VStack(alignment: .leading, spacing: 6) {
-                                Label(l.tr(zh: "备注", en: "Notes", de: "Notizen"), systemImage: "note.text")
-                                    .font(OhanaFont.caption(.bold))
-                                    .foregroundStyle(Color.ohanaSecondaryText)
-                                TextEditor(text: $notes)
-                                    .font(OhanaFont.body())
-                                    .foregroundStyle(Color.ohanaPrimaryText)
-                                    .scrollContentBackground(.hidden)
-                                    .frame(height: 60)
-                                    .padding(10)
-                                    .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.badge))
-                                    .accessibilityLabel(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
-                                    .accessibilityIdentifier("add-human-health-report-notes-input")
-                            }
-                        }
-                        .padding(16)
-                    }
-                    .padding(.horizontal, 16)
-                    .disabled(isReadOnly)
-
-                    if !isReadOnly {
-                        // Delete button if editing
-                        if let report = editing {
-                            Button {
-                                reportPendingDeletion = report
-                                showingDeleteConfirmation = true
-                                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            } label: {
-                                Label(l.tr(zh: "删除这条报告", en: "Delete this report", de: "Diesen Bericht löschen"), systemImage: "trash")
-                                    .font(OhanaFont.callout(.semibold))
-                                    .foregroundStyle(Color.goRed)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 14)
-                                    .background(Color.goRed.opacity(0.1), in: Capsule())
-                                    .overlay(Capsule().strokeBorder(Color.goRed.opacity(0.3), lineWidth: 1))
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .disabled(isSaving)
-                            .accessibilityHint(l.tr(
-                                zh: "需要再次确认",
-                                en: "Requires confirmation",
-                                de: "Erfordert eine Bestätigung"
-                            ))
-                            .accessibilityIdentifier("add-human-health-report-delete-action")
-                            .padding(.horizontal, 16)
-                        }
-
-                        // Save
-                        Button { save() } label: {
-                            Text(editing == nil ? l.tr(zh: "保存报告", en: "Save Report", de: "Bericht sichern") : l.tr(zh: "更新", en: "Update", de: "Aktualisieren"))
-                                .font(OhanaFont.headline(.bold))
-                                .foregroundStyle(Color.arkInk)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(Color.goTeal, in: Capsule())
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .disabled(isSaving || requiresRecorderSelection)
-                        .accessibilityIdentifier("add-human-health-report-save-action")
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 40)
-                    }
+                    .disabled(isSaving || requiresRecorderSelection)
+                    .accessibilityIdentifier("add-human-health-report-save-action")
                 }
             }
         }
@@ -1372,9 +1182,8 @@ struct AddHumanHealthReportSheet: View {
             )
             return
         }
-        if action == .delete {
-            onDeleted?()
-        }
+        if action == .delete { onDeleted?() }
+        else { onSaved?() }
         dismiss()
     }
 

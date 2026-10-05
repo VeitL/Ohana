@@ -11,6 +11,7 @@ import UIKit
 
 struct HumanWeightDashboardContent: View {
     let human: Human
+    var showsCloseButton = true
     var onClose: () -> Void
     var onAdd: () -> Void
 
@@ -40,6 +41,7 @@ struct HumanWeightDashboardContent: View {
         OhanaSheetPageScaffold(
             title: l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewicht"),
             subtitle: human.name,
+            showsCloseButton: showsCloseButton,
             onClose: onClose,
             leading: {
                 FeatureHubAvatar(
@@ -68,8 +70,10 @@ struct HumanWeightDashboardContent: View {
                     VStack(alignment: .leading, spacing: 16) {
                         HumanPrivateDataNotice(human: human, field: .weight)
                         metrics
-                        chartBlock
                         historyBlock
+                        if logs.count >= 2 {
+                            DisclosureGroup(l.tr(zh: "详细图表", en: "Detailed charts", de: "Detaillierte Diagramme")) { chartBlock }
+                        }
                     }
                 }
             },

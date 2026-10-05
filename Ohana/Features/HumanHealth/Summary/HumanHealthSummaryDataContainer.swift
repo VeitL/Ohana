@@ -66,6 +66,7 @@ struct HumanHealthSummaryDataContainer<Content: View>: View {
                     human: human,
                     bodyIsVisible: bodyIsVisible,
                     medicationIsVisible: medicationIsVisible,
+                    workoutIsVisible: workoutIsVisible,
                     referenceDate: referenceDate,
                     context: modelContext
                 )
@@ -103,7 +104,7 @@ struct HumanHealthSummaryDataContainer<Content: View>: View {
 
     private var refreshToken: String {
         let dayKey = HumanHealthSummaryDayIdentity.key(for: referenceDate)
-        return "\(human.id.uuidString)|\(dayKey)|\(readRevision)|\(bodyIsVisible)|\(medicationIsVisible)|\(appleHealthBoundHumanIDRaw)"
+        return "\(human.id.uuidString)|\(dayKey)|\(referenceDate.timeIntervalSince1970)|\(readRevision)|\(bodyIsVisible)|\(medicationIsVisible)|\(workoutIsVisible)|\(appleHealthBoundHumanIDRaw)"
     }
 
     private var sourceState: HumanHealthSummarySourceState {
@@ -131,6 +132,10 @@ private struct HumanHealthSummaryRouteData {
     var reports: [HumanHealthReport] = []
     var conditions: [HumanHealthCondition] = []
     var observations: [HumanHealthObservation] = []
+    var weights: [HumanWeightLog] = []
+    var workouts: [HumanWorkoutLog] = []
+    var weightDidLoad = false
+    var workoutDidLoad = false
     var medicationsDidLoad = false
     var medicationLogsDidLoad = false
     var metricLogsDidLoad = false
@@ -144,6 +149,7 @@ private struct HumanHealthSummaryRouteData {
         human: Human,
         bodyIsVisible: Bool,
         medicationIsVisible: Bool,
+        workoutIsVisible: Bool,
         referenceDate: Date,
         context: ModelContext
     ) -> HumanHealthSummaryRouteData {
@@ -152,7 +158,7 @@ private struct HumanHealthSummaryRouteData {
         let humanKeyLower = humanKey.lowercased()
         let calendar = Calendar.current
         let logStart = calendar.startOfDay(for: referenceDate)
-        let logEnd = calendar.date(byAdding: .day, value: 1, to: logStart) ?? Date.distantFuture
+        let logEnd = calendar.date(byAdding: .day, value: 8, to: logStart) ?? Date.distantFuture
         let observationStart = calendar.date(byAdding: .day, value: -13, to: logStart) ?? logStart
         let resolvedStatus = HumanHealthTrackingStatus.resolved.rawValue
         let noMedicationEndBoundary = Date.distantFuture
@@ -246,7 +252,7 @@ private struct HumanHealthSummaryRouteData {
             for: HumanHealthSummaryQueryLimit.observations
         )
 
-        return loadData(
+        var data = loadData(
             medicationDescriptor: medicationDescriptor,
             medicationLogDescriptor: medicationLogDescriptor,
             metricDescriptor: metricDescriptor,
@@ -257,6 +263,33 @@ private struct HumanHealthSummaryRouteData {
             bodyIsVisible: bodyIsVisible,
             context: context
         )
+        data.loadRecentValues(humanID: humanID, bodyIsVisible: bodyIsVisible, workoutIsVisible: workoutIsVisible, context: context)
+        return data
+    }
+
+    @MainActor
+    private mutating func loadRecentValues(humanID: UUID, bodyIsVisible: Bool, workoutIsVisible: Bool, context: ModelContext) {
+        var weightDescriptor = FetchDescriptor<HumanWeightLog>(
+            predicate: #Predicate<HumanWeightLog> { $0.human?.id == humanID },
+            sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.id, order: .reverse)]
+        )
+        weightDescriptor.fetchLimit = 2
+        var workoutDescriptor = FetchDescriptor<HumanWorkoutLog>(
+            predicate: #Predicate<HumanWorkoutLog> { $0.human?.id == humanID },
+            sortBy: [SortDescriptor(\.date, order: .reverse), SortDescriptor(\.id, order: .reverse)]
+        )
+        workoutDescriptor.fetchLimit = 1
+
+        if bodyIsVisible {
+            let result = Self.fetch(weightDescriptor, context: context, name: "latest weight")
+            weights = result.values
+            weightDidLoad = result.didLoad
+        } else { weightDidLoad = true }
+        if workoutIsVisible {
+            let result = Self.fetch(workoutDescriptor, context: context, name: "latest workout")
+            workouts = result.values
+            workoutDidLoad = result.didLoad
+        } else { workoutDidLoad = true }
     }
 
     @MainActor
@@ -334,12 +367,7 @@ private struct HumanHealthSummaryRouteData {
     ) -> HumanHealthSummarySnapshot {
         let canonicalMedications = medications.filter { medication in
             HumanHealthSummaryOwnerIdentity.matches(medication.humanId, humanID: human.id) &&
-                HumanHealthSummaryMedicationWindow.includes(
-                    isActive: medication.isActive,
-                    startDate: medication.startDate,
-                    endDate: medication.endDate,
-                    on: referenceDate
-                )
+                medication.isActive
         }
         let canonicalMedicationLogs = medicationLogs.filter {
             HumanHealthSummaryOwnerIdentity.matches($0.humanId, humanID: human.id)
@@ -438,21 +466,24 @@ private struct HumanHealthSummaryRouteData {
                         updatedAt: $0.updatedAt
                     )
                 },
-                observations: visibleObservations.map {
-                    HumanHealthSummaryObservationInput(
-                        id: $0.id,
-                        conditionID: UUID(
-                            uuidString: $0.conditionId.trimmingCharacters(in: .whitespacesAndNewlines)
-                        ),
-                        recordedAt: $0.recordedAt,
-                        severity: $0.severity,
-                        moodScore: $0.moodScore
-                    )
-                },
-                sourceState: sourceState
+                observations: observationInputs(visibleObservations),
+                sourceState: sourceState,
+                weights: bodyIsVisible ? weights.map { HumanHealthSummaryValue(value: $0.weight, date: $0.date) } : [],
+                latestWorkout: workoutIsVisible ? workouts.first.map {
+                    HumanHealthSummaryValue(value: Double($0.durationMinutes), date: $0.date)
+                } : nil,
+                weightDidLoad: weightDidLoad,
+                workoutDidLoad: workoutDidLoad,
+                upcomingDoses: upcomingMedicationDoses(medications: visibleMedications, logs: visibleMedicationLogs, humanID: human.id, referenceDate: referenceDate)
             ),
             now: referenceDate
         )
+    }
+
+    private func observationInputs(_ values: [HumanHealthObservation]) -> [HumanHealthSummaryObservationInput] {
+        values.map {
+            HumanHealthSummaryObservationInput(id: $0.id, conditionID: UUID(uuidString: $0.conditionId.trimmingCharacters(in: .whitespacesAndNewlines)), recordedAt: $0.recordedAt, severity: $0.severity, moodScore: $0.moodScore)
+        }
     }
 
     private func medicationInput(
@@ -483,6 +514,17 @@ private struct HumanHealthSummaryRouteData {
             return group == .current || group == .manual
         }
         return (doses, activePlanCount)
+    }
+
+    private func upcomingMedicationDoses(medications: [HumanMedication], logs: [HumanMedicationLog], humanID: UUID, referenceDate: Date) -> [HumanHealthSummaryDoseInput] {
+        var upcoming: [HumanHealthSummaryDoseInput] = []
+        for offset in 1 ... 7 {
+            guard let day = Calendar.current.date(byAdding: .day, value: offset, to: referenceDate) else { continue }
+            let inputs = medicationInput(medications: medications, logs: logs, humanID: humanID, referenceDate: day).doses
+            upcoming += inputs.filter { $0.state == .pending }
+            if upcoming.count >= 3 { break }
+        }
+        return Array(upcoming.prefix(3))
     }
 
     private func metricInputs(

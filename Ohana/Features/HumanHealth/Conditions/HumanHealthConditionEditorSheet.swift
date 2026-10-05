@@ -42,6 +42,7 @@ struct HumanHealthConditionEditorSheet: View {
     @State private var notes: String
     @State private var selectedMedicationIDs: Set<UUID>
     @State private var selectedMetricKeys: Set<String>
+    @State private var showsAdditionalInfo: Bool
     @State private var isSaving = false
     @State private var showsDeleteConfirmation = false
     @State private var showsDiscardConfirmation = false
@@ -64,7 +65,7 @@ struct HumanHealthConditionEditorSheet: View {
         self.onDeleted = onDeleted
         let draft = HumanHealthConditionEditorDraft(
             name: condition?.name ?? "",
-            category: condition?.category ?? .mentalHealth,
+            category: condition?.category ?? .other,
             trackingStatus: condition?.trackingStatus ?? .active,
             hasStartDate: condition?.startedOn != nil,
             startedOn: condition?.startedOn,
@@ -85,6 +86,7 @@ struct HumanHealthConditionEditorSheet: View {
         _notes = State(initialValue: draft.notes)
         _selectedMedicationIDs = State(initialValue: draft.selectedMedicationIDs)
         _selectedMetricKeys = State(initialValue: draft.selectedMetricKeys)
+        _showsAdditionalInfo = State(initialValue: condition != nil)
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -122,6 +124,20 @@ struct HumanHealthConditionEditorSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if condition == nil, name.isEmpty {
+                    Section(HumanHealthPatternCopy.quickStart.text(l)) {
+                        Button(HumanHealthPatternCopy.hairShedding.text(l)) {
+                            name = HumanHealthPatternCopy.hairShedding.text(l)
+                            category = .hairAndScalp
+                        }
+                        .accessibilityIdentifier("human-condition-template-hair")
+                        Button(HumanHealthPatternCopy.allergySymptoms.text(l)) {
+                            name = HumanHealthPatternCopy.allergySymptoms.text(l)
+                            category = .allergy
+                        }
+                        .accessibilityIdentifier("human-condition-template-allergy")
+                    }
+                }
                 Section {
                     TextField(
                         l.tr(zh: "例如：季节性过敏", en: "For example: Seasonal allergy", de: "Zum Beispiel: Saisonale Allergie"),
@@ -137,11 +153,6 @@ struct HumanHealthConditionEditorSheet: View {
                         }
                     }
 
-                    Picker(l.tr(zh: "追踪状态", en: "Tracking status", de: "Tracking-Status"), selection: $trackingStatus) {
-                        ForEach(HumanHealthTrackingStatus.allCases) { item in
-                            Text(item.displayName(l)).tag(item)
-                        }
-                    }
                 } header: {
                     Text(l.tr(zh: "基本信息", en: "Basics", de: "Grundlagen"))
                 } footer: {
@@ -152,91 +163,103 @@ struct HumanHealthConditionEditorSheet: View {
                     ))
                 }
 
-                Section(l.tr(zh: "时间", en: "Timeline", de: "Zeitraum")) {
-                    Toggle(l.tr(zh: "记录开始日期", en: "Record start date", de: "Startdatum erfassen"), isOn: $hasStartDate)
-                    if hasStartDate {
-                        DatePicker(
-                            l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"),
-                            selection: $startedOn,
-                            in: ...Date(),
-                            displayedComponents: .date
-                        )
-                    }
-                }
-
-                Section(l.tr(zh: "照护计划", en: "Care plan", de: "Versorgungsplan")) {
-                    TextField(
-                        l.tr(zh: "复诊、日常行动或医生建议", en: "Follow-up, daily actions, or clinician advice", de: "Kontrolle, Alltag oder ärztlicher Rat"),
-                        text: $carePlan,
-                        axis: .vertical
-                    )
-                    .lineLimit(3 ... 7)
-                }
-
                 Section {
-                    if !canViewMedication {
-                        Label(
-                            l.tr(zh: "用药信息已锁定", en: "Medication information is locked", de: "Medikamenteninformationen sind gesperrt"),
-                            systemImage: "lock.fill"
-                        )
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    } else if selectableMedications.isEmpty {
-                        Text(l.tr(zh: "暂无可关联用药", en: "No medication to link", de: "Keine Medikamente zum Verknüpfen"))
-                            .foregroundStyle(Color.ohanaSecondaryText)
-                    } else {
-                        ForEach(selectableMedications) { medication in
-                            selectionRow(
-                                title: medication.name,
-                                subtitle: "\(medication.dosage) · \(medication.frequency.displayTitle(l: l))",
-                                isSelected: selectedMedicationIDs.contains(medication.id)
-                            ) {
-                                toggle(medication.id, in: &selectedMedicationIDs)
+                    DisclosureGroup(HumanHealthHomeText.additionalInfo.title(l), isExpanded: $showsAdditionalInfo) { EmptyView() }
+                        .accessibilityIdentifier("human-condition-additional-info")
+                }
+                if showsAdditionalInfo {
+                    Section {
+                        Picker(l.tr(zh: "追踪状态", en: "Tracking status", de: "Tracking-Status"), selection: $trackingStatus) {
+                            ForEach(HumanHealthTrackingStatus.allCases) { item in
+                                Text(item.displayName(l)).tag(item)
                             }
                         }
                     }
-                } header: {
-                    Text(l.tr(zh: "关联用药", en: "Linked medication", de: "Verknüpfte Medikamente"))
-                }
-
-                Section {
-                    if !category.defaultMetricKeys.isEmpty {
-                        Button {
-                            selectedMetricKeys.formUnion(category.defaultMetricKeys)
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            Label(
-                                l.tr(zh: "选择常用指标", en: "Select common metrics", de: "Übliche Werte auswählen"),
-                                systemImage: "wand.and.stars"
+                    Section(l.tr(zh: "时间", en: "Timeline", de: "Zeitraum")) {
+                        Toggle(l.tr(zh: "记录开始日期", en: "Record start date", de: "Startdatum erfassen"), isOn: $hasStartDate)
+                        if hasStartDate {
+                            DatePicker(
+                                l.tr(zh: "开始日期", en: "Start date", de: "Startdatum"),
+                                selection: $startedOn,
+                                in: ...Date(),
+                                displayedComponents: .date
                             )
                         }
                     }
 
-                    DisclosureGroup(l.tr(zh: "选择体检指标", en: "Choose checkup metrics", de: "Check-up-Werte auswählen")) {
-                        ForEach(HealthMetricCatalog.all) { metric in
-                            selectionRow(
-                                title: metric.displayName(l),
-                                subtitle: metric.category.displayName(l),
-                                isSelected: selectedMetricKeys.contains(metric.key)
-                            ) {
-                                toggle(metric.key, in: &selectedMetricKeys)
+                    Section(l.tr(zh: "照护计划", en: "Care plan", de: "Versorgungsplan")) {
+                        TextField(
+                            l.tr(zh: "复诊、日常行动或医生建议", en: "Follow-up, daily actions, or clinician advice", de: "Kontrolle, Alltag oder ärztlicher Rat"),
+                            text: $carePlan,
+                            axis: .vertical
+                        )
+                        .lineLimit(3 ... 7)
+                    }
+
+                    Section {
+                        if !canViewMedication {
+                            Label(
+                                l.tr(zh: "用药信息已锁定", en: "Medication information is locked", de: "Medikamenteninformationen sind gesperrt"),
+                                systemImage: "lock.fill"
+                            )
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                        } else if selectableMedications.isEmpty {
+                            Text(l.tr(zh: "暂无可关联用药", en: "No medication to link", de: "Keine Medikamente zum Verknüpfen"))
+                                .foregroundStyle(Color.ohanaSecondaryText)
+                        } else {
+                            ForEach(selectableMedications) { medication in
+                                selectionRow(
+                                    title: medication.name,
+                                    subtitle: "\(medication.dosage) · \(medication.frequency.displayTitle(l: l))",
+                                    isSelected: selectedMedicationIDs.contains(medication.id)
+                                ) {
+                                    toggle(medication.id, in: &selectedMedicationIDs)
+                                }
                             }
                         }
+                    } header: {
+                        Text(l.tr(zh: "关联用药", en: "Linked medication", de: "Verknüpfte Medikamente"))
                     }
-                } header: {
-                    Text(l.tr(zh: "关联体检指标", en: "Linked checkup metrics", de: "Verknüpfte Check-up-Werte"))
-                } footer: {
-                    Text(l.tr(zh: "关联不代表相关。", en: "A link does not imply a relationship.", de: "Eine Verknüpfung bedeutet keinen Zusammenhang."))
-                }
 
-                Section(l.tr(zh: "备注", en: "Notes", de: "Notizen")) {
-                    TextField(
-                        l.tr(zh: "其他需要保留的信息", en: "Anything else worth keeping", de: "Weitere wichtige Informationen"),
-                        text: $notes,
-                        axis: .vertical
-                    )
-                    .lineLimit(3 ... 8)
-                }
+                    Section {
+                        if !category.defaultMetricKeys.isEmpty {
+                            Button {
+                                selectedMetricKeys.formUnion(category.defaultMetricKeys)
+                                UISelectionFeedbackGenerator().selectionChanged()
+                            } label: {
+                                Label(
+                                    l.tr(zh: "选择常用指标", en: "Select common metrics", de: "Übliche Werte auswählen"),
+                                    systemImage: "wand.and.stars"
+                                )
+                            }
+                        }
 
+                        DisclosureGroup(l.tr(zh: "选择体检指标", en: "Choose checkup metrics", de: "Check-up-Werte auswählen")) {
+                            ForEach(HealthMetricCatalog.all) { metric in
+                                selectionRow(
+                                    title: metric.displayName(l),
+                                    subtitle: metric.category.displayName(l),
+                                    isSelected: selectedMetricKeys.contains(metric.key)
+                                ) {
+                                    toggle(metric.key, in: &selectedMetricKeys)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text(l.tr(zh: "关联体检指标", en: "Linked checkup metrics", de: "Verknüpfte Check-up-Werte"))
+                    } footer: {
+                        Text(l.tr(zh: "关联不代表相关。", en: "A link does not imply a relationship.", de: "Eine Verknüpfung bedeutet keinen Zusammenhang."))
+                    }
+
+                    Section(l.tr(zh: "备注", en: "Notes", de: "Notizen")) {
+                        TextField(
+                            l.tr(zh: "其他需要保留的信息", en: "Anything else worth keeping", de: "Weitere wichtige Informationen"),
+                            text: $notes,
+                            axis: .vertical
+                        )
+                        .lineLimit(3 ... 8)
+                    }
+                }
                 if condition != nil {
                     Section {
                         Button(role: .destructive) {

@@ -21,6 +21,47 @@ nonisolated enum HumanHealthSummaryDestination: String, Codable, CaseIterable, H
 nonisolated enum HumanHealthSummaryRoute: Hashable, Sendable {
     case feature(HumanHealthSummaryDestination)
     case metric(String)
+    case condition(UUID)
+    case profile
+    case directory
+    case notes
+    case expenses
+    case wishlist
+    case assets
+    case achievements
+}
+
+nonisolated struct HumanHealthSummaryValue: Equatable, Sendable {
+    let value: Double
+    let date: Date
+}
+
+nonisolated enum HumanHealthSummaryTodayItem: Equatable, Sendable, Identifiable {
+    case dose(HumanHealthSummaryDose)
+    case followUp(HumanHealthSummaryFollowUp)
+
+    var id: String {
+        switch self {
+        case let .dose(dose): "dose:\(dose.medicationID):\(dose.scheduledTime.timeIntervalSince1970)"
+        case let .followUp(report): "report:\(report.reportID)"
+        }
+    }
+
+    var date: Date {
+        switch self {
+        case let .dose(dose): dose.scheduledTime
+        case let .followUp(report): report.date
+        }
+    }
+
+    func isOverdue(at now: Date) -> Bool {
+        switch self {
+        case let .dose(dose): return dose.scheduledTime < now
+        case let .followUp(report):
+            if case .overdue = report.timing { return true }
+            return false
+        }
+    }
 }
 
 nonisolated enum HumanHealthSummaryDoseState: Equatable, Sendable {
@@ -105,6 +146,11 @@ nonisolated struct HumanHealthSummaryInput: Equatable, Sendable {
     var conditions: [HumanHealthSummaryConditionInput] = []
     var observations: [HumanHealthSummaryObservationInput] = []
     var sourceState: HumanHealthSummarySourceState = .localOnly
+    var weights: [HumanHealthSummaryValue] = []
+    var latestWorkout: HumanHealthSummaryValue?
+    var weightDidLoad = true
+    var workoutDidLoad = true
+    var upcomingDoses: [HumanHealthSummaryDoseInput] = []
 }
 
 nonisolated struct HumanHealthSummaryDose: Equatable, Sendable {
@@ -143,6 +189,7 @@ nonisolated enum HumanHealthSummaryFollowUpTiming: Equatable, Sendable {
 
 nonisolated struct HumanHealthSummaryObservation: Equatable, Sendable {
     let observationID: UUID
+    let conditionID: UUID?
     let conditionName: String
     let recordedAt: Date
     let severity: Int
@@ -254,6 +301,13 @@ nonisolated struct HumanHealthSummarySnapshot: Equatable, Sendable {
     let trends: [HumanHealthSummaryTrend]
     let recordCounts: HumanHealthSummaryRecordCounts
     let sourceState: HumanHealthSummarySourceState
+    var todayItems: [HumanHealthSummaryTodayItem] = []
+    var latestMetrics: [HumanHealthSummaryMetric] = []
+    var latestWeight: HumanHealthSummaryValue?
+    var latestWorkout: HumanHealthSummaryValue?
+    var latestReportDate: Date?
+    var weightDidLoad = true
+    var workoutDidLoad = true
 
     var followUpStatus: HumanHealthSummaryFollowUpStatus {
         if let followUpAttention {
@@ -266,7 +320,7 @@ nonisolated struct HumanHealthSummarySnapshot: Equatable, Sendable {
 nonisolated enum HumanHealthSummaryBuilder {
     static let maximumFocusItemCount = 4
     static let maximumHighlightCount = 3
-    static let maximumTrendCount = 3
+    static let maximumTrendCount = 2
 
     static func build(
         input: HumanHealthSummaryInput,
@@ -368,8 +422,41 @@ nonisolated enum HumanHealthSummaryBuilder {
                     isTruncated: input.conditionsAreTruncated
                 )
             ),
-            sourceState: input.sourceState
+            sourceState: input.sourceState,
+            todayItems: todayItems(
+                doses: input.medicationIsVisible ? pendingDoses + input.upcomingDoses.filter { $0.state == .pending } : [],
+                followUps: input.bodyIsVisible ? followUps(reports: input.reports, now: now, calendar: calendar) : [],
+                now: now
+            ),
+            latestMetrics: input.bodyIsVisible ? latestMetrics.map {
+                HumanHealthSummaryMetric(metricKey: $0.metricKey, unitCode: $0.unitCode,
+                                         value: $0.value, date: $0.date, status: $0.status)
+            } : [],
+            latestWeight: input.bodyIsVisible ? input.weights.max(by: { $0.date < $1.date }) : nil,
+            latestWorkout: input.workoutIsVisible ? input.latestWorkout : nil,
+            latestReportDate: input.bodyIsVisible ? input.reports.map(\.reportDate).max() : nil,
+            weightDidLoad: input.weightDidLoad,
+            workoutDidLoad: input.workoutDidLoad
         )
+    }
+
+    private static func todayItems(
+        doses: [HumanHealthSummaryDoseInput],
+        followUps: [HumanHealthSummaryFollowUp],
+        now: Date
+    ) -> [HumanHealthSummaryTodayItem] {
+        var items = doses.map {
+            HumanHealthSummaryTodayItem.dose(HumanHealthSummaryDose(
+                medicationID: $0.medicationID, name: $0.name,
+                dosage: $0.dosage, scheduledTime: $0.scheduledTime
+            ))
+        }
+        items += followUps.map { .followUp($0) }
+        return Array(items.sorted {
+            if $0.isOverdue(at: now) != $1.isOverdue(at: now) { return $0.isOverdue(at: now) }
+            if $0.date != $1.date { return $0.date < $1.date }
+            return $0.id < $1.id
+        }.prefix(3))
     }
 
     private static func latestMetricsByKey(
@@ -386,6 +473,16 @@ nonisolated enum HumanHealthSummaryBuilder {
         return latestByKey.values.sorted {
             if $0.date != $1.date { return $0.date > $1.date }
             return $0.metricKey < $1.metricKey
+        }
+    }
+
+    private static func followUps(reports: [HumanHealthSummaryReportInput], now: Date, calendar: Calendar) -> [HumanHealthSummaryFollowUp] {
+        let today = calendar.startOfDay(for: now)
+        let horizon = calendar.date(byAdding: .day, value: 30, to: today) ?? now
+        return latestReportsByType(reports).compactMap { report in
+            guard let date = report.nextCheckDate, calendar.startOfDay(for: date) <= horizon else { return nil }
+            let days = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: date)).day ?? 0
+            return HumanHealthSummaryFollowUp(reportID: report.id, reportTypeRaw: report.reportTypeRaw, date: date, timing: days < 0 ? .overdue(days: -days) : .upcoming(days: days))
         }
     }
 
@@ -471,6 +568,7 @@ nonisolated enum HumanHealthSummaryBuilder {
             ?? ""
         return HumanHealthSummaryObservation(
             observationID: latest.id,
+            conditionID: latest.conditionID,
             conditionName: conditionName,
             recordedAt: latest.recordedAt,
             severity: max(0, min(10, latest.severity)),

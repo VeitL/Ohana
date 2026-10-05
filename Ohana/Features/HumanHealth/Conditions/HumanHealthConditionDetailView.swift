@@ -91,6 +91,16 @@ struct HumanHealthConditionDetailView: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 16) {
                     pageHeader
+                    if canViewMedication {
+                        NavigationLink {
+                            HumanHealthMedicationPatternView(human: human, condition: condition, onRecordsChanged: refreshRecords)
+                        } label: {
+                            Label(HumanHealthPatternCopy.title.text(l), systemImage: "calendar.badge.clock")
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("human-condition-medication-pattern-action")
+                    }
                     if isLoadingRecentObservations {
                         recentObservationLoadingNotice
                     }

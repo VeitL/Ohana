@@ -23,6 +23,7 @@ struct HumanNoteHistoryContent: View {
     let human: Human
     let humans: [Human]
     let noteRecords: [HumanNoteRecord]
+    let showsCloseButton: Bool
     let onRecordsChanged: () -> Void
 
     @Environment(\.modelContext) private var modelContext
@@ -48,16 +49,22 @@ struct HumanNoteHistoryContent: View {
         human: Human,
         humans: [Human],
         noteRecords: [HumanNoteRecord],
+        showsCloseButton: Bool = true,
         onRecordsChanged: @escaping () -> Void
     ) {
         self.human = human
         self.humans = humans
         self.noteRecords = noteRecords
+        self.showsCloseButton = showsCloseButton
         self.onRecordsChanged = onRecordsChanged
     }
 
     var body: some View {
-        NavigationStack {
+        if showsCloseButton { NavigationStack { content } } else { content }
+    }
+
+    private var content: some View {
+        Group {
             ZStack(alignment: .bottomTrailing) {
                 OhanaAppBackground().ignoresSafeArea()
 
@@ -81,7 +88,7 @@ struct HumanNoteHistoryContent: View {
                         .padding(.bottom, 24)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .toolbar(showsCloseButton ? .hidden : .visible, for: .navigationBar)
             .sheet(isPresented: $showAddSheet) {
                 QuickHumanNoteSheet(
                     human: human,
@@ -102,6 +109,7 @@ struct HumanNoteHistoryContent: View {
             human: human,
             title: l.tr(zh: "备注记录", en: "Notes", de: "Notizen"),
             subtitle: human.name,
+            showsCloseButton: showsCloseButton,
             onClose: { dismiss() }
         ) {
             if isViewingOwnProfile {

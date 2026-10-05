@@ -6506,12 +6506,12 @@ final class OhanaUITests: XCTestCase {
 
         let detailRoutes: [(actionPath: [String], marker: String, returnActions: [String])] = [
             (
-                ["human-detail-health-summary-action", "human-health-summary-today-metrics"],
+                ["human-detail-health-summary-action", "human-health-summary-pin-metrics"],
                 "human-health-metric-starter-record-action",
                 ["BackButton", "BackButton"]
             ),
             (
-                ["human-detail-health-summary-action", "human-health-summary-today-follow-up"],
+                ["human-detail-health-summary-action", "human-health-summary-today-reports"],
                 "human-health-report-add-action",
                 ["BackButton", "BackButton"]
             ),
@@ -6554,6 +6554,9 @@ final class OhanaUITests: XCTestCase {
             tapWhenSemanticallyHittable(profileBack, timeout: 8),
             "Human detail did not expose a stable Back action."
         )
+        if app.descendants(matching: .any)["human-health-summary-screen"].waitForExistence(timeout: 8) {
+            tapWhenHittable(app.buttons["BackButton"], timeout: 8)
+        }
         XCTAssertTrue(
             waitUntil(timeout: 10) {
                 !humanDetail.exists && app.buttons["home-tab-home"].exists
@@ -6641,7 +6644,7 @@ final class OhanaUITests: XCTestCase {
         collapseExpandedHumanCardIfNeeded(in: app, humanName: humanName)
         assertHumanHomeQuickActionOpensSheet(
             actionIdentifier: "home-quick-action-humanMedication",
-            sheetIdentifier: "quick-human-medication-sheet",
+            sheetIdentifier: "human-medication-add-action",
             in: app,
             humanName: humanName
         )
@@ -6690,6 +6693,109 @@ final class OhanaUITests: XCTestCase {
     }
 
     @MainActor
+    func testHumanHealthHomeNameOnlyRecordHistoryAndColdLaunch() throws {
+        let app = launchEnglishApp(seedHumanBaseline: false, enableProductionOverlays: true)
+        let humanName = "Codex Health Home"
+        createOnboardingHuman(named: humanName, in: app)
+        tapWhenHittable(app.buttons["onboarding-defer-pet"], timeout: 8)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+
+        func openHealthHome() {
+            ensureHomeSurfaceVisible(in: app, humanName: humanName)
+            expandHumanCardFromHome(in: app, humanName: humanName)
+            tapWhenHittable(app.buttons["home-expanded-detail-human"], timeout: 8)
+            XCTAssertTrue(app.descendants(matching: .any)["human-health-summary-screen"].waitForExistence(timeout: 14))
+        }
+        openHealthHome()
+        tapWhenHittable(app.buttons["human-health-home-record-observation"], timeout: 8)
+        XCTAssertTrue(app.buttons["human-health-quick-add-condition"].waitForExistence(timeout: 10), "No condition must lead to explicit creation.")
+        XCTAssertFalse(app.buttons["human-condition-observation-save-action"].exists, "No condition or observation should be fabricated.")
+        tapWhenHittable(app.buttons["Cancel"], timeout: 8)
+        tapWhenHittable(app.buttons["human-health-home-record-metrics"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["human-health-quick-metric-picker"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["human-health-metric-entry-sheet-tsh"].exists, "Empty history must not preselect TSH.")
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 8))
+        tapWhenHittable(search, timeout: 8)
+        search.typeText("A1C")
+        dismissKeyboardIfPresent(in: app)
+        tapWhenHittable(app.buttons["human-health-quick-metric-hba1c"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["human-health-metric-entry-sheet-hba1c"].waitForExistence(timeout: 10))
+        tapWhenHittable(app.buttons["embedded-decimal-keypad-key-5"], timeout: 8)
+        tapWhenHittable(app.buttons["human-health-metric-entry-save-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["human-health-home-record-saved"].waitForExistence(timeout: 12))
+        XCTAssertFalse(app.alerts.firstMatch.exists, "Health home must not require permissions before a first record.")
+        tapWhenHittable(app.buttons["human-health-home-record-weight"], timeout: 8)
+        let entry = app.descendants(matching: .any)["generic-weight-entry-sheet-human"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.descendants(matching: .any)["generic-weight-entry-previous-record"].exists)
+        tapWhenHittable(app.buttons["embedded-decimal-keypad-key-7"], timeout: 8)
+        tapWhenHittable(app.buttons["embedded-decimal-keypad-key-0"], timeout: 8)
+        tapWhenHittable(app.buttons["generic-weight-entry-save-action"], timeout: 8)
+        XCTAssertTrue(waitUntil(timeout: 14) { !entry.exists })
+        XCTAssertTrue(app.descendants(matching: .any)["human-health-home-record-saved"].waitForExistence(timeout: 10))
+        tapWhenHittable(app.buttons["View record"], timeout: 8)
+        assertAnyMarkerExists(["70.0", "70 kg", "70kg"], in: app, timeout: 12, context: "first weight history")
+        keepScreenshot(of: app, named: "Human health home - first record history")
+        app.terminate()
+        // Relaunch through the established preservation helper, without reseeding.
+        let readback = launchEnglishApp(resetPersistentState: false, seedHumanBaseline: false, enableProductionOverlays: true)
+        ensureHomeSurfaceVisible(in: readback, humanName: humanName)
+        expandHumanCardFromHome(in: readback, humanName: humanName)
+        tapWhenHittable(readback.buttons["home-expanded-detail-human"], timeout: 8)
+        XCTAssertTrue(readback.descendants(matching: .any)["human-health-summary-screen"].waitForExistence(timeout: 14))
+        tapWhenHittable(readback.buttons["human-health-home-record-weight"], timeout: 8)
+        XCTAssertTrue(readback.descendants(matching: .any)["generic-weight-entry-previous-record"].waitForExistence(timeout: 10))
+        keepScreenshot(of: readback, named: "Human health home - cold launch weight readback")
+    }
+
+    @MainActor
+    func testHairTrackingTemplateDailyRecordAndDelayedComparison() throws {
+        continueAfterFailure = false
+        let app = launchEnglishApp(seedMemberCardBaseline: true, enableProductionOverlays: true)
+        let humanName = try XCTUnwrap(seededHumanBaselineName)
+        ensureHomeSurfaceVisible(in: app, humanName: humanName)
+        expandHumanCardFromHome(in: app, humanName: humanName)
+        tapWhenHittable(app.buttons["home-expanded-detail-human"], timeout: 8)
+        tapWhenHittable(app.buttons["human-health-home-record-observation"], timeout: 14)
+        tapWhenHittable(app.buttons["human-health-quick-add-condition"], timeout: 12)
+        tapWhenHittable(app.buttons["human-condition-template-hair"], timeout: 8)
+        XCTAssertEqual(app.textFields["human-condition-name-input"].value as? String, "Hair shedding")
+        tapWhenHittable(app.buttons["human-condition-save-action"], timeout: 8)
+        let severity = app.sliders["human-condition-observation-severity-input"]
+        XCTAssertTrue(severity.waitForExistence(timeout: 12))
+        severity.adjust(toNormalizedSliderPosition: 0.5)
+        // Native slider positioning is approximate; read the displayed choice
+        // before saving and require that same value after a cold launch.
+        let selectedSeverity = try XCTUnwrap((severity.value as? String)?.split(separator: "/").first
+            .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) })
+        XCTAssertTrue((0 ... 10).contains(selectedSeverity))
+        tapWhenHittable(app.buttons["human-condition-observation-save-action"], timeout: 8)
+        XCTAssertTrue(app.descendants(matching: .any)["human-health-home-record-saved"].waitForExistence(timeout: 12))
+        tapWhenHittable(app.buttons["View record"], timeout: 8)
+        tapWhenHittable(app.buttons["human-condition-medication-pattern-action"], timeout: 12)
+        XCTAssertTrue(app.descendants(matching: .any)["human-health-medication-pattern-screen"].waitForExistence(timeout: 10))
+        assertAnyMarkerExists(["60 days later"], in: app, timeout: 10, context: "hair tracking starts with an adjustable 60-day view")
+        XCTAssertFalse(app.descendants(matching: .any)["human-health-pattern-chart"].exists, "No medication records must not manufacture a relationship.")
+        tapWhenHittable(app.descendants(matching: .any)["human-health-pattern-delay-picker"], timeout: 8)
+        tapWhenHittable(app.buttons["Same day"], timeout: 8)
+        assertAnyMarkerExists(["Same day"], in: app, timeout: 8, context: "the interval remains a user choice")
+        keepScreenshot(of: app, named: "Hair tracking - adjustable interval and honest empty state")
+        app.terminate()
+        let readback = launchEnglishApp(resetPersistentState: false, seedHumanBaseline: false, enableProductionOverlays: true)
+        ensureHomeSurfaceVisible(in: readback, humanName: humanName)
+        expandHumanCardFromHome(in: readback, humanName: humanName)
+        tapWhenHittable(readback.buttons["home-expanded-detail-human"], timeout: 8)
+        XCTAssertTrue(readback.descendants(matching: .any)["human-health-summary-screen"].waitForExistence(timeout: 14))
+        scrollTowardElement(readback.buttons["human-health-summary-pin-conditions"], in: readback, maxSwipes: 4)
+        tapWhenHittable(readback.buttons["human-health-summary-pin-conditions"], timeout: 14)
+        XCTAssertTrue(readback.buttons["human-condition-medication-pattern-action"].waitForExistence(timeout: 12))
+        assertAnyMarkerExists(["Hair shedding"], in: readback, timeout: 8, context: "saved hair condition after cold launch")
+        assertAnyMarkerExists(["\(selectedSeverity)/10"], in: readback, timeout: 8, context: "saved severity after cold launch")
+        keepScreenshot(of: readback, named: "Hair tracking - cold launch readback")
+    }
+
+    @MainActor
     func testHumanHealthConditionsCreateObservationEditDeleteAndPersistAcrossRelaunch() throws {
         let app = launchEnglishApp(
             seedMemberCardBaseline: true,
@@ -6711,7 +6817,7 @@ final class OhanaUITests: XCTestCase {
         )
 
         openHumanDetailModule(
-            ["human-detail-health-summary-action", "human-health-summary-today-observation"],
+            ["human-detail-health-summary-action", "human-health-summary-pin-conditions"],
             in: app,
             humanName: humanName
         )
@@ -6805,7 +6911,7 @@ final class OhanaUITests: XCTestCase {
         relaunchPreservingPersistentState(in: app)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
         openHumanDetailModule(
-            ["human-detail-health-summary-action", "human-health-summary-today-observation"],
+            ["human-detail-health-summary-action", "human-health-summary-pin-conditions"],
             in: app,
             humanName: humanName
         )
@@ -6865,7 +6971,7 @@ final class OhanaUITests: XCTestCase {
         relaunchPreservingPersistentState(in: app)
         ensureHomeSurfaceVisible(in: app, humanName: humanName)
         openHumanDetailModule(
-            ["human-detail-health-summary-action", "human-health-summary-today-observation"],
+            ["human-detail-health-summary-action", "human-health-summary-pin-conditions"],
             in: app,
             humanName: humanName
         )
@@ -6991,6 +7097,9 @@ final class OhanaUITests: XCTestCase {
             app.descendants(matching: .any)["add-human-health-report-sheet"].waitForExistence(timeout: 10),
             "Free did not open the imported report editor after the production introduction was dismissed."
         )
+        if !app.textFields["add-human-health-report-hospital-input"].exists {
+            tapWhenHittable(app.descendants(matching: .any)["add-human-health-report-additional-info"], timeout: 8)
+        }
         let typedHospitalInput = app.textFields["add-human-health-report-hospital-input"]
         let fallbackHospitalInput = app.descendants(matching: .any)["add-human-health-report-hospital-input"]
         XCTAssertTrue(
@@ -11866,6 +11975,9 @@ final class OhanaUITests: XCTestCase {
             ),
             "Expanded Human card did not expose a stable detail entry."
         )
+        if app.descendants(matching: .any)["human-health-summary-screen"].waitForExistence(timeout: 10) {
+            tapWhenHittable(app.buttons["human-health-home-profile"], timeout: 8)
+        }
         XCTAssertTrue(
             app.descendants(matching: .any)["human-detail-screen"].waitForExistence(timeout: 14),
             "Human detail did not open from the expanded Home card."
@@ -11889,13 +12001,13 @@ final class OhanaUITests: XCTestCase {
             openHumanQuickActionDetailFromHome("humanNote", in: app, humanName: humanName)
         case "feature-hub-body-metrics":
             openHumanDetailModule(
-                ["human-detail-health-summary-action", "human-health-summary-today-metrics"],
+                ["human-detail-health-summary-action", "human-health-summary-pin-metrics"],
                 in: app,
                 humanName: humanName
             )
         case "feature-hub-body-report":
             openHumanDetailModule(
-                ["human-detail-health-summary-action", "human-health-summary-today-follow-up"],
+                ["human-detail-health-summary-action", "human-health-summary-today-reports"],
                 in: app,
                 humanName: humanName
             )
@@ -12266,6 +12378,12 @@ final class OhanaUITests: XCTestCase {
         openHumanModuleFromHome("feature-hub-body-metrics", in: app, humanName: humanName)
 
         tapWhenHittable(app.buttons["human-health-metric-starter-record-action"], timeout: 8)
+        let search = app.searchFields.firstMatch
+        XCTAssertTrue(search.waitForExistence(timeout: 8))
+        tapWhenHittable(search, timeout: 8)
+        search.typeText("TSH")
+        dismissKeyboardIfPresent(in: app)
+        tapWhenHittable(app.buttons["human-health-quick-metric-tsh"], timeout: 8)
 
         XCTAssertTrue(
             app.descendants(matching: .any)["human-health-metric-entry-sheet-tsh"].waitForExistence(timeout: 10),

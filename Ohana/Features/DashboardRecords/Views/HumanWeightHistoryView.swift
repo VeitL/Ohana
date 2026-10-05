@@ -10,6 +10,7 @@ import SwiftUI
 
 struct HumanWeightHistoryView: View {
     let human: Human
+    var showsCloseButton = true
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -63,6 +64,7 @@ struct HumanWeightHistoryView: View {
         ZStack {
             HumanWeightDashboardContent(
                 human: human,
+                showsCloseButton: showsCloseButton,
                 onClose: { dismiss() },
                 onAdd: {
                     withAnimation(GoMotion.feedback) {

@@ -6,19 +6,34 @@
 //  Apple Fitness and Apple Health without copying Activity Rings.
 //
 
+import SwiftData
 import SwiftUI
 
 struct HumanHealthSummaryView: View {
     let human: Human
+    var onOpenAchievements: (() -> Void)?
+    var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
+    var onOpenTasks: (() -> Void)?
 
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var appServices
     @AppStorage("currentActiveHumanId") private var activeHumanIdStr = ""
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var pinnedDestinations: [HumanHealthSummaryDestination]
     @State private var showingPinnedEditor = false
+    @State private var quickRecord: HumanHealthQuickRecord?
+    @State private var savedRecordRoute: HumanHealthSummaryRoute?
+    @State private var dosePresentation = HumanMedicationPresentationState()
+    @State private var lastRecordedDose: HumanHealthSummaryDose?
+    @State private var doseError: String?
+    @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
-    init(human: Human) {
+    init(human: Human, onOpenAchievements: (() -> Void)? = nil, onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil, onOpenTasks: (() -> Void)? = nil) {
         self.human = human
+        self.onOpenAchievements = onOpenAchievements
+        self.onPresentCoconutLog = onPresentCoconutLog
+        self.onOpenTasks = onOpenTasks
         let key = HumanHealthSummaryPinPreference.storageKey(humanID: human.id)
         let stored = UserDefaults.standard.string(forKey: key)
         _pinnedDestinations = State(
@@ -63,11 +78,18 @@ struct HumanHealthSummaryView: View {
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 22) {
                         identityHeader(snapshot)
-                        todaySection(snapshot)
+                        HumanHealthTodaySection(
+                            human: human, snapshot: snapshot,
+                            isPending: { dosePresentation.pendingStatus(for: $0) != nil },
+                            onDose: recordDose
+                        )
+                        savedFeedback
+                        quickRecordsSection
                         pinnedSection(snapshot)
-                        highlightsSection(snapshot)
-                        trendsSection(snapshot)
-                        recordsAndSourcesSection(snapshot)
+                        if !snapshot.trends.isEmpty { trendsSection(snapshot) }
+                        DisclosureGroup(l.tr(zh: "记录与来源", en: "Records & Sources", de: "Einträge & Quellen")) {
+                            recordsAndSourcesSection(snapshot)
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 12)
@@ -76,8 +98,11 @@ struct HumanHealthSummaryView: View {
                 .scrollBounceBehavior(.basedOnSize)
             }
             .accessibilityIdentifier("human-health-summary-screen")
-            .navigationTitle(l.tr(zh: "健康摘要", en: "Health Summary", de: "Gesundheitsübersicht"))
+            .navigationTitle(l.tr(zh: "健康", en: "Health", de: "Gesundheit"))
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $quickRecord) { record in
+                quickRecordView(record)
+            }
             .sheet(isPresented: $showingPinnedEditor) {
                 HumanHealthSummaryPinEditor(
                     initialItems: pinnedDestinations,
@@ -86,6 +111,9 @@ struct HumanHealthSummaryView: View {
             }
         }
         .environment(\.locale, AppLanguage.effectiveLocale)
+        .onDisappear { commandQueue.cancelAll()
+        dosePresentation.cancelAll()
+        }
     }
 
     private func identityHeader(_ snapshot: HumanHealthSummarySnapshot) -> some View {
@@ -99,108 +127,143 @@ struct HumanHealthSummaryView: View {
 
             Spacer(minLength: 8)
 
-            Label(
-                l.tr(zh: "本机", en: "On device", de: "Auf dem Gerät"),
-                systemImage: "iphone"
-            )
-            .font(OhanaFont.caption2(.black))
-            .foregroundStyle(Color.goTeal)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 6)
-            .background(Color.goTeal.opacity(0.12), in: Capsule())
-            .accessibilityLabel(l.tr(
-                zh: "健康摘要在本机处理",
-                en: "Health summary processed on device",
-                de: "Gesundheitsübersicht wird auf dem Gerät verarbeitet"
-            ))
+            NavigationLink { destinationView(HumanHealthSummaryRoute.profile) } label: {
+                Text(HumanHealthHomeText.profile.title(l))
+            }
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("human-health-home-profile")
+            NavigationLink { destinationView(HumanHealthSummaryRoute.directory) } label: {
+                Text(HumanHealthHomeText.more.title(l))
+            }
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("human-health-home-more")
         }
     }
 
-    private func todaySection(_ snapshot: HumanHealthSummarySnapshot) -> some View {
+    private var quickRecordsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            sectionHeading(
-                l.tr(zh: "今天", en: "Today", de: "Heute"),
-                identifier: "human-health-summary-today-section"
-            )
-
-            VStack(spacing: 0) {
-                todayMedicationRow(snapshot)
-                summaryDivider
-                todayMetricRow(snapshot)
-                summaryDivider
-                todayFollowUpRow(snapshot)
-                summaryDivider
-                todayObservationRow(snapshot)
+            HStack {
+                sectionHeading(HumanHealthHomeText.quickRecords.title(l), identifier: "human-health-home-quick-records")
+                Spacer()
+                NavigationLink { destinationView(HumanHealthSummaryRoute.directory) } label: {
+                    Text(HumanHealthHomeText.moreRecords.title(l)).font(OhanaFont.caption())
+                }
+                .frame(minHeight: 44)
             }
-            .background(
-                Color.ohanaCardSurface,
-                in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
-                    .strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-                    .allowsHitTesting(false)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) { quickRecordButtons }
+                VStack(alignment: .leading, spacing: 8) { quickRecordButtons }
             }
         }
     }
 
-    private func todayMedicationRow(_ snapshot: HumanHealthSummarySnapshot) -> some View {
-        summaryNavigationRow(
-            route: .feature(.medication),
-            icon: "pills.fill",
-            tint: .goPurple,
-            title: l.tr(zh: "今日用药", en: "Medication today", de: "Medikamente heute"),
-            value: medicationTodayValue(snapshot),
-            detail: medicationTodayDetail(snapshot),
-            isLocked: !snapshot.medicationIsVisible,
-            identifier: "human-health-summary-today-medication"
-        )
+    @ViewBuilder
+    private var quickRecordButtons: some View {
+        quickRecordButton(.weight, text: .recordWeight, icon: "scalemass")
+        quickRecordButton(.metrics, text: .recordMetric, icon: "waveform.path.ecg")
+        quickRecordButton(.observation, text: .recordState, icon: "heart.text.clipboard")
     }
 
-    private func todayMetricRow(_ snapshot: HumanHealthSummarySnapshot) -> some View {
-        summaryNavigationRow(
-            route: .feature(.metrics),
-            icon: "waveform.path.ecg.rectangle.fill",
-            tint: snapshot.abnormalMetrics.isEmpty ? .goTeal : .goOrange,
-            title: l.tr(zh: "最新指标", en: "Latest metrics", de: "Aktuelle Werte"),
-            value: metricTodayValue(snapshot),
-            detail: metricTodayDetail(snapshot),
-            isLocked: !snapshot.bodyIsVisible,
-            identifier: "human-health-summary-today-metrics"
-        )
+    private func quickRecordButton(_ record: HumanHealthQuickRecord, text: HumanHealthHomeText, icon: String) -> some View {
+        Button { quickRecord = record } label: {
+            Label(text.title(l), systemImage: icon)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .disabled(!bodyIsVisible || human.hasPassedAway)
+        .accessibilityIdentifier("human-health-home-record-\(record.id)")
     }
 
-    private func todayFollowUpRow(_ snapshot: HumanHealthSummarySnapshot) -> some View {
-        summaryNavigationRow(
-            route: .feature(.reports),
-            icon: "calendar.badge.clock",
-            tint: .goBlue,
-            title: l.tr(zh: "复查安排", en: "Follow-up", de: "Kontrolle"),
-            value: followUpValue(snapshot),
-            detail: followUpDetail(snapshot),
-            isLocked: !snapshot.bodyIsVisible,
-            identifier: "human-health-summary-today-follow-up"
-        )
+    @ViewBuilder
+    private var savedFeedback: some View {
+        if let doseError {
+            Text(doseError)
+                .font(OhanaFont.callout())
+                .foregroundStyle(Color.goRed)
+                .accessibilityIdentifier("human-health-home-save-error")
+        }
+        if let dose = lastRecordedDose {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("\(dose.name) · \(HumanHealthHomeText.saved.title(l))")
+                HStack {
+                    NavigationLink { destinationView(HumanHealthSummaryRoute.feature(.medication)) } label: { Text(HumanHealthHomeText.viewRecord.title(l)) }
+                    Spacer()
+                    Button(l.tr(zh: "撤回", en: "Undo", de: "Zurücknehmen")) { recordDose(dose, .pending) }
+                        .disabled(dosePresentation.pendingStatus(for: HumanHealthSummaryTodayItem.dose(dose).id) != nil)
+                }
+                .frame(minHeight: 44)
+            }
+            .font(OhanaFont.callout())
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("human-health-home-dose-saved")
+        }
+        if let savedRecordRoute {
+            HStack {
+                Text(HumanHealthHomeText.saved.title(l))
+                Spacer()
+                NavigationLink { destinationView(savedRecordRoute) } label: { Text(HumanHealthHomeText.viewRecord.title(l)) }
+            }
+            .font(OhanaFont.callout())
+            .frame(minHeight: 44)
+            .accessibilityIdentifier("human-health-home-record-saved")
+        }
     }
 
-    private func todayObservationRow(_ snapshot: HumanHealthSummarySnapshot) -> some View {
-        summaryNavigationRow(
-            route: .feature(.conditions),
-            icon: "heart.text.clipboard.fill",
-            tint: .goTeal,
-            title: l.tr(zh: "近期状态", en: "Recent state", de: "Letzter Zustand"),
-            value: observationValue(snapshot),
-            detail: observationDetail(snapshot),
-            isLocked: !snapshot.bodyIsVisible,
-            identifier: "human-health-summary-today-observation"
+    private func recordDose(_ dose: HumanHealthSummaryDose, _ status: HumanMedicationStatus) {
+        guard medicationIsVisible, !human.hasPassedAway else { return }
+        let itemID = HumanHealthSummaryTodayItem.dose(dose).id
+        guard dosePresentation.pendingStatus(for: itemID) == nil else { return }
+        dosePresentation.begin(itemID: itemID, status: status)
+        doseError = nil
+        savedRecordRoute = nil
+        let command = DomainCommand.humanMedicationDose(
+            humanID: human.id, medicationID: dose.medicationID,
+            scheduledMinute: Int(dose.scheduledTime.timeIntervalSince1970 / 60), status: status.rawValue
         )
+        commandQueue.enqueue(command) {
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).setMedicationDoseStatus(
+                human: human, medicationID: dose.medicationID, scheduledTime: dose.scheduledTime, status: status
+            )
+            switch dosePresentation.complete(itemID: itemID, result: result) {
+            case .persisted:
+                lastRecordedDose = status == .pending ? nil : dose
+            case .failed:
+                doseError = HumanHealthHomeText.saveFailed.title(l)
+            }
+        }
+    }
+
+    private func didSave(_ route: HumanHealthSummaryRoute) {
+        savedRecordRoute = route
+        lastRecordedDose = nil
+        quickRecord = nil
+        UIAccessibility.post(notification: .announcement, argument: HumanHealthHomeText.saved.title(l))
+    }
+
+    @ViewBuilder
+    private func quickRecordView(_ record: HumanHealthQuickRecord) -> some View {
+        switch record {
+        case .weight:
+            GenericWeightEntrySheet(target: .human(human), onSaved: { didSave(.feature(.weight)) })
+        case .metrics:
+            HumanMetricQuickRecordView(human: human) { key in didSave(.metric(key)) }
+        case .observation:
+            HumanObservationQuickRecordView(human: human) { id in didSave(.condition(id)) }
+        case .workout:
+            QuickHumanWorkoutSheet(human: human, onSaved: { didSave(.feature(.workouts)) })
+        case .report:
+            AddHumanHealthReportSheet(human: human, onSaved: { didSave(.feature(.reports)) })
+                .ohanaSheetPagePresentation()
+        case .note:
+            QuickHumanNoteSheet(human: human, onSaved: { didSave(.notes) })
+        }
     }
 
     private func pinnedSection(_ snapshot: HumanHealthSummarySnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 sectionHeading(
-                    l.tr(zh: "重点项目", en: "Pinned", de: "Fixiert"),
+                    l.tr(zh: "关注项目", en: "Pinned", de: "Fixiert"),
                     identifier: "human-health-summary-pinned-section"
                 )
                 Spacer(minLength: 8)
@@ -243,9 +306,7 @@ struct HumanHealthSummaryView: View {
         _ destination: HumanHealthSummaryDestination,
         snapshot: HumanHealthSummarySnapshot
     ) -> some View {
-        NavigationLink {
-            destinationView(.feature(destination))
-        } label: {
+        NavigationLink { destinationView(pinnedRoute(destination, snapshot: snapshot)) } label: {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: destination.systemImage)
@@ -334,7 +395,7 @@ struct HumanHealthSummaryView: View {
     private func trendsSection(_ snapshot: HumanHealthSummarySnapshot) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionHeading(
-                l.tr(zh: "趋势", en: "Trends", de: "Trends"),
+                HumanHealthHomeText.changes.title(l),
                 identifier: "human-health-summary-trends-section"
             )
 
@@ -692,31 +753,11 @@ struct HumanHealthSummaryView: View {
             .accessibilityHidden(true)
     }
 
-    @ViewBuilder
     private func destinationView(_ route: HumanHealthSummaryRoute) -> some View {
-        switch route {
-        case let .feature(destination):
-            switch destination {
-            case .medication:
-                HumanMedicationView(human: human)
-            case .metrics:
-                HumanHealthCheckupView(human: human)
-            case .conditions:
-                HumanHealthConditionsView(human: human, showsCloseButton: false)
-            case .reports:
-                HumanHealthReportView(human: human)
-            case .weight:
-                HumanWeightHistoryView(human: human)
-            case .workouts:
-                HumanWorkoutSummaryView(human: human)
-            }
-        case let .metric(metricKey):
-            if let metric = HealthMetricCatalog.metric(forKey: metricKey) {
-                HumanHealthMetricDetailView(human: human, metric: metric)
-            } else {
-                HumanHealthCheckupView(human: human)
-            }
-        }
+        HumanHealthSummaryDestinationView(
+            human: human, route: route, quickRecord: $quickRecord, savedRecordRoute: $savedRecordRoute,
+            onOpenAchievements: onOpenAchievements, onPresentCoconutLog: onPresentCoconutLog, onOpenTasks: onOpenTasks
+        )
     }
 
     private func savePinnedDestinations(_ values: [HumanHealthSummaryDestination]) {
@@ -1046,74 +1087,62 @@ private extension HumanHealthSummaryView {
         return "\(name) · \(observation.recordedAt.formatted(.dateTime.month().day()))"
     }
 
-    func destinationValue(
-        _ destination: HumanHealthSummaryDestination,
-        snapshot: HumanHealthSummarySnapshot
-    ) -> String {
+    func pinnedRoute(_ destination: HumanHealthSummaryDestination, snapshot: HumanHealthSummarySnapshot) -> HumanHealthSummaryRoute {
+        if destination == .metrics, let metric = snapshot.latestMetrics.first { return .metric(metric.metricKey) }
+        if destination == .conditions, let id = snapshot.recentObservation?.conditionID { return .condition(id) }
+        return .feature(destination)
+    }
+
+    func destinationValue(_ destination: HumanHealthSummaryDestination, snapshot: HumanHealthSummarySnapshot) -> String {
         switch destination {
         case .medication:
             guard snapshot.medicationIsVisible else { return "—" }
-            if snapshot.medicationScheduleIsIncomplete {
-                return snapshot.pendingDoseCount > 0
-                    ? "\(snapshot.pendingDoseCount)+"
-                    : l.tr(zh: "未完整", en: "Incomplete", de: "Unvollständig")
-            }
+            if snapshot.medicationScheduleIsIncomplete { return boundedCountText(.init(loaded: snapshot.pendingDoseCount, isTruncated: true)) }
             return "\(snapshot.pendingDoseCount)"
         case .metrics:
             guard snapshot.bodyIsVisible else { return "—" }
-            return boundedCountText(snapshot.recordCounts.trackedMetrics)
+            guard let metric = snapshot.latestMetrics.first else { return boundedCountText(snapshot.recordCounts.trackedMetrics) }
+            return metricValue(metric.value, metricKey: metric.metricKey, unitCode: metric.unitCode)
         case .conditions:
             guard snapshot.bodyIsVisible else { return "—" }
+            if let observation = snapshot.recentObservation { return "\(observation.severity)/10" }
             return boundedCountText(snapshot.recordCounts.activeConditions)
         case .reports:
             guard snapshot.bodyIsVisible else { return "—" }
-            return boundedCountText(snapshot.recordCounts.reports)
+            return snapshot.latestReportDate?.formatted(date: .abbreviated, time: .omitted) ?? boundedCountText(snapshot.recordCounts.reports)
         case .weight:
             guard snapshot.bodyIsVisible else { return "—" }
-            return l.tr(zh: "趋势", en: "Trend", de: "Trend")
+            return snapshot.latestWeight.map { "\($0.value.formatted(.number.precision(.fractionLength(1)))) kg" } ?? (snapshot.weightDidLoad ? "—" : HumanHealthHomeText.incomplete.title(l))
         case .workouts:
             guard snapshot.workoutIsVisible else { return "—" }
-            switch snapshot.sourceState {
-            case .appleHealthBound:
-                return l.tr(zh: "已绑定", en: "Bound", de: "Verbunden")
-            case .localOnly:
-                return l.tr(zh: "本机", en: "Local", de: "Lokal")
-            case .hidden, .unavailable:
-                return l.tr(zh: "不可用", en: "Unavailable", de: "Nicht verfügbar")
-            }
+            return snapshot.latestWorkout.map { "\(Int($0.value)) min" } ?? (snapshot.workoutDidLoad ? "—" : HumanHealthHomeText.incomplete.title(l))
         }
     }
 
-    func destinationDetail(
-        _ destination: HumanHealthSummaryDestination,
-        snapshot: HumanHealthSummarySnapshot
-    ) -> String {
+    func destinationDetail(_ destination: HumanHealthSummaryDestination, snapshot: HumanHealthSummarySnapshot) -> String {
+        let date: Date?
         switch destination {
         case .medication:
-            snapshot.medicationIsVisible
-                ? l.tr(zh: "今日待处理", en: "Due today", de: "Heute fällig")
-                : privateDetail
+            return snapshot.medicationIsVisible ? l.tr(zh: "今日待处理", en: "Due today", de: "Heute fällig") : privateDetail
         case .metrics:
-            snapshot.bodyIsVisible
-                ? l.tr(zh: "已追踪指标", en: "Tracked metrics", de: "Erfasste Werte")
-                : privateDetail
+            guard snapshot.bodyIsVisible else { return privateDetail }
+            guard let metric = snapshot.latestMetrics.first else { return HumanHealthHomeText.recordMetric.title(l) }
+            return "\(metricTitle(metric.metricKey)) · \(metric.date.formatted(date: .abbreviated, time: .omitted))"
         case .conditions:
-            snapshot.bodyIsVisible
-                ? l.tr(zh: "正在关注", en: "Actively tracked", de: "Aktiv beobachtet")
-                : privateDetail
+            guard snapshot.bodyIsVisible else { return privateDetail }
+            if let observation = snapshot.recentObservation { return observationDetail(snapshot) }
+            return l.tr(zh: "正在关注", en: "Actively tracked", de: "Aktiv beobachtet")
         case .reports:
-            snapshot.bodyIsVisible
-                ? l.tr(zh: "报告与复查", en: "Reports and follow-ups", de: "Berichte und Kontrollen")
-                : privateDetail
+            guard snapshot.bodyIsVisible else { return privateDetail }
+            return l.tr(zh: "报告与复查", en: "Reports and follow-ups", de: "Berichte und Kontrollen")
         case .weight:
-            snapshot.bodyIsVisible
-                ? l.tr(zh: "体重记录", en: "Weight records", de: "Gewichtseinträge")
-                : privateDetail
+            guard snapshot.bodyIsVisible else { return privateDetail }
+            date = snapshot.latestWeight?.date
         case .workouts:
-            snapshot.workoutIsVisible
-                ? l.tr(zh: "运动与 Apple Health", en: "Workouts & Apple Health", de: "Training & Apple Health")
-                : privateDetail
+            guard snapshot.workoutIsVisible else { return privateDetail }
+            date = snapshot.latestWorkout?.date
         }
+        return date?.formatted(date: .abbreviated, time: .omitted) ?? HumanHealthHomeText.recentMetrics.title(l)
     }
 
     func highlightIcon(_ highlight: HumanHealthSummaryHighlight) -> String {

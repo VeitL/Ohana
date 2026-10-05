@@ -47,6 +47,7 @@ struct HumanHealthObservationEditorSheet: View {
     @State private var medicationResponse: HumanMedicationResponse
     @State private var sideEffects: String
     @State private var notes: String
+    @State private var showsAdditionalInfo = false
     @State private var isSaving = false
     @State private var showsDeleteConfirmation = false
     @State private var showsDiscardConfirmation = false
@@ -94,6 +95,7 @@ struct HumanHealthObservationEditorSheet: View {
         _medicationResponse = State(initialValue: draft.medicationResponse)
         _sideEffects = State(initialValue: draft.sideEffects)
         _notes = State(initialValue: draft.notes)
+        _showsAdditionalInfo = State(initialValue: observation != nil)
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -163,123 +165,131 @@ struct HumanHealthObservationEditorSheet: View {
                 } header: {
                     Text(condition.name)
                 } footer: {
-                    Text(l.tr(zh: "0 表示没有不适，10 表示对当下影响很强。", en: "0 means no impact; 10 means very high impact right now.", de: "0 bedeutet keine, 10 eine sehr starke aktuelle Belastung."))
+                    Text(condition.category == .hairAndScalp
+                         ? HumanHealthPatternCopy.severityGuide.text(l)
+                         : l.tr(zh: "0 表示没有不适，10 表示对当下影响很强。", en: "0 means no impact; 10 means very high impact right now.", de: "0 bedeutet keine, 10 eine sehr starke aktuelle Belastung."))
                 }
 
                 Section {
-                    Toggle(l.tr(zh: "记录心情自评", en: "Record mood rating", de: "Stimmung erfassen"), isOn: $recordsMood)
-                    if recordsMood {
-                        Stepper(value: $moodScore, in: 1 ... 10) {
-                            HStack {
-                                Text(l.tr(zh: "心情", en: "Mood", de: "Stimmung"))
-                                Spacer()
-                                Text("\(moodScore)/10")
-                                    .fontWeight(.bold)
-                            }
-                        }
-                    }
-
-                    Toggle(l.tr(zh: "记录睡眠", en: "Record sleep", de: "Schlaf erfassen"), isOn: $recordsSleep)
-                    if recordsSleep {
-                        Stepper(value: $sleepHours, in: 0 ... 24, step: 0.5) {
-                            let value = sleepHours.formatted(
-                                .number.precision(.fractionLength(1)).locale(appLocale)
-                            )
-                            HStack {
-                                Text(l.tr(zh: "睡眠时长", en: "Sleep duration", de: "Schlafdauer"))
-                                Spacer()
-                                Text(l.tr(zh: "\(value) 小时", en: "\(value) hr", de: "\(value) Std."))
-                                    .fontWeight(.bold)
-                            }
-                        }
-                    }
-                } header: {
-                    Text(l.tr(zh: "可选状态", en: "Optional state", de: "Optionaler Status"))
+                    DisclosureGroup(HumanHealthHomeText.additionalInfo.title(l), isExpanded: $showsAdditionalInfo) { EmptyView() }
+                        .accessibilityIdentifier("human-condition-observation-additional-info")
                 }
-
-                Section {
-                    let suggestions = condition.category.suggestedTags(l)
-                    if !suggestions.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(suggestions, id: \.self) { tag in
-                                    Button {
-                                        toggleSuggestedTag(tag)
-                                    } label: {
-                                        Text(tag)
-                                            .font(OhanaFont.caption(.black))
-                                            .foregroundStyle(parsedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) ? Color.arkInk : condition.category.tint)
-                                            .padding(.horizontal, 10)
-                                            .frame(minHeight: 44)
-                                            .background(
-                                                parsedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })
-                                                    ? condition.category.tint
-                                                    : condition.category.tint.opacity(0.12),
-                                                in: Capsule()
-                                            )
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityAddTraits(isSuggestedTagSelected(tag) ? .isSelected : [])
+                if showsAdditionalInfo {
+                    Section {
+                        Toggle(l.tr(zh: "记录心情自评", en: "Record mood rating", de: "Stimmung erfassen"), isOn: $recordsMood)
+                        if recordsMood {
+                            Stepper(value: $moodScore, in: 1 ... 10) {
+                                HStack {
+                                    Text(l.tr(zh: "心情", en: "Mood", de: "Stimmung"))
+                                    Spacer()
+                                    Text("\(moodScore)/10")
+                                        .fontWeight(.bold)
                                 }
                             }
-                            .padding(.vertical, 2)
                         }
+
+                        Toggle(l.tr(zh: "记录睡眠", en: "Record sleep", de: "Schlaf erfassen"), isOn: $recordsSleep)
+                        if recordsSleep {
+                            Stepper(value: $sleepHours, in: 0 ... 24, step: 0.5) {
+                                let value = sleepHours.formatted(
+                                    .number.precision(.fractionLength(1)).locale(appLocale)
+                                )
+                                HStack {
+                                    Text(l.tr(zh: "睡眠时长", en: "Sleep duration", de: "Schlafdauer"))
+                                    Spacer()
+                                    Text(l.tr(zh: "\(value) 小时", en: "\(value) hr", de: "\(value) Std."))
+                                        .fontWeight(.bold)
+                                }
+                            }
+                        }
+                    } header: {
+                        Text(l.tr(zh: "可选状态", en: "Optional state", de: "Optionaler Status"))
                     }
 
-                    TextField(
-                        l.tr(zh: "用逗号分隔，例如：鼻塞、眼痒", en: "Comma-separated, for example: congestion, itchy eyes", de: "Mit Kommas trennen, z. B. Nase zu, juckende Augen"),
-                        text: $tagsText,
-                        axis: .vertical
-                    )
-                    .lineLimit(2 ... 5)
-                } header: {
-                    Text(l.tr(zh: "症状或状态标签", en: "Symptom or state tags", de: "Symptom- oder Status-Tags"))
-                }
-
-                Section(l.tr(zh: "上下文", en: "Context", de: "Kontext")) {
-                    TextField(
-                        l.tr(zh: "可能的诱因或暴露（不作因果判断）", en: "Possible triggers or exposure (not a causal claim)", de: "Mögliche Auslöser oder Exposition (keine Kausalaussage)"),
-                        text: $possibleTriggers,
-                        axis: .vertical
-                    )
-                    .lineLimit(2 ... 6)
-                    TextField(
-                        l.tr(zh: "采取了什么行动", en: "Actions taken", de: "Ergriffene Maßnahmen"),
-                        text: $careActions,
-                        axis: .vertical
-                    )
-                    .lineLimit(2 ... 6)
-                }
-
-                if canViewMedication {
                     Section {
-                        Picker(l.tr(zh: "主观用药反应", en: "Self-reported medication response", de: "Selbst berichtete Medikamentenreaktion"), selection: $medicationResponse) {
-                            ForEach(HumanMedicationResponse.allCases) { response in
-                                Text(response.displayName(l)).tag(response)
+                        let suggestions = condition.category.suggestedTags(l)
+                        if !suggestions.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    ForEach(suggestions, id: \.self) { tag in
+                                        Button {
+                                            toggleSuggestedTag(tag)
+                                        } label: {
+                                            Text(tag)
+                                                .font(OhanaFont.caption(.semibold))
+                                                .foregroundStyle(parsedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) ? Color.arkInk : condition.category.tint)
+                                                .padding(.horizontal, 10)
+                                                .frame(minHeight: 44)
+                                                .background(
+                                                    parsedTags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame })
+                                                        ? condition.category.tint
+                                                        : condition.category.tint.opacity(0.12),
+                                                    in: Capsule()
+                                                )
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityAddTraits(isSuggestedTagSelected(tag) ? .isSelected : [])
+                                    }
+                                }
+                                .padding(.vertical, 2)
                             }
                         }
 
                         TextField(
-                            l.tr(zh: "副作用或其他不适", en: "Side effects or other discomfort", de: "Nebenwirkungen oder andere Beschwerden"),
-                            text: $sideEffects,
+                            l.tr(zh: "用逗号分隔，例如：鼻塞、眼痒", en: "Comma-separated, for example: congestion, itchy eyes", de: "Mit Kommas trennen, z. B. Nase zu, juckende Augen"),
+                            text: $tagsText,
+                            axis: .vertical
+                        )
+                        .lineLimit(2 ... 5)
+                    } header: {
+                        Text(l.tr(zh: "症状或状态标签", en: "Symptom or state tags", de: "Symptom- oder Status-Tags"))
+                    }
+
+                    Section(l.tr(zh: "上下文", en: "Context", de: "Kontext")) {
+                        TextField(
+                            l.tr(zh: "可能的诱因或暴露（不作因果判断）", en: "Possible triggers or exposure (not a causal claim)", de: "Mögliche Auslöser oder Exposition (keine Kausalaussage)"),
+                            text: $possibleTriggers,
                             axis: .vertical
                         )
                         .lineLimit(2 ... 6)
-                    } header: {
-                        Text(l.tr(zh: "用药观察", en: "Medication observation", de: "Medikamentenbeobachtung"))
-                    } footer: {
-                        Text(l.tr(zh: "这里只记录主观感受，不用于判断药物疗效或安全性。", en: "This records personal experience only; it does not assess effectiveness or safety.", de: "Hier wird nur die persönliche Wahrnehmung erfasst; Wirksamkeit oder Sicherheit werden nicht bewertet."))
+                        TextField(
+                            l.tr(zh: "采取了什么行动", en: "Actions taken", de: "Ergriffene Maßnahmen"),
+                            text: $careActions,
+                            axis: .vertical
+                        )
+                        .lineLimit(2 ... 6)
                     }
-                }
 
-                Section(l.tr(zh: "备注", en: "Notes", de: "Notizen")) {
-                    TextField(
-                        l.tr(zh: "其他细节", en: "Other details", de: "Weitere Details"),
-                        text: $notes,
-                        axis: .vertical
-                    )
-                    .lineLimit(3 ... 8)
-                    .accessibilityIdentifier("human-condition-observation-notes-input")
+                    if canViewMedication {
+                        Section {
+                            Picker(l.tr(zh: "主观用药反应", en: "Self-reported medication response", de: "Selbst berichtete Medikamentenreaktion"), selection: $medicationResponse) {
+                                ForEach(HumanMedicationResponse.allCases) { response in
+                                    Text(response.displayName(l)).tag(response)
+                                }
+                            }
+
+                            TextField(
+                                l.tr(zh: "副作用或其他不适", en: "Side effects or other discomfort", de: "Nebenwirkungen oder andere Beschwerden"),
+                                text: $sideEffects,
+                                axis: .vertical
+                            )
+                            .lineLimit(2 ... 6)
+                        } header: {
+                            Text(l.tr(zh: "用药观察", en: "Medication observation", de: "Medikamentenbeobachtung"))
+                        } footer: {
+                            Text(l.tr(zh: "这里只记录主观感受，不用于判断药物疗效或安全性。", en: "This records personal experience only; it does not assess effectiveness or safety.", de: "Hier wird nur die persönliche Wahrnehmung erfasst; Wirksamkeit oder Sicherheit werden nicht bewertet."))
+                        }
+                    }
+
+                    Section(l.tr(zh: "备注", en: "Notes", de: "Notizen")) {
+                        TextField(
+                            l.tr(zh: "其他细节", en: "Other details", de: "Weitere Details"),
+                            text: $notes,
+                            axis: .vertical
+                        )
+                        .lineLimit(3 ... 8)
+                        .accessibilityIdentifier("human-condition-observation-notes-input")
+                    }
                 }
 
                 if observation != nil {

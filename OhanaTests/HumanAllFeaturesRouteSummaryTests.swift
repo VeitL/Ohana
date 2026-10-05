@@ -4,6 +4,49 @@ import Testing
 
 struct HumanAllFeaturesRouteSummaryTests {
     @MainActor
+    @Test func healthTilesShareOwnerNormalizationAndCalendarBasedScheduleSummary() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = date(year: 2026, month: 7, day: 7, hour: 12)
+        let human = Human(name: "Lin")
+        let owner = human.id.uuidString.lowercased()
+        let current = HumanMedication(
+            humanId: owner, name: "Current", frequency: .daily,
+            firstDoseTime: date(year: 2026, month: 7, day: 7, hour: 20),
+            startDate: date(year: 2026, month: 7, day: 6)
+        )
+        let endingToday = HumanMedication(
+            humanId: owner, name: "Ends today", frequency: .asNeeded,
+            startDate: date(year: 2026, month: 7, day: 6), endDate: date(year: 2026, month: 7, day: 7, hour: 0)
+        )
+        let notStarted = HumanMedication(humanId: owner, startDate: date(year: 2026, month: 7, day: 9))
+        let ended = HumanMedication(humanId: owner, startDate: date(year: 2026, month: 7, day: 1), endDate: date(year: 2026, month: 7, day: 6))
+        let other = HumanMedication(humanId: UUID().uuidString, startDate: date(year: 2026, month: 7, day: 1))
+        let reportDate = date(year: 2026, month: 7, day: 6)
+        let summary = HumanAllFeaturesActivitySummary.load(
+            human: human, allMeds: [current, endingToday, notStarted, ended, other],
+            allReports: [
+                HumanHealthReport(humanId: owner, reportDate: reportDate),
+                HumanHealthReport(humanId: UUID().uuidString, reportDate: now)
+            ], allExpenses: [], now: now, calendar: calendar
+        )
+        #expect(summary.activeMedicationPlanCount == 2)
+        #expect(summary.nextScheduledDoseDate == date(year: 2026, month: 7, day: 7, hour: 20))
+        #expect(summary.medicationChartPoints.map(\.value) == [2, 2])
+        #expect(summary.reportCount == 1)
+        #expect(summary.latestReportDate == reportDate)
+    }
+
+    @Test func quickRecordRoutesPreservePrivacyAndMemorialRules() {
+        #expect(HumanAllFeatureDestination.weightQuick.privacyField == .weight)
+        #expect(HumanAllFeatureDestination.workoutQuick.privacyField == .workout)
+        #expect(HumanAllFeatureDestination.noteQuick.privacyField == .note)
+        #expect(!HumanAllFeatureDestination.weightQuick.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.workoutQuick.isAvailableInMemorialMode)
+        #expect(HumanAllFeatureDestination.noteQuick.isAvailableInMemorialMode)
+    }
+
+    @MainActor
     @Test func humanAllFeaturesSummaryUsesRouteScopedRows() throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = date(year: 2026, month: 7, day: 7, hour: 12)

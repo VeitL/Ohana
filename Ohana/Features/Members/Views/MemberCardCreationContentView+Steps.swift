@@ -22,48 +22,50 @@ extension MemberCardCreationContentView {
             VStack(alignment: .leading, spacing: 12) {
                 humanNameInput()
                     .frame(maxWidth: .infinity)
-                Text(l.tr(
-                    zh: "性别或身份（可选）", en: "Gender or identity (optional)", de: "Geschlecht oder Identität (optional)",
-                    es: "Género o identidad (opcional)", pt: "Gênero ou identidade (opcional)", fr: "Genre ou identité (facultatif)",
-                    ja: "性別・アイデンティティ（任意）", ko: "성별 또는 정체성(선택 사항)", it: "Genere o identità (facoltativo)"
-                ))
-                .font(OhanaFont.caption(.bold))
-                .foregroundStyle(cardSecondaryForeground)
-                compactHumanGenderGrid(
-                    options: humanGenderOptions,
-                    selection: $draft.humanGender,
-                    label: humanGenderLabel
-                )
-                MemberCompactDateRow(
-                    title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
-                    icon: "birthday.cake.fill",
-                    isEnabled: $draft.hasBirthday,
-                    date: $draft.birthday,
-                    range: birthdayRange,
-                    foreground: cardForeground,
-                    secondaryForeground: cardSecondaryForeground,
-                    fill: cardControlFill,
-                    stroke: cardControlStroke,
-                    accent: cardAccent
-                )
-                if draft.hasBirthday {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
-                            .foregroundStyle(cardAccent)
-                            .accessibilityHidden(true)
-                        Text(l.tr(
-                            zh: "星座", en: "Zodiac", de: "Sternzeichen",
-                            es: "Signo", pt: "Signo", fr: "Signe",
-                            ja: "星座", ko: "별자리", it: "Segno"
-                        ))
-                        .foregroundStyle(cardSecondaryForeground)
-                        Spacer(minLength: 8)
-                        Text(Human.westernZodiacDisplay(for: draft.birthday, l: l))
-                            .foregroundStyle(cardForeground)
-                    }
+                DisclosureGroup(HumanHealthHomeText.additionalInfo.title(l)) {
+                    Text(l.tr(
+                        zh: "性别或身份（可选）", en: "Gender or identity (optional)", de: "Geschlecht oder Identität (optional)",
+                        es: "Género o identidad (opcional)", pt: "Gênero ou identidade (opcional)", fr: "Genre ou identité (facultatif)",
+                        ja: "性別・アイデンティティ（任意）", ko: "성별 또는 정체성(선택 사항)", it: "Genere o identità (facoltativo)"
+                    ))
                     .font(OhanaFont.caption(.bold))
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("member-human-zodiac")
+                    .foregroundStyle(cardSecondaryForeground)
+                    compactHumanGenderGrid(
+                        options: humanGenderOptions,
+                        selection: $draft.humanGender,
+                        label: humanGenderLabel
+                    )
+                    MemberCompactDateRow(
+                        title: l.tr(zh: "生日", en: "Birthday", de: "Geburtstag"),
+                        icon: "birthday.cake.fill",
+                        isEnabled: $draft.hasBirthday,
+                        date: $draft.birthday,
+                        range: birthdayRange,
+                        foreground: cardForeground,
+                        secondaryForeground: cardSecondaryForeground,
+                        fill: cardControlFill,
+                        stroke: cardControlStroke,
+                        accent: cardAccent
+                    )
+                    if draft.hasBirthday {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles") // a11y: allow decorative zodiac glyph hidden below
+                                .foregroundStyle(cardAccent)
+                                .accessibilityHidden(true)
+                            Text(l.tr(
+                                zh: "星座", en: "Zodiac", de: "Sternzeichen",
+                                es: "Signo", pt: "Signo", fr: "Signe",
+                                ja: "星座", ko: "별자리", it: "Segno"
+                            ))
+                            .foregroundStyle(cardSecondaryForeground)
+                            Spacer(minLength: 8)
+                            Text(Human.westernZodiacDisplay(for: draft.birthday, l: l))
+                                .foregroundStyle(cardForeground)
+                        }
+                        .font(OhanaFont.caption(.bold))
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("member-human-zodiac")
+                    }
                 }
             }
         }

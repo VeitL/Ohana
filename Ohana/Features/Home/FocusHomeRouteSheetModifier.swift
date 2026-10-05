@@ -816,8 +816,12 @@ private extension FocusHomeRouteSheetModifier {
         switch destination {
         case .basicInfo:
             .humanBasicInfo(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
         case .weight:
             .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
         case .workout:
             .humanWorkoutDashboard(humanID)
         case .metrics:
@@ -832,6 +836,8 @@ private extension FocusHomeRouteSheetModifier {
             .humanExpense(humanID)
         case .wishlist:
             .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
         case .notes:
             .humanNote(humanID)
         case .achievements:

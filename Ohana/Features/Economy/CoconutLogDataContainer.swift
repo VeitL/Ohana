@@ -5,6 +5,7 @@ struct CoconutLogView: View {
     @Query(sort: \CoconutAccount.updatedAt, order: .reverse) private var walletAccounts: [CoconutAccount]
     @Query(sort: \CoconutLedgerEntry.occurredAt, order: .reverse) private var walletLedgerEntries: [CoconutLedgerEntry]
 
+    private let showsCloseButton: Bool
     private let subject: CoconutLogSubject?
     private let onClose: (() -> Void)?
     private let safeTopInset: CGFloat
@@ -13,11 +14,13 @@ struct CoconutLogView: View {
 
     init(
         subject: CoconutLogSubject? = nil,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil,
         safeTopInset: CGFloat = 0,
         safeBottomInset: CGFloat = 0,
         historyContentDelayMilliseconds: UInt64 = 70
     ) {
+        self.showsCloseButton = showsCloseButton
         self.subject = subject
         self.onClose = onClose
         self.safeTopInset = safeTopInset
@@ -26,10 +29,15 @@ struct CoconutLogView: View {
     }
 
     var body: some View {
+        content
+    }
+
+    private var content: some View {
         CoconutLogContentView(
             walletAccounts: walletAccounts,
             walletLedgerEntries: walletLedgerEntries,
             subject: subject,
+            showsCloseButton: showsCloseButton,
             onClose: onClose,
             safeTopInset: safeTopInset,
             safeBottomInset: safeBottomInset,

@@ -198,6 +198,7 @@ struct CoconutLogContentView: View {
     @State private var memberSnapshot = CoconutLogMemberSnapshot.empty
     @State private var historyContentMountTask: Task<Void, Never>?
     @State private var memberSnapshotTask: Task<Void, Never>?
+    private let showsCloseButton: Bool
     private let subject: CoconutLogSubject?
     private let onClose: (() -> Void)?
     private let safeTopInset: CGFloat
@@ -208,6 +209,7 @@ struct CoconutLogContentView: View {
         walletAccounts: [CoconutAccount],
         walletLedgerEntries: [CoconutLedgerEntry],
         subject: CoconutLogSubject? = nil,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil,
         safeTopInset: CGFloat = 0,
         safeBottomInset: CGFloat = 0,
@@ -215,6 +217,7 @@ struct CoconutLogContentView: View {
     ) {
         self.walletAccounts = walletAccounts
         self.walletLedgerEntries = walletLedgerEntries
+        self.showsCloseButton = showsCloseButton
         self.subject = subject
         self.onClose = onClose
         self.safeTopInset = safeTopInset
@@ -313,7 +316,7 @@ struct CoconutLogContentView: View {
                 }
             }
         }
-        .navigationBarHidden(true)
+        .toolbar(showsCloseButton ? .hidden : .visible, for: .navigationBar)
         .onAppear {
             scheduleMemberSnapshotRefresh()
             scheduleHistoryContentMount()
@@ -486,6 +489,7 @@ struct CoconutLogContentView: View {
                 : l.tr(zh: "返回椰子历史", en: "Return to coconut history", de: "Zurück zum Kokosnuss-Verlauf"))
             .accessibilityIdentifier("coconut-log-wealth-action")
 
+            if showsCloseButton {
             Button { closeLog() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -496,6 +500,7 @@ struct CoconutLogContentView: View {
             .buttonStyle(ScaleButtonStyle())
             .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
             .accessibilityIdentifier("coconut-log-close-action")
+            }
         }
     }
 

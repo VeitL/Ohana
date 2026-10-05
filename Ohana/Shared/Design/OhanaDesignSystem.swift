@@ -323,7 +323,11 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
     @ViewBuilder let floating: () -> Floating
 
     var body: some View {
-        NavigationStack {
+        if showsCloseButton { NavigationStack { pageContent } } else { pageContent }
+    }
+
+    private var pageContent: some View {
+        Group {
             ZStack(alignment: .bottomTrailing) {
                 ScrollView(showsIndicators: false) {
                     content()

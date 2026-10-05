@@ -33,6 +33,7 @@ struct GenericWeightEntrySheet: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
+    @AppStorage("currentActiveHumanId") private var activeHumanIDRaw = ""
 
     @State private var weightText = ""
     @State private var selectedDate = Date()
@@ -46,6 +47,9 @@ struct GenericWeightEntrySheet: View {
     @State private var isClosing = false
     @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @State private var saveFailed = false
+    @State private var latestHumanWeight: HumanHealthSummaryValue?
+    @State private var weightReferenceFailed = false
     @State private var latestPetWeightKg: Double?
     @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -83,6 +87,7 @@ struct GenericWeightEntrySheet: View {
     }
 
     private var recordDate: Date {
+        if case .human = target { return min(selectedDate, Date()) }
         let date = includesRecordTime ? selectedDate : Calendar.current.startOfDay(for: selectedDate)
         return min(date, Date())
     }
@@ -108,9 +113,8 @@ struct GenericWeightEntrySheet: View {
                 [0.5, 1, 2]
             }
             return uniqueWeights([latestPetWeightKg].compactMap(\.self) + defaults)
-        case let .human(human):
-            let latest = human.weightLogs.sorted { $0.date > $1.date }.first?.weight
-            return uniqueWeights([latest].compactMap(\.self) + [50, 60, 70])
+        case .human:
+            return []
         }
     }
 
@@ -134,7 +138,22 @@ struct GenericWeightEntrySheet: View {
                         }
                     )
                     .padding(.horizontal, 20)
-                    quickWeightStrip
+                    if case .pet = target { quickWeightStrip }
+                    if let latestHumanWeight {
+                        Text("\(HumanHealthHomeText.previousRecord.title(l)) · \(latestHumanWeight.value.formatted(.number.precision(.fractionLength(1)))) kg · \(latestHumanWeight.date.formatted(date: .abbreviated, time: .omitted))")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .accessibilityIdentifier("generic-weight-entry-previous-record")
+                    }
+                    if weightReferenceFailed {
+                        Text(HumanHealthHomeText.loadFailed.title(l)).font(OhanaFont.caption())
+                        Button(l.tr(zh: "重试", en: "Retry", de: "Erneut versuchen"), action: scheduleLatestHumanWeightLoad)
+                    }
+                    if saveFailed {
+                        Text(HumanHealthHomeText.saveFailed.title(l))
+                            .foregroundStyle(Color.goRed)
+                            .accessibilityIdentifier("generic-weight-entry-save-error")
+                    }
                     dateAndTargetBlock
                     QuickCareActionHumanPickerContainer(
                         selectedHumanID: $selectedRecorderHumanID,
@@ -169,6 +188,11 @@ struct GenericWeightEntrySheet: View {
         .onAppear {
             isClosing = false
             scheduleLatestPetWeightLoad()
+            scheduleLatestHumanWeightLoad()
+        }
+        .onChange(of: activeHumanIDRaw) { _, _ in
+            latestHumanWeight = nil
+            scheduleLatestHumanWeightLoad()
         }
         .onChange(of: weightText) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(
@@ -284,7 +308,8 @@ struct GenericWeightEntrySheet: View {
                     .minimumScaleFactor(0.45)
                     .accessibilityIdentifier(weightValueAccessibilityIdentifier)
 
-                unitPicker
+                if case .pet = target { unitPicker }
+                else { Text("kg").font(OhanaFont.callout(.semibold)) }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
@@ -521,6 +546,27 @@ struct GenericWeightEntrySheet: View {
         return abs(parsedWeight - kg) < 0.05
     }
 
+    private func scheduleLatestHumanWeightLoad() {
+        guard case let .human(human) = target else { return }
+        latestPetWeightLoadTask?.cancel()
+        latestPetWeightLoadTask = nil
+        guard !human.isPrivate(.weight, viewedBy: UUID(uuidString: activeHumanIDRaw)) else {
+            latestHumanWeight = nil
+            weightReferenceFailed = false
+            return
+        }
+        latestPetWeightLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            guard !human.isPrivate(.weight, viewedBy: UUID(uuidString: activeHumanIDRaw)) else {
+                latestPetWeightLoadTask = nil
+                return
+            }
+            let reference = HumanWeightEntryReadModel.latest(humanID: human.id, context: modelContext)
+            latestHumanWeight = reference.value
+            weightReferenceFailed = !reference.didLoad
+            latestPetWeightLoadTask = nil
+        }
+    }
+
     private func scheduleLatestPetWeightLoad() {
         guard case let .pet(pet) = target else { return }
         latestPetWeightLoadTask?.cancel()
@@ -582,6 +628,7 @@ struct GenericWeightEntrySheet: View {
               let weight = parsedWeight,
               weight > 0 else { return }
         isSaving = true
+        saveFailed = false
         let executorId = selectedRecorderHumanID?.uuidString
         let savedDate = recordDate
         let savedUnit = weightUnit
@@ -610,6 +657,7 @@ struct GenericWeightEntrySheet: View {
                     closeSheet()
                 } catch {
                     isSaving = false
+                    saveFailed = true
                     appServices.domainRevisions.publishFailure(command: command, error: error)
                 }
             }
@@ -631,6 +679,7 @@ struct GenericWeightEntrySheet: View {
                     closeSheet()
                 } catch {
                     isSaving = false
+                    saveFailed = true
                     appServices.domainRevisions.publishFailure(command: command, error: error)
                 }
             }

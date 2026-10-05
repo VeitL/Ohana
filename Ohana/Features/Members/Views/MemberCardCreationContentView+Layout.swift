@@ -98,6 +98,7 @@ extension MemberCardCreationContentView {
         VStack(alignment: .leading, spacing: cardControlsSpacing) {
             currentStepContent
                 .frame(maxWidth: .infinity, alignment: .bottomLeading)
+            if kind != .human || currentStep != .basicInfo {
             MemberCreationStepIndicator(
                 steps: creationSteps,
                 currentStep: currentStep,
@@ -107,6 +108,7 @@ extension MemberCardCreationContentView {
                 inactiveFill: cardControlFill
             )
             .layoutPriority(2)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.bottom, 18)
@@ -137,7 +139,8 @@ extension MemberCardCreationContentView {
     }
 
     var bottomCTA: some View {
-        let isEnabled = isLastStep ? canSave : canAdvanceStep
+        let savesImmediately = isLastStep || (kind == .human && currentStep == .basicInfo)
+        let isEnabled = savesImmediately ? canSave : canAdvanceStep
         return VStack(spacing: 8) {
             if duplicateName {
                 Text(l.tr(zh: "这个名字已经被使用。", en: "This name is already in use.", de: "Dieser Name wird bereits verwendet."))
@@ -171,7 +174,7 @@ extension MemberCardCreationContentView {
                 }
 
                 Button {
-                    if isLastStep {
+                    if savesImmediately {
                         save()
                     } else {
                         advanceStep()
@@ -182,9 +185,9 @@ extension MemberCardCreationContentView {
                             ProgressView()
                                 .tint(Color.ohanaPrimaryActionText)
                         } else {
-                            Image(systemName: isLastStep ? "checkmark.seal.fill" : "chevron.right")
+                            Image(systemName: savesImmediately ? "checkmark.seal.fill" : "chevron.right")
                         }
-                        Text(isLastStep ? creationCTA : l.tr(zh: "下一步", en: "Next", de: "Weiter"))
+                        Text(savesImmediately ? creationCTA : l.tr(zh: "下一步", en: "Next", de: "Weiter"))
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
                     }
@@ -204,6 +207,13 @@ extension MemberCardCreationContentView {
                 .disabled(!isEnabled)
             }
             .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
+            if kind == .human, currentStep == .basicInfo {
+                Button(HumanHealthHomeText.customize.title(l)) { advanceStep() }
+                    .buttonStyle(.plain)
+                    .frame(minHeight: 44)
+                    .disabled(!canAdvanceStep || isSaving)
+                    .accessibilityIdentifier("member-human-customize-action")
+            }
         }
     }
 

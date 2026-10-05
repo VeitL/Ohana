@@ -86,16 +86,14 @@ struct HumanHealthCheckupContentView: View {
     @State private var detailMetric: HealthMetric?
     @State private var metricToOpenAfterEntry: HealthMetric?
     @State private var sheetDestination: HumanHealthCheckupSheetDestination?
+    @State private var showsQuickRecord = false
+    @State private var metricSearch = ""
 
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.weight, viewedBy: activeHumanId) }
     private var isReadOnly: Bool { human.hasPassedAway }
     private var l: L10n { L10n(appLanguage) }
-
-    private var starterMetric: HealthMetric? {
-        HealthMetricCatalog.metric(forKey: "tsh") ?? HealthMetricCatalog.all.first
-    }
 
     var body: some View {
         let snapshot = HumanHealthCheckupLogSnapshot(logs: metricLogs)
@@ -112,9 +110,11 @@ struct HumanHealthCheckupContentView: View {
                         if !isReadOnly {
                             labReportImportEntry
                         }
-                        trackedChartSection(snapshot)
                         recentSection(snapshot)
                         catalogSection(snapshot)
+                        if !snapshot.trackedMetrics.isEmpty {
+                            DisclosureGroup(l.tr(zh: "详细图表", en: "Detailed charts", de: "Detaillierte Diagramme")) { trackedChartSection(snapshot) }
+                        }
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 12)
@@ -127,6 +127,10 @@ struct HumanHealthCheckupContentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(item: $detailMetric) { metric in
             HumanHealthMetricDetailView(human: human, metric: metric)
+        }
+        .searchable(text: $metricSearch, prompt: HumanHealthHomeText.searchMetrics.title(l))
+        .sheet(isPresented: $showsQuickRecord) {
+            HumanMetricQuickRecordView(human: human) { _ in showsQuickRecord = false }
         }
         .sheet(item: $recordingMetric, onDismiss: openSavedMetricDetailIfNeeded) { metric in
             HumanHealthMetricEntrySheet(
@@ -293,19 +297,15 @@ struct HumanHealthCheckupContentView: View {
                 Spacer(minLength: 0)
             }
 
-            if !isReadOnly, let starterMetric {
+            if !isReadOnly {
                 Button {
                     withAnimation(GoMotion.feedback) {
-                        recordingMetric = starterMetric
+                        showsQuickRecord = true
                     }
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Label(
-                        l.tr(
-                            zh: "记录 \(starterMetric.displayName(l))",
-                            en: "Record \(starterMetric.displayName(l))",
-                            de: "\(starterMetric.displayName(l)) erfassen"
-                        ),
+                        HumanHealthHomeText.chooseMetric.title(l),
                         systemImage: "plus.circle.fill"
                     )
                     .font(OhanaFont.caption(.black))
@@ -484,7 +484,7 @@ struct HumanHealthCheckupContentView: View {
         _ category: HealthMetricCategory,
         snapshot: HumanHealthCheckupLogSnapshot
     ) -> some View {
-        let metrics = HealthMetricCatalog.metrics(in: category)
+        let metrics = HealthMetricCatalog.metrics(in: category).filter { HumanMetricQuickRecordPolicy.matches($0, query: metricSearch, l: l) }
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 9) {
                 Image(systemName: category.systemImage)
@@ -777,7 +777,7 @@ struct HumanHealthCheckupContentView: View {
         for metric: HealthMetric,
         snapshot: HumanHealthCheckupLogSnapshot
     ) -> HealthMetricUnit {
-        if let latest = latestLog(for: metric, snapshot: snapshot),
+        if let latest = logs(for: metric, snapshot: snapshot).first(where: { metric.unit(for: $0.unitCode) != nil }),
            let unit = metric.unit(for: latest.unitCode) {
             return unit
         }

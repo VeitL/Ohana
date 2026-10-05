@@ -11,6 +11,7 @@ import UIKit
 
 struct HumanWorkoutSummaryView: View {
     let human: Human
+    var showsCloseButton = true
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
@@ -138,6 +139,7 @@ struct HumanWorkoutSummaryView: View {
                     human: human,
                     title: l.tr(zh: "运动摘要", en: "Workout Summary", de: "Trainingsübersicht"),
                     subtitle: human.name,
+                    showsCloseButton: showsCloseButton,
                     onClose: { dismiss() }
                 ) {
                     HumanPrivacyToggleButton(human: human, field: .workout)
@@ -158,6 +160,15 @@ struct HumanWorkoutSummaryView: View {
                     ScrollView {
                         VStack(spacing: 12) {
                             HumanPrivateDataNotice(human: human, field: .workout)
+                            HumanWorkoutRecentWorkoutsCard(
+                                selectedPeriod: selectedPeriod,
+                                rows: summaryRows,
+                                historyCoverage: historyCoverage,
+                                canReadLiveAppleHealth: canReadLiveAppleHealth,
+                                isHealthLoading: healthManager.isLoading,
+                                recentWorkoutsStatus: healthManager.recentWorkoutsStatus,
+                                onDelete: { pendingWorkoutDeletion = $0 }
+                            )
                             HumanWorkoutAppleHealthBindingCard(
                                 humanName: human.name,
                                 state: appleHealthBindingState,
@@ -191,20 +202,13 @@ struct HumanWorkoutSummaryView: View {
                                     }
                                 )
                             }
+                            DisclosureGroup(l.tr(zh: "详细图表", en: "Detailed charts", de: "Detaillierte Diagramme")) {
                             HumanWorkoutHistoryOverviewCard(
                                 selectedPeriod: $selectedPeriod,
                                 trendSnapshot: trendSnapshot,
                                 historyCoverage: historyCoverage
                             )
-                            HumanWorkoutRecentWorkoutsCard(
-                                selectedPeriod: selectedPeriod,
-                                rows: summaryRows,
-                                historyCoverage: historyCoverage,
-                                canReadLiveAppleHealth: canReadLiveAppleHealth,
-                                isHealthLoading: healthManager.isLoading,
-                                recentWorkoutsStatus: healthManager.recentWorkoutsStatus,
-                                onDelete: { pendingWorkoutDeletion = $0 }
-                            )
+                            }
                             Spacer(minLength: 92)
                         }
                         .padding(.horizontal, 16)
@@ -224,7 +228,7 @@ struct HumanWorkoutSummaryView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.visible, for: .navigationBar)
         .onChange(of: selectedPeriod) { _, _ in
             markHistorySourcesLoading()
         }

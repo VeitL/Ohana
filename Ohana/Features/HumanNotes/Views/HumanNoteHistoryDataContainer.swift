@@ -10,11 +10,13 @@ import SwiftUI
 
 struct HumanNoteHistorySheet: View {
     let human: Human
+    var showsCloseButton = true
     @State private var refreshToken = 0
 
     var body: some View {
         HumanNoteHistoryDataContainer(
             human: human,
+            showsCloseButton: showsCloseButton,
             refreshToken: refreshToken,
             onRecordsChanged: { refreshToken += 1 }
         )
@@ -23,6 +25,7 @@ struct HumanNoteHistorySheet: View {
 
 private struct HumanNoteHistoryDataContainer: View {
     let human: Human
+    var showsCloseButton = true
     let refreshToken: Int
     let onRecordsChanged: () -> Void
     @Environment(\.modelContext) private var modelContext
@@ -45,6 +48,7 @@ private struct HumanNoteHistoryDataContainer: View {
                 human: human,
                 humans: data.humans,
                 noteRecords: data.noteRecords,
+                showsCloseButton: showsCloseButton,
                 onRecordsChanged: onRecordsChanged
             )
         }

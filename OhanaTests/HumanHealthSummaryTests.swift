@@ -478,6 +478,78 @@ struct HumanHealthSummaryTests {
         }
     }
 
+    @Test("Health home caps mixed pending items and orders overdue before future dates")
+    func homeTodayOrderingAndBound() throws {
+        let fixture = try Fixture()
+        let overdueReportID = UUID()
+        let snapshot = HumanHealthSummaryBuilder.build(input: HumanHealthSummaryInput(
+            doses: [dose(UUID(), at: fixture.hour(20), state: .pending), dose(UUID(), at: fixture.hour(8), state: .pending), dose(UUID(), at: fixture.hour(9), state: .taken)],
+            reports: [report(id: overdueReportID, reportTypeRaw: "physical", reportDate: fixture.day(-8), nextCheckDate: fixture.day(-2)), report(reportTypeRaw: "vision", reportDate: fixture.day(-5), nextCheckDate: fixture.day(4))]
+        ), now: fixture.now, calendar: fixture.calendar)
+        #expect(snapshot.todayItems.count == 3)
+        #expect(snapshot.todayItems.first?.id == "report:\(overdueReportID)")
+        #expect(snapshot.todayItems.map(\.date) == snapshot.todayItems.map(\.date).sorted())
+        #expect(Set(snapshot.todayItems.map(\.id)).count == 3)
+    }
+
+    @Test("Health home recent values remain member-private and single points are not changes")
+    func homeRecentReadbackAndPrivacy() throws {
+        let fixture = try Fixture()
+        var input = HumanHealthSummaryInput(metrics: [metric(key: "tsh", value: 2.2, date: fixture.day(-1), status: .normal)])
+        input.weights = [.init(value: 70, date: fixture.day(-3)), .init(value: 69, date: fixture.day(-1))]
+        input.latestWorkout = .init(value: 20, date: fixture.day(-2))
+        let visible = HumanHealthSummaryBuilder.build(input: input, now: fixture.now, calendar: fixture.calendar)
+        #expect(visible.latestWeight?.value == 69)
+        #expect(visible.latestMetrics.first?.value == 2.2)
+        #expect(visible.trends.isEmpty)
+        input.bodyIsVisible = false
+        input.workoutIsVisible = false
+        let hidden = HumanHealthSummaryBuilder.build(input: input, now: fixture.now, calendar: fixture.calendar)
+        #expect(hidden.latestWeight == nil)
+        #expect(hidden.latestWorkout == nil)
+        #expect(hidden.latestMetrics.isEmpty)
+        #expect(hidden.todayItems.isEmpty)
+    }
+
+    @Test("Upcoming doses join the next items without changing today's progress")
+    func upcomingMedicationDoesNotCountAsToday() throws {
+        let fixture = try Fixture()
+        let future = dose(UUID(), at: fixture.day(2), state: .pending)
+        var input = HumanHealthSummaryInput(
+            doses: [dose(UUID(), at: fixture.hour(8), state: .taken)],
+            upcomingDoses: [future, dose(UUID(), at: fixture.day(1), state: .skipped)]
+        )
+        let snapshot = HumanHealthSummaryBuilder.build(input: input, now: fixture.now, calendar: fixture.calendar)
+        #expect(snapshot.scheduledDoseCount == 1)
+        #expect(snapshot.pendingDoseCount == 0)
+        #expect(snapshot.todayItems.map(\.date) == [future.scheduledTime])
+        input.medicationIsVisible = false
+        let privateSnapshot = HumanHealthSummaryBuilder.build(input: input, now: fixture.now, calendar: fixture.calendar)
+        #expect(privateSnapshot.todayItems.isEmpty)
+    }
+
+    @Test("A late dose precedes a same-day follow-up without a due time")
+    func lateDosePrecedesTodayFollowUp() throws {
+        let fixture = try Fixture()
+        let medicationID = UUID()
+        let snapshot = HumanHealthSummaryBuilder.build(input: HumanHealthSummaryInput(
+            doses: [dose(medicationID, at: fixture.hour(8), state: .pending)],
+            reports: [report(reportTypeRaw: "physical", reportDate: fixture.day(-1), nextCheckDate: fixture.calendar.startOfDay(for: fixture.now))]
+        ), now: fixture.now, calendar: fixture.calendar)
+        #expect(snapshot.todayItems.first?.isOverdue(at: fixture.now) == true)
+        #expect(snapshot.todayItems.first?.date == fixture.hour(8))
+        #expect(snapshot.todayItems.last?.isOverdue(at: fixture.now) == false)
+    }
+
+    @Test("Quick metric search accepts aliases and localized names without suggesting a diagnosis")
+    @MainActor
+    func metricSearch() throws {
+        let metric = try #require(HealthMetricCatalog.metric(forKey: "hba1c"))
+        #expect(HumanMetricQuickRecordPolicy.matches(metric, query: " A1C ", l: L10n("en")))
+        #expect(HumanMetricQuickRecordPolicy.matches(metric, query: metric.nameZh, l: L10n("zh")))
+        #expect(!HumanMetricQuickRecordPolicy.matches(metric, query: "no such metric", l: L10n("en")))
+    }
+
     private func dose(
         _ medicationID: UUID,
         at date: Date,

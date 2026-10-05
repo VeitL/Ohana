@@ -830,8 +830,12 @@ private struct AppSheetRouteDestination: View {
         let route: AppSheetRoute = switch destination {
         case .basicInfo:
             .humanBasicInfo(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
         case .weight:
             .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
         case .workout:
             .humanWorkoutDashboard(humanID)
         case .metrics:
@@ -846,6 +850,8 @@ private struct AppSheetRouteDestination: View {
             .humanExpense(humanID)
         case .wishlist:
             .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
         case .notes:
             .humanNote(humanID)
         case .achievements:

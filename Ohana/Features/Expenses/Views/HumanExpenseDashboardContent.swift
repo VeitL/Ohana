@@ -11,6 +11,7 @@ import UIKit
 
 struct HumanExpenseDashboardContent: View {
     let human: Human
+    var showsCloseButton = true
     let allExpenses: [PetExpenseLog]
     var onClose: () -> Void
 
@@ -65,6 +66,7 @@ struct HumanExpenseDashboardContent: View {
                 ja: "ペットの支出", ko: "반려동물 지출", it: "Spese per animali"
             ),
             subtitle: human.name,
+            showsCloseButton: showsCloseButton,
             onClose: onClose,
             leading: {
                 FeatureHubAvatar(
