@@ -39,14 +39,15 @@ struct HomePlantCareLogRouteContainer: View {
                     plant: plant,
                     initialCareType: initialCareType,
                     currentHealthStatus: plant.healthStatus,
-                    onSave: { type, careNote, healthStatus, photoData, executorID in
+                    onSave: { type, careNote, healthStatus, photoData, executorID, completion in
                         saveCareLog(
                             type,
                             plant: plant,
                             careNote: careNote,
                             healthStatus: healthStatus,
                             photoData: photoData,
-                            executorID: executorID
+                            executorID: executorID,
+                            completion: completion
                         )
                     }
                 )
@@ -68,7 +69,9 @@ struct HomePlantCareLogRouteContainer: View {
                 }
             )
             descriptor.fetchLimit = 1
-            let plant = try context.fetch(descriptor).first // route-first-frame: allow deferred-fetch
+            let plant = try context.fetch(descriptor).first.flatMap { candidate in // route-first-frame: allow deferred-fetch
+                candidate.isArchived ? nil : candidate
+            }
             return HomePlantCareLogRouteData(plant: plant, hasLoaded: true)
         } catch {
             OhanaLog.warning(
@@ -85,7 +88,8 @@ struct HomePlantCareLogRouteContainer: View {
         careNote: String,
         healthStatus: PlantHealthStatus,
         photoData: Data?,
-        executorID: UUID?
+        executorID: UUID?,
+        completion: @escaping (Bool) -> Void
     ) {
         let result = HomeCommandExecutor(modelContext: modelContext, services: appServices).recordPlantCare(
             type,
@@ -96,6 +100,7 @@ struct HomePlantCareLogRouteContainer: View {
             healthStatus: healthStatus
         )
         UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
+        completion(result.didPersist)
     }
 }
 

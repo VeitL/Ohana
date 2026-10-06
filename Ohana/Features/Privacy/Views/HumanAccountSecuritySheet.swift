@@ -65,7 +65,7 @@ struct HumanAccountSecuritySheet: View {
             accountAvatar(size: 46)
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "密码与隐私", en: "PIN & Privacy", de: "PIN & Datenschutz"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(displayName(human))
                     .font(OhanaFont.caption(.semibold))
@@ -74,7 +74,7 @@ struct HumanAccountSecuritySheet: View {
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.primary.opacity(0.08), in: Circle())
@@ -88,13 +88,13 @@ struct HumanAccountSecuritySheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: hasPasscode ? "lock.shield.fill" : "lock.open.fill")
-                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(hasPasscode ? Color.goYellow : Color.goPrimary)
                     .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background((hasPasscode ? Color.goYellow : Color.goPrimary).opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "账户密码", en: "Account PIN", de: "Konto-PIN"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(hasPasscode ? l.tr(zh: "切换到此账户时需要 4 位密码", en: "Switching to this account requires a 4-digit PIN", de: "Für dieses Konto ist eine 4-stellige PIN nötig") : l.tr(zh: "当前为公开切换，可直接进入", en: "This account can be opened directly", de: "Dieses Konto kann direkt geöffnet werden"))
                         .font(OhanaFont.caption(.semibold))
@@ -102,8 +102,8 @@ struct HumanAccountSecuritySheet: View {
                 }
                 Spacer()
                 Text(hasPasscode ? l.tr(zh: "隐私", en: "Private", de: "Privat") : l.tr(zh: "公开", en: "Open", de: "Offen"))
-                    .font(OhanaFont.caption2(.black))
-                    .foregroundStyle(hasPasscode ? Color.goYellow : Color.arkInk)
+                    .font(OhanaFont.caption2(.semibold))
+                    .foregroundStyle(hasPasscode ? Color.goYellow : Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(hasPasscode ? Color.goYellow.opacity(0.14) : Color.goPrimary, in: Capsule())
@@ -113,8 +113,8 @@ struct HumanAccountSecuritySheet: View {
                 showingPasscodeSheet = true
             } label: {
                 Label(hasPasscode ? l.tr(zh: "修改或关闭密码", en: "Change or turn off PIN", de: "PIN ändern oder deaktivieren") : l.tr(zh: "设置 4 位密码", en: "Set 4-digit PIN", de: "4-stellige PIN festlegen"), systemImage: "key.fill")
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -131,7 +131,7 @@ struct HumanAccountSecuritySheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "资料可见性", en: "Data Visibility", de: "Datensichtbarkeit"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(privateCount == 0 ? l.tr(zh: "所有敏感资料对家庭成员公开", en: "All sensitive data is visible to family members", de: "Alle sensiblen Daten sind für Familienmitglieder sichtbar") : l.tr(zh: "\(privateCount) 项设为仅本人可见", en: "\(privateCount) fields are private", de: "\(privateCount) Felder sind privat"))
                         .font(OhanaFont.caption(.semibold))
@@ -143,7 +143,7 @@ struct HumanAccountSecuritySheet: View {
                     setAllPrivate(false)
                 } label: {
                     Text(l.tr(zh: "全公开", en: "All open", de: "Alles offen"))
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.goPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -155,7 +155,7 @@ struct HumanAccountSecuritySheet: View {
                     setAllPrivate(true)
                 } label: {
                     Text(l.tr(zh: "全隐私", en: "All private", de: "Alles privat"))
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.goYellow)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -191,13 +191,13 @@ struct HumanAccountSecuritySheet: View {
         )) {
             HStack(spacing: 10) {
                 Image(systemName: icon(for: field))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
                     .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(localizedFieldTitle(field))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(displayedPrivateFields.contains(field.rawValue) ? l.tr(zh: "仅本人可见", en: "Private to owner", de: "Nur selbst sichtbar") : l.tr(zh: "家庭成员可见", en: "Visible to family", de: "Für Familie sichtbar"))
                         .font(OhanaFont.caption2(.bold))
@@ -322,7 +322,7 @@ struct HumanAccountSecuritySheet: View {
     private func localizedFieldTitle(_ field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

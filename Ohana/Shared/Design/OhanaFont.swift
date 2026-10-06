@@ -5,12 +5,12 @@
 
 import SwiftUI
 
-// MARK: - Ohana Font System (SF Pro Rounded, always use these)
+// MARK: - Rounded semantic type with a warm, stronger hierarchy
 enum OhanaFont {
     static func adaptive(
         size: CGFloat,
-        weight: Font.Weight = .regular,
-        design: Font.Design = .default
+        weight: Font.Weight = .medium,
+        design: Font.Design = .rounded
     ) -> Font {
         let style: Font.TextStyle = switch size {
         case ..<11:
@@ -35,51 +35,59 @@ enum OhanaFont {
         return .system(style, design: design).weight(weight)
     }
 
-    static func largeTitle(_ weight: Font.Weight = .black) -> Font {
-        adaptive(size: 34, weight: weight, design: .rounded)
+    static func largeTitle(_ weight: Font.Weight = .bold) -> Font {
+        .system(.largeTitle, design: .rounded).weight(weight == .semibold ? .bold : weight)
     }
 
     static func title(_ weight: Font.Weight = .bold) -> Font {
-        adaptive(size: 24, weight: weight, design: .rounded)
+        .system(.title, design: .rounded).weight(weight == .semibold ? .bold : weight)
     }
 
     static func title2(_ weight: Font.Weight = .bold) -> Font {
-        adaptive(size: 20, weight: weight, design: .rounded)
+        .system(.title2, design: .rounded).weight(weight == .semibold ? .bold : weight)
     }
 
-    static func title3(_ weight: Font.Weight = .semibold) -> Font {
-        adaptive(size: 17, weight: weight, design: .rounded)
+    static func title3(_ weight: Font.Weight = .bold) -> Font {
+        .system(.title3, design: .rounded).weight(weight == .semibold ? .bold : weight)
     }
 
     static func headline(_ weight: Font.Weight = .bold) -> Font {
-        adaptive(size: 16, weight: weight, design: .rounded)
+        .system(.headline, design: .rounded).weight(weight == .semibold ? .bold : weight)
     }
 
     static func body(_ weight: Font.Weight = .medium) -> Font {
-        adaptive(size: 15, weight: weight, design: .rounded)
+        .system(.body, design: .rounded).weight(weight)
     }
 
     static func callout(_ weight: Font.Weight = .medium) -> Font {
-        adaptive(size: 14, weight: weight, design: .rounded)
+        .system(.callout, design: .rounded).weight(weight)
     }
 
     static func subheadline(_ weight: Font.Weight = .medium) -> Font {
-        adaptive(size: 13, weight: weight, design: .rounded)
+        .system(.subheadline, design: .rounded).weight(weight)
     }
 
     static func footnote(_ weight: Font.Weight = .medium) -> Font {
-        adaptive(size: 12, weight: weight, design: .rounded)
+        .system(.footnote, design: .rounded).weight(weight)
     }
 
     static func caption(_ weight: Font.Weight = .medium) -> Font {
-        adaptive(size: 11, weight: weight, design: .rounded)
+        .system(.caption, design: .rounded).weight(weight)
     }
 
     static func caption2(_ weight: Font.Weight = .medium) -> Font {
-        adaptive(size: 10, weight: weight, design: .rounded)
+        .system(.caption2, design: .rounded).weight(weight)
     }
 
-    static func metric(size: CGFloat, _ weight: Font.Weight = .black) -> Font {
-        adaptive(size: size, weight: weight, design: .rounded)
+    static func metric(size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
+        adaptive(size: size, weight: weight).monospacedDigit()
+    }
+
+    static func brandTitle(_ style: Font.TextStyle = .title2, weight: Font.Weight = .bold) -> Font {
+        .system(style, design: .rounded).weight(weight)
+    }
+
+    static func brandMetric(size: CGFloat, _ weight: Font.Weight = .bold) -> Font {
+        adaptive(size: size, weight: weight, design: .rounded).monospacedDigit()
     }
 }

@@ -32,7 +32,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .sheet(item: modalSheetRouteBinding, onDismiss: handleModalDismissed) { route in
                 AppDeferredRouteContent(
                     routeID: route.id,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { modalSheetRouteBinding.wrappedValue = nil }
                 ) {
                     homeModalDestination(for: route)
                 }
@@ -45,7 +46,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .sheet(item: systemSheetRouteBinding) { route in
                 AppDeferredRouteContent(
                     routeID: route.id,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { systemSheetRouteBinding.wrappedValue = nil }
                 ) {
                     homeSheetDestination(for: route)
                 }
@@ -64,7 +66,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .sheet(item: overlayRouteBinding) { route in
                 AppDeferredRouteContent(
                     routeID: route.id.uuidString,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { overlayRouteBinding.wrappedValue = nil }
                 ) {
                     homeOverlayDestination(for: route)
                 }
@@ -150,6 +153,15 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .functionMenu(destination):
             FunctionMenuSheet(initialDestination: destination)
                 .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+        case .critterCodex:
+            OasisCritterCodexRouteContainer(
+                mode: .codex,
+                onClose: { routes.dismissModal() },
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                }
+            )
+            .ohanaSheetPagePresentation()
         case .streakDetail:
             DailyStreakDetailRouteContainer(
                 onClose: { routes.dismissModal() },
@@ -192,45 +204,36 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             )
             .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
         case let .crewRoster(mode):
-            NavigationStack {
-                CrewRosterOverlayRouteContainer(
-                    initialMode: mode,
-                    onSelectPet: { pet in
-                        routes.dismissModal()
-                        onCrewPetSelected(pet)
-                    },
-                    onSelectHuman: { human in
-                        routes.dismissModal()
-                        onCrewHumanSelected(human)
-                    },
-                    onInlinePetSaved: { pet in
-                        routes.dismissModal()
-                        onPetSavedFromAddEntity(pet)
-                    },
-                    onInlineHumanSaved: { human in
-                        routes.dismissModal()
-                        onHumanSavedFromAddEntity(human)
-                    },
-                    onClose: { routes.dismissModal() },
-                    onPresentCoconutLog: { subject in
-                        routes.openCoconutLog(subject)
-                    },
-                    onOpenTaskCenter: {
-                        routes.dismissModal()
-                        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
-                            routes.openTaskCenter()
-                        }
-                    }
-                )
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button { routes.dismissModal() } label: {
-                            Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
+            CrewRosterOverlayRouteContainer(
+                initialMode: mode,
+                onSelectPet: { pet in
+                    routes.dismissModal()
+                    onCrewPetSelected(pet)
+                },
+                onSelectHuman: { human in
+                    routes.dismissModal()
+                    onCrewHumanSelected(human)
+                },
+                onInlinePetSaved: { pet in
+                    routes.dismissModal()
+                    onPetSavedFromAddEntity(pet)
+                },
+                onInlineHumanSaved: { human in
+                    routes.dismissModal()
+                    onHumanSavedFromAddEntity(human)
+                },
+                onClose: { routes.dismissModal() },
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                },
+                onOpenTaskCenter: {
+                    routes.dismissModal()
+                    OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+                        routes.openTaskCenter()
                     }
                 }
-            }
+            )
+
             .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
         case .accountSwitcher:
             AppAccountSwitcherRouteContainer(onSwitched: { routes.dismissModal() })
@@ -294,7 +297,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func openFunctionMenu(destination: FMDest?) {
         routes.openFunctionMenu(
             destination: destination,
-            currentLevel: appServices.oasisTree.treeLevel.rawValue
+            currentLevel: appServices.oasisTree.treeLevel.rawValue,
+            plan: appServices.commerce.ohanaPlanLevel
         )
     }
 
@@ -556,9 +560,33 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             de: "Dieses Mitglied hat diese Funktion nur fur sich selbst sichtbar gemacht."
         )
     }
+}
 
+private extension FocusHomeRouteSheetModifier {
     @ViewBuilder
     private func homeSheetDestination(for route: HomeSheetRoute) -> some View {
+        switch route {
+        case .petAllFeatures, .petBasicInfo, .petFood, .petWeightQuick, .petWeight,
+             .petExpenseQuick, .petExpense, .petFeed, .petWater, .petPotty, .petLitter,
+             .petPlay, .petHygiene, .petWalkSummary, .petHealth, .petMedication,
+             .petMomentHistory, .petDocuments, .petAchievements, .petRetention, .petBondVault:
+            petSheetDestination(for: route)
+        case .humanAllFeatures, .humanBasicInfo, .humanMedicationQuick, .humanMedication,
+             .humanWeightQuick, .humanWeight, .humanWorkoutQuick, .humanWorkout,
+             .humanWorkoutDashboard, .humanMetrics, .humanObservationQuick, .humanConditions, .humanReport, .humanExpenseQuick,
+             .humanExpense, .humanWishlist, .humanNoteQuick, .humanNote:
+            humanSheetDestination(for: route)
+        case let .plantCareLog(id, initialCareType):
+            HomePlantCareLogRouteContainer(
+                id: id,
+                initialCareType: initialCareType,
+                onMissing: { routes.dismissSheet() }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func petSheetDestination(for route: HomeSheetRoute) -> some View {
         switch route {
         case let .petAllFeatures(id):
             AppPetDetailSheetRouteContainer(
@@ -573,20 +601,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 }
             )
             .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
-        case let .humanAllFeatures(id):
-            HumanAllFeaturesRouteContainer(
-                id: id,
-                onMissing: { routes.dismissSheet() },
-                onOpenDestination: { humanID, destination in
-                    routes.openSheet(homeHumanFeatureRoute(humanID: humanID, destination: destination))
-                }
-            )
-            .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
         case let .petBasicInfo(id):
             petRouteContainer(id: id, destination: .basicInfo)
-                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-        case let .humanBasicInfo(id):
-            humanRouteContainer(id: id, destination: .basicInfo)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petFood(id):
             petRouteContainer(id: id, destination: .food)
@@ -632,8 +648,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .petMedication(id):
             petRouteContainer(id: id, destination: .medication)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-        case let .petMomentHistory(id):
-            petRouteContainer(id: id, destination: .momentHistory)
+        case let .petMomentHistory(id, route):
+            petRouteContainer(id: id, destination: .momentHistory(route))
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petDocuments(id):
             petRouteContainer(id: id, destination: .documents)
@@ -646,6 +662,33 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petBondVault(id):
             petRouteContainer(id: id, destination: .bondVault)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func humanSheetDestination(for route: HomeSheetRoute) -> some View {
+        switch route {
+        case let .humanAllFeatures(id):
+            HumanAllFeaturesRouteContainer(
+                id: id,
+                onMissing: { routes.dismissSheet() },
+                onOpenDestination: { humanID, destination in
+                    if let route = homeHumanFeatureRoute(humanID: humanID, destination: destination) {
+                        routes.openSheet(route)
+                    } else {
+                        routes.dismissSheet()
+                        DispatchQueue.main.async {
+                            openFunctionMenu(destination: .featureAggregate(.achievements))
+                        }
+                    }
+                }
+            )
+            .ohanaSheetPagePresentation() // ui-v4: allow long feature hub sheet
+        case let .humanBasicInfo(id):
+            humanRouteContainer(id: id, destination: .basicInfo)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanMedicationQuick(id):
             humanRouteContainer(id: id, destination: .medicationQuick)
@@ -672,6 +715,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanMetrics(id):
             humanRouteContainer(id: id, destination: .metrics)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .humanObservationQuick(id):
+            humanRouteContainer(id: id, destination: .observationQuick)
+                .ohanaSheetPagePresentation() // ui-v4: allow local health record editor
+        case let .humanConditions(id):
+            humanRouteContainer(id: id, destination: .conditions)
+                .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .humanReport(id):
             humanRouteContainer(id: id, destination: .report)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
@@ -688,12 +737,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
         case let .humanNote(id):
             humanRouteContainer(id: id, destination: .note)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-        case let .plantCareLog(id, initialCareType):
-            HomePlantCareLogRouteContainer(
-                id: id,
-                initialCareType: initialCareType,
-                onMissing: { routes.dismissSheet() }
-            )
+        default:
+            EmptyView()
         }
     }
 
@@ -746,8 +791,14 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .petBasicInfo(petID)
         case .documents:
             .petDocuments(petID)
-        case .moments, .timeline:
+        case .moments:
             .petMomentHistory(petID)
+        case .timeline:
+            .petMomentHistory(petID, initialRoute: .timeline)
+        case .photos:
+            .petMomentHistory(petID, initialRoute: .photos)
+        case let .memory(reference):
+            .petMomentHistory(petID, initialRoute: reference.route)
         case .achievements:
             .petAchievements(petID)
         case .retention:
@@ -764,16 +815,22 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
     private func homeHumanFeatureRoute(
         humanID: UUID,
         destination: HumanAllFeatureDestination
-    ) -> HomeSheetRoute {
+    ) -> HomeSheetRoute? {
         switch destination {
         case .basicInfo:
             .humanBasicInfo(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
         case .weight:
             .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
         case .workout:
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .medication:
             .humanMedication(humanID)
         case .report:
@@ -782,8 +839,12 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .humanExpense(humanID)
         case .wishlist:
             .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
         case .notes:
             .humanNote(humanID)
+        case .achievements:
+            nil
         }
     }
 
@@ -810,6 +871,10 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .observationQuick:
+            .humanObservationQuick(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .report:
             .humanReport(humanID)
         case .expenseQuick:

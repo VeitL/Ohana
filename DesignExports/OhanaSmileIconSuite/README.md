@@ -1,9 +1,12 @@
 # Ohana Exact Black / White Icon Suite
 
-`Icon.png` is now treated as the source of truth. The mark is extracted from its alpha channel and rendered as a binary mask, so the icon uses only pure black `#000000` and pure white `#FFFFFF`.
+`input/Icon.png` is the source of truth. The mark is extracted from its alpha channel and rendered as a binary mask, so the icon uses only pure black `#000000` and pure white `#FFFFFF`.
 
 ## Contents
 
+- `input/Icon.png`: raster extraction source.
+- `input/Icon.svg`: editable vector source.
+- `input/Icon.pixel-exact.svg`: pixel-exact vector reference.
 - `masters/ohana-smile-black-on-white-1024.png`: black mark on white.
 - `masters/ohana-smile-white-on-black-1024.png`: white mark on black.
 - `source/ohana-smile-mask-binary-1024.png`: pure black/white extracted mask.
@@ -15,7 +18,7 @@
 
 ## Extraction Rules
 
-- Source: `/Users/guanchenli/Documents/Space/Ohana/Icon.png`.
+- Source: `input/Icon.png`.
 - Canvas: `1024x1024`.
 - Mask: alpha channel, threshold `>= 16`.
 - Final opaque app icons contain only two RGB values: black and white.

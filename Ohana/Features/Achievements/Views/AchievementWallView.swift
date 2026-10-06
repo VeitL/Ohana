@@ -11,6 +11,7 @@ import UIKit
 
 struct AchievementWallContentView: View {
     let pet: Pet
+    var showsCloseButton = true
     var allPets: [Pet] = []
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     let electronicPets: [OasisElectronicPet]
@@ -24,6 +25,7 @@ struct AchievementWallContentView: View {
     let allExpenseLogs: [PetExpenseLog]
     let careLedgerEvents: [CareLedgerEvent]
     let petActivitySummaries: [UUID: AchievementPetActivitySummary]
+    var achievementSnapshot: AchievementWallSnapshot = .empty
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
@@ -98,9 +100,10 @@ struct AchievementWallContentView: View {
             medicationLogs: [HumanMedicationLog],
             expenses: [PetExpenseLog]
         ) -> AchievementHumanActivityIndex {
+            let petExpenses = expenses.filter { $0.pet != nil && $0.amount > 0 }
             let groupedExpenses = Dictionary(
-                grouping: expenses.compactMap { expense in
-                    expense.executorId.map { ($0, expense) }
+                grouping: petExpenses.flatMap { expense in
+                    expense.payerIDs.map { ($0, expense) }
                 },
                 by: \.0
             )
@@ -264,6 +267,7 @@ struct AchievementWallContentView: View {
     var achievementContext: AchievementComputationContext {
         AchievementComputationContext(
             allPets: pets,
+            allHumans: humans,
             electronicPets: electronicPets,
             critterFragments: critterFragments,
             critterActionLogs: critterActionLogs,
@@ -282,10 +286,28 @@ struct AchievementWallContentView: View {
     }
 
     var achievements: [Achievement] {
-        if let human = activeHuman {
-            return humanAchievements(for: human)
+        let computed: [Achievement] = if let human = activeHuman {
+            humanAchievements(for: human)
+        } else {
+            screenModel.petAchievements(for: activePet)
         }
-        return screenModel.petAchievements(for: activePet)
+        return computed.map { badge in
+            let scope = screenModel.isGlobalAchievement(badge)
+                ? AchievementScopeReference.island
+                : activeAchievementScope
+            guard let unlockedAt = achievementSnapshot.items.first(where: {
+                $0.definitionID == badge.id && $0.scope == scope
+            })?.unlockedAt else { return badge }
+            var durable = badge
+            durable.isUnlocked = true
+            durable.unlockedAt = unlockedAt
+            return durable
+        }
+    }
+
+    private var activeAchievementScope: AchievementScopeReference {
+        if let human = activeHuman { return .human(human.id) }
+        return .pet(activePet.id)
     }
 
     var unlocked: [Achievement] {
@@ -338,18 +360,13 @@ struct AchievementWallContentView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
             }
-            .blur(radius: selectedAchievement == nil && pendingClaimAchievement == nil ? 0 : 1.2)
-            .allowsHitTesting(selectedAchievement == nil && pendingClaimAchievement == nil)
-
-            if let selectedAchievement {
-                achievementPopup(selectedAchievement)
-                    .zIndex(4)
-            }
-
-            if let pendingClaimAchievement {
-                claimConfirmPopup(pendingClaimAchievement)
-                    .zIndex(5)
-            }
+        }
+        .navigationTitle(l.tr(zh: "成就解锁", en: "Badges", de: "Abzeichen"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }) } }
+        .sheet(item: $selectedAchievement) { badge in
+            achievementPopup(badge)
+                .presentationDetents([.medium, .large])
         }
         .tint(Color.goPrimary)
         .onAppear {
@@ -369,12 +386,6 @@ struct AchievementWallContentView: View {
             amount: rewardAnimationAmount,
             label: rewardAnimationLabel
         )
-        .sheet(isPresented: $showingAchievementShareSheet) {
-            if let achievementShareImage {
-                ShareSheet(image: achievementShareImage)
-            }
-        }
-        .animation(GoMotion.sheet, value: selectedAchievement?.id)
-        .animation(GoMotion.sheet, value: pendingClaimAchievement?.id)
+
     }
 }

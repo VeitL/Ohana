@@ -71,15 +71,18 @@ struct AppHumanRouteContainer: View {
     @State private var dataLoadTask: Task<Void, Never>?
 
     let id: UUID
+    let showsHealthHome: Bool
     let onPresentCoconutLog: (CoconutLogSubject?) -> Void
     let onOpenTasks: () -> Void
 
     init(
         id: UUID,
+        showsHealthHome: Bool = true,
         onPresentCoconutLog: @escaping (CoconutLogSubject?) -> Void = { _ in },
         onOpenTasks: @escaping () -> Void = {}
     ) {
         self.id = id
+        self.showsHealthHome = showsHealthHome
         self.onPresentCoconutLog = onPresentCoconutLog
         self.onOpenTasks = onOpenTasks
     }
@@ -87,6 +90,9 @@ struct AppHumanRouteContainer: View {
     var body: some View {
         Group {
             if let human = routeData.human {
+                if showsHealthHome && !human.hasPassedAway {
+                    HumanHealthSummaryView(human: human, onPresentCoconutLog: onPresentCoconutLog, onOpenTasks: onOpenTasks)
+                } else {
                 HumanDetailView(
                     human: human,
                     allPets: routeData.allPets,
@@ -97,6 +103,7 @@ struct AppHumanRouteContainer: View {
                     onPresentCoconutLog: onPresentCoconutLog,
                     onOpenTasks: onOpenTasks
                 )
+                }
             } else if routeData.hasLoaded {
                 MemberProfileMissingEntityView(kind: "human")
             } else {
@@ -119,7 +126,10 @@ struct AppHumanRouteContainer: View {
         guard force || !routeData.hasLoaded else { return }
         guard dataLoadTask == nil else { return }
         dataLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: delayMilliseconds) {
-            routeData = HumanProfileRouteData.load(id: id, from: modelContext)
+            let identity = HumanProfileRouteData.loadIdentity(id: id, from: modelContext)
+            routeData = !showsHealthHome || identity.human?.hasPassedAway == true
+                ? HumanProfileRouteData.load(id: id, from: modelContext)
+                : identity
             dataLoadTask = nil
         }
     }
@@ -152,8 +162,15 @@ private struct HumanProfileRouteData {
     var allReports: [HumanHealthReport] = []
     var hasLoaded = false
 
+    static func loadIdentity(id: UUID, from context: ModelContext) -> HumanProfileRouteData {
+        var descriptor = FetchDescriptor<Human>(predicate: #Predicate { $0.id == id })
+        descriptor.fetchLimit = 1
+        return HumanProfileRouteData(human: fetchOne(descriptor, context: context, name: "Human"), hasLoaded: true)
+    }
+
     static func load(id: UUID, from context: ModelContext) -> HumanProfileRouteData {
         let humanKey = id.uuidString
+        let humanKeyLower = humanKey.lowercased()
         return HumanProfileRouteData(
             human: fetchOne(
                 FetchDescriptor<Human>(
@@ -182,7 +199,9 @@ private struct HumanProfileRouteData {
             ),
             allMeds: fetch(
                 FetchDescriptor<HumanMedication>(
-                    predicate: #Predicate<HumanMedication> { $0.humanId == humanKey },
+                    predicate: #Predicate<HumanMedication> {
+                        $0.humanId == humanKey || $0.humanId == humanKeyLower
+                    },
                     sortBy: [SortDescriptor(\.createdAt)]
                 ),
                 context: context,
@@ -190,7 +209,9 @@ private struct HumanProfileRouteData {
             ),
             allReports: fetch(
                 FetchDescriptor<HumanHealthReport>(
-                    predicate: #Predicate<HumanHealthReport> { $0.humanId == humanKey },
+                    predicate: #Predicate<HumanHealthReport> {
+                        $0.humanId == humanKey || $0.humanId == humanKeyLower
+                    },
                     sortBy: [SortDescriptor(\.reportDate, order: .reverse)]
                 ),
                 context: context,
@@ -237,7 +258,7 @@ private struct MemberProfileMissingEntityView: View {
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
             Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfügbar"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)
                 .font(OhanaFont.caption(.semibold))

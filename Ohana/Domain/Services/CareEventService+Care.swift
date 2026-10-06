@@ -70,6 +70,8 @@ extension CareEventService {
         date: Date = Date(),
         source: CareLedgerSource = .quickAction,
         createsLinkedPottyLog: Bool = false,
+        note: String = "",
+        persist providedPersist: ((ModelContext) -> ModelContextSaveResult)? = nil,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
         let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
@@ -78,7 +80,7 @@ extension CareEventService {
                 type: type,
                 amountGrams: 0,
                 amountMl: amountMl,
-                note: "",
+                note: note.trimmingCharacters(in: .whitespacesAndNewlines),
                 foodKind: .dry,
                 treatKind: nil,
                 autoFeedDedupKey: "",
@@ -109,8 +111,12 @@ extension CareEventService {
         )
         let log = careWrite.log
         let pottyLog = careWrite.linkedPottyLog
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let saveResult = providedPersist?(context) ?? context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            defer {
+                if let pottyLog { context.delete(pottyLog) }
+                context.delete(log)
+            }
             return (
                 CareRecordResult(
                     logID: log.id,
@@ -239,6 +245,7 @@ extension CareEventService {
         let log = DomainCareFactWriter.createPottyLog(plan: write, context: context)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            defer { context.delete(log) }
             return (
                 PottyRecordResult(
                     logID: log.id,
@@ -384,6 +391,7 @@ extension CareEventService {
         let log = DomainCareFactWriter.createHygieneLog(plan: write, context: context)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            defer { context.delete(log) }
             return (
                 HygieneRecordResult(
                     logID: log.id,
@@ -511,6 +519,7 @@ extension CareEventService {
         let log = DomainCareFactWriter.createHealthLog(plan: write, context: context)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            defer { context.delete(log) }
             return (
                 HealthRecordResult(
                     logID: log.id,

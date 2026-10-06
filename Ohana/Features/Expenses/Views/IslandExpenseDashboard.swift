@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 private struct PetExpenseSummary: Identifiable {
     let id: UUID
@@ -31,7 +32,11 @@ struct IslandExpenseDashboardContentView: View {
     var standalone: Bool = true
     let pets: [Pet]
     let humans: [Human]
-    let allExpenseLogs: [PetExpenseLog]
+    let snapshot: ExpenseInsightSnapshot
+    let onFilterChange: (ExpenseDashboardRange, String?) -> Void
+    var onRefresh: () -> Void = {}
+    var isLoading = false
+    var loadFailed = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -39,31 +44,68 @@ struct IslandExpenseDashboardContentView: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedRange: ExpenseDashboardRange = .month
+    @State private var selectedSubjectID: String?
+    @State private var showingPersonalPlan = false
+    @State private var preparedExpenseCSV = "date,subject,payer,category,amount,note"
 
     private var l: L10n { L10n(appLanguage) }
+    private var allExpenseLogs: [ExpenseInsightLogSnapshot] { snapshot.logs }
 
     private var activeHumanId: UUID? {
         UUID(uuidString: activeHumanIdStr)
     }
 
     private var visibleExpenseHumans: [Human] {
-        appServices.privacy.unlockedHumans(for: .expense, from: humans, viewedBy: activeHumanId)
+        appServices.privacy.unlockedHumans(
+            for: .expense,
+            from: humans.filter { !$0.hasPassedAway },
+            viewedBy: activeHumanId
+        )
     }
 
-    private var filteredLogs: [PetExpenseLog] {
-        ExpenseSummaryBuilder.logs(allExpenseLogs, in: selectedRange)
+    private var visiblePets: [Pet] {
+        pets.filter { !$0.hasPassedAway }
     }
 
-    private var visibleExpenseLogs: [PetExpenseLog] {
+    private var selectedHumanSubjectID: String? {
+        guard let selectedSubjectID, selectedSubjectID.hasPrefix("human:") else { return nil }
+        return UUID(uuidString: String(selectedSubjectID.dropFirst(6)))?.uuidString
+    }
+
+    private var subjectScopedLogs: [ExpenseInsightLogSnapshot] {
+        guard let selectedSubjectID else { return allExpenseLogs }
+        if selectedSubjectID.hasPrefix("pet:"),
+           let id = UUID(uuidString: String(selectedSubjectID.dropFirst(4))) {
+            return ExpenseSummaryBuilder.linkedToPet(id, from: allExpenseLogs)
+        }
+        if selectedSubjectID.hasPrefix("human:"),
+           let id = UUID(uuidString: String(selectedSubjectID.dropFirst(6))) {
+            return ExpenseSummaryBuilder.paidBy(id, from: allExpenseLogs)
+        }
+        return []
+    }
+
+    private var filteredLogs: [ExpenseInsightLogSnapshot] {
+        ExpenseSummaryBuilder.logs(subjectScopedLogs, in: selectedRange)
+    }
+
+    private var visibleExpenseLogs: [ExpenseInsightLogSnapshot] {
         visibleLogs(from: filteredLogs)
     }
 
-    private var positiveExpenseLogs: [PetExpenseLog] {
-        ExpenseSummaryBuilder.positiveLogs(visibleExpenseLogs)
+    private var summaryExpenseLogs: [ExpenseSummarySlice] {
+        ExpenseSummaryBuilder.summarySlices(
+            from: visibleExpenseLogs,
+            attributedTo: selectedHumanSubjectID
+        )
+    }
+
+    private var positiveExpenseLogs: [ExpenseSummarySlice] {
+        ExpenseSummaryBuilder.positiveLogs(summaryExpenseLogs)
     }
 
     private var totals: ExpenseTotals {
-        ExpenseSummaryBuilder.totals(from: visibleExpenseLogs)
+        ExpenseSummaryBuilder.totals(from: summaryExpenseLogs)
     }
 
     private var totalAmount: Double {
@@ -80,15 +122,17 @@ struct IslandExpenseDashboardContentView: View {
         let span = now.timeIntervalSince(currentStart)
         guard span > 0 else { return nil }
         let previousStart = currentStart.addingTimeInterval(-span)
-        let previousLogs = allExpenseLogs.filter { $0.date >= previousStart && $0.date < currentStart }
-        let previousTotal = visibleLogs(from: previousLogs)
-            .filter { $0.amount > 0 }
-            .reduce(0) { $0 + $1.amount }
+        let previousLogs = subjectScopedLogs.filter { $0.date >= previousStart && $0.date < currentStart }
+        let previousSummary = ExpenseSummaryBuilder.summarySlices(
+            from: visibleLogs(from: previousLogs),
+            attributedTo: selectedHumanSubjectID
+        )
+        let previousTotal = ExpenseSummaryBuilder.totals(from: previousSummary).spent
         return totalAmount - previousTotal
     }
 
     private var categorySummaries: [ExpenseCategoryBreakdown] {
-        ExpenseSummaryBuilder.categoryBreakdown(from: visibleExpenseLogs)
+        ExpenseSummaryBuilder.categoryBreakdown(from: summaryExpenseLogs)
     }
 
     private var topCategory: ExpenseCategoryBreakdown? {
@@ -97,7 +141,7 @@ struct IslandExpenseDashboardContentView: View {
 
     private var petSummaries: [PetExpenseSummary] {
         pets.compactMap { pet in
-            let logs = ExpenseSummaryBuilder.linkedToPet(pet.id, from: visibleExpenseLogs)
+            let logs = ExpenseSummaryBuilder.linkedToPet(pet.id, from: summaryExpenseLogs)
             let total = ExpenseSummaryBuilder.totals(from: logs).spent
             guard total > 0 else { return nil }
             return PetExpenseSummary(
@@ -119,11 +163,15 @@ struct IslandExpenseDashboardContentView: View {
     private var humanSummaries: [PayerSummary] {
         let total = max(1, totalAmount)
         var totals: [String: Double] = [:]
-        var logsByKey: [String: [PetExpenseLog]] = [:]
-        for log in positiveExpenseLogs {
-            let key = payerKey(for: log.executorId)
-            totals[key, default: 0] += log.amount
-            logsByKey[key, default: []].append(log)
+        var logsByKey: [String: [ExpenseSummarySlice]] = [:]
+        let payerSlices = ExpenseSummaryBuilder.payerContributionSlices(
+            from: visibleExpenseLogs,
+            attributedTo: selectedHumanSubjectID
+        )
+        for slice in payerSlices where slice.amount > 0 {
+            let key = payerKey(for: slice.executorId)
+            totals[key, default: 0] += slice.amount
+            logsByKey[key, default: []].append(slice)
         }
 
         return totals.compactMap { key, value in
@@ -139,7 +187,9 @@ struct IslandExpenseDashboardContentView: View {
                 )
             }
 
-            guard let human = visibleExpenseHumans.first(where: { $0.id.uuidString == key }) else {
+            guard let human = visibleExpenseHumans.first(where: {
+                ExpenseSummaryBuilder.payerIDsMatch($0.id.uuidString, key)
+            }) else {
                 return nil
             }
             return PayerSummary(
@@ -160,36 +210,53 @@ struct IslandExpenseDashboardContentView: View {
     }
 
     private var trendBuckets: [ExpenseTimeBucket] {
-        let calendar = Calendar.current
-        let now = Date()
-        let start = selectedRange.startDate() ?? allExpenseStartDate(calendar: calendar, now: now)
-
-        guard let start else { return [] }
-        let dayCount = max(0, calendar.dateComponents([.day], from: calendar.startOfDay(for: start), to: calendar.startOfDay(for: now)).day ?? 0)
-
-        return (0 ... dayCount).compactMap { offset in
-            guard let day = calendar.date(byAdding: .day, value: offset, to: calendar.startOfDay(for: start)) else {
-                return nil
-            }
-            let amount = positiveExpenseLogs.reduce(0) { partial, log in
-                calendar.isDate(log.date, inSameDayAs: day) ? partial + log.amount : partial
-            }
-            return ExpenseTimeBucket(date: day, label: compactDayLabel(day), amount: amount)
-        }
+        makeExpenseBuckets(from: positiveExpenseLogs, range: selectedRange)
     }
 
     var body: some View {
         dashboardBody
+            .accessibilityIdentifier("household-expense-insight-screen")
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    selectedRange = .month
+                    onFilterChange(.month, selectedSubjectID)
+                }
+                reconcileComparisonAccess()
+            }
+            .onAppear {
+                reconcileComparisonAccess()
+                prepareExpenseExport()
+            }
+            .onChange(of: pets.count) { _, _ in reconcileComparisonAccess() }
+            .onChange(of: visibleExpenseHumans.map(\.id)) { _, _ in
+                reconcileComparisonAccess()
+                prepareExpenseExport()
+            }
+            .onChange(of: selectedRange) { prepareExpenseExport() }
+            .onChange(of: selectedSubjectID) { prepareExpenseExport() }
+            .onChange(of: appLanguage) { prepareExpenseExport() }
+            .onChange(of: snapshot.revisionID) { prepareExpenseExport() }
+            .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+                prepareExpenseExport()
+            }
     }
 
     @ViewBuilder
     private var dashboardBody: some View {
         if standalone {
-            ZStack {
-                OhanaAppBackground().ignoresSafeArea()
+            NavigationStack {
                 scrollContent
+                    .background(OhanaAppBackground())
+                    .navigationTitle(l.tr(zh: "花费", en: "Expenses", de: "Ausgaben", es: "Gastos", pt: "Despesas", fr: "Dépenses", ja: "支出", ko: "지출", it: "Spese"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        OhanaModalToolbar(onClose: { dismiss() })
+                    }
             }
-            .ignoresSafeArea(edges: .top)
         } else {
             scrollContent
         }
@@ -197,99 +264,179 @@ struct IslandExpenseDashboardContentView: View {
 
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                if standalone { navBar }
-                expensePlanetHero
+            VStack(alignment: .leading, spacing: OhanaSpacing.section) {
+                analysisLimitNotice
+                subjectSelector
+                if snapshot.hasLoaded, !visibleExpenseLogs.isEmpty {
+                    expensePlanetHero
+                }
                 expenseTrendCard
-                expenseBadgeStrip
-                humanSpendSection
-                petSpendSection
+                if appServices.commerce.allows(.extendedTrends), !visibleExpenseLogs.isEmpty {
+                    humanSpendSection
+                    petSpendSection
+                    expenseExportButton
+                }
                 if totalReimbursed > 0 {
                     reimbursementStrip
                 }
                 Color.clear.frame(height: 40)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, OhanaSpacing.pageMargin)
             .padding(.top, standalone ? 0 : 14)
         }
     }
 
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.ohanaControlFill, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-
-            Spacer()
-            Text(l.tr(zh: "花费星球", en: "Expense Planet", de: "Ausgabenplanet"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
+    private func reconcileComparisonAccess() {
+        let validIDs = Set(
+            visiblePets.map { "pet:\($0.id.uuidString)" }
+                + visibleExpenseHumans.map { "human:\($0.id.uuidString)" }
+        )
+        if let selectedSubjectID, !validIDs.contains(selectedSubjectID) {
+            self.selectedSubjectID = nil
+            onFilterChange(selectedRange, nil)
         }
-        .padding(.top, 50)
+        guard !appServices.commerce.allows(.extendedTrends), selectedSubjectID == nil else { return }
+        selectedSubjectID = visiblePets.first.map { "pet:\($0.id.uuidString)" }
+            ?? visibleExpenseHumans.first.map { "human:\($0.id.uuidString)" }
+        onFilterChange(selectedRange, selectedSubjectID)
+    }
+
+    @ViewBuilder
+    private var analysisLimitNotice: some View {
+        if snapshot.isTruncated {
+            Label(
+                l.tr(
+                    zh: "图表显示最近 20,000 条；原始记录仍完整保留。",
+                    en: "Charts show the latest 20,000 records; raw records remain intact.",
+                    de: "Diagramme zeigen die neuesten 20.000 Einträge; Rohdaten bleiben vollständig erhalten."
+                ),
+                systemImage: "info.circle.fill"
+            )
+            .font(OhanaFont.footnote(.semibold))
+            .foregroundStyle(Color.ohanaSecondaryText)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge))
+            .accessibilityIdentifier("expense-analysis-truncated-notice")
+        }
+    }
+
+    private var expenseExportButton: some View {
+        ShareLink(item: preparedExpenseCSV) {
+            Label(
+                l.tr(zh: "导出当前花费数据", en: "Export current expense data", de: "Aktuelle Ausgaben exportieren"),
+                systemImage: "square.and.arrow.up"
+            )
+            .font(OhanaFont.callout(.semibold))
+            .foregroundStyle(Color.ohanaPrimaryText)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(Color.ohanaControlFill, in: Capsule())
+        }
+        .accessibilityIdentifier("expense-insight-export")
+    }
+
+    private func prepareExpenseExport() {
+        var lines = ["date,subject,payer,category,amount,note"]
+        lines.append(contentsOf: visibleExpenseLogs.map { log in
+            let subject = log.expensePetID.flatMap { petID in
+                pets.first(where: { $0.id == petID })?.name
+            }
+                ?? l.tr(zh: "家庭", en: "Household", de: "Haushalt")
+            let export = exportPayerProjection(for: log)
+            return [
+                HouseholdInsightExport.csvCell(HouseholdInsightExport.iso8601(log.date)),
+                HouseholdInsightExport.csvCell(subject),
+                HouseholdInsightExport.csvCell(export.payer),
+                HouseholdInsightExport.csvCell(l.expenseCategoryTitle(log.expenseCategory)),
+                HouseholdInsightExport.decimal(export.amount, fractionDigits: 2),
+                HouseholdInsightExport.csvCell(log.note)
+            ].joined(separator: ",")
+        })
+        preparedExpenseCSV = lines.joined(separator: "\n")
+    }
+
+    private func exportPayerProjection(
+        for log: ExpenseInsightLogSnapshot
+    ) -> (payer: String, amount: Double) {
+        if let selectedHumanSubjectID {
+            let payer = visibleExpenseHumans.first {
+                ExpenseSummaryBuilder.payerIDsMatch($0.id.uuidString, selectedHumanSubjectID)
+            }?.name ?? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet")
+            return (
+                payer,
+                ExpenseSummaryBuilder.amountPaid(by: selectedHumanSubjectID, for: log)
+            )
+        }
+
+        let payerText = ExpenseSummaryBuilder.payerShares(for: log).map { share in
+            let name = share.humanID.flatMap { humanID in
+                visibleExpenseHumans.first {
+                    ExpenseSummaryBuilder.payerIDsMatch($0.id.uuidString, humanID)
+                }?.name
+            } ?? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet")
+            return "\(name) \(AppCurrency.format(share.amount, fractionDigits: 2))"
+        }.joined(separator: " · ")
+        return (
+            payerText.isEmpty ? l.tr(zh: "未指定", en: "Unassigned", de: "Nicht zugeordnet") : payerText,
+            log.amount
+        )
+    }
+
+    private var selectedSubjectName: String {
+        visiblePets.first(where: { selectedSubjectID == "pet:\($0.id.uuidString)" })?.name
+            ?? visibleExpenseHumans.first(where: { selectedSubjectID == "human:\($0.id.uuidString)" })?.name
+            ?? l.tr(zh: "全部成员", en: "All members", de: "Alle Mitglieder", es: "Todos los miembros", pt: "Todos os membros", fr: "Tous les membres", ja: "すべてのメンバー", ko: "모든 멤버", it: "Tutti i membri")
+    }
+
+    private var subjectSelector: some View {
+        Menu {
+            subjectOption(id: nil, title: l.tr(zh: "全部", en: "All", de: "Alle", es: "Todos", pt: "Todos", fr: "Tous", ja: "すべて", ko: "전체", it: "Tutti"), isLocked: !appServices.commerce.allows(.extendedTrends))
+            ForEach(visiblePets) { pet in
+                subjectOption(id: "pet:\(pet.id.uuidString)", title: pet.name)
+            }
+            ForEach(visibleExpenseHumans) { human in
+                subjectOption(id: "human:\(human.id.uuidString)", title: human.name)
+            }
+        } label: {
+            HStack(spacing: OhanaSpacing.related) {
+                Text(selectedSubjectName)
+                    .font(OhanaFont.headline())
+                    .lineLimit(2)
+                Image(systemName: "chevron.down")
+                    .font(OhanaFont.caption())
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44, alignment: .leading)
+        }
+        .accessibilityIdentifier("expense-subject-selector")
+    }
+
+    private func subjectOption(id: String?, title: String, isLocked: Bool = false) -> some View {
+        Button {
+            guard !isLocked else {
+                showingPersonalPlan = true
+                return
+            }
+            guard selectedSubjectID != id else { return }
+            selectedSubjectID = id
+            onFilterChange(selectedRange, id)
+            OhanaFeedback.selection()
+        } label: {
+            Label(title, systemImage: isLocked ? "lock.fill" : (selectedSubjectID == id ? "checkmark" : "person"))
+        }
     }
 
     private var expensePlanetHero: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.goPrimary.opacity(0.16))
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "creditcard.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black))
-                        .foregroundStyle(Color.goPrimary)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "本期花费", en: "Spent", de: "Ausgaben"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    HStack(alignment: .lastTextBaseline, spacing: 8) {
-                        Text(AppCurrency.format(totalAmount, fractionDigits: 0))
-                            .font(OhanaFont.adaptive(size: 38, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .ohanaNumericMotion(totalAmount)
-                        if let periodDelta {
-                            trendDeltaPill(periodDelta)
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 10) {
-                if let topCategory {
-                    miniMetric(
-                        title: l.tr(zh: "最多", en: "Top", de: "Top"),
-                        value: l.expenseCategoryTitle(topCategory.category),
-                        icon: topCategory.category.systemIconName,
-                        tint: expenseTint(topCategory.category)
-                    )
-                }
-                if let topPayer {
-                    miniMetric(
-                        title: l.tr(zh: "成员", en: "Member", de: "Mitglied"),
-                        value: topPayer.name,
-                        icon: "person.fill",
-                        tint: topPayer.color
-                    )
-                }
-                if let topPet {
-                    miniMetric(
-                        title: l.tr(zh: "宠物", en: "Pet", de: "Tier"),
-                        value: topPet.name,
-                        icon: "pawprint.fill",
-                        tint: topPet.color
-                    )
-                }
-            }
+        VStack(alignment: .leading, spacing: OhanaSpacing.related) {
+            Text(l.tr(zh: "本期花费", en: "Spent", de: "Ausgaben"))
+                .font(OhanaFont.subheadline())
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(AppCurrency.format(totalAmount, fractionDigits: 0))
+                .font(OhanaFont.metric(size: 34))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .ohanaNumericMotion(totalAmount)
+                .fixedSize(horizontal: false, vertical: true)
+            if let periodDelta { trendDeltaPill(periodDelta) }
         }
     }
 
@@ -297,18 +444,38 @@ struct IslandExpenseDashboardContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 Label(l.tr(zh: "花费节奏", en: "Spend rhythm", de: "Ausgabenrhythmus"), systemImage: "chart.bar.xaxis")
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: ExpenseDashboardRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: ExpenseDashboardRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
 
-            if trendBuckets.allSatisfy({ $0.amount == 0 }) {
+            if loadFailed {
+                OhanaFeedbackState(
+                    state: .error,
+                    title: l.recordsLoadFailed,
+                    message: l.recordsRetryMessage,
+                    actionLabel: l.retryRecords,
+                    action: onRefresh,
+                    layout: .compact
+                )
+            } else if isLoading || !snapshot.hasLoaded {
+                OhanaFeedbackState(
+                    state: .loading,
+                    title: l.tr(zh: "正在读取记录", en: "Loading records", de: "Einträge werden geladen", es: "Cargando registros", pt: "Carregando registros", fr: "Chargement des données", ja: "記録を読み込み中", ko: "기록을 불러오는 중", it: "Caricamento dei dati"),
+                    message: "",
+                    layout: .compact
+                )
+            } else if visibleExpenseLogs.isEmpty {
                 emptyState(
                     icon: "creditcard",
-                    text: l.tr(zh: "记录花费后会显示趋势", en: "Log spending to see the trend", de: "Ausgaben erfassen, um den Trend zu sehen")
+                    text: l.noRecords
                 )
             } else {
                 ExpenseBarDashboardChart(buckets: trendBuckets, accent: .goPrimary)
@@ -317,6 +484,21 @@ struct IslandExpenseDashboardContentView: View {
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+    }
+
+    private var personalRangeSelection: Binding<ExpenseDashboardRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+                onFilterChange(range, selectedSubjectID)
+            }
+        )
     }
 
     private var expenseBadgeStrip: some View {
@@ -350,7 +532,7 @@ struct IslandExpenseDashboardContentView: View {
             if humanSummaries.isEmpty {
                 emptyState(
                     icon: "person.crop.circle.badge.questionmark",
-                    text: l.tr(zh: "记录支付人后会显示成员花费", en: "Add payers to see member spending", de: "Zahlende erfassen, um Ausgaben je Mitglied zu sehen")
+                    text: l.tr(zh: "暂无支付人数据", en: "No payer data", de: "Keine Zahlungsdaten")
                 )
             } else {
                 VStack(spacing: 0) {
@@ -377,7 +559,7 @@ struct IslandExpenseDashboardContentView: View {
             if petSummaries.isEmpty {
                 emptyState(
                     icon: "pawprint",
-                    text: l.tr(zh: "关联宠物后会显示每只宠物花了什么", en: "Link pets to see what each one cost", de: "Haustiere zuordnen, um Kosten je Tier zu sehen")
+                    text: l.tr(zh: "暂无宠物花费", en: "No pet expenses", de: "Keine Tierausgaben")
                 )
             } else {
                 VStack(spacing: 0) {
@@ -399,14 +581,14 @@ struct IslandExpenseDashboardContentView: View {
     private var reimbursementStrip: some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.uturn.backward.circle.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(Color(hex: "06B6D4"))
             Text(l.tr(zh: "已记录报销", en: "Refunds logged", de: "Erstattungen erfasst"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
             Text(AppCurrency.format(totalReimbursed, fractionDigits: 0))
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 4)
@@ -419,7 +601,7 @@ struct IslandExpenseDashboardContentView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             content()
         }
@@ -442,7 +624,7 @@ struct IslandExpenseDashboardContentView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(name)
-                        .font(OhanaFont.body(.black))
+                        .font(OhanaFont.body(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(categorySummaryText(categories, prefix: detailPrefix))
@@ -454,7 +636,7 @@ struct IslandExpenseDashboardContentView: View {
                 Spacer()
 
                 Text(AppCurrency.format(amount, fractionDigits: 0))
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(amount)
             }
@@ -489,11 +671,11 @@ struct IslandExpenseDashboardContentView: View {
         let tint = isUp ? Color.goRed : Color.goTeal
         return HStack(spacing: 4) {
             Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
             Text(AppCurrency.format(abs(delta), fractionDigits: 0))
                 .ohanaNumericMotion(delta)
         }
-        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
         .foregroundStyle(tint)
         .padding(.horizontal, 8)
         .frame(height: 24)
@@ -503,14 +685,14 @@ struct IslandExpenseDashboardContentView: View {
     private func miniMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -521,15 +703,15 @@ struct IslandExpenseDashboardContentView: View {
     private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(value)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
@@ -537,28 +719,32 @@ struct IslandExpenseDashboardContentView: View {
     }
 
     private func emptyState(icon: String, text: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
-                .foregroundStyle(Color.ohanaTertiaryText)
-            Text(text)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, minHeight: 120)
+        OhanaFeedbackState(state: .empty, title: text, message: "", layout: .compact)
     }
 
-    private func visibleLogs(from logs: [PetExpenseLog]) -> [PetExpenseLog] {
-        logs.filter {
-            !appServices.privacy.isLocked(.expense, humanId: $0.executorId, in: humans, viewedBy: activeHumanId)
+    private func visibleLogs(
+        from logs: [ExpenseInsightLogSnapshot]
+    ) -> [ExpenseInsightLogSnapshot] {
+        logs.filter { log in
+            ExpenseSummaryBuilder.payerShares(for: log)
+                .compactMap(\.humanID)
+                .allSatisfy { payerID in
+                    !appServices.privacy.isLocked(
+                        .expense,
+                        humanId: payerID,
+                        in: humans,
+                        viewedBy: activeHumanId
+                    )
+                }
         }
     }
 
     private func payerKey(for executorId: String?) -> String {
         guard let raw = executorId, !raw.isEmpty else { return "__unknown__" }
-        guard visibleExpenseHumans.contains(where: { $0.id.uuidString == raw }) else { return "__unknown__" }
-        return raw
+        guard let human = visibleExpenseHumans.first(where: {
+            ExpenseSummaryBuilder.payerIDsMatch($0.id.uuidString, raw)
+        }) else { return "__unknown__" }
+        return human.id.uuidString
     }
 
     private func humanThemeColor(_ human: Human) -> Color {

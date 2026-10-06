@@ -11,7 +11,7 @@ import UIKit
 
 extension AddPlantView {
     var plantCreationSteps: [AddPlantCreationStep] {
-        AddPlantCreationStep.allCases
+        [.plant, .confirm]
     }
 
     var currentStepIndex: Int {
@@ -25,14 +25,15 @@ extension AddPlantView {
     var resolvedPlantName: String {
         if !trimmedName.isEmpty { return trimmedName }
         if let selectedCatalog { return selectedCatalog.localizedCommonName }
-        return trimmedSpecies
+        if !trimmedSpecies.isEmpty { return trimmedSpecies }
+        return isUnknownSpeciesSelected ? l.tr(zh: "我的植物", en: "My plant", de: "Meine Pflanze") : ""
     }
 
     var canAdvanceStep: Bool {
         guard !isSaving else { return false }
         switch currentStep {
         case .plant:
-            return !selectedCatalogID.isEmpty && !resolvedPlantName.isEmpty
+            return selectedCatalog != nil || isUnknownSpeciesSelected
         case .avatar, .care:
             return true
         case .confirm:
@@ -50,10 +51,6 @@ extension AddPlantView {
                 let cardHeight = plantCreationCardHeight(in: proxy.size.height)
                 VStack(spacing: MemberCreationCardLayout.stackSpacing) {
                     Spacer(minLength: 0)
-                    plantTopChrome
-                        .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
-                        .opacity(isSaving ? 0.42 : 1)
-                        .allowsHitTesting(!isSaving)
                     plantCreationCardArea
                         .frame(height: cardHeight)
                     plantBottomCTA
@@ -70,71 +67,26 @@ extension AddPlantView {
             if didShowSuccess {
                 AddWizardJoinCelebrationOverlay(
                     title: l.tr(zh: "\(resolvedPlantName) 已加入植物页", en: "\(resolvedPlantName) joined Plants", de: "\(resolvedPlantName) ist bei Pflanzen"),
-                    subtitle: l.tr(zh: "植物卡片正在进入卡片堆", en: "The plant card is joining the stack", de: "Die Pflanzenkarte wird in den Stapel eingefügt"),
                     systemImage: "leaf.fill",
                     accent: Color.goTeal
                 )
                 .zIndex(50)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .overlay(alignment: .topLeading) {
             PlantCreationAccessibilityMarker(identifier: "add-plant-step-flow")
         }
-        .onAppear {
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
-                media.prepareCameraIfNeeded()
-            }
-        }
-    }
-
-    var plantTopChrome: some View {
-        HStack(spacing: 10) {
-            Button {
-                onComplete()
-            } label: {
-                Image(systemName: "xmark") // a11y: allow decorative close glyph; button has localized Cancel label.
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .accessibilityHidden(true)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.cancel)
-            .accessibilityIdentifier("add-plant-cancel-action")
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                    .font(OhanaFont.title(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-                Text(plantTopChromeSubtitle)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-            Spacer()
-        }
-    }
-
-    var plantTopChromeSubtitle: String {
-        switch currentStep {
-        case .plant:
-            l.tr(zh: "先选植物、名字和房间", en: "Pick a plant, name, and room", de: "Pflanze, Name und Raum wählen")
-        case .avatar:
-            l.tr(zh: "选择自带 3D 头像或照片", en: "Choose a built-in 3D avatar or photo", de: "3D-Avatar oder Foto wählen")
-        case .care:
-            l.tr(zh: "按推荐值微调护理信息", en: "Tune the recommended care info", de: "Empfohlene Pflegeinfos anpassen")
-        case .confirm:
-            l.tr(zh: "确认后加入植物卡片堆", en: "Confirm and join the plant stack", de: "Bestätigen und Karte hinzufügen")
-        }
     }
 
     var plantCreationCardArea: some View {
-        PlantCreationCardSurface {
+        PlantCreationCardSurface(
+            title: profilePreviewName,
+            subtitle: plantCreationCardSubtitle,
+            avatarImage: selectedAvatarSource == .customImage ? decodedAvatarImage : nil,
+            catalog: selectedCatalog,
+            layoutMode: plantCreationCardLayoutMode
+        ) {
             currentPlantStepContent
             Spacer(minLength: 2)
             PlantCreationStepIndicator(
@@ -148,13 +100,27 @@ extension AddPlantView {
     }
 
     func plantCreationCardHeight(in containerHeight: CGFloat) -> CGFloat {
-        max(
-            340,
-            MemberCreationCardLayout.cardHeight(
-                in: containerHeight,
-                includesTopChrome: true
-            ) - 84
+        MemberCreationCardLayout.cardHeight(
+            in: containerHeight,
+            includesTopChrome: false
         )
+    }
+
+    var plantCreationCardLayoutMode: PlantCreationCardLayoutMode {
+        switch currentStep {
+        case .plant:
+            .standard
+        case .avatar:
+            .avatarFocus
+        case .care, .confirm:
+            .compact
+        }
+    }
+
+    var plantCreationCardSubtitle: String {
+        let identity = selectedCatalog?.latinName ?? profilePreviewSpecies
+        guard !trimmedRoomName.isEmpty else { return identity }
+        return "\(identity) · \(trimmedRoomName)"
     }
 
     @ViewBuilder
@@ -167,7 +133,46 @@ extension AddPlantView {
         case .care:
             plantCareDetailsStep
         case .confirm:
-            plantConfirmationStep
+            plantQuickSetupStep
+        }
+    }
+
+    var plantQuickSetupStep: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            PlantCreationSection(
+                title: l.tr(zh: "名字", en: "Name", de: "Name"),
+                icon: "text.cursor"
+            ) {
+                plantNameSummarySection
+            }
+            PlantCreationSection(
+                title: l.tr(zh: "摆放位置（可选）", en: "Placement (optional)", de: "Standort (optional)"),
+                icon: "house.fill"
+            ) {
+                roomAndSpotControls
+            }
+            duplicateWarningSection
+            Button {
+                withAnimation(GoMotion.selection) {
+                    showingOptionalPlantDetails.toggle()
+                }
+            } label: {
+                Label(
+                    l.tr(zh: "照片与更多资料（可选）", en: "Photo and more details (optional)", de: "Foto und weitere Angaben (optional)"),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(OhanaFont.callout(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("add-plant-optional-details-toggle")
+            if showingOptionalPlantDetails {
+                plantAvatarStep
+                plantCareDetailsStep
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-confirm")
         }
     }
 
@@ -181,7 +186,7 @@ extension AddPlantView {
                     retreatPlantStep()
                 } label: {
                     Label(l.tr(zh: "上一步", en: "Back", de: "Zurück"), systemImage: "chevron.left")
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                         .frame(minWidth: 96, idealWidth: 112, maxWidth: 154, minHeight: 54)
                         .background(Color.ohanaControlFill.opacity(0.62), in: Capsule())
@@ -210,7 +215,7 @@ extension AddPlantView {
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(enabled ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)

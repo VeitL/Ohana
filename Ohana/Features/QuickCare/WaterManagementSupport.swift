@@ -184,6 +184,11 @@ nonisolated enum WaterRuleMetadata {
     }
 }
 
+struct WaterPlanWriteResult {
+    let events: [Event]
+    let reminders: [Reminder]
+}
+
 enum WaterPlanWriter {
     nonisolated static let entityType = DomainEntityLinkRegistry.petWaterPlan
     private static let reminderWindowDays = 14
@@ -221,13 +226,34 @@ enum WaterPlanWriter {
         now: Date = Date(),
         calendar: Calendar = .current
     ) throws -> [Reminder] {
+        try replacePlanResult(
+            pet: pet,
+            times: times,
+            allEvents: allEvents,
+            context: context,
+            now: now,
+            calendar: calendar
+        ).reminders
+    }
+
+    @MainActor
+    @discardableResult
+    static func replacePlanResult(
+        pet: Pet,
+        times: [Date],
+        allEvents: [Event],
+        context: ModelContext,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) throws -> WaterPlanWriteResult {
         guard canWriteActiveWaterPlan(for: pet) else {
             try deletePlan(pet: pet, allEvents: allEvents, context: context)
-            return []
+            return WaterPlanWriteResult(events: [], reminders: [])
         }
         CarePlanCalendarSync.suppressDefaultPlan(kind: "drink", pet: pet, context: context)
         try deletePlan(pet: pet, allEvents: allEvents, context: context, save: false)
 
+        var createdEvents: [Event] = []
         var createdReminders: [Reminder] = []
         for time in normalizedTimes(times, count: times.count, now: now, calendar: calendar) {
             let startDate = nextOccurrenceDate(forTimeOfDay: time, after: now, calendar: calendar)
@@ -250,11 +276,12 @@ enum WaterPlanWriter {
                 continue
             }
             let event = DomainScheduleWriter.createEvent(plan: plan, context: context).event
+            createdEvents.append(event)
             createdReminders.append(contentsOf: createUpcomingReminders(for: event, context: context, now: now, calendar: calendar))
         }
 
         try saveWaterPlanChanges(context: context)
-        return createdReminders
+        return WaterPlanWriteResult(events: createdEvents, reminders: createdReminders)
     }
 
     @MainActor

@@ -26,7 +26,7 @@ struct PetHealthLogCard: View {
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goRed)
                 Text(l.tr(zh: "健康日志", en: "Health Log", de: "Gesundheitsprotokoll"))
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(l.tr(
@@ -34,7 +34,7 @@ struct PetHealthLogCard: View {
                     en: "\(healthLogs.count) records",
                     de: "\(healthLogs.count) Einträge"
                 ))
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
             }
 
@@ -44,7 +44,7 @@ struct PetHealthLogCard: View {
                     Text(log.healthLogType.emoji)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(healthLogTypeTitle(log.healthLogType, l: l))
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if !log.note.isEmpty {
                             Text(log.note)
@@ -89,7 +89,7 @@ struct PetHealthLogCard: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(log.date, style: .date)
-                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         if log.cost > 0 {
                             Text(AppCurrency.format(log.cost, fractionDigits: 0))
@@ -116,7 +116,7 @@ struct PetHealthLogCard: View {
                             en: "View all \(healthLogs.count)",
                             de: "Alle \(healthLogs.count) anzeigen"
                         ))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.goPrimary)
                         Image(systemName: "chevron.right").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 11, weight: .bold))
@@ -227,8 +227,8 @@ struct HealthLogListView: View {
     private func filterChip(label: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(isSelected ? Color.arkInk : .primary.opacity(0.7))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
+                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : .primary.opacity(0.7))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 7)
                 .background(isSelected ? Color.goPrimary : .clear, in: Capsule())
@@ -248,7 +248,7 @@ struct HealthLogListView: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(healthLogTypeTitle(log.healthLogType, l: l))
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if !log.note.isEmpty {
                     Text(log.note)
@@ -260,11 +260,11 @@ struct HealthLogListView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text(log.date, style: .date)
-                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 if log.cost > 0 {
                     Text(AppCurrency.format(log.cost, fractionDigits: 0))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.goYellow)
                 }
             }

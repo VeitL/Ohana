@@ -8,6 +8,15 @@
 import SwiftData
 import SwiftUI
 
+nonisolated enum PetDetailModelReadability {
+    static func isReadable(_ pet: Pet) -> Bool {
+        guard !pet.isDeleted else { return false }
+        // A saved deletion detaches the model before retained views and queries
+        // necessarily refresh. Unsaved preview/editor drafts remain readable.
+        return pet.modelContext != nil || pet.persistentModelID.storeIdentifier == nil
+    }
+}
+
 enum AppPetDetailSheetDestination: Hashable {
     case allFeatures
     case basicInfo
@@ -25,7 +34,7 @@ enum AppPetDetailSheetDestination: Hashable {
     case walkSummary
     case health(PetHealthInitialSection?)
     case medication
-    case momentHistory
+    case momentHistory(PetMomentsRoute = .highlights)
     case documents
     case achievements
     case retention
@@ -54,6 +63,7 @@ struct AppPetDetailSheetRouteContainer: View {
     let destination: AppPetDetailSheetDestination
     let onMissing: () -> Void
     let onDismiss: () -> Void
+    let showsFoodCloseButton: Bool
     let onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)?
     let onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
@@ -62,6 +72,7 @@ struct AppPetDetailSheetRouteContainer: View {
         destination: AppPetDetailSheetDestination,
         onMissing: @escaping () -> Void,
         onDismiss: @escaping () -> Void = {},
+        showsFoodCloseButton: Bool = false,
         onOpenFeatureDestination: ((UUID, PetAllFeatureDestination) -> Void)? = nil,
         onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil
     ) {
@@ -71,12 +82,13 @@ struct AppPetDetailSheetRouteContainer: View {
         self.destination = destination
         self.onMissing = onMissing
         self.onDismiss = onDismiss
+        self.showsFoodCloseButton = showsFoodCloseButton
         self.onOpenFeatureDestination = onOpenFeatureDestination
         self.onPresentCoconutLog = onPresentCoconutLog
     }
 
     var body: some View {
-        if let pet = pets.first {
+        if let pet = pets.first, PetDetailModelReadability.isReadable(pet) {
             petDestination(for: pet)
         } else {
             PetRouteMissingEntityView(kind: "pet")
@@ -109,9 +121,15 @@ struct AppPetDetailSheetRouteContainer: View {
                     allFeaturesActivitySummaryTask = nil
                 }
             case .basicInfo:
-                NavigationStack { PetBasicInfoDetailView(pet: pet) }
+                NavigationStack { PetBasicInfoDetailView(pet: pet, onClose: onDismiss) }
             case .food:
-                NavigationStack { PetFoodManagementView(pet: pet) }
+                NavigationStack {
+                    PetFoodManagementView(
+                        pet: pet,
+                        onClose: onDismiss,
+                        showsCloseButton: showsFoodCloseButton
+                    )
+                }
             case .weightQuick:
                 GenericWeightEntrySheet(
                     target: .pet(pet),
@@ -119,7 +137,7 @@ struct AppPetDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .weight:
-                NavigationStack { WeightHistoryView(pet: pet) }
+                WeightHistoryView(pet: pet)
             case .expenseQuick:
                 PetExpenseQuickRouteContent(
                     pet: pet,
@@ -128,7 +146,7 @@ struct AppPetDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .expense:
-                NavigationStack { ExpenseHistoryView(pet: pet) }
+                ExpenseHistoryView(pet: pet)
             case let .feed(opensManualSheet):
                 QuickFeedDetailRouteContainer(
                     id: pet.id,
@@ -147,21 +165,26 @@ struct AppPetDetailSheetRouteContainer: View {
             case .hygiene:
                 NavigationStack { PetHygieneDetailView(pet: pet) }
             case .walkSummary:
-                NavigationStack { WalkSummarySheet(pet: pet) }
+                WalkSummarySheet(pet: pet)
             case let .health(initialSection):
                 NavigationStack {
                     PetHealthDetailView(
                         pet: pet,
                         isModal: true,
-                        initialSection: initialSection
+                        initialSection: initialSection,
+                        onFullDismiss: onDismiss
                     )
                 }
             case .medication:
-                NavigationStack { PetMedicationView(pet: pet) }
-            case .momentHistory:
-                PetMomentsHubRouteContainer(pet: pet)
+                PetMedicationView(pet: pet)
+            case let .momentHistory(route):
+                PetMomentsHubRouteContainer(pet: pet, initialRoute: route)
             case .documents:
-                DocumentsListView(pet: pet, showsCloseButton: true)
+                DocumentsListView(
+                    pet: pet,
+                    showsCloseButton: true,
+                    onClose: onDismiss
+                )
             case .achievements:
                 NavigationStack {
                     AchievementWallView(
@@ -288,7 +311,7 @@ struct PetRouteMissingEntityView: View {
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
             Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfuegbar"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)
                 .font(OhanaFont.caption(.semibold))

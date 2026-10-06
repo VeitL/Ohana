@@ -2,9 +2,9 @@
 //  LocalBackupExclusionPolicy.swift
 //  Ohana
 //
-//  Keeps local persistence and private attachment roots out of OS-managed
-//  device backups. Approved user-controlled recovery uses Ohana's restricted
-//  backup package instead.
+//  Marks local persistence and private attachment roots for OS-managed backup
+//  exclusion, then verifies the resource value. Approved user-controlled
+//  recovery uses Ohana's restricted backup package instead.
 //
 
 import Foundation

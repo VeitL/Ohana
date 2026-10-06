@@ -130,6 +130,12 @@ nonisolated struct DomainHumanHealthMetricLogRehydrateSnapshot: Equatable {
     let notes: String
     let humanId: UUID?
     let recordedByHumanId: String?
+    var sourceReportID: UUID? = nil
+    var sourceLabel: String = ""
+    var referenceLow: Double? = nil
+    var referenceHigh: Double? = nil
+    var referenceRangeText: String = ""
+    var reportedFlagRaw: String = "unknown"
     let createdAt: Date
 }
 
@@ -145,6 +151,7 @@ nonisolated struct DomainHumanHealthReportRehydrateSnapshot: Equatable {
     let summary: String
     let notes: String
     let recordedByHumanId: String?
+    var captureSourceRaw: String = "manual"
     let colorHex: String
     let createdAt: Date
 }
@@ -400,13 +407,14 @@ nonisolated enum DomainMemberContentRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainMemberContentRehydrateResult {
-        let plan = authorizeHuman(humanId: snapshot.humanId, source: source, context: context)
+        let canonicalHumanId = canonicalUUIDString(snapshot.humanId) ?? snapshot.humanId
+        let plan = authorizeHuman(humanId: canonicalHumanId, source: source, context: context)
         guard plan.disposition.allowsPersistence else { return DomainMemberContentRehydrateResult(inserted: false, plan: plan) }
         guard try fetchHumanMedication(id: snapshot.id, context: context) == nil else {
             return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
         }
         let medication = HumanMedication(
-            humanId: snapshot.humanId,
+            humanId: canonicalHumanId,
             name: snapshot.name,
             dosage: snapshot.dosage,
             frequency: MedicationFrequency(rawValue: snapshot.frequencyRaw) ?? .daily,
@@ -431,14 +439,21 @@ nonisolated enum DomainMemberContentRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainMemberContentRehydrateResult {
-        let plan = authorizeHuman(humanId: snapshot.humanId, source: source, context: context)
+        let canonicalHumanId = canonicalUUIDString(snapshot.humanId) ?? snapshot.humanId
+        let plan = authorizeHuman(humanId: canonicalHumanId, source: source, context: context)
         guard plan.disposition.allowsPersistence else { return DomainMemberContentRehydrateResult(inserted: false, plan: plan) }
+        guard let canonicalMedicationId = canonicalUUIDString(snapshot.medicationId),
+              let medicationID = UUID(uuidString: canonicalMedicationId),
+              let medication = try fetchHumanMedication(id: medicationID, context: context),
+              canonicalUUIDString(medication.humanId) == canonicalHumanId else {
+            return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
+        }
         guard try fetchHumanMedicationLog(id: snapshot.id, context: context) == nil else {
             return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
         }
         let log = HumanMedicationLog(
-            humanId: snapshot.humanId,
-            medicationId: snapshot.medicationId,
+            humanId: canonicalHumanId,
+            medicationId: medication.id.uuidString,
             scheduledTime: snapshot.scheduledTime,
             status: HumanMedicationStatus(rawValue: snapshot.statusRaw) ?? .pending,
             recordedTime: snapshot.recordedTime
@@ -462,13 +477,26 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
         }
         let human = try humanReference(id: snapshot.humanId, context: context)
+        if let sourceReportID = snapshot.sourceReportID {
+            guard let human,
+                  let report = try fetchHumanHealthReport(id: sourceReportID, context: context),
+                  canonicalUUIDString(report.humanId) == human.id.uuidString else {
+                return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
+            }
+        }
         let log = HumanHealthMetricLog(
             metricKey: snapshot.metricKey,
             unitCode: snapshot.unitCode,
             value: snapshot.value,
             date: snapshot.date,
             notes: snapshot.notes,
-            recordedByHumanId: snapshot.recordedByHumanId,
+            recordedByHumanId: canonicalOptionalUUIDString(snapshot.recordedByHumanId),
+            sourceReportID: snapshot.sourceReportID,
+            sourceLabel: snapshot.sourceLabel,
+            referenceLow: snapshot.referenceLow,
+            referenceHigh: snapshot.referenceHigh,
+            referenceRangeText: snapshot.referenceRangeText,
+            reportedFlag: HumanHealthMetricReportedFlag(rawValue: snapshot.reportedFlagRaw) ?? .unknown,
             human: human
         )
         log.id = snapshot.id
@@ -485,13 +513,14 @@ nonisolated enum DomainMemberContentRehydrateWriter {
         source: DomainRehydrateSourceKind,
         context: ModelContext
     ) throws -> DomainMemberContentRehydrateResult {
-        let plan = authorizeHuman(humanId: snapshot.humanId, source: source, context: context)
+        let canonicalHumanId = canonicalUUIDString(snapshot.humanId) ?? snapshot.humanId
+        let plan = authorizeHuman(humanId: canonicalHumanId, source: source, context: context)
         guard plan.disposition.allowsPersistence else { return DomainMemberContentRehydrateResult(inserted: false, plan: plan) }
         guard try fetchHumanHealthReport(id: snapshot.id, context: context) == nil else {
             return DomainMemberContentRehydrateResult(inserted: false, plan: plan)
         }
         let report = HumanHealthReport(
-            humanId: snapshot.humanId,
+            humanId: canonicalHumanId,
             reportType: HealthReportType(rawValue: snapshot.reportTypeRaw) ?? .other,
             conclusion: ReportConclusion(rawValue: snapshot.conclusionRaw) ?? .normal,
             hospitalName: snapshot.hospitalName,
@@ -500,7 +529,8 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             nextCheckDate: snapshot.nextCheckDate,
             summary: snapshot.summary,
             notes: snapshot.notes,
-            recordedByHumanId: snapshot.recordedByHumanId,
+            recordedByHumanId: canonicalOptionalUUIDString(snapshot.recordedByHumanId),
+            captureSource: HumanHealthReportCaptureSource(rawValue: snapshot.captureSourceRaw) ?? .manual,
             colorHex: snapshot.colorHex
         )
         report.id = snapshot.id
@@ -682,6 +712,14 @@ nonisolated enum DomainMemberContentRehydrateWriter {
             context: context,
             requirement: .requiredHuman
         )
+    }
+
+    private static func canonicalUUIDString(_ raw: String) -> String? {
+        UUID(uuidString: raw.trimmingCharacters(in: .whitespacesAndNewlines))?.uuidString
+    }
+
+    private static func canonicalOptionalUUIDString(_ raw: String?) -> String? {
+        raw.flatMap(canonicalUUIDString)
     }
 
     private static func petReference(id: UUID?, context: ModelContext) throws -> Pet? {

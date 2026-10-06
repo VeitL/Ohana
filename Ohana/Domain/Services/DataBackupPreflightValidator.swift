@@ -15,6 +15,8 @@ nonisolated enum DataBackupRestoreLimits {
     static let maximumMediaItemBytes = 64 * 1024 * 1024
     static let maximumMediaBytes = 512 * 1024 * 1024
     static let maximumEncryptionOverheadBytes = 1024 * 1024
+    static let maximumEncryptedManifestBytes = ((maximumManifestBytes + 2) / 3) * 4 + maximumEncryptionOverheadBytes
+    static let maximumEncryptedMediaItemBytes = ((maximumMediaItemBytes + 2) / 3) * 4 + maximumEncryptionOverheadBytes
 }
 
 nonisolated struct DataBackupRestoreExistingIdentities: Sendable {
@@ -23,6 +25,7 @@ nonisolated struct DataBackupRestoreExistingIdentities: Sendable {
     let plants: Set<UUID>
     let documents: Set<UUID>
     let humanMedications: Set<UUID>
+    let humanHealthReportOwners: [UUID: UUID]
 
     @MainActor
     init(context: ModelContext) throws {
@@ -31,15 +34,22 @@ nonisolated struct DataBackupRestoreExistingIdentities: Sendable {
         plants = try Set(context.fetch(FetchDescriptor<Plant>()).map(\.id))
         documents = try Set(context.fetch(FetchDescriptor<PetDocument>()).map(\.id))
         humanMedications = try Set(context.fetch(FetchDescriptor<HumanMedication>()).map(\.id))
+        var reportOwners: [UUID: UUID] = [:]
+        for report in try context.fetch(FetchDescriptor<HumanHealthReport>()) {
+            guard let humanID = UUID(uuidString: report.humanId) else { continue }
+            reportOwners[report.id] = humanID
+        }
+        humanHealthReportOwners = reportOwners
     }
 }
 
 nonisolated enum DataBackupPreflightValidator {
+    @MainActor
     static func validate(
         _ backup: OhanaBackup,
         existing: DataBackupRestoreExistingIdentities
     ) throws {
-        guard backup.schemaVersion >= 1, backup.schemaVersion <= 31 else {
+        guard backup.schemaVersion >= 1, backup.schemaVersion <= 34 else {
             throw BackupError.unsupportedVersion(backup.schemaVersion)
         }
 
@@ -68,7 +78,7 @@ nonisolated enum DataBackupPreflightValidator {
         guard values.isRegularFile == true,
               let size = values.fileSize,
               size >= 0,
-              size <= DataBackupRestoreLimits.maximumManifestBytes else {
+              size <= DataBackupRestoreLimits.maximumEncryptedManifestBytes else {
             throw BackupError.invalidRestoreData(.sizeLimit)
         }
     }
@@ -217,13 +227,18 @@ nonisolated enum DataBackupPreflightValidator {
 
     // MARK: - Business value validation
 
+    @MainActor
     private static func validateBusinessValues(_ backup: OhanaBackup) throws {
         for expense in backup.petExpenseLogs {
             guard ExpenseAmountPolicy.isValidPersistedExpense(
                 amount: expense.amount,
                 categoryRaw: expense.category,
                 note: expense.note
-            ) else {
+            ),
+            (try? ExpensePayerContributionPolicy.validatedDecoded(
+                expense.payerContributionsJSON ?? "",
+                total: expense.amount
+            )) != nil else {
                 throw BackupError.invalidRestoreData(.businessValue)
             }
         }
@@ -232,6 +247,27 @@ nonisolated enum DataBackupPreflightValidator {
             guard session.actionKindRaw == SharedCareActionKind.expense.rawValue else { continue }
             guard let amount = session.totalExpenseAmount,
                   ExpenseAmountPolicy.isValidUserExpense(amount) else {
+                throw BackupError.invalidRestoreData(.businessValue)
+            }
+        }
+
+        for metric in backup.humanHealthMetricLogs ?? [] {
+            guard HumanHealthMetricImportValidationPolicy.isValid(
+                metricKey: metric.metricKey,
+                unitCode: metric.unitCode,
+                value: metric.value,
+                referenceLow: metric.referenceLow,
+                referenceHigh: metric.referenceHigh,
+                sourceLabel: metric.sourceLabel ?? "",
+                referenceRangeText: metric.referenceRangeText ?? ""
+            ),
+                  metric.reportedFlagRaw.map({ ["low", "normal", "high", "unknown"].contains($0) }) != false else {
+                throw BackupError.invalidRestoreData(.businessValue)
+            }
+        }
+
+        for report in backup.humanHealthReports ?? [] {
+            guard report.captureSourceRaw.map({ ["manual", "documentScan"].contains($0) }) != false else {
                 throw BackupError.invalidRestoreData(.businessValue)
             }
         }
@@ -250,6 +286,7 @@ nonisolated enum DataBackupPreflightValidator {
         let medicationIDs = existing.humanMedications.union(
             (backup.humanMedications ?? []).compactMap { UUID(uuidString: $0.id) }
         )
+        var healthReportOwners = existing.humanHealthReportOwners
 
         for relationship in backup.petRelationships ?? [] {
             try requireReference(relationship.fromPetId, in: petIDs)
@@ -267,6 +304,12 @@ nonisolated enum DataBackupPreflightValidator {
         }
         for report in backup.humanHealthReports ?? [] {
             try requireReference(report.humanId, in: humanIDs)
+            guard let reportID = UUID(uuidString: report.id),
+                  let humanID = UUID(uuidString: report.humanId),
+                  healthReportOwners[reportID] == nil || healthReportOwners[reportID] == humanID else {
+                throw BackupError.invalidRestoreData(.relationship)
+            }
+            healthReportOwners[reportID] = humanID
             if let recorder = report.recordedByHumanId {
                 try requireReference(recorder, in: humanIDs)
             }
@@ -278,6 +321,13 @@ nonisolated enum DataBackupPreflightValidator {
             if let recorder = metric.recordedByHumanId {
                 try requireReference(recorder, in: humanIDs)
             }
+            if let sourceReportID = metric.sourceReportID {
+                guard let reportID = UUID(uuidString: sourceReportID),
+                      let humanID = metric.humanId.flatMap(UUID.init(uuidString:)),
+                      healthReportOwners[reportID] == humanID else {
+                    throw BackupError.invalidRestoreData(.relationship)
+                }
+            }
         }
         for record in backup.humanNoteRecords ?? [] {
             try requireReference(record.humanId, in: humanIDs)
@@ -285,11 +335,7 @@ nonisolated enum DataBackupPreflightValidator {
                 try requireReference(recorder, in: humanIDs)
             }
         }
-        for expense in backup.petExpenseLogs {
-            if let recorder = expense.recordedByHumanId {
-                try requireReference(recorder, in: humanIDs)
-            }
-        }
+        try validateExpensePayerReferences(backup.petExpenseLogs, humanIDs: humanIDs)
         for symptom in backup.symptomLogs ?? [] {
             if let recorder = symptom.recordedByHumanId {
                 try requireReference(recorder, in: humanIDs)
@@ -310,6 +356,24 @@ nonisolated enum DataBackupPreflightValidator {
             }
             if !session.stockOwnerPetId.isEmpty {
                 try requireReference(session.stockOwnerPetId, in: petIDs)
+            }
+        }
+    }
+
+    private static func validateExpensePayerReferences(
+        _ expenses: [PetExpenseLogBackup],
+        humanIDs: Set<UUID>
+    ) throws {
+        for expense in expenses {
+            if let recorder = expense.recordedByHumanId {
+                try requireReference(recorder, in: humanIDs)
+            }
+            for contribution in ExpensePayerContributionPolicy.decode(
+                expense.payerContributionsJSON ?? ""
+            ) ?? [] {
+                if let humanID = contribution.humanID {
+                    try requireReference(humanID.uuidString, in: humanIDs)
+                }
             }
         }
     }

@@ -22,12 +22,12 @@ private struct PlantCareLogCompactNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 18)
                 .accessibilityHidden(true)
             Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -47,7 +47,7 @@ private struct PlantCareLogPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)
@@ -66,7 +66,7 @@ private extension View {
 
 struct PlantCareLogSheet: View {
     let plant: Plant
-    let onSave: (PlantCareType, String, PlantHealthStatus, Data?, UUID?) -> Void
+    let onSave: (PlantCareType, String, PlantHealthStatus, Data?, UUID?, @escaping (Bool) -> Void) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -78,6 +78,12 @@ struct PlantCareLogSheet: View {
     @State private var isLoadingPhoto = false
     @State private var showsAdvancedOptions = false
     @State private var note = ""
+    @State private var isSaving = false
+    @State private var saveFailed = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [selectedCareType.rawValue, selectedHealthStatus.rawValue, note]
+    }
     @State private var selectedExecutorID: UUID?
     @State private var requiresExecutorSelection = false
 
@@ -139,7 +145,7 @@ struct PlantCareLogSheet: View {
         initialCareType: PlantCareType,
         currentHealthStatus: PlantHealthStatus,
         initialExecutorID: UUID? = nil,
-        onSave: @escaping (PlantCareType, String, PlantHealthStatus, Data?, UUID?) -> Void
+        onSave: @escaping (PlantCareType, String, PlantHealthStatus, Data?, UUID?, @escaping (Bool) -> Void) -> Void
     ) {
         self.plant = plant
         self.onSave = onSave
@@ -150,9 +156,12 @@ struct PlantCareLogSheet: View {
     }
 
     var body: some View {
-        OhanaSheetWrapper(
+        OhanaEditorSheet(
             title: l.tr(zh: "记录植物护理", en: "Log plant care", de: "Pflanzenpflege erfassen"),
-            onDismiss: { dismiss() }
+            hasChanges: (initialDraft.map { $0 != editorDraft } ?? false) || selectedPhotoData != nil || selectedPhotoItem != nil,
+            isSaving: isSaving, canSave: !isLoadingPhoto && !requiresExecutorSelection,
+            saveIdentifier: "plant-care-log-save",
+            onCancel: { dismiss() }, onSave: saveRecord
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 plantCareSheetHero
@@ -165,12 +174,17 @@ struct PlantCareLogSheet: View {
                 careTypePicker
                 compactSaveNotice
                 advancedOptionsDisclosure
-                saveButton
             }
             .padding(.top, 18)
             .padding(.bottom, 24)
         }
         .accessibilityIdentifier("plant-care-log-sheet")
+        .onAppear { if initialDraft == nil { initialDraft = editorDraft } }
+        .alert(l.tr(zh: "未能保存", en: "Could not save", de: "Speichern fehlgeschlagen"), isPresented: $saveFailed) {
+            Button(l.done, role: .cancel) {}
+        } message: {
+            Text(l.tr(zh: "输入已保留，请重试。", en: "Your changes are kept. Please try again.", de: "Deine Eingaben bleiben erhalten. Bitte versuche es erneut."))
+        }
         .onChange(of: selectedPhotoItem) { _, item in
             loadPhoto(from: item)
         }
@@ -182,7 +196,7 @@ struct PlantCareLogSheet: View {
     private var plantCareSheetHero: some View {
         HStack(spacing: 12) {
             Image(systemName: careSymbol(for: selectedCareType)) // a11y: allow decorative sheet glyph; heading names the log.
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 44, height: 44)
                 .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
@@ -190,12 +204,12 @@ struct PlantCareLogSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "记录护理", en: "Log care", de: "Pflege erfassen"))
-                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text("\(plant.name) · \(selectedCareType.displayName(l: l))")
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -263,10 +277,10 @@ struct PlantCareLogSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: category.icon)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(category.shortTitle(l: l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -289,11 +303,11 @@ struct PlantCareLogSheet: View {
         } label: {
             HStack(spacing: 10) {
                 Text(l.tr(zh: "更多记录选项", en: "More log options", de: "Mehr Eintragsoptionen"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 8)
                 Text(advancedSummaryText)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -340,7 +354,7 @@ struct PlantCareLogSheet: View {
                             appendSuggestedNote(suggestion.text)
                         } label: {
                             Text(suggestion.text)
-                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -425,10 +439,10 @@ struct PlantCareLogSheet: View {
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                     HStack(spacing: 8) {
                         Image(systemName: isLoadingPhoto ? "hourglass" : "photo.badge.plus") // a11y: allow decorative picker glyph; label names the action.
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                             .accessibilityHidden(true)
                         Text(isLoadingPhoto ? l.tr(zh: "正在读取照片", en: "Loading photo", de: "Foto wird geladen") : l.tr(zh: "添加一张照片", en: "Add a photo", de: "Foto hinzufügen"))
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .lineLimit(1)
                             .minimumScaleFactor(0.76)
                     }
@@ -448,24 +462,21 @@ struct PlantCareLogSheet: View {
         }
     }
 
-    private var saveButton: some View {
-        PlantCareLogPrimaryButton(
-            title: l.tr(zh: "保存记录", en: "Save log", de: "Eintrag speichern"),
-            icon: "checkmark.circle.fill",
-            tint: tint
-        ) {
-            guard !requiresExecutorSelection else { return }
-            onSave(selectedCareType, trimmedNote, selectedHealthStatus, selectedPhotoData, selectedExecutorID)
-            dismiss()
+    private func saveRecord() {
+        guard !isSaving, !isLoadingPhoto, !requiresExecutorSelection else { return }
+        isSaving = true
+        Task { @MainActor in
+            await OhanaFrameScheduler.waitAfterNextFrame()
+            onSave(selectedCareType, trimmedNote, selectedHealthStatus, selectedPhotoData, selectedExecutorID) { didPersist in
+                isSaving = false
+                if didPersist { dismiss() } else { saveFailed = true }
+            }
         }
-        .disabled(isLoadingPhoto || requiresExecutorSelection)
-        .opacity(isLoadingPhoto || requiresExecutorSelection ? 0.62 : 1)
-        .accessibilityIdentifier("plant-care-log-save")
     }
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryText)
     }
 
@@ -479,10 +490,10 @@ struct PlantCareLogSheet: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon) // a11y: allow decorative chip glyph; chip text names the option.
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -513,10 +524,10 @@ struct PlantCareLogSheet: View {
     private func photoActionLabel(title: String, icon: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon) // a11y: allow decorative photo action glyph; text names the action.
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .accessibilityHidden(true)
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
         }

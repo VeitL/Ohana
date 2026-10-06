@@ -2,7 +2,21 @@ import Foundation
 import Testing
 @testable import Ohana
 
+@MainActor
 struct CareLedgerAnalysisScreenModelTests {
+    @Test func freeAndPersonalCareRangesStayConsistentWithHouseholdInsights() {
+        #expect(CareLedgerRangeFilter.allCases == [.week, .month, .days90, .year, .all])
+        #expect(!CareLedgerRangeFilter.week.requiresPersonal)
+        #expect(!CareLedgerRangeFilter.month.requiresPersonal)
+        #expect(CareLedgerRangeFilter.days90.requiresPersonal)
+        #expect(CareLedgerRangeFilter.year.requiresPersonal)
+        #expect(CareLedgerRangeFilter.all.requiresPersonal)
+        #expect(CareLedgerRangeFilter.week.trendDayCount == 7)
+        #expect(CareLedgerRangeFilter.month.trendDayCount == 30)
+        #expect(CareLedgerRangeFilter.days90.trendDayCount == 90)
+        #expect(CareLedgerRangeFilter.year.trendDayCount == 365)
+    }
+
     @Test func dailyTrendPointsTrackRangeAndKindFilter() {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
@@ -17,8 +31,7 @@ struct CareLedgerAnalysisScreenModelTests {
                 ledger(kind: .hygiene, occurredAt: yesterday.addingTimeInterval(60)),
                 ledger(kind: .walk, occurredAt: older)
             ],
-            pets: [],
-            humans: []
+            subjects: []
         )
 
         model.selectedRange = .week
@@ -79,8 +92,7 @@ struct CareLedgerAnalysisScreenModelTests {
                     metadataJSON: "{\"sharedSessionId\":\"\(sharedPetSession)\"}"
                 )
             ],
-            pets: [],
-            humans: []
+            subjects: []
         )
         model.selectedRange = .all
 
@@ -90,21 +102,57 @@ struct CareLedgerAnalysisScreenModelTests {
         #expect(model.kindStats.map(\.1).reduce(0, +) == 2)
     }
 
+    @Test func subjectSelectionKeepsFreeAnalysisScopedToOneObject() throws {
+        let now = Date()
+        let first = Pet(name: "Mochi", species: "cat")
+        let second = Pet(name: "Nori", species: "cat")
+        let firstSubject = CareLedgerAnalysisSubjectSnapshot(
+            id: "pet:\(first.id.uuidString)",
+            kind: CareLedgerSubjectKind.pet.rawValue,
+            subjectID: first.id.uuidString,
+            name: first.name
+        )
+        let secondSubject = CareLedgerAnalysisSubjectSnapshot(
+            id: "pet:\(second.id.uuidString)",
+            kind: CareLedgerSubjectKind.pet.rawValue,
+            subjectID: second.id.uuidString,
+            name: second.name
+        )
+        let model = CareLedgerAnalysisScreenModel()
+        model.applyQuerySnapshot(
+            ledgerEvents: [
+                ledger(kind: .care, occurredAt: now, subjectId: first.id.uuidString),
+                ledger(kind: .care, occurredAt: now, subjectId: second.id.uuidString)
+            ],
+            subjects: [firstSubject, secondSubject]
+        )
+
+        #expect(model.availableSubjects.map(\.name) == ["Mochi", "Nori"])
+        model.selectedSubjectKey = try #require(model.availableSubjects.first?.id)
+        #expect(model.realOperationCount == 1)
+        #expect(model.objectCoverageCount == 1)
+        model.selectedSubjectKey = nil
+        #expect(model.realOperationCount == 2)
+    }
+
     private func ledger(
         kind: CareLedgerEventKind,
         actionType: String? = nil,
         occurredAt: Date,
         subjectId: String = "pet-1",
         metadataJSON: String = ""
-    ) -> CareLedgerEvent {
-        CareLedgerEvent(
+    ) -> CareLedgerAnalysisEventSnapshot {
+        CareLedgerAnalysisEventSnapshot(
+            id: UUID(),
             occurredAt: occurredAt,
-            actorKind: .human,
+            actorKind: CareLedgerActorKind.human.rawValue,
             actorId: "human-1",
-            subjectKind: .pet,
+            subjectKind: CareLedgerSubjectKind.pet.rawValue,
             subjectId: subjectId,
-            eventKind: kind,
+            eventKind: kind.rawValue,
             actionType: actionType ?? kind.rawValue,
+            amountValue: 0,
+            coconutDelta: 0,
             metadataJSON: metadataJSON
         )
     }

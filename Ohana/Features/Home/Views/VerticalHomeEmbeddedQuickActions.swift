@@ -29,6 +29,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let quickAccessibilityLabel: String
     let detailAccessibilityLabel: String
     let detailAction: (() -> Void)?
+    let usesLabeledMenu: Bool
+    let quickActionTitle: String?
+    let primarySemantic: PetQuickActionSemantic?
     let optionAction: (String) -> Void
     let action: () -> Void
 
@@ -53,6 +56,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         quickAccessibilityLabel: String = "Quick action",
         detailAccessibilityLabel: String = "Details",
         detailAction: (() -> Void)? = nil,
+        usesLabeledMenu: Bool = false,
+        quickActionTitle: String? = nil,
+        primarySemantic: PetQuickActionSemantic? = nil,
         optionAction: @escaping (String) -> Void = { _ in },
         action: @escaping () -> Void
     ) {
@@ -77,6 +83,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.quickAccessibilityLabel = quickAccessibilityLabel
         self.detailAccessibilityLabel = detailAccessibilityLabel
         self.detailAction = detailAction
+        self.usesLabeledMenu = usesLabeledMenu
+        self.quickActionTitle = quickActionTitle
+        self.primarySemantic = primarySemantic
         self.optionAction = optionAction
         self.action = action
     }
@@ -105,6 +114,45 @@ nonisolated enum VerticalHomeEmbeddedQuickActionHitAreaPolicy {
 
     static func inlineMenuButtonWidth(buttonCount _: Int) -> CGFloat {
         minimumHitSize
+    }
+}
+
+nonisolated enum VerticalHomeQuickActionSecondaryMenuStyle {
+    static let editActionType = "secondary-menu-edit"
+    static let editSystemName = "square.and.pencil"
+    static let chartActionType = "secondary-menu-chart"
+    static let chartSystemName = "chart.line.uptrend.xyaxis"
+}
+
+private struct VerticalHomeQuickActionCellBoundsPreferenceKey: PreferenceKey {
+    static var defaultValue: [String: Anchor<CGRect>] = [:]
+
+    static func reduce(value: inout [String: Anchor<CGRect>], nextValue: () -> [String: Anchor<CGRect>]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, newValue in newValue })
+    }
+}
+
+struct VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+nonisolated enum VerticalHomeQuickActionReorderPolicy {
+    /// The existing move command inserts at the target's original index.
+    /// Convert the system's "before" destination to that command's target ID.
+    static func moveTargetID(order: [String], fromID: String, before destinationID: String?) -> String? {
+        guard let fromIndex = order.firstIndex(of: fromID) else { return nil }
+        guard let destinationID else {
+            return order.last == fromID ? nil : order.last
+        }
+        guard let destinationIndex = order.firstIndex(of: destinationID),
+              destinationID != fromID else { return nil }
+        let targetIndex = fromIndex < destinationIndex ? destinationIndex - 1 : destinationIndex
+        let targetID = order[targetIndex]
+        return targetID == fromID ? nil : targetID
     }
 }
 
@@ -176,31 +224,17 @@ struct VerticalHomeEmbeddedQuickActions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             header
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
-                ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
-                    actionCell(item, index: index)
-                        .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
-                }
-
-                if showsAddLauncher {
-                    addLauncherCell
-                        .transition(.opacity.combined(with: .scale(scale: 0.88, anchor: .center)))
-                        .zIndex(35)
-                }
-            }
-            .animation(GoMotion.selection, value: visibleItemsRevision)
-            .animation(GoMotion.selection, value: availableAddItemsRevision)
-            .onDrop(
-                of: [.plainText, .utf8PlainText],
-                delegate: VerticalHomeEmbeddedActionDropResetDelegate(
-                    isEnabled: isEditMode,
-                    draggingItemId: draggingItemId,
-                    lastDropTargetId: $lastDropTargetId
-                )
-            )
+            actionGrid
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
+        // Menus float below the dock cell. Give their semantic hit targets
+        // real layout space so the host card's hit-test bounds include them.
+        .padding(.bottom, openMenuHitTestOverflow)
+        .preference(
+            key: VerticalHomeEmbeddedQuickActionHitOverflowPreferenceKey.self,
+            value: openMenuHitTestOverflow
+        )
         .overlay(alignment: .bottom) {
             if isEditMode, showingAddPanel {
                 addOptionsPanel
@@ -219,8 +253,16 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .zIndex(120)
             }
         }
+        .overlayPreferenceValue(VerticalHomeQuickActionCellBoundsPreferenceKey.self) { anchors in
+            quickActionMenuOverlay(anchors: anchors)
+        }
         .onChange(of: visibleItemsRevision) { _, _ in
-            openActionId = nil
+            if let openActionId,
+               !visibleItems.contains(where: { item in
+                   item.id == openActionId && shouldOpenMenu(for: item)
+               }) {
+                self.openActionId = nil
+            }
             if visibleItems.count >= maxItems || availableAddItems.isEmpty {
                 showingAddPanel = false
             }
@@ -237,10 +279,96 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
     }
 
+    @ViewBuilder
+    private var actionGrid: some View {
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            if isEditMode {
+                actionGridContent
+                    .reorderContainer(for: VerticalHomeEmbeddedAction.self) { difference in
+                        applyNativeReorder(difference)
+                    }
+            } else {
+                actionGridContent
+            }
+        } else {
+            legacyDropGrid
+        }
+        #else
+        legacyDropGrid
+        #endif
+    }
+
+    private var legacyDropGrid: some View {
+        actionGridContent
+            .onDrop(
+                of: [.plainText, .utf8PlainText],
+                delegate: VerticalHomeEmbeddedActionDropResetDelegate(
+                    isEnabled: isEditMode,
+                    draggingItemId: draggingItemId,
+                    lastDropTargetId: $lastDropTargetId
+                )
+            )
+    }
+
+    private var actionGridContent: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(minimum: 0), spacing: 6), count: 4), spacing: 8) {
+            #if compiler(>=6.4)
+            if #available(iOS 27.0, *), isEditMode {
+                ForEach(visibleItems) { item in
+                    let index = visibleItems.firstIndex(where: { $0.id == item.id }) ?? 0
+                    actionCell(item, index: index)
+                        .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
+                }
+                .reorderable()
+            } else {
+                legacyActionCells
+            }
+            #else
+            legacyActionCells
+            #endif
+
+            if showsAddLauncher {
+                addLauncherCell
+                    .transition(.opacity.combined(with: .scale(scale: 0.88, anchor: .center)))
+                    .zIndex(35)
+            }
+        }
+        .animation(GoMotion.selection, value: visibleItemsRevision)
+        .animation(GoMotion.selection, value: availableAddItemsRevision)
+    }
+
+    private var legacyActionCells: some View {
+        ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
+            actionCell(item, index: index)
+                .zIndex(openActionId == item.id ? 40 : Double(visibleItems.count - index))
+        }
+    }
+
+    #if compiler(>=6.4)
+    @available(iOS 27.0, *)
+    private func applyNativeReorder(
+        _ difference: ReorderDifference<String, ReorderableSingleCollectionIdentifier>
+    ) {
+        guard let fromID = difference.sources.first else { return }
+        let destinationID: String? = switch difference.destination.position {
+        case let .before(id): id
+        case .end: nil
+        }
+        guard let targetID = VerticalHomeQuickActionReorderPolicy.moveTargetID(
+            order: visibleItems.map(\.id),
+            fromID: fromID,
+            before: destinationID
+        ) else { return }
+        OhanaFeedback.light()
+        onMove(fromID, targetID)
+    }
+    #endif
+
     private var header: some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goCardWhite.opacity(0.92))
             Spacer()
             if let onToggleEdit {
@@ -252,7 +380,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     onToggleEdit()
                 } label: {
                     Image(systemName: isEditMode ? "checkmark" : "pencil")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(isEditMode ? Color.goPrimary : Color.goCardWhite)
                         .frame(
@@ -269,13 +397,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
     }
 
+    @ViewBuilder
     private func actionCell(_ item: VerticalHomeEmbeddedAction, index: Int) -> some View {
-        ZStack {
-            Button {
-                performActionCellTap(item)
-            } label: {
-                actionCellContent(item)
-            }
+        let cell = ZStack {
+            actionCellTrigger(item)
             .buttonStyle(ScaleButtonStyle())
             .frame(maxWidth: .infinity)
             .frame(height: cellHeight)
@@ -284,46 +409,93 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
             ) // ui-v4: allow invisible quick-action hit surface so the full 72pt cell activates, including label/icon gaps.
             .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
-            .allowsHitTesting(!isEditMode && (!hasOpenActionMenu || openActionId == item.id))
             .accessibilityLabel(accessibilityLabel(for: item, statusText: statusText(for: item)))
             .accessibilityIdentifier("home-quick-action-\(item.actionType)")
             .highPriorityGesture(detailLongPressGesture(for: item))
+            // Apply hit-testing to the composed button, including its long-press
+            // recognizer, so it cannot intercept the overlapping inline menu.
+            .allowsHitTesting(!isEditMode && !hasOpenActionMenu)
 
-            if openActionId == item.id {
-                inlineMenu(item: item, detailAction: item.detailAction, index: index)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity
-                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
-                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
-                            removal: .opacity
-                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
-                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
-                        )
-                    )
-                    .zIndex(80)
+            #if compiler(>=6.4)
+            if isEditMode, #unavailable(iOS 27.0) {
+                editDragLayer(for: item)
             }
-
+            #else
             if isEditMode {
                 editDragLayer(for: item)
             }
+            #endif
         }
+        .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
         .scaleEffect(isDragging(item) ? 1.035 : 1)
         .opacity(isDragging(item) ? 0.72 : 1)
         .rotationEffect(.degrees(editJiggleAngle(for: item)))
         .animation(editJiggleAnimation, value: jiggle)
         .animation(GoMotion.selection, value: activeDraggingItemId)
-        .animation(motion, value: openActionId)
         .overlay(alignment: .topLeading) {
             if isEditMode {
                 removeButton(for: item)
             }
         }
-        .onDrop(
+        .anchorPreference(key: VerticalHomeQuickActionCellBoundsPreferenceKey.self, value: .bounds) {
+            [item.id: $0]
+        }
+        #if compiler(>=6.4)
+        if #available(iOS 27.0, *) {
+            cell
+        } else {
+            legacyDropCell(cell, targetID: item.id)
+        }
+        #else
+        legacyDropCell(cell, targetID: item.id)
+        #endif
+    }
+
+    @ViewBuilder
+    private func actionCellTrigger(_ item: VerticalHomeEmbeddedAction) -> some View {
+        if item.usesLabeledMenu, !isEditMode {
+            Menu {
+                if item.menuOptions.isEmpty, item.showsQuickButton || item.primarySemantic == .fillRecord {
+                    Button {
+                        item.action()
+                    } label: {
+                        Label(item.quickActionTitle ?? item.quickAccessibilityLabel, systemImage: item.primaryIcon)
+                    }
+                    .disabled(item.isPrimaryDisabled)
+                    .accessibilityIdentifier("home-quick-action-menu-\(item.id)-quick")
+                }
+                ForEach(item.menuOptions) { option in
+                    Button {
+                        item.optionAction(option.id)
+                    } label: {
+                        Label(option.title, systemImage: option.icon)
+                    }
+                    .accessibilityIdentifier("home-quick-action-menu-\(item.id)-\(option.id)")
+                }
+                if let detailAction = item.detailAction {
+                    Button(action: detailAction) {
+                        Label(item.detailAccessibilityLabel, systemImage: item.detailIcon)
+                    }
+                    .accessibilityIdentifier("home-quick-action-menu-\(item.id)-detail")
+                }
+            } label: {
+                actionCellContent(item)
+            }
+        } else {
+            Button {
+                performActionCellTap(item)
+            } label: {
+                actionCellContent(item)
+            }
+        }
+    }
+
+    private func legacyDropCell(_ content: some View, targetID: String) -> some View {
+        content.onDrop(
             of: [.plainText, .utf8PlainText],
             delegate: VerticalHomeEmbeddedActionDropDelegate(
                 isEnabled: isEditMode,
-                targetId: item.id,
+                targetId: targetID,
                 draggingItemId: draggingItemId,
                 lastDropTargetId: $lastDropTargetId,
                 onMove: onMove
@@ -357,18 +529,18 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 }
                 if item.isLocked, !isEditMode {
                     Image(systemName: "lock.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 8, weight: .black))
+                        .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                         .foregroundStyle(Color.goYellow)
                         .offset(x: 4, y: -4)
                 }
             }
             Text(item.title)
-                .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10.5, weight: .semibold, design: .default))
                 .foregroundStyle(state.foreground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
             Text(statusLine)
-                .font(OhanaFont.adaptive(size: 8.4, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 8.4, weight: .regular))
                 .foregroundStyle(state.statusForeground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
@@ -412,10 +584,12 @@ struct VerticalHomeEmbeddedQuickActions: View {
             if item.menuOptions.isEmpty {
                 if item.showsQuickButton {
                     inlineMenuButton(
-                        actionType: item.actionType,
-                        icon: item.isPrimaryDisabled ? "checkmark" : item.primaryIcon,
-                        tint: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.16) : Color.goPrimary,
-                        foreground: item.isPrimaryDisabled ? Color.goCardWhite.opacity(0.42) : Color.arkInk,
+                        actionType: VerticalHomeQuickActionSecondaryMenuStyle.editActionType,
+                        icon: item.isPrimaryDisabled
+                            ? "checkmark"
+                            : VerticalHomeQuickActionSecondaryMenuStyle.editSystemName,
+                        tint: item.isPrimaryDisabled ? Color.ohanaControlFill : Color.goPrimary,
+                        foreground: item.isPrimaryDisabled ? Color.ohanaTertiaryText : Color.arkInk,
                         accessibility: item.quickAccessibilityLabel,
                         accessibilityIdentifier: "home-quick-action-menu-\(item.id)-quick",
                         isDisabled: item.isPrimaryDisabled,
@@ -441,10 +615,10 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
             if let detailAction {
                 inlineMenuButton(
-                    actionType: "\(item.actionType)-detail",
-                    icon: item.detailIcon,
-                    tint: Color.goCardWhite.opacity(0.16),
-                    foreground: Color.goCardWhite,
+                    actionType: VerticalHomeQuickActionSecondaryMenuStyle.chartActionType,
+                    icon: VerticalHomeQuickActionSecondaryMenuStyle.chartSystemName,
+                    tint: Color.ohanaControlFill,
+                    foreground: Color.ohanaPrimaryText,
                     accessibility: item.detailAccessibilityLabel,
                     accessibilityIdentifier: "home-quick-action-menu-\(item.id)-detail",
                     isDisabled: false,
@@ -453,14 +627,9 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 )
             }
         }
-        .padding(6)
-        .background(Color.arkInk.opacity(0.34), in: Capsule()) // ui-v4: allow embedded quick action submenu contrast on dark card gradient
+        .modifier(VerticalHomeQuickActionSecondaryMenuSurface())
         .shadow(color: Color.arkInk.opacity(0.24), radius: 14, x: 0, y: 8) // ui-v4: allow embedded quick action submenu lift
         .fixedSize()
-        .offset(
-            x: menuOffsetX(index: index, buttonCount: buttonCount),
-            y: menuOffsetY(index: index)
-        )
     }
 
     private func shouldOpenMenu(for item: VerticalHomeEmbeddedAction) -> Bool {
@@ -550,13 +719,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: "plus").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent button owns the 72pt quick-action hit target.
                     .background(Color.goCardWhite.opacity(0.12), in: Circle())
                 Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                    .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10.5, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goCardWhite.opacity(0.74))
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
@@ -580,7 +749,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         VStack(spacing: 9) {
             HStack(spacing: 8) {
                 Text(l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 0)
                 Button {
@@ -590,7 +759,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     }
                 } label: {
                     Image(systemName: "xmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                         .background(Color.ohanaControlFill, in: Circle())
@@ -643,13 +812,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     primaryColor: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText
                 )
                 Text(item.title)
-                    .font(OhanaFont.adaptive(size: 9.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9.5, weight: .semibold, design: .default))
                     .foregroundStyle(item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
                 if let status = item.statusText, !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(status)
-                        .font(OhanaFont.adaptive(size: 7.6, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 7.6, weight: .semibold, design: .default))
                         .foregroundStyle(item.isAddDisabled ? Color.ohanaTertiaryText : Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.58)
@@ -660,7 +829,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
             if item.isAddDisabled {
                 Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .padding(6)
@@ -695,7 +864,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     )
                     .frame(width: 44, height: 44)
                     Text(item.title)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .fixedSize()
@@ -712,7 +881,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .fill(Color.goRed)
                     .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                 Image(systemName: "minus").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.arkInk)
             }
@@ -777,8 +946,11 @@ struct VerticalHomeEmbeddedQuickActions: View {
         }
     }
 
-    private func opensMenuAbove(index: Int) -> Bool {
-        !forcesSubmenusBelow && index >= 4
+    private func opensMenuAbove(index _: Int) -> Bool {
+        // These docks sit along the bottom edge of the Home surface. When a
+        // caller permits upward menus, keep every submenu in the visible area;
+        // otherwise the first row's menu is clipped below the bottom tabs.
+        !forcesSubmenusBelow
     }
 
     private func menuTransitionAnchor(index: Int) -> UnitPoint {
@@ -842,6 +1014,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             return l.tr(zh: "待处理", en: "Needs care", de: "Offen")
         }
         if showsCheckInStatus(for: item) {
+            if item.usesLabeledMenu { return PetCareExperienceCopy(l: l).noRecord }
             return l.tr(zh: "未打卡", en: "Open", de: "Offen")
         }
         return " "
@@ -882,6 +1055,49 @@ struct VerticalHomeEmbeddedQuickActions: View {
     }
 }
 
+private extension VerticalHomeEmbeddedQuickActions {
+    var openMenuHitTestOverflow: CGFloat {
+        guard let openActionId,
+              let index = visibleItems.firstIndex(where: { $0.id == openActionId }),
+              let item = visibleItems.first(where: { $0.id == openActionId }),
+              shouldOpenMenu(for: item),
+              !opensMenuAbove(index: index) else {
+            return 0
+        }
+        return VerticalHomeEmbeddedQuickActionHitAreaPolicy.minimumHitSize + 8
+    }
+
+    @ViewBuilder
+    func quickActionMenuOverlay(anchors: [String: Anchor<CGRect>]) -> some View {
+        GeometryReader { proxy in
+            if let openActionId,
+               let index = visibleItems.firstIndex(where: { $0.id == openActionId }),
+               let item = visibleItems.first(where: { $0.id == openActionId }),
+               let anchor = anchors[openActionId],
+               shouldOpenMenu(for: item) {
+                let buttonCount = menuButtonCount(for: item)
+                inlineMenu(item: item, detailAction: item.detailAction, index: index)
+                    .position(
+                        x: proxy[anchor].midX + menuOffsetX(index: index, buttonCount: buttonCount),
+                        y: proxy[anchor].midY + menuOffsetY(index: index)
+                    )
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity
+                                .combined(with: .scale(scale: 0.82, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 10))),
+                            removal: .opacity
+                                .combined(with: .scale(scale: 0.92, anchor: menuTransitionAnchor(index: index)))
+                                .combined(with: .offset(y: menuTransitionOffsetY(index: index, magnitude: 4)))
+                        )
+                    )
+                    .animation(motion, value: openActionId)
+                    .zIndex(120)
+            }
+        }
+    }
+}
+
 private struct VerticalHomeEmbeddedActionDropResetDelegate: DropDelegate {
     let isEnabled: Bool
     let draggingItemId: Binding<String?>?
@@ -903,6 +1119,25 @@ private struct VerticalHomeEmbeddedActionDropResetDelegate: DropDelegate {
 
     func dropExited(info _: DropInfo) {
         lastDropTargetId = nil
+    }
+}
+
+private struct VerticalHomeQuickActionSecondaryMenuSurface: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let surface = content.padding(6)
+        if #available(iOS 26.0, *), !reduceTransparency {
+            surface
+                .glassEffect(.regular, in: Capsule())
+        } else {
+            surface
+                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
+                }
+        }
     }
 }
 

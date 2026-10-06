@@ -220,7 +220,7 @@ scan_rule \
 
 scan_rule \
   "native-legacy-overlay-call" \
-  '\b(inlineFeedSheetOverlay|inlineWaterSheetOverlay|inlinePoopSheetOverlay|inlineTaskEditorOverlay|healthRecordInlineOverlay|medicationInlineOverlay|playPlanInlineOverlay|addMedicationOverlay)\b' \
+  '\b(inlineFeedSheetOverlay|inlineWaterSheetOverlay|inlinePoopSheetOverlay|inlineTaskEditorOverlay|healthRecordInlineOverlay|medicationInlineOverlay|playPlanInlineOverlay|addMedicationOverlay|critterNestPopupOverlay|OasisBentoFeatureInfoOverlay)\b' \
   "A runtime call to a legacy inline renderer recreates native sheet behavior." \
   ".sheet(item:), .sheet(isPresented:), .alert, .confirmationDialog, or Menu; compatibility definitions must carry a native-ui allow comment"
 
@@ -229,6 +229,12 @@ scan_rule \
   'isInlinePopup:\s*true' \
   "Inline popup mode draws its own sheet chrome and transition." \
   "Present the standard content with .sheet and use its non-inline mode"
+
+scan_rule \
+  "native-root-navigation" \
+  '\b(HomeBottomNavigationTabButton|HomeBottomContextActionChrome|HomeQuickRecordPopoutControl|HomeQuickRecordPopoutItemButton)\b' \
+  "The retired custom tab/menu renderer duplicates native selection, press and presentation behavior." \
+  "Native Picker through ohanaContentTabsPickerStyle plus Button/Menu in safeAreaBar; shared modal toolbar for exits"
 
 if [[ ! -s "$warnings_file" ]]; then
   echo "V4 UI audit: passed (${#files[@]} file(s))."

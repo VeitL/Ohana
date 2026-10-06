@@ -13,21 +13,28 @@ extension FamilyCollaborationDashboardView {
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "宠物地图", en: "Pet map", de: "Tierkarte"))
-                        .font(OhanaFont.title2(.black))
+                        .font(OhanaFont.title2(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
             }
 
             HStack(spacing: 8) {
-                mapScopeButton(.mine, title: l.tr(zh: "待我", en: "Mine", de: "Meine"), count: assignedFamilyTasks.count, icon: "person.crop.circle.badge.clock", tint: Color.goPurple)
-                mapScopeButton(.bounty, title: l.tr(zh: "悬赏", en: "Bounty", de: "Prämie"), count: bountyFamilyTasks.count, icon: "target", tint: Color.goTeal)
+                mapScopeButton(.mine, title: l.tr(zh: "待我", en: "Mine", de: "Meine"), count: assignedFamilyTasks.count, icon: "person.crop.circle.badge.clock", tint: Color.goPurple, selectedForeground: Color.goCardWhite)
+                mapScopeButton(.bounty, title: l.tr(zh: "悬赏", en: "Bounty", de: "Prämie"), count: bountyFamilyTasks.count, icon: "target", tint: Color.goTeal, selectedForeground: Color.arkInk)
                 progressScopePill
             }
         }
     }
 
-    func mapScopeButton(_ scope: TaskScope, title: String, count: Int, icon: String, tint: Color) -> some View {
+    func mapScopeButton(
+        _ scope: TaskScope,
+        title: String,
+        count: Int,
+        icon: String,
+        tint: Color,
+        selectedForeground: Color
+    ) -> some View {
         let selected = selectedTaskScope == scope
         return Button {
             UISelectionFeedbackGenerator().selectionChanged()
@@ -35,15 +42,15 @@ extension FamilyCollaborationDashboardView {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(title)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .lineLimit(1)
                 Text("\(count)")
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .monospacedDigit()
             }
-            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
+            .foregroundStyle(selected ? selectedForeground : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 9)
             .background(selected ? tint : Color.ohanaControlFill, in: Capsule())
@@ -54,12 +61,12 @@ extension FamilyCollaborationDashboardView {
     var progressScopePill: some View {
         HStack(spacing: 6) {
             Image(systemName: "chart.line.uptrend.xyaxis") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "完成", en: "Done", de: "Fertig"))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .lineLimit(1)
             Text("\(Int(boardProgress * 100))%")
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }
@@ -126,7 +133,7 @@ extension FamilyCollaborationDashboardView {
                 .background(Color.ohanaControlFill, in: Circle())
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.10), radius: 8, x: 0, y: 5) // ui-v4: allow small floating avatar shadow
             Text(human.name)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(human.id.uuidString == activeHumanId ? Color.goPrimary : Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .frame(width: 44)
@@ -156,6 +163,15 @@ extension FamilyCollaborationDashboardView {
         let rewards = familyTasks(for: pet).filter(\.hasReward).count
         let count = assigned + open + rewards
         let tint: Color = assigned > 0 ? Color.goPurple : (rewards > 0 ? Color.goTeal : (open > 0 ? Color.goYellow : Color.goPrimary))
+        let badgeForeground: Color = {
+            if assigned > 0 {
+                return OhanaResolvedPrimaryAccent(customHex: "A855F7")?.actionTextColor ?? Color.ohanaPrimaryText
+            }
+            if rewards > 0 || open > 0 {
+                return Color.arkInk
+            }
+            return Color.ohanaPrimaryActionText
+        }()
 
         return Button {
             UISelectionFeedbackGenerator().selectionChanged()
@@ -169,8 +185,8 @@ extension FamilyCollaborationDashboardView {
                     petMapAvatar(pet, selected: selected, tint: tint)
                     if count > 0 {
                         Text("\(count)")
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(badgeForeground)
                             .monospacedDigit()
                             .frame(width: 23, height: 23) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(tint, in: Circle())
@@ -178,7 +194,7 @@ extension FamilyCollaborationDashboardView {
                     }
                 }
                 Text(pet.name)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .frame(width: 82)

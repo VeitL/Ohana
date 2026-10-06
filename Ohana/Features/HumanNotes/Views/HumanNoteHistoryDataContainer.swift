@@ -10,19 +10,26 @@ import SwiftUI
 
 struct HumanNoteHistorySheet: View {
     let human: Human
+    var showsCloseButton = true
+    @Environment(AppServices.self) private var appServices
     @State private var refreshToken = 0
 
     var body: some View {
         HumanNoteHistoryDataContainer(
             human: human,
+            showsCloseButton: showsCloseButton,
             refreshToken: refreshToken,
             onRecordsChanged: { refreshToken += 1 }
         )
+        .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
+            refreshToken += 1
+        }
     }
 }
 
 private struct HumanNoteHistoryDataContainer: View {
     let human: Human
+    var showsCloseButton = true
     let refreshToken: Int
     let onRecordsChanged: () -> Void
     @Environment(\.modelContext) private var modelContext
@@ -37,6 +44,7 @@ private struct HumanNoteHistoryDataContainer: View {
             load: {
                 HumanNoteHistoryRouteData.load(
                     humanID: human.id,
+                    notes: human.notes,
                     context: modelContext
                 )
             }
@@ -44,7 +52,9 @@ private struct HumanNoteHistoryDataContainer: View {
             HumanNoteHistoryContent(
                 human: human,
                 humans: data.humans,
-                noteRecords: data.noteRecords,
+                noteEntries: data.noteEntries,
+                isLoading: !data.hasLoaded,
+                showsCloseButton: showsCloseButton,
                 onRecordsChanged: onRecordsChanged
             )
         }
@@ -53,12 +63,13 @@ private struct HumanNoteHistoryDataContainer: View {
 
 private struct HumanNoteHistoryRouteData {
     var humans: [Human] = []
-    var noteRecords: [HumanNoteRecord] = []
+    var noteEntries: [HumanNoteEntry] = []
     var hasLoaded = false
 
     @MainActor
     static func load(
         humanID: UUID,
+        notes: String,
         context: ModelContext
     ) -> HumanNoteHistoryRouteData {
         var humansDescriptor = FetchDescriptor<Human>(
@@ -67,12 +78,18 @@ private struct HumanNoteHistoryRouteData {
         humansDescriptor.fetchLimit = 64
         var noteDescriptor = FetchDescriptor<HumanNoteRecord>(
             predicate: #Predicate<HumanNoteRecord> { $0.humanId == humanID },
-            sortBy: [SortDescriptor(\HumanNoteRecord.sequence)]
+            sortBy: [SortDescriptor(\HumanNoteRecord.sequence, order: .reverse)]
         )
         noteDescriptor.fetchLimit = 1024
+        let records = fetch(noteDescriptor, context: context, name: "HumanNoteRecord").map {
+            HumanNoteTimelineRecord(
+                id: $0.id, humanID: $0.humanId, sequence: $0.sequence,
+                date: $0.date, rawEntry: $0.rawEntry, recordedByHumanId: $0.recordedByHumanId
+            )
+        }
         return HumanNoteHistoryRouteData(
             humans: fetch(humansDescriptor, context: context, name: "Human"),
-            noteRecords: fetch(noteDescriptor, context: context, name: "HumanNoteRecord"),
+            noteEntries: HumanNoteTimelineBuilder.entries(notes: notes, humanID: humanID, records: records),
             hasLoaded: true
         )
     }

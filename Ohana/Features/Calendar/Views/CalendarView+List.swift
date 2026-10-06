@@ -117,7 +117,7 @@ extension CalendarView {
                         .frame(width: 40)
 
                     Text(relativeDate(date))
-                        .font(OhanaFont.footnote(.black))
+                        .font(OhanaFont.footnote(.semibold))
                         .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : classicSoftText)
                         .tracking(0.5)
 
@@ -170,7 +170,7 @@ extension CalendarView {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text(l.tr(zh: "今天", en: "Today", de: "Heute"))
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(chipAccent)
                     Text(count == 0 ? l.tr(zh: "暂无事件", en: "No events", de: "Keine Ereignisse") : l.tr(zh: "\(count) 项", en: "\(count) items", de: "\(count) Eintraege"))
                         .font(OhanaFont.footnote(.bold))
@@ -192,12 +192,12 @@ extension CalendarView {
         let dayNumber = Calendar.current.component(.day, from: date)
         return VStack(spacing: 3) {
             Text(weekdayShort(date))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(isToday ? chipAccent : classicSoftText)
                 .textCase(.uppercase)
 
             Text("\(dayNumber)")
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(isToday ? chipSelFg : classicPrimaryText)
                 .ohanaNumericMotion(dayNumber)
                 .frame(width: 34, height: 34) // a11y: allow fixed-format noninteractive date badge
@@ -445,11 +445,13 @@ extension CalendarView {
             .flatMap { plantId in plants.first(where: { $0.id == plantId }) }
             .map { Color(hex: $0.themeColorHex) }
         let allowsUserEventDetail = CalendarEventInteractionPolicy.allowsUserEventDetail(for: event, pets: pets)
+        let allowsDirectMutation = CalendarEventInteractionPolicy.allowsDirectMutation(for: event)
         return SwipeableEventRow(
             event: event,
             occurrenceDate: occurrenceDate,
             petThemeColor: relatedPetColor,
             allowsUserEventDetail: allowsUserEventDetail,
+            allowsMutation: allowsDirectMutation,
             onComplete: {
                 toggleEventCompletion(event, occurrenceDate: occurrenceDate)
             },
@@ -460,7 +462,7 @@ extension CalendarView {
                 openEventDetail(
                     event,
                     occurrenceDate: occurrenceDate,
-                    allowsEditing: allowsUserEventDetail
+                    allowsEditing: allowsUserEventDetail && allowsDirectMutation
                 )
             },
             onOpenRelated: {
@@ -478,6 +480,7 @@ extension CalendarView {
     }
 
     func toggleEventCompletion(_ event: Event, occurrenceDate: Date) -> Bool {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else { return false }
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         if shouldComplete, event.requiresTodayFocusActionHuman {
             return requestActionHumanForEventCompletion(event, occurrenceDate: occurrenceDate)
@@ -493,7 +496,7 @@ extension CalendarView {
             currentLocalHumanID: UUID(uuidString: activeHumanIdStr),
             humans: options
         )
-        guard eligible.count > 1 else {
+        guard eligible.count > 1, preferredID == nil else {
             return performEventCompletion(event, occurrenceDate: occurrenceDate, executorID: preferredID?.uuidString)
         }
         pendingActionHumanConfirmation = ActionHumanConfirmationDraft(
@@ -513,6 +516,7 @@ extension CalendarView {
         occurrenceDate: Date,
         executorID: String?
     ) -> Bool {
+        guard CalendarEventInteractionPolicy.allowsDirectMutation(for: event) else { return false }
         let shouldComplete = !event.isOccurrenceMarkedComplete(on: occurrenceDate)
         if shouldComplete, let onCompleteEvent {
             if onCompleteEvent(event, occurrenceDate, executorID) {
@@ -536,6 +540,10 @@ extension CalendarView {
             )
             schedulePreparedCalendarSnapshotRebuild(force: true)
             return true
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return false
         } catch {
             appServices.domainRevisions.publishFailure(command: command, error: error)
             return false

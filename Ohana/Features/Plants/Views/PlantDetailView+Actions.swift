@@ -76,7 +76,7 @@ extension PlantDetailContentView {
         case .leafCleaning:
             openPlantCareFeatureDetail(for: .leafCleaning)
         case .profile:
-            showingEditSheet = true
+            showingBasicInfo = true
         case .photos:
             if galleryPhotoItems.isEmpty {
                 openCareLogSheet(.photo)
@@ -155,6 +155,14 @@ extension PlantDetailContentView {
     }
 
     func presentQuickCareConfirm(for careType: PlantCareType, detail: String? = nil) {
+        let human = PlantActionHumanSelectionResolver.resolve(
+            context: modelContext,
+            currentLocalHumanIDRaw: activeHumanIdRaw
+        )
+        if !human.needsConfirmation {
+            recordQuickCare(careType, executorID: human.defaultHumanID)
+            return
+        }
         quickCareExecutorID = nil
         quickCareConfirmDraft = PlantQuickCareConfirmDraft(
             careType: careType,
@@ -186,19 +194,22 @@ extension PlantDetailContentView {
         careNote: String,
         healthStatus: PlantHealthStatus,
         photoData: Data?,
-        executorID: UUID?
+        executorID: UUID?,
+        completion: @escaping (Bool) -> Void
     ) {
         recordCare(
             type,
             executorId: executorID?.uuidString,
             careNote: careNote,
             photoData: photoData,
-            healthStatus: healthStatus
+            healthStatus: healthStatus,
+            completion: completion
         )
     }
 
     func recordQuickCare(_ type: PlantCareType, executorID: UUID?) {
         guard !pendingDetailQuickCareTypes.contains(type) else { return }
+        guard !(pendingBatchCareUndoToken?.items.contains { $0.plantID == plant.id && $0.careType == type } ?? false) else { return }
         quickCareConfirmDraft = nil
         withAnimation(GoMotion.feedback) {
             pendingDetailQuickCareTypes.insert(type)
@@ -207,13 +218,17 @@ extension PlantDetailContentView {
         }
 
         let plantID = plant.id
+        let selection = PlantBatchCareSelection(plantID: plantID, careType: type)
+        let operationID = quickCareOperationIDs[type] ?? UUID()
+        quickCareOperationIDs[type] = operationID
         commandQueue.enqueue(.plantCare(plantID: plantID, action: type.rawValue)) {
-            let result = commandExecutor.recordPlantCare(
-                type,
-                plant: plant,
-                executorId: executorID?.uuidString
+            let result = commandExecutor.recordPlantBatchQuickCare(
+                selections: [selection],
+                executorId: executorID?.uuidString,
+                operationID: operationID
             )
-            guard result.didPersist else {
+            let didCommit = handleBatchQuickCareResult(result, selections: [selection])
+            guard didCommit else {
                 withAnimation(GoMotion.feedback) {
                     pendingDetailQuickCareTypes.remove(type)
                     failedDetailQuickCareTypes.insert(type)
@@ -221,13 +236,63 @@ extension PlantDetailContentView {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
             }
+            quickCareOperationIDs[type] = nil
             withAnimation(GoMotion.feedback) {
                 pendingDetailQuickCareTypes.remove(type)
                 completedDetailQuickCareTypes.insert(type)
             }
-            showQuickCareToast(type: type, result: result)
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
         }
+    }
+
+    func deferCare(_ type: PlantCareType, byDays days: Int) {
+        let date = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date().addingTimeInterval(Double(days) * 86400)
+        deferCare(type, until: date, wetSoil: days == 1 && type == .watering && !plant.isHydroponic)
+    }
+
+    func deferCare(_ type: PlantCareType, until date: Date, wetSoil: Bool = false) {
+        OhanaFeedback.light()
+        let result = commandExecutor.deferPlantCare(
+            plant: plant,
+            careType: type,
+            until: date,
+            wetSoil: wetSoil,
+            executorId: activeHumanIdRaw
+        )
+        guard result.didPersist else {
+            careActionFailureText = result.persistenceErrorDescription ?? l.tr(
+                zh: "没有修改检查时间，请重试。",
+                en: "The check date was not changed. Please try again.",
+                de: "Der Prüftermin wurde nicht geändert. Bitte erneut versuchen."
+            )
+            showingCareActionFailure = true
+            return
+        }
+        if result.didChange {
+            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
+        }
+    }
+
+    func enableWateringCheckReminder() {
+        OhanaFeedback.light()
+        let result = commandExecutor.enablePlantWateringCheck(plant: plant, intervalDays: draftWateringCheckDays)
+        guard result.didPersist else {
+            careActionFailureText = result.persistenceErrorDescription ?? l.tr(
+                zh: "提醒设置未保存，请重试。",
+                en: "Reminder settings were not saved. Please try again.",
+                de: "Erinnerung konnte nicht gespeichert werden. Bitte erneut versuchen."
+            )
+            showingCareActionFailure = true
+            return
+        }
+        showingWaterReminderOptIn = false
+        Task {
+            if await appServices.userNotifications.authorizationStatus() == .notDetermined {
+                _ = await appServices.userNotifications.requestPermission()
+            }
+            notificationAuthorizationStatus = await appServices.userNotifications.authorizationStatus()
+        }
+        schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
     }
 
     func openBatchQuickRecordFromDetail(careType: PlantCareType) {
@@ -264,10 +329,12 @@ extension PlantDetailContentView {
         guard !selections.isEmpty else { return false }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         let executorId = executorID?.uuidString
+        let operationID = UUID()
         await OhanaFrameScheduler.waitAfterNextFrame()
         let result = commandExecutor.recordPlantBatchQuickCare(
             selections: selections,
-            executorId: executorId
+            executorId: executorId,
+            operationID: operationID
         )
         return handleBatchQuickCareResult(result, selections: selections)
     }
@@ -277,15 +344,14 @@ extension PlantDetailContentView {
         selections: [PlantBatchCareSelection]
     ) -> Bool {
         guard result.didPersist else {
-            presentBatchCareFailure(result.persistenceErrorDescription)
+            presentQuickOrBatchCareFailure(result.persistenceErrorDescription, selectionCount: selections.count)
             return false
         }
         guard result.skipped.isEmpty else {
-            presentBatchCareFailure(l.tr(
-                zh: "植物状态已变化，整批未写入。请刷新后重新选择。",
-                en: "Plant status changed, so nothing was written. Refresh and select again.",
-                de: "Der Pflanzenstatus hat sich geändert. Es wurde nichts gespeichert; bitte neu auswählen."
-            ))
+            let detail = selections.count == 1
+                ? l.tr(zh: "植物状态已变化，未记录这次护理。请刷新后重试。", en: "Plant status changed. Care was not logged; refresh and try again.", de: "Der Pflanzenstatus hat sich geändert. Bitte aktualisieren und erneut versuchen.")
+                : l.tr(zh: "植物状态已变化，整批未写入。请刷新后重新选择。", en: "Plant status changed, so nothing was written. Refresh and select again.", de: "Der Pflanzenstatus hat sich geändert. Es wurde nichts gespeichert; bitte neu auswählen.")
+            presentQuickOrBatchCareFailure(detail, selectionCount: selections.count)
             return false
         }
         guard result.didWrite else { return true }
@@ -296,6 +362,16 @@ extension PlantDetailContentView {
         scheduleDetailBatchCareRewardCommit(for: token)
         showDetailBatchCareSuccess(result, selections: selections)
         return true
+    }
+
+    func presentQuickOrBatchCareFailure(_ detail: String?, selectionCount: Int) {
+        if selectionCount == 1 {
+            careActionFailureText = detail ?? l.tr(zh: "没有记录这次护理，请重试。", en: "Care was not logged. Please try again.", de: "Pflege wurde nicht erfasst. Bitte erneut versuchen.")
+            showingCareActionFailure = true
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+        } else {
+            presentBatchCareFailure(detail)
+        }
     }
 
     func undoPendingBatchCareFromDetail() {
@@ -399,7 +475,8 @@ extension PlantDetailContentView {
         executorId: String?,
         careNote: String = "",
         photoData: Data? = nil,
-        healthStatus: PlantHealthStatus? = nil
+        healthStatus: PlantHealthStatus? = nil,
+        completion: ((Bool) -> Void)? = nil
     ) {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
@@ -418,29 +495,25 @@ extension PlantDetailContentView {
             } else {
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
             }
+            completion?(result.didPersist)
         }
     }
 
     func deferTaskOneDay(_ task: PlantCareTaskSnapshot, reason: String? = nil) {
-        let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        let reasonSuffix = reason.map { "|\($0)" } ?? ""
-        recordCare(
-            .customNote,
-            executorId: currentExecutorId(),
-            careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)"
-        )
+        deferCare(task.careType, until: tomorrow, wetSoil: reason == "soilWet")
     }
 
     func skipTask(_ task: PlantCareTaskSnapshot, reason: String? = nil) {
-        let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        let reasonSuffix = reason.map { "|\($0)" } ?? ""
-        recordCare(
-            .customNote,
-            executorId: currentExecutorId(),
-            careNote: "skip:\(task.careType.rawValue):\(formatter.string(from: tomorrow))\(reasonSuffix)"
-        )
+        OhanaFeedback.light()
+        let result = commandExecutor.deferPlantCare(plant: plant, careType: task.careType, until: tomorrow, skip: true, executorId: currentExecutorId())
+        if result.didPersist {
+            schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
+        } else {
+            careActionFailureText = result.persistenceErrorDescription ?? l.tr(zh: "没有修改检查时间，请重试。", en: "The check date was not changed. Please try again.", de: "Der Prüftermin wurde nicht geändert. Bitte erneut versuchen.")
+            showingCareActionFailure = true
+        }
     }
 
     func currentExecutorId() -> String? {
@@ -506,6 +579,11 @@ extension PlantDetailContentView {
                 plant,
                 note: "plant.detail.restore"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

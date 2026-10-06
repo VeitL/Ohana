@@ -62,16 +62,16 @@ extension QuickPottyDetailSheet {
         )
     }
 
-    func startPottyPlanSave(_ operation: @escaping @MainActor () -> Void) {
+    func startPottyPlanSave(_ operation: @escaping @MainActor () -> Bool) {
         guard !isSavingPottyPlan else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             return
         }
         isSavingPottyPlan = true
         pottyPlanSaveTask?.cancel()
-        dismissInlinePoopSheet()
         pottyPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: pottyPlanSaveDelayMilliseconds) {
-            operation()
+            if operation() { dismissInlinePoopSheet() }
+            else { planSaveFailed = true }
             isSavingPottyPlan = false
             pottyPlanSaveTask = nil
         }
@@ -81,72 +81,108 @@ extension QuickPottyDetailSheet {
         workloadPolicy.interactionMotionBudget(isVisible: true).allowsMotion ? 120 : 40
     }
 
-    func syncScoopPlan(showToast: Bool) {
+    @discardableResult
+    func syncScoopPlan(showToast: Bool) -> Bool {
         syncScoopPlan(for: selectedPottyTargets, showToast: showToast)
     }
 
-    func syncScoopPlan(for targets: [Pet], showToast: Bool) {
-        var scheduledReminders: [Reminder] = []
-        for target in targets {
-            persistScoopSettings(for: target)
-            if let event = CarePlanCalendarSync.syncScoopPlan(
-                pet: target,
-                context: modelContext,
+    @discardableResult
+    func syncScoopPlan(for targets: [Pet], showToast: Bool) -> Bool {
+        do {
+            let events = try pottyCommandExecutor.syncScoopPlans(
+                pets: targets,
+                allEvents: allEvents,
                 intervalDays: scoopIntervalDays,
                 enabled: scoopReminderOn,
                 anchor: scoopAnchorDate
-            ) {
-                scheduledReminders.append(contentsOf: event.reminders)
+            )
+            for target in targets {
+                persistScoopSettings(for: target)
+            }
+            if scoopReminderOn {
+                scheduleCarePlanReminders(events.flatMap(\.reminders))
+            }
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showSaveConfirmation(scoopReminderOn ? l.tr(zh: "铲砂提醒已保存", en: "Scoop reminder saved", de: "Klo-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            }
+            return true
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            }
+        } catch {
+            if showToast {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "scoopPlan"),
+                    error: error
+                )
+                showSaveConfirmation(l.tr(zh: "保存失败，请重试", en: "Save failed. Please try again.", de: "Speichern fehlgeschlagen. Bitte erneut versuchen."))
             }
         }
-        if scoopReminderOn {
-            scheduleCarePlanReminders(scheduledReminders)
-        }
-        if showToast {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(scoopReminderOn ? l.tr(zh: "铲砂提醒已保存", en: "Scoop reminder saved", de: "Klo-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
-        }
+        return false
     }
 
-    func syncLitterChangePlan(showToast: Bool) {
+    @discardableResult
+    func syncLitterChangePlan(showToast: Bool) -> Bool {
         syncLitterChangePlan(for: selectedPottyTargets, showToast: showToast)
     }
 
-    func syncLitterChangePlan(for targets: [Pet], showToast: Bool) {
-        var scheduledReminders: [Reminder] = []
-        for target in targets {
-            persistLitterChangeSettings(for: target)
-            if let event = CarePlanCalendarSync.syncLitterFullChangePlan(
-                pet: target,
-                context: modelContext,
+    @discardableResult
+    func syncLitterChangePlan(for targets: [Pet], showToast: Bool) -> Bool {
+        do {
+            let events = try pottyCommandExecutor.syncLitterFullChangePlans(
+                pets: targets,
+                allEvents: allEvents,
                 intervalDays: litterChangeIntervalDays,
                 enabled: litterReminderOn,
                 cycleAnchor: litterCycleAnchorDate
-            ) {
-                scheduledReminders.append(contentsOf: event.reminders)
+            )
+            for target in targets {
+                persistLitterChangeSettings(for: target)
+            }
+            if litterReminderOn {
+                scheduleCarePlanReminders(events.flatMap(\.reminders))
+            }
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showSaveConfirmation(litterReminderOn ? l.tr(zh: "换砂提醒已保存", en: "Litter reminder saved", de: "Streu-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            }
+            return true
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            }
+        } catch {
+            if showToast {
+                appServices.domainRevisions.publishFailure(
+                    command: .quickCare(entityID: pet.id, action: "litterChangePlan"),
+                    error: error
+                )
+                showSaveConfirmation(l.tr(zh: "保存失败，请重试", en: "Save failed. Please try again.", de: "Speichern fehlgeschlagen. Bitte erneut versuchen."))
             }
         }
-        if litterReminderOn {
-            scheduleCarePlanReminders(scheduledReminders)
-        }
-        if showToast {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(litterReminderOn ? l.tr(zh: "换砂提醒已保存", en: "Litter reminder saved", de: "Streu-Erinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
-        }
+        return false
     }
 
-    func deleteScoopPlan() {
+    @discardableResult
+    func deleteScoopPlan() -> Bool {
         scoopReminderOn = false
-        syncScoopPlan(showToast: false)
+        guard syncScoopPlan(showToast: false) else { return false }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         showSaveConfirmation(l.tr(zh: "铲砂计划已删除", en: "Scoop plan deleted", de: "Klo-Plan gelöscht"))
+        return true
     }
 
-    func deleteLitterChangePlan() {
+    @discardableResult
+    func deleteLitterChangePlan() -> Bool {
         litterReminderOn = false
-        syncLitterChangePlan(showToast: false)
+        guard syncLitterChangePlan(showToast: false) else { return false }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         showSaveConfirmation(l.tr(zh: "换砂计划已删除", en: "Litter plan deleted", de: "Streu-Plan gelöscht"))
+        return true
     }
 
     func showSaveConfirmation(_ message: String) {
@@ -183,10 +219,12 @@ extension QuickPottyDetailSheet {
             isCommittingPottyLog = false
             guard let result else {
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
                 return
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            savedRecord = result.recordReference
+            selectedSharedPottyPetIds = [pet.id]
             let delta = result.coconutDelta
             pottyFeedbackToken = CheckInFeedbackToken(kind: .gain, deltaText: delta > 0 ? "+\(delta)" : "+1", tint: pottyTint)
             scheduleFeedbackClear()
@@ -203,17 +241,19 @@ extension QuickPottyDetailSheet {
         let executorId = selectedActionHumanID?.uuidString
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "unknownSharedPotty")) {
-            guard pottyCommandExecutor.recordUnknownSharedPotty(
+            guard let result = pottyCommandExecutor.recordUnknownSharedPotty(
                 sourcePetID: pet.id,
                 targetIDs: targetIDs,
                 type: .perfectPoop,
                 executorId: executorId,
                 date: Date()
-            ) != nil else {
+            ) else {
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
                 return
             }
+            savedRecord = result.recordReference
+            selectedSharedPottyPetIds = [pet.id]
             SharedPetSelectionMemory.saveSelection(
                 targetIDs,
                 sourcePet: pet,
@@ -264,7 +304,7 @@ extension QuickPottyDetailSheet {
                 )
             ) else {
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
                 return
             }
             if let undoToken = result.undoToken {
@@ -281,6 +321,8 @@ extension QuickPottyDetailSheet {
                 )
                 syncScoopPlan(for: targets, showToast: false)
             }
+            savedRecord = result.recordReference
+            selectedSharedPottyPetIds = [pet.id]
             let delta = result.coconutDelta
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             scoopFeedbackToken = CheckInFeedbackToken(kind: .done, deltaText: "✓", tint: scoopTint)
@@ -309,22 +351,24 @@ extension QuickPottyDetailSheet {
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: "litterFullChange")) {
             guard canApplyPottyDerivedEffects(executorId: executorId) else {
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
                 return
             }
 
             if shouldRecordLitterCare {
-                guard pottyCommandExecutor.recordLitterCare(
+                guard let result = pottyCommandExecutor.recordLitterCare(
                     sourcePetID: pet.id,
                     targetIDs: targetIDs,
                     executorId: executorId,
                     date: now,
                     isFullChange: true
-                ) != nil else {
+                ) else {
                     UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                    showSaveConfirmation(l.tr(zh: "未找到成员", en: "Member not found", de: "Mitglied nicht gefunden"))
+                    showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
                     return
                 }
+                savedRecord = result.recordReference
+                selectedSharedPottyPetIds = [pet.id]
             }
             LitterCareSettingsStore.markFullChange(petKey: petKey, changedAt: now, cycleAnchor: cycleAnchor)
             SharedPetSelectionMemory.saveSelection(

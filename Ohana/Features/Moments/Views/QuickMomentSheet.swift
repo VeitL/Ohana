@@ -42,8 +42,13 @@ struct QuickMomentSheet: View {
     @State private var manualPlace = ""
     @StateObject private var locationModel = MomentLocationModel()
     @State private var selectedRecorderHumanID: UUID?
-    @State private var requiresRecorderSelection = false
+    @State private var requiresRecorderSelection = true
     @State private var isSaving = false
+    @State private var isLoadingPhotos = false
+    @State private var savedRecord: PetRecordReference?
+    @State private var saveError: String?
+    @State private var moreOptionsExpanded = false
+    @State private var recordDate = Date()
     @State private var savedSuccess = false
     @State private var showLocationInput = false
     @State private var adaptiveSheetHeight: CGFloat = 540
@@ -53,14 +58,23 @@ struct QuickMomentSheet: View {
     @State private var popupDragOffset: CGFloat = 0
 
     /// 记录时刻强调色：有宠物时用主题色
-    private var momentAccent: Color {
-        guard let pet else { return Color.goPrimary }
+    private var momentAccentHex: String? {
+        guard let pet else { return nil }
         let hex = pet.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Color(hex: hex.isEmpty ? "FF7600" : hex)
+        return hex.isEmpty ? "FF7600" : hex
+    }
+
+    private var momentAccent: Color {
+        momentAccentHex.map { Color(hex: $0) } ?? Color.goPrimary
+    }
+
+    private var momentAccentForeground: Color {
+        guard let momentAccentHex else { return Color.ohanaPrimaryActionText }
+        return OhanaResolvedPrimaryAccent(customHex: momentAccentHex)?.actionTextColor ?? Color.ohanaPrimaryText
     }
 
     private var canSave: Bool {
-        (!selectedPhotos.isEmpty || !trimmedNote.isEmpty) && !requiresRecorderSelection
+        (!selectedPhotos.isEmpty || !trimmedNote.isEmpty) && !requiresRecorderSelection && !isLoadingPhotos
     }
 
     private let maxDraftPhotos = 9
@@ -74,16 +88,24 @@ struct QuickMomentSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    if let pet {
+                        Text(pet.name)
+                            .font(OhanaFont.headline())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 22)
+                    }
                     photoSection
                     moodAndNoteSection
-                    locationCompactSection
-                    QuickCareActionHumanPickerContainer(
-                        selectedHumanID: $selectedRecorderHumanID,
-                        requiresSelection: $requiresRecorderSelection,
-                        role: .recorder,
-                        tint: momentAccent
-                    )
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    DisclosureGroup(PetCareExperienceCopy(l: l).moreOptions, isExpanded: $moreOptionsExpanded) {
+                        DatePicker(PetCareExperienceCopy(l: l).recordTime, selection: $recordDate)
+                        locationCompactSection
+                        QuickCareActionHumanPickerContainer(
+                            selectedHumanID: $selectedRecorderHumanID,
+                            requiresSelection: $requiresRecorderSelection,
+                            role: .recorder,
+                            tint: momentAccent
+                        )
+                    }
                     .padding(.horizontal, 22)
                 }
                 .padding(.vertical, 12)
@@ -91,10 +113,13 @@ struct QuickMomentSheet: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))
             .navigationBarTitleDisplayMode(.inline)
+            .ohanaEditorChrome(
+                hasChanges: !noteText.isEmpty || !manualPlace.isEmpty || !selectedPhotos.isEmpty || !selectedItems.isEmpty,
+                isSaving: isSaving || isLoadingPhotos, canSave: canSave,
+                saveIdentifier: "pet-moment-save", onCancel: close, onSave: saveRecord
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { close() }
-                }
+
                 if onRemove != nil {
                     ToolbarItem(placement: .secondaryAction) {
                         Button(role: .destructive) {
@@ -105,15 +130,14 @@ struct QuickMomentSheet: View {
                         }
                     }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveRecord() }
-                        .disabled(!canSave || isSaving)
-                }
+
             }
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .onChange(of: selectedItems) { _, newItems in
+            guard !newItems.isEmpty else { return }
+            isLoadingPhotos = true
             Task {
                 var loaded: [MomentDraftPhoto] = []
                 for item in newItems {
@@ -129,6 +153,11 @@ struct QuickMomentSheet: View {
                     }
                 }
                 await MainActor.run {
+                    isLoadingPhotos = false
+                    guard loaded.count == newItems.count else {
+                        saveError = PetCareExperienceCopy(l: l).saveFailed
+                        return
+                    }
                     appendDraftPhotos(loaded)
                     selectedItems = []
                 }
@@ -139,10 +168,10 @@ struct QuickMomentSheet: View {
             appendDraftPhotos([MomentDraftPhoto(image: img)])
             capturedImage = nil
         }
-        .overlay {
-            if savedSuccess {
-                successOverlay
-            }
+        .petRecordFeedback($savedRecord)
+        .petRecordAttribution(selectedHumanID: $selectedRecorderHumanID, requiresSelection: $requiresRecorderSelection)
+        .alert(PetCareExperienceCopy(l: l).saveFailed, isPresented: Binding(get: { saveError != nil }, set: { if !$0 { saveError = nil } })) {
+            Button(l.done, role: .cancel) { saveError = nil }
         }
         .onDisappear {
             commandQueue.cancelAll()
@@ -223,7 +252,7 @@ struct QuickMomentSheet: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pet.name)
                         .font(OhanaFont.caption(.semibold))
@@ -232,7 +261,7 @@ struct QuickMomentSheet: View {
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "快速记录", en: "Quick Moment", de: "Schneller Moment"))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "文字和照片会进入记录中心", en: "Text and photos go to Moments", de: "Text und Fotos landen in Momente"))
                         .font(OhanaFont.caption(.semibold))
@@ -247,7 +276,7 @@ struct QuickMomentSheet: View {
                     close()
                 } label: {
                     Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .contentShape(Rectangle())
@@ -298,7 +327,7 @@ struct QuickMomentSheet: View {
 
                 if !resolvedPlaceDisplay.isEmpty {
                     Text(resolvedPlaceDisplay)
-                        .font(OhanaFont.adaptive(size: 15, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 15, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Spacer(minLength: 0)
@@ -327,8 +356,8 @@ struct QuickMomentSheet: View {
                         locationModel.requestFix(locationProvider: appServices.location)
                     } label: {
                         Text(l.tr(zh: "定位", en: "Locate", de: "Orten"))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.arkInk)
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(momentAccentForeground)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
                             .background(Capsule().fill(momentAccent))
@@ -385,17 +414,24 @@ struct QuickMomentSheet: View {
                             title: selectedPhotos.isEmpty
                                 ? l.tr(zh: "相册", en: "Album", de: "Album")
                                 : l.tr(zh: "继续添加", en: "Add More", de: "Mehr hinzufügen"),
-                            color: momentAccent
+                            color: momentAccent,
+                            foreground: momentAccentForeground
                         )
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .disabled(selectedPhotos.count >= maxDraftPhotos)
+                    .disabled(selectedPhotos.count >= maxDraftPhotos || isSaving || isLoadingPhotos)
+                    .accessibilityIdentifier("pet-moment-photo-picker")
 
                     Button { presentMomentCamera() } label: {
-                        photoActionLabel(icon: "camera.fill", title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"), color: Color.goTeal)
+                        photoActionLabel(
+                            icon: "camera.fill",
+                            title: l.tr(zh: "拍照", en: "Camera", de: "Kamera"),
+                            color: Color.goTeal,
+                            foreground: Color.arkInk
+                        )
                     }
                     .buttonStyle(ScaleButtonStyle())
-                    .disabled(selectedPhotos.count >= maxDraftPhotos)
+                    .disabled(selectedPhotos.count >= maxDraftPhotos || isSaving || isLoadingPhotos)
                 }
 
                 Text(selectedPhotos.isEmpty
@@ -431,14 +467,17 @@ struct QuickMomentSheet: View {
                 }
             } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goRed, in: Circle())
             }
             .padding(10)
         }
-        .frame(width: max(0, min(ScreenCompat.width - 64, 320)), height: 240)
+        .containerRelativeFrame(.horizontal) { width, _ in
+            max(0, min(width - 44, 320))
+        }
+        .frame(height: 240)
         .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
@@ -446,14 +485,14 @@ struct QuickMomentSheet: View {
         }
     }
 
-    private func photoActionLabel(icon: String, title: String, color: Color) -> some View {
+    private func photoActionLabel(icon: String, title: String, color: Color, foreground: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(foreground)
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
         .background(color, in: Capsule())
@@ -478,7 +517,7 @@ struct QuickMomentSheet: View {
                     ForEach(moodTags, id: \.self) { tag in
                         Button { appendMoodTag(tag) } label: {
                             Text(tag)
-                                .font(OhanaFont.caption(.black))
+                                .font(OhanaFont.caption(.semibold))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
                                 .background(Capsule().fill(Color.ohanaControlFill))
@@ -499,6 +538,8 @@ struct QuickMomentSheet: View {
                         .allowsHitTesting(false)
                 }
                 TextEditor(text: $noteText)
+                    .accessibilityLabel(PetCareExperienceCopy(l: l).note)
+                    .accessibilityIdentifier("pet-moment-note")
                     .font(OhanaFont.body(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(minHeight: 118, maxHeight: 154)
@@ -533,7 +574,7 @@ struct QuickMomentSheet: View {
             HStack(spacing: 8) {
                 if isSaving {
                     ProgressView()
-                        .tint(Color.arkInk)
+                        .tint(Color.ohanaPrimaryActionText)
                         .scaleEffect(0.8)
                 } else {
                     Image(systemName: canSave ? "checkmark.circle.fill" : "lock.fill")
@@ -544,9 +585,9 @@ struct QuickMomentSheet: View {
                     : (canSave
                         ? l.tr(zh: "保存这一刻", en: "Save Moment", de: "Moment speichern")
                         : l.tr(zh: "写点什么或添加照片", en: "Add text or a photo", de: "Text oder Foto hinzufügen")))
-                    .font(OhanaFont.body(.black))
+                    .font(OhanaFont.body(.semibold))
             }
-            .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
+            .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(
@@ -570,7 +611,7 @@ struct QuickMomentSheet: View {
                 .font(OhanaFont.adaptive(size: 48)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(momentAccent)
             Text(l.tr(zh: "时刻已记录！", en: "Moment saved!", de: "Moment gespeichert!"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.opacity(0.18)) // ui-v4: allow transient success overlay scrim
@@ -579,7 +620,8 @@ struct QuickMomentSheet: View {
     // MARK: - Save Logic
 
     private func saveRecord() {
-        guard canSave else { return }
+        guard canSave, !isSaving else { return }
+        savedRecord = nil
         isSaving = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
@@ -593,14 +635,14 @@ struct QuickMomentSheet: View {
         let lat = locationModel.latitude
         let lon = locationModel.longitude
         let hasCoords = lat != 0 || lon != 0
-        let baseDate = Date()
+        let baseDate = recordDate
         let draftPhotos = selectedPhotos
         let executorId = selectedRecorderHumanID?.uuidString
         commandQueue.enqueue(.quickMoment(petID: pet?.id)) {
             let photoData = draftPhotos.compactMap { photo in
                 photo.image.jpegData(compressionQuality: 0.82) ?? photo.image.pngData()
             }
-            _ = MomentCommandExecutor(context: modelContext, services: appServices).recordMoment(
+            let result = MomentCommandExecutor(context: modelContext, services: appServices).recordMoment(
                 pet: pet,
                 note: note,
                 photoData: photoData,
@@ -611,21 +653,25 @@ struct QuickMomentSheet: View {
                 date: baseDate,
                 revisionNote: "quickMoment.record"
             )
+            isSaving = false
+            guard let recordID = result.savedLogIDs.first else {
+                saveError = PetCareExperienceCopy(l: l).saveFailed
+                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            withAnimation(GoMotion.feedback) { savedSuccess = true }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                isSaving = false
-                onSaved?()
-                close()
+            if let pet {
+                savedRecord = PetRecordReference(petID: pet.id, recordID: recordID, filter: .memories)
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-                noteText = ""
-                selectedPhotos = []
-                selectedItems = []
-                manualPlace = ""
-                locationModel.reset()
-                withAnimation(GoMotion.quick) { savedSuccess = false }
-            }
+            onSaved?()
+            noteText = ""
+            selectedPhotos = []
+            selectedItems = []
+            manualPlace = ""
+            recordDate = Date()
+            locationModel.reset()
+            if pet == nil { close() }
+
         }
     }
 

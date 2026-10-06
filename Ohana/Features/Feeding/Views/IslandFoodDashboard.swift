@@ -89,8 +89,9 @@ struct IslandFoodDashboardContentView: View {
                     OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
-                .ignoresSafeArea(edges: .top)
-                .navigationBarHidden(true)
+                .navigationTitle(l.tr(zh: "饮食总览", en: "Food overview", de: "Futterübersicht"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { OhanaModalToolbar(onClose: { dismiss() }) }
             }
         } else {
             scrollContent
@@ -100,7 +101,6 @@ struct IslandFoodDashboardContentView: View {
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
-                if standalone { navBar }
                 memberSelector
                 foodBowlHero
                 overviewCards
@@ -109,30 +109,11 @@ struct IslandFoodDashboardContentView: View {
                 Color.clear.frame(height: 36)
             }
             .padding(.horizontal, 16)
-            .padding(.top, standalone ? 0 : 14)
+            .padding(.top, 14)
         }
     }
 
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .goGlassBackground(Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
 
-            Spacer()
-            Text(l.tr(zh: "饮食总览", en: "Food overview"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-        }
-        .padding(.top, 64)
-    }
 
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -156,10 +137,10 @@ struct IslandFoodDashboardContentView: View {
                 Image(systemName: icon)
                     .font(OhanaFont.adaptive(size: 11, weight: .bold))
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 13)
             .padding(.vertical, 8)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -177,10 +158,10 @@ struct IslandFoodDashboardContentView: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .lineLimit(1)
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.leading, 7)
             .padding(.trailing, 12)
             .padding(.vertical, 6)
@@ -226,27 +207,27 @@ struct IslandFoodDashboardContentView: View {
         HStack(spacing: 16) {
             ZStack(alignment: .bottom) {
                 Image(systemName: "takeoutbag.and.cup.and.straw.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 82, weight: .black))
+                    .font(OhanaFont.adaptive(size: 82, weight: .semibold))
                     .foregroundStyle(Color.foodDry.opacity(0.22))
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.foodDry.gradient)
                     .frame(width: 82, height: max(10, 68 * CGFloat(min(1, snapshot.weekGrams / max(1, Double(selectedPets.count) * 700))) * chartRevealProgress))
                     .mask {
                         Image(systemName: "takeoutbag.and.cup.and.straw.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 82, weight: .black))
+                            .font(OhanaFont.adaptive(size: 82, weight: .semibold))
                     }
             }
             .frame(width: 104, height: 104)
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(l.tr(zh: "喂食节奏", en: "Feeding rhythm"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(todayFeedText)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(weekFeedText)
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -262,7 +243,7 @@ struct IslandFoodDashboardContentView: View {
                     .font(OhanaFont.adaptive(size: 12, weight: .bold))
                     .foregroundStyle(Color.goPrimary)
                 Text(l.tr(zh: "近 7 天喂食", en: "Last 7 days"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text(l.tr(zh: "克数", en: "Grams"))
@@ -291,7 +272,7 @@ struct IslandFoodDashboardContentView: View {
     private var foodRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "成员饮食状态", en: "Member food status"))
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
 
@@ -322,20 +303,20 @@ struct IslandFoodDashboardContentView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(pet.name)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(pet.species.isEmpty ? l.tr(zh: "成员", en: "Member") : pet.species)
-                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaTertiaryText)
                             .lineLimit(1)
                     }
                     Text(foodStatusText(for: pet))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(accent)
                         .lineLimit(1)
                     Text(summaryText(summary))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .lineLimit(1)
                 }
@@ -350,7 +331,7 @@ struct IslandFoodDashboardContentView: View {
                         .stroke(accent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                     Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -371,16 +352,16 @@ struct IslandFoodDashboardContentView: View {
             }
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(unit)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(14)
@@ -394,7 +375,7 @@ struct IslandFoodDashboardContentView: View {
                 .font(OhanaFont.adaptive(size: 26, weight: .semibold))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(text)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color.ohanaSecondaryText)
         }

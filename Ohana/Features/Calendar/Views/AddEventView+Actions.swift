@@ -98,6 +98,10 @@ extension AddEventContentView {
                     scheduleNotifications: scheduleNotifications
                 )
                 finishSuccessfulSave()
+            } catch let TaskCareAssignmentError.personalUpgradeRequired(denial) {
+                isSaving = false
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
             } catch {
                 isSaving = false
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
@@ -122,6 +126,10 @@ extension AddEventContentView {
                 }
 
                 finishSuccessfulSave()
+            } catch let CalendarCommandError.personalUpgradeRequired(denial) {
+                isSaving = false
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
             } catch {
                 isSaving = false
                 UINotificationFeedbackGenerator().notificationOccurred(.error)

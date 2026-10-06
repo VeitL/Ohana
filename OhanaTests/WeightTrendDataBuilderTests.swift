@@ -35,7 +35,7 @@ struct WeightTrendDataBuilderTests {
         #expect(points.last?.isSynthetic == true)
     }
 
-    @Test func weightTrendShowsFlatKnownWeightWhenRangeHasNoNewLog() {
+    @Test func weightTrendDoesNotInventTrendFromSingleReadingOutsideRange() {
         let calendar = Calendar(identifier: .gregorian)
         let end = Date(timeIntervalSince1970: 1_800_000_000)
         let start = calendar.date(byAdding: .day, value: -6, to: calendar.startOfDay(for: end))!
@@ -47,9 +47,22 @@ struct WeightTrendDataBuilderTests {
             rangeEnd: end
         )
 
-        #expect(points.map(\.date) == [start, end])
-        #expect(points.map(\.isSynthetic) == [true, true])
-        #expect(points.map(\.kilograms) == [6.2, 6.2])
+        #expect(points.isEmpty)
+    }
+
+    @Test func singleReadingKeepsItsActualDateWithoutSyntheticTrend() {
+        let end = Date(timeIntervalSince1970: 1_800_000_000)
+        let date = end.addingTimeInterval(-86400)
+        let points = WeightTrendDataBuilder.points(
+            from: [(date: date, kilograms: 6.2)],
+            rangeStart: end.addingTimeInterval(-7 * 86400),
+            rangeEnd: end
+        )
+
+        #expect(points.count == 1)
+        #expect(points.first?.date == date)
+        #expect(points.first?.kilograms == 6.2)
+        #expect(points.first?.isSynthetic == false)
     }
 
     @Test func weightTrendPointIdIsStableForSameDateAndWeight() {

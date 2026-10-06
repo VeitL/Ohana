@@ -69,6 +69,8 @@ struct InsurancePolicyDetailSheet: View {
                 .padding(.top, 18)
             }
         }
+        .navigationTitle(insurance.productName.isEmpty ? l.tr(zh: "保单详情", en: "Policy", de: "Police") : insurance.productName)
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showEdit) {
             ProtectionInsurancePopup(pet: pet, existing: insurance) {
                 showEdit = false
@@ -96,13 +98,13 @@ struct InsurancePolicyDetailSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: "shield.lefthalf.filled").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 48, height: 48)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(insurance.productName.isEmpty ? l.tr(zh: "保单详情", en: "Policy", de: "Police") : insurance.productName)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -111,15 +113,7 @@ struct InsurancePolicyDetailSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+
         }
     }
 
@@ -127,11 +121,11 @@ struct InsurancePolicyDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(insurance.renewalStatusLabel)
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color(hex: insurance.renewalStatusColor))
                 Spacer()
                 Text(daysLabel)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color(hex: insurance.renewalStatusColor))
                     .padding(.horizontal, 10)
                     .frame(height: 28)
@@ -170,7 +164,7 @@ struct InsurancePolicyDetailSheet: View {
     private func metric(_ title: String, _ value: String, _ tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(value)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -185,13 +179,13 @@ struct InsurancePolicyDetailSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label(l.tr(zh: "报销", en: "Claims", de: "Erstattungen"), systemImage: "arrow.down.circle.fill")
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button { withAnimation(GoMotion.page) { showAddClaim = true } } label: {
                     Image(systemName: "plus").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(Color.arkInk)
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 38, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(Color.goPrimary, in: Capsule())
                 }
@@ -203,6 +197,7 @@ struct InsurancePolicyDetailSheet: View {
                     icon: "arrow.down.doc.fill",
                     title: l.tr(zh: "还没有报销", en: "No claims yet", de: "Noch keine Erstattung"),
                     actionTitle: l.tr(zh: "新增报销", en: "Add claim", de: "Hinzufügen"),
+                    actionIdentifier: "pet-insurance-add-claim-action",
                     tint: Color.goPurple
                 ) { withAnimation(GoMotion.page) { showAddClaim = true } }
             } else {
@@ -225,7 +220,7 @@ struct InsurancePolicyDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(claim.incidentDate.formatted(.dateTime.year().month().day()))
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if !claim.note.isEmpty {
                     Text(claim.note)
@@ -237,10 +232,10 @@ struct InsurancePolicyDetailSheet: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text(AppCurrency.format(claim.claimedAmount, fractionDigits: 0))
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(claim.claimStatus.localizedLabel(l))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color(hex: claim.claimStatus.colorHex))
             }
         }
@@ -273,8 +268,8 @@ struct InsurancePolicyDetailSheet: View {
         HStack(spacing: 10) {
             Button { withAnimation(GoMotion.page) { showEdit = true } } label: {
                 Label(l.tr(zh: "编辑保单", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
-                    .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.subheadline(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
                     .background(Color.goPrimary, in: Capsule())
@@ -285,7 +280,7 @@ struct InsurancePolicyDetailSheet: View {
                 setPolicyActive(!insurance.isActive)
             } label: {
                 Image(systemName: insurance.isActive ? "pause.fill" : "play.fill")
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 52, height: 48)
                     .background(Color.ohanaCardSurface, in: Capsule())
@@ -294,7 +289,7 @@ struct InsurancePolicyDetailSheet: View {
 
             Button(role: .destructive) { showDeleteConfirm = true } label: {
                 Image(systemName: "trash.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goRed)
                     .frame(width: 52, height: 48)
                     .background(Color.ohanaCardSurface, in: Capsule())
@@ -474,22 +469,18 @@ private struct InsuranceClaimPopup: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(l.tr(zh: "新增报销", en: "Add Claim", de: "Erstattung"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel, action: close)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern"), action: save)
-                        .disabled(!canSave)
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: !totalExpenseInput.isEmpty || !claimedAmountInput.isEmpty || !noteInput.isEmpty || initialStatus != .submitted,
+                isSaving: isSaving, canSave: canSave,
+                onCancel: close, onSave: save
+            )
         }
     }
 
     private var statusBlock: some View {
         popupBlock {
             Text(l.tr(zh: "状态", en: "Status", de: "Status"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(ClaimStatus.allCases, id: \.rawValue) { status in
@@ -501,10 +492,10 @@ private struct InsuranceClaimPopup: View {
                                 .fill(Color(hex: status.colorHex))
                                 .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             Text(status.rawValue)
-                                .font(OhanaFont.caption(.black))
+                                .font(OhanaFont.caption(.semibold))
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(initialStatus == status ? Color.arkInk : Color.ohanaPrimaryText)
+                        .foregroundStyle(initialStatus == status ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 40)
                         .background(initialStatus == status ? Color.goPrimary : Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

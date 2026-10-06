@@ -37,6 +37,12 @@ struct AddHealthRecordSheet: View {
     @State private var nextCheckupDate: Date = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var selectedRecorderHumanID: UUID?
     @State private var requiresRecorderSelection = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [selectedType.rawValue, String(date.timeIntervalSince1970), name, note, vetName, cost,
+         String(hasExpiration), String(expirationDate.timeIntervalSince1970),
+         String(hasNextCheckup), String(nextCheckupDate.timeIntervalSince1970)]
+    }
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     private var l: L10n { L10n(appLanguage) }
@@ -110,7 +116,7 @@ struct AddHealthRecordSheet: View {
                             )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
-                                    .font(OhanaFont.body(.black))
+                                    .font(OhanaFont.body(.semibold))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 Text(typeLabel)
                                     .font(OhanaFont.caption(.medium))
@@ -135,7 +141,7 @@ struct AddHealthRecordSheet: View {
                                         .foregroundStyle(Color.goPrimary)
                                         .frame(width: 22)
                                     TextField(l.tr(zh: "名称（如：狂犬疫苗三联苗）", en: "Name (e.g. rabies vaccine)", de: "Name (z. B. Tollwutimpfung)"), text: $name) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
@@ -146,7 +152,7 @@ struct AddHealthRecordSheet: View {
                             DatePicker(l.tr(zh: "记录日期", en: "Record date", de: "Eintragsdatum"), selection: $date, displayedComponents: .date)
                                 .datePickerStyle(.compact)
                                 .tint(Color.goPrimary)
-                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText)
                         }
 
@@ -157,11 +163,11 @@ struct AddHealthRecordSheet: View {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(l.tr(zh: "设置有效期", en: "Set validity", de: "Gültigkeit setzen"))
-                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.ohanaPrimaryText)
                                             if !expirationHint.isEmpty {
                                                 Text(expirationHint)
-                                                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                     .foregroundStyle(Color.ohanaSecondaryText)
                                             }
                                         }
@@ -174,7 +180,7 @@ struct AddHealthRecordSheet: View {
                                         DatePicker(l.tr(zh: "有效期至", en: "Valid until", de: "Gültig bis"), selection: $expirationDate, in: date..., displayedComponents: .date)
                                             .datePickerStyle(.compact)
                                             .tint(Color.goYellow)
-                                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     }
                                 }
@@ -187,7 +193,7 @@ struct AddHealthRecordSheet: View {
                                 VStack(spacing: 10) {
                                     HStack {
                                         Text(l.tr(zh: "下次体检提醒", en: "Next checkup reminder", de: "Nächste Check-up-Erinnerung"))
-                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaPrimaryText)
                                         Spacer()
                                         Toggle("", isOn: $hasNextCheckup)
@@ -198,7 +204,7 @@ struct AddHealthRecordSheet: View {
                                         DatePicker(l.tr(zh: "提醒日期", en: "Reminder date", de: "Erinnerungsdatum"), selection: $nextCheckupDate, in: date..., displayedComponents: .date)
                                             .datePickerStyle(.compact)
                                             .tint(Color.goTeal)
-                                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                                     }
                                 }
@@ -213,7 +219,7 @@ struct AddHealthRecordSheet: View {
                                     .foregroundStyle(Color.goTeal)
                                     .frame(width: 22)
                                 TextField(l.tr(zh: "医生 / 诊所（可选）", en: "Vet / clinic (optional)", de: "Tierarzt / Praxis (optional)"), text: $vetName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                             }
                         }
@@ -230,6 +236,7 @@ struct AddHealthRecordSheet: View {
                                     placeholder: "0",
                                     maxFractionDigits: 2,
                                     accent: Color.goYellow,
+                                    accentForeground: Color.arkInk,
                                     step: 10,
                                     valueFont: .system(size: 15, weight: .medium, design: .rounded),
                                     valueAlignment: .leading,
@@ -250,7 +257,7 @@ struct AddHealthRecordSheet: View {
                                     .frame(width: 22)
                                     .padding(.top, 2)
                                 TextField(l.tr(zh: "备注 / 笔记（可选）", en: "Notes (optional)", de: "Notizen (optional)"), text: $note, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                    .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(3 ... 6)
                             }
@@ -264,27 +271,6 @@ struct AddHealthRecordSheet: View {
                         )
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        // 保存按钮
-                        Button(action: save) {
-                            HStack(spacing: 8) {
-                                Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                Text(isSaving
-                                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
-                                    : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
-                                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            }
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(
-                                isSaving ? Color.ohanaControlFill : Color.goPrimary,
-                                in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous)
-                            )
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .disabled(isSaving || !pet.canWriteHealthFacts || requiresRecorderSelection)
-
                         Spacer(minLength: 40)
                     }
                     .padding(16)
@@ -292,16 +278,15 @@ struct AddHealthRecordSheet: View {
             }
             .navigationTitle(typeLabel)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarBackground(Color.ohanaCardSurface, for: .navigationBar)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
-                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, canSave: pet.canWriteHealthFacts && !requiresRecorderSelection,
+                onCancel: { dismiss() }, onSave: save
+            )
             .onAppear {
+                guard initialDraft == nil else { return }
                 applyDefaultsForSelectedType()
+                initialDraft = editorDraft
             }
             .onChange(of: selectedType) { _, _ in
                 applyDefaultsForSelectedType()
@@ -337,7 +322,7 @@ struct AddHealthRecordSheet: View {
 
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "记录类型", en: "Record Type", de: "Eintragstyp"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 4)
             ScrollView(.horizontal, showsIndicators: false) {
@@ -347,8 +332,8 @@ struct AddHealthRecordSheet: View {
                             selectedType = t
                         } label: {
                             Text(label)
-                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                .foregroundStyle(selectedType == t ? Color.arkInk : .primary)
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .foregroundStyle(selectedType == t ? Color.ohanaPrimaryActionText : .primary)
                                 .padding(.horizontal, 12).padding(.vertical, 8)
                                 .background(selectedType == t ? Color.goPrimary : Color.primary.opacity(0.08), in: Capsule())
                         }

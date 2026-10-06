@@ -214,6 +214,7 @@ struct OhanaMinimalTrendChart: View {
 
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var entranceProgress: Double = 0
+    @State private var lastAnimatedKey: String?
 
     private var sortedPoints: [OhanaMinimalChartPoint] {
         points.sorted { $0.date < $1.date }
@@ -277,7 +278,7 @@ struct OhanaMinimalTrendChart: View {
                         .opacity(effectiveProgress)
                 }
 
-                if showsLatestPoint, let latest = chartPoints.last {
+                if showsLatestPoint, chartPoints.count > 1, let latest = chartPoints.last {
                     Circle()
                         .fill(tint)
                         .frame(width: 9, height: 9) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -333,8 +334,7 @@ struct OhanaMinimalTrendChart: View {
 
         return sorted.map { point in
             let xRatio = (point.date.timeIntervalSinceReferenceDate - start) / span
-            let animatedValue = y.lowerBound + (point.value - y.lowerBound) * effectiveProgress
-            let yRatio = (animatedValue - y.lowerBound) / ySpan
+            let yRatio = (point.value - y.lowerBound) / ySpan
             return CGPoint(
                 x: plotLeadingInset + min(max(CGFloat(xRatio) * plotWidth, 0), plotWidth),
                 y: min(max(size.height - CGFloat(yRatio) * size.height, 0), size.height)
@@ -363,11 +363,14 @@ struct OhanaMinimalTrendChart: View {
 
     private func playEntrance() {
         guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
+            lastAnimatedKey = animationKey
             entranceProgress = 1
             return
         }
+        guard lastAnimatedKey != animationKey else { return }
+        lastAnimatedKey = animationKey
         entranceProgress = 0
-        withAnimation(GoMotion.page) {
+        withAnimation(GoMotion.chartLine) {
             entranceProgress = 1
         }
     }
@@ -383,6 +386,7 @@ struct OhanaMinimalMultiTrendChart: View {
 
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var entranceProgress: Double = 0
+    @State private var lastAnimatedKey: String?
 
     private var allPoints: [OhanaMinimalChartPoint] {
         series.flatMap(\.points).sorted { $0.date < $1.date }
@@ -398,12 +402,8 @@ struct OhanaMinimalMultiTrendChart: View {
             .joined(separator: "|")
     }
 
-    private var effectiveProgress: Double {
-        max(0, min(1, progress)) * max(0, min(1, entranceProgress))
-    }
-
     private var effectiveDrawProgress: Double {
-        max(0, min(1, drawProgress)) * max(0, min(1, entranceProgress))
+        max(0, min(1, progress)) * max(0, min(1, drawProgress)) * max(0, min(1, entranceProgress))
     }
 
     var body: some View {
@@ -449,8 +449,7 @@ struct OhanaMinimalMultiTrendChart: View {
 
         return sorted.map { point in
             let xRatio = (point.date.timeIntervalSinceReferenceDate - start) / span
-            let animatedValue = y.lowerBound + (point.value - y.lowerBound) * effectiveProgress
-            let yRatio = (animatedValue - y.lowerBound) / ySpan
+            let yRatio = (point.value - y.lowerBound) / ySpan
             return CGPoint(
                 x: min(max(CGFloat(xRatio) * size.width, 0), size.width),
                 y: min(max(size.height - CGFloat(yRatio) * size.height, 0), size.height)
@@ -472,11 +471,14 @@ struct OhanaMinimalMultiTrendChart: View {
 
     private func playEntrance() {
         guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
+            lastAnimatedKey = animationKey
             entranceProgress = 1
             return
         }
+        guard lastAnimatedKey != animationKey else { return }
+        lastAnimatedKey = animationKey
         entranceProgress = 0
-        withAnimation(GoMotion.page) {
+        withAnimation(GoMotion.chartLine) {
             entranceProgress = 1
         }
     }
@@ -492,6 +494,7 @@ struct OhanaMinimalBarChart: View {
 
     @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     @State private var entranceProgress: Double = 0
+    @State private var lastAnimatedKey: String?
 
     private var maxValue: Double {
         max(1, points.map(\.value).max() ?? 1)
@@ -522,7 +525,7 @@ struct OhanaMinimalBarChart: View {
                             .scaleEffect(x: 1, y: 0.98 + 0.02 * effectiveProgress, anchor: .bottom)
                         if showsLabels, points.count <= 10 {
                             Text(point.label ?? point.date.formatted(.dateTime.weekday(.narrow)))
-                                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                                 .foregroundStyle(Calendar.current.isDateInToday(point.date) ? tint : Color.ohanaTertiaryText)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.6)
@@ -543,11 +546,14 @@ struct OhanaMinimalBarChart: View {
 
     private func playEntrance() {
         guard workloadPolicy.shouldRunInteractionAnimation(isVisible: true) else {
+            lastAnimatedKey = animationKey
             entranceProgress = 1
             return
         }
+        guard lastAnimatedKey != animationKey else { return }
+        lastAnimatedKey = animationKey
         entranceProgress = 0
-        withAnimation(GoMotion.page) {
+        withAnimation(GoMotion.quick) {
             entranceProgress = 1
         }
     }

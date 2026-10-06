@@ -20,7 +20,7 @@ struct QuickFeedStockCalculationModePicker: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
             ViewThatFits(in: .horizontal) {
@@ -65,18 +65,18 @@ struct QuickFeedStockCalculationModeButton: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(isSelected ? Color.arkInk : tint)
                     .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(isSelected ? Color.arkInk.opacity(0.14) : tint.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
                     Text(subtitle)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                         .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -103,7 +103,7 @@ struct QuickFeedOptionalStockDateRow: View {
         VStack(alignment: .leading, spacing: 10) {
             Toggle(isOn: $isOn.animation(GoMotion.feedback)) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .tint(tint)
@@ -136,11 +136,11 @@ struct QuickFeedStockExpenseAmountInput: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Text(amountTitle)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Text(optionalTitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(amountText.isEmpty ? Color.ohanaTertiaryText : tint)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 5)
@@ -150,17 +150,17 @@ struct QuickFeedStockExpenseAmountInput: View {
             Button(action: onToggleKeypad) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(currencySymbol)
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                         .foregroundStyle(tint)
                     Text(amountText.isEmpty ? placeholder : amountText)
-                        .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                         .foregroundStyle(amountText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .lineLimit(1)
                         .minimumScaleFactor(0.55)
                     Spacer(minLength: 8)
                     Image(systemName: isKeypadVisible ? "keyboard.chevron.compact.down" : "number")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(tint)
                 }
                 .padding(.horizontal, 14)
@@ -171,7 +171,7 @@ struct QuickFeedStockExpenseAmountInput: View {
             .buttonStyle(ScaleButtonStyle())
 
             if isKeypadVisible {
-                EmbeddedDecimalKeypad(
+                OhanaDecimalInput(
                     text: $amountText,
                     countryCode: countryCode,
                     maxFractionDigits: 2,
@@ -198,16 +198,16 @@ struct QuickFeedStockDeleteCurrentRecordCard: View {
         Button(action: onDelete) {
             HStack(spacing: 12) {
                 Image(systemName: "trash").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goRed)
                     .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.goRed)
                     Text(message)
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -237,15 +237,15 @@ struct QuickFeedStockManagementCurrentCard: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(subtitle)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(statusTint)
                 }
                 Spacer()
                 Text(remainingDaysText)
-                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                     .foregroundStyle(statusTint)
             }
 
@@ -254,7 +254,7 @@ struct QuickFeedStockManagementCurrentCard: View {
 
             if let correctionText {
                 Text(correctionText)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -273,11 +273,11 @@ struct QuickFeedStockDateLine: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
             Text(date.formatted(date: .numeric, time: .omitted))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
     }
@@ -297,21 +297,21 @@ struct QuickFeedStockCorrectionCard<Keypad: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             VStack(alignment: .leading, spacing: 8) {
                 Button(action: onOpenNumberPad) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text(valueText.isEmpty ? placeholder : valueText)
-                            .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                             .foregroundStyle(valueText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                             .monospacedDigit()
                         Text(unitText)
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                         Spacer()
                         Image(systemName: "number").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                             .foregroundStyle(tint)
                     }
                 }
@@ -344,7 +344,7 @@ struct QuickFeedStockReminderManageCard: View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $isEnabled) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .tint(tint)
@@ -362,7 +362,7 @@ struct QuickFeedStockReminderManageCard: View {
                 onSave()
             } label: {
                 Label(saveTitle, systemImage: "bell.badge.fill")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(tint)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)

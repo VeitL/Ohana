@@ -6,6 +6,7 @@ import SwiftUI
 struct UiV4BadFixture: View {
     var body: some View {
         VStack {
+            HomeQuickRecordPopoutControl() // rule: native-root-navigation
             ArkBackgroundView() // rule: background
             Text("hello").foregroundStyle(.primary) // rule: system-text-color
             Text("hi").foregroundColor(.white) // rule: hardcoded-white-black

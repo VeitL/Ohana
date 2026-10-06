@@ -10,38 +10,48 @@ import UIKit
 
 enum HumanAllFeatureDestination: Hashable {
     case basicInfo
+    case weightQuick
     case weight
+    case workoutQuick
     case workout
     case metrics
+    case conditions
     case medication
     case report
     case expense
     case wishlist
+    case noteQuick
     case notes
+    case achievements
 }
 
 extension HumanAllFeatureDestination: Identifiable {
     var id: String {
         switch self {
         case .basicInfo: "basicInfo"
+        case .weightQuick: "weightQuick"
         case .weight: "weight"
+        case .workoutQuick: "workoutQuick"
         case .workout: "workout"
         case .metrics: "metrics"
+        case .conditions: "conditions"
         case .medication: "medication"
         case .report: "report"
         case .expense: "expense"
         case .wishlist: "wishlist"
+        case .noteQuick: "noteQuick"
         case .notes: "notes"
+        case .achievements: "achievements"
         }
     }
 
     var privacyField: HumanPrivateField? {
         switch self {
-        case .basicInfo:
+        case .basicInfo, .achievements:
             nil
-        case .weight, .metrics, .report:
+        case .weightQuick, .weight, .metrics, .conditions, .report:
             .weight
-        case .workout:
+        case .workoutQuick, .workout:
             .workout
         case .medication:
             .medication
@@ -49,16 +59,16 @@ extension HumanAllFeatureDestination: Identifiable {
             .expense
         case .wishlist:
             .wishlist
-        case .notes:
+        case .noteQuick, .notes:
             .note
         }
     }
 
     var isAvailableInMemorialMode: Bool {
         switch self {
-        case .basicInfo, .notes:
+        case .basicInfo, .noteQuick, .notes, .achievements:
             true
-        case .weight, .workout, .metrics, .medication, .report, .expense, .wishlist:
+        case .weightQuick, .weight, .workoutQuick, .workout, .metrics, .conditions, .medication, .report, .expense, .wishlist:
             false
         }
     }
@@ -73,11 +83,19 @@ struct HumanAllFeaturesActivitySummary: Equatable {
     var latestHealthMetricKey: String?
     var latestHealthMetricUnitCode: String?
     var latestHealthMetricValue: Double?
+    var activeHealthConditionCount: Int = 0
+    var recentHealthObservationCount: Int = 0
+    var activeMedicationPlanCount: Int = 0
+    var nextScheduledDoseDate: Date?
+    var reportCount: Int = 0
+    var latestReportDate: Date?
+    var noteCount: Int = 0
     var weightChartPoints: [OhanaMinimalChartPoint] = []
     var workoutChartPoints: [OhanaMinimalChartPoint] = []
     var metricsChartPoints: [OhanaMinimalChartPoint] = []
     var reportChartPoints: [OhanaMinimalChartPoint] = []
     var medicationChartPoints: [OhanaMinimalChartPoint] = []
+    var conditionChartPoints: [OhanaMinimalChartPoint] = []
     var expenseChartPoints: [OhanaMinimalChartPoint] = []
     var coconutChartPoints: [OhanaMinimalChartPoint] = []
     var noteChartPoints: [OhanaMinimalChartPoint] = []
@@ -94,6 +112,9 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         weightLogs: [HumanWeightLog] = [],
         workoutLogs: [HumanWorkoutLog] = [],
         healthMetricLogs: [HumanHealthMetricLog] = [],
+        healthConditions: [HumanHealthCondition] = [],
+        healthObservations: [HumanHealthObservation] = [],
+        explicitlyResolvedProfileCategories: Set<MemberProfileCompletionCategory> = [],
         now: Date = Date(),
         calendar: Calendar = .current
     ) -> HumanAllFeaturesActivitySummary {
@@ -101,21 +122,25 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         let recentDays = (0 ..< 7).compactMap {
             calendar.date(byAdding: .day, value: $0 - 6, to: todayStart)
         }
-        let humanID = human.id.uuidString
-        let myMeds = allMeds.filter { $0.humanId == humanID }
-        let myReports = allReports.filter { $0.humanId == humanID }
-        let myExpenses = allExpenses.filter { $0.executorId == humanID }
+        let myMeds = allMeds.filter { HumanHealthSummaryOwnerIdentity.matches($0.humanId, humanID: human.id) }
+        let activeMeds = myMeds.filter {
+            let group = HumanMedicationSchedulePlan.displayGroup(for: $0, now: now, calendar: calendar)
+            return group == .current || group == .manual
+        }
+        let nextScheduledDoseDate = myMeds.flatMap {
+            HumanMedicationSchedulePlan.futureDoses(for: $0, from: now, days: 7, calendar: calendar)
+        }.map(\.scheduledTime).min()
+        let myReports = allReports.filter { HumanHealthSummaryOwnerIdentity.matches($0.humanId, humanID: human.id) }
+        let myExpenses = ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
         let latestWeight = weightLogs.max(by: { $0.date < $1.date })
         let latestWorkout = workoutLogs.max(by: { $0.date < $1.date })
         let latestHealthMetric = healthMetricLogs.max(by: { $0.date < $1.date })
         let monthlyWorkoutCount = workoutLogs.count(where: { calendar.isDate($0.date, equalTo: now, toGranularity: .month) })
-        let visibleNotes = HumanProfileOptions.visibleNoteParts(from: human.notes)
-        let profileCompletion = [
-            !human.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            human.birthday != nil,
-            !human.role.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-            !visibleNotes.isEmpty
-        ].count { $0 }
+        let visibleNotes = HumanNoteTimelineBuilder.entries(notes: human.notes, humanID: human.id)
+        let profileCompletion = MemberProfileCompletenessPolicy.human(
+            human,
+            explicitlyResolvedCategories: explicitlyResolvedProfileCategories
+        )
 
         return HumanAllFeaturesActivitySummary(
             latestWeightKg: latestWeight?.weight,
@@ -126,6 +151,13 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             latestHealthMetricKey: latestHealthMetric?.metricKey,
             latestHealthMetricUnitCode: latestHealthMetric?.unitCode,
             latestHealthMetricValue: latestHealthMetric?.value,
+            activeHealthConditionCount: healthConditions.count { $0.trackingStatus != .resolved },
+            recentHealthObservationCount: healthObservations.count { $0.recordedAt >= (recentDays.first ?? todayStart) },
+            activeMedicationPlanCount: activeMeds.count,
+            nextScheduledDoseDate: nextScheduledDoseDate,
+            reportCount: myReports.count,
+            latestReportDate: myReports.map(\.reportDate).max(),
+            noteCount: visibleNotes.count,
             weightChartPoints: weightLogs
                 .sorted { $0.date < $1.date }
                 .suffix(7)
@@ -156,17 +188,25 @@ struct HumanAllFeaturesActivitySummary: Equatable {
             ),
             medicationChartPoints: FeatureHubChartPointFactory.bars(
                 [
-                    Double(myMeds.count { $0.isActive && $0.isActiveToday }),
-                    Double(myMeds.count { !$0.isActive || !$0.isActiveToday })
+                    Double(activeMeds.count),
+                    Double(myMeds.count - activeMeds.count)
                 ],
                 idPrefix: "human-all-medication"
+            ),
+            conditionChartPoints: dailyPoints(
+                days: recentDays,
+                idPrefix: "human-all-conditions",
+                values: healthObservations,
+                date: \.recordedAt,
+                value: { _ in 1 },
+                calendar: calendar
             ),
             expenseChartPoints: dailyPoints(
                 days: recentDays,
                 idPrefix: "human-all-expense",
                 values: myExpenses,
                 date: \.date,
-                value: { max(0, $0.amount) },
+                value: { max(0, ExpenseSummaryBuilder.amountPaid(by: human.id, for: $0)) },
                 calendar: calendar
             ),
             coconutChartPoints: FeatureHubChartPointFactory.quietPlaceholder(
@@ -179,8 +219,8 @@ struct HumanAllFeaturesActivitySummary: Equatable {
                 idPrefix: "human-all-notes"
             ),
             profileChartPoints: FeatureHubChartPointFactory.level(
-                current: Double(profileCompletion),
-                total: 4,
+                current: Double(profileCompletion.completedCategoryCount),
+                total: Double(profileCompletion.totalCategoryCount),
                 idPrefix: "human-all-profile"
             )
         )
@@ -261,6 +301,7 @@ struct HumanAllFeaturesSheet: View {
                     subtitle: headerSubtitle,
                     eyebrow: l.tr(zh: "人类驾驶舱", en: "Human Hub", de: "Menschen-Hub"),
                     onClose: { dismiss() },
+                    showsCloseButton: false,
                     avatar: {
                         FeatureHubAvatar(
                             image: preparedAvatarImage,
@@ -274,17 +315,16 @@ struct HumanAllFeaturesSheet: View {
             } content: {
                 if human.hasPassedAway {
                     HumanMemorialBanner(human: human, appLanguage: appLanguage)
-                } else if isViewingOwnProfile, !human.privateFields.isEmpty {
+                } else if HumanLocalPrivacyPolicy.isEnabled,
+                          isViewingOwnProfile,
+                          !human.privateFields.isEmpty {
                     HumanOwnerPrivacyHint(appLanguage: appLanguage)
                 }
 
-                FeatureHubSummaryPanel(
-                    title: l.tr(zh: "成员摘要", en: "Member Summary", de: "Mitgliederübersicht"),
-                    statusText: summaryStatusText,
-                    statusTint: summaryStatusTint,
-                    metrics: metrics
-                )
-                .accessibilityIdentifier("human-all-features-summary-panel")
+                if !human.hasPassedAway {
+                    healthSummaryEntry
+                    quickActions
+                }
 
                 ForEach(visibleSections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
@@ -292,7 +332,9 @@ struct HumanAllFeaturesSheet: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "feature-hub-close-action") }
             .saturation(human.hasPassedAway ? 0.08 : 1)
             .grayscale(human.hasPassedAway ? 0.86 : 0)
             .animation(GoMotion.page, value: human.hasPassedAway)
@@ -362,6 +404,138 @@ struct HumanAllFeaturesSheet: View {
         onOpenDestination(destination)
     }
 
+    // Use the existing bounded health overview; its rows enforce each field's privacy.
+    private var healthSummaryEntry: some View {
+        NavigationLink {
+            HumanHealthSummaryView(human: human)
+                .toolbar(.visible, for: .navigationBar)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.text.clipboard")
+                    .foregroundStyle(Color.goTeal)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(l.tr(
+                        zh: "健康摘要", en: "Health summary", de: "Gesundheitsübersicht",
+                        es: "Resumen de salud", pt: "Resumo de saúde", fr: "Résumé de santé",
+                        ja: "健康の概要", ko: "건강 요약", it: "Riepilogo salute"
+                    ))
+                    .font(OhanaFont.headline(.bold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    Text(l.tr(
+                        zh: "今日用药、复查安排与近期指标",
+                        en: "Today's medication, follow-ups and latest metrics",
+                        de: "Medikamente heute, Kontrollen und aktuelle Werte",
+                        es: "Medicación de hoy, revisiones y últimas mediciones",
+                        pt: "Medicação de hoje, consultas e medições recentes",
+                        fr: "Médicaments du jour, contrôles et dernières mesures",
+                        ja: "今日の服薬、再検査予定、最新の測定値",
+                        ko: "오늘의 복약, 재검 일정 및 최근 측정값",
+                        it: "Farmaci di oggi, controlli e ultime misurazioni"
+                    ))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-hub-health-summary")
+    }
+
+    private var quickActions: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(l.tr(
+                zh: "常用操作", en: "Quick actions", de: "Schnellaktionen",
+                es: "Acciones rápidas", pt: "Ações rápidas", fr: "Actions rapides",
+                ja: "クイック操作", ko: "빠른 작업", it: "Azioni rapide"
+            ))
+            .font(OhanaFont.headline(.semibold))
+            .foregroundStyle(Color.ohanaPrimaryText)
+
+            VStack(spacing: 0) {
+                quickActionButton(
+                    l.tr(
+                        zh: "记录体重", en: "Log weight", de: "Gewicht eintragen",
+                        es: "Registrar peso", pt: "Registrar peso", fr: "Noter le poids",
+                        ja: "体重を記録", ko: "체중 기록", it: "Registra peso"
+                    ),
+                    icon: "scalemass", destination: .weightQuick
+                )
+                Divider().padding(.horizontal, 14)
+                quickActionButton(
+                    l.tr(
+                        zh: "记录运动", en: "Log workout", de: "Training eintragen",
+                        es: "Registrar ejercicio", pt: "Registrar exercício", fr: "Noter une activité",
+                        ja: "運動を記録", ko: "운동 기록", it: "Registra allenamento"
+                    ),
+                    icon: "figure.run", destination: .workoutQuick
+                )
+                Divider().padding(.horizontal, 14)
+                quickActionButton(
+                    l.tr(
+                        zh: "添加备注", en: "Add note", de: "Notiz hinzufügen",
+                        es: "Añadir nota", pt: "Adicionar nota", fr: "Ajouter une note",
+                        ja: "メモを追加", ko: "메모 추가", it: "Aggiungi nota"
+                    ),
+                    icon: "square.and.pencil", destination: .noteQuick
+                )
+                Divider().padding(.horizontal, 14)
+                quickActionButton(
+                    l.tr(
+                        zh: "成员资料", en: "Member profile", de: "Mitgliederprofil",
+                        es: "Perfil del miembro", pt: "Perfil do membro", fr: "Profil du membre",
+                        ja: "メンバープロフィール", ko: "구성원 프로필", it: "Profilo del membro"
+                    ),
+                    icon: "person.crop.circle", destination: .basicInfo
+                )
+            }
+            .goIslandModuleCard(cornerRadius: OhanaRadius.cardLarge)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("human-hub-quick-actions")
+    }
+
+    private func quickActionButton(
+        _ title: String,
+        icon: String,
+        destination: HumanAllFeatureDestination
+    ) -> some View {
+        Button {
+            OhanaFeedback.light()
+            open(destination)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundStyle(Color.goPrimary)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.forward")
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .accessibilityHidden(true)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("human-hub-quick-\(destination.id)")
+    }
+
     private var headerSubtitle: String {
         if human.hasPassedAway {
             return l.tr(zh: "纪念模式 · 只读", en: "Memorial mode · read-only", de: "Gedenkmodus · nur Lesen")
@@ -378,49 +552,13 @@ struct HumanAllFeaturesSheet: View {
         }
         let years = Calendar.current.dateComponents([.year], from: birthday, to: Date()).year ?? 0
         if years >= 1 {
-            return l.tr(zh: "\(years)岁", en: "\(years)y", de: "\(years) J.")
+            return l.tr(
+                zh: "\(years)岁", en: "\(years)y", de: "\(years) J.",
+                es: "\(years) años", pt: "\(years) anos", fr: "\(years) ans",
+                ja: "\(years)歳", ko: "\(years)세", it: "\(years) anni"
+            )
         }
         return l.tr(zh: "不满1岁", en: "Under 1", de: "Unter 1")
-    }
-
-    private var metrics: [FeatureHubMetric] {
-        [
-            FeatureHubMetric(
-                id: "weight",
-                title: l.tr(zh: "体重", en: "Weight", de: "Gewicht"),
-                value: lockedValue(.weight, visible: latestWeightText)
-            ),
-            FeatureHubMetric(
-                id: "meds",
-                title: l.tr(zh: "今日用药", en: "Meds today", de: "Medikamente"),
-                value: lockedValue(.medication, visible: medicationMetric)
-            ),
-            FeatureHubMetric(
-                id: "expense",
-                title: l.tr(zh: "本月花费", en: "This month", de: "Diesen Monat"),
-                value: lockedValue(.expense, visible: monthlyExpenseText)
-            )
-        ]
-    }
-
-    private var summaryStatusText: String {
-        if human.hasPassedAway {
-            return l.tr(zh: "纪念模式", en: "Memorial", de: "Gedenken")
-        }
-        if isViewingOwnProfile, !human.privateFields.isEmpty {
-            return l.tr(zh: "\(human.privateFields.count) 项隐私保护", en: "\(human.privateFields.count) private fields", de: "\(human.privateFields.count) private Felder")
-        }
-        return l.tr(zh: "资料可用", en: "Profile ready", de: "Profil bereit")
-    }
-
-    private var summaryStatusTint: Color {
-        if human.hasPassedAway {
-            return Color.ohanaSecondaryText
-        }
-        if isViewingOwnProfile, !human.privateFields.isEmpty {
-            return Color.goPurple
-        }
-        return Color.goTeal
     }
 
     private var visibleSections: [FeatureHubSectionData<HumanAllFeatureDestination>] {
@@ -454,13 +592,52 @@ struct HumanAllFeaturesSheet: View {
             FeatureHubSectionData(
                 id: "money",
                 title: l.tr(zh: "财务备注", en: "Money & Notes", de: "Geld & Notizen"),
-                subtitle: l.tr(zh: "花费、心愿和记录", en: "Expenses, wishes, notes", de: "Ausgaben, Wünsche, Notizen"),
+                subtitle: l.tr(
+                    zh: "宠物花费、心愿和记录", en: "Pet spending, wishes, notes", de: "Haustierausgaben, Wünsche, Notizen",
+                    es: "Gastos de mascotas, deseos y notas", pt: "Despesas com pets, desejos e notas",
+                    fr: "Dépenses des animaux, souhaits et notes", ja: "ペットの支出、願い、記録",
+                    ko: "반려동물 지출, 소원, 기록", it: "Spese per animali, desideri e note"
+                ),
                 items: moneyItems
             ),
             FeatureHubSectionData(
+                id: "growth",
+                title: l.tr(
+                    zh: "成长",
+                    en: "Growth",
+                    de: "Wachstum",
+                    es: "Crecimiento",
+                    pt: "Crescimento",
+                    fr: "Progression",
+                    ja: "成長",
+                    ko: "성장",
+                    it: "Crescita"
+                ),
+                subtitle: l.tr(
+                    zh: "个人、伙伴与全岛里程碑",
+                    en: "Personal, companion, and island milestones",
+                    de: "Persönliche, Begleiter- und Inselmeilensteine",
+                    es: "Hitos personales, de compañeros y de la isla",
+                    pt: "Marcos pessoais, de companheiros e da ilha",
+                    fr: "Jalons personnels, des compagnons et de l’île",
+                    ja: "個人・仲間・島のマイルストーン",
+                    ko: "개인·동료·섬 마일스톤",
+                    it: "Traguardi personali, dei compagni e dell’isola"
+                ),
+                items: growthItems
+            ),
+            FeatureHubSectionData(
                 id: "account",
-                title: l.tr(zh: "账户隐私", en: "Account", de: "Konto"),
-                subtitle: l.tr(zh: "身份、权限和安全", en: "Identity, access, privacy", de: "Identität, Zugriff, Datenschutz"),
+                title: l.tr(
+                    zh: "家庭资料", en: "Household profile", de: "Haushaltsprofil",
+                    es: "Perfil del hogar", pt: "Perfil da família", fr: "Profil du foyer",
+                    ja: "家族プロフィール", ko: "가족 프로필", it: "Profilo familiare"
+                ),
+                subtitle: l.tr(
+                    zh: "身份、资料与本地隐私", en: "Identity, profile, local privacy", de: "Identität, Profil, lokaler Datenschutz",
+                    es: "Identidad, perfil y privacidad local", pt: "Identidade, perfil e privacidade local", fr: "Identité, profil et confidentialité locale",
+                    ja: "本人情報・プロフィール・ローカルプライバシー", ko: "신원, 프로필 및 로컬 개인정보", it: "Identità, profilo e privacy locale"
+                ),
                 items: accountItems
             )
         ]
@@ -501,7 +678,7 @@ struct HumanAllFeaturesSheet: View {
             item(
                 id: "report",
                 title: l.tr(zh: "健康报告", en: "Reports", de: "Berichte"),
-                value: lockedValue(.weight, visible: "\(myReports.count)"),
+                value: lockedValue(.weight, visible: "\(summary.reportCount)"),
                 subtitle: lockedSubtitle(.weight, visible: reportSubtitle),
                 icon: "cross.case.fill",
                 tint: Color.goRed,
@@ -513,6 +690,23 @@ struct HumanAllFeaturesSheet: View {
 
     private var careItems: [FeatureHubDestinationItem<HumanAllFeatureDestination>] {
         [
+            item(
+                id: "conditions",
+                title: l.tr(zh: "健康状况", en: "Conditions", de: "Gesundheitszustände"),
+                value: lockedValue(.weight, visible: "\(summary.activeHealthConditionCount)"),
+                subtitle: lockedSubtitle(
+                    .weight,
+                    visible: l.tr(
+                        zh: "近 7 天 \(summary.recentHealthObservationCount) 条状态记录",
+                        en: "\(summary.recentHealthObservationCount) state logs in 7 days",
+                        de: "\(summary.recentHealthObservationCount) Status-Einträge in 7 Tagen"
+                    )
+                ),
+                icon: "cross.case.fill",
+                tint: Color.goTeal,
+                chart: privacyChart(.weight, points: summary.conditionChartPoints),
+                destination: .conditions
+            ),
             item(
                 id: "medication",
                 title: l.tr(zh: "用药", en: "Medication", de: "Medikation"),
@@ -540,7 +734,11 @@ struct HumanAllFeaturesSheet: View {
         [
             item(
                 id: "expense",
-                title: l.tr(zh: "花费", en: "Expense", de: "Kosten"),
+                title: l.tr(
+                    zh: "宠物花费", en: "Pet spending", de: "Haustierausgaben",
+                    es: "Gastos de mascotas", pt: "Despesas com pets", fr: "Dépenses des animaux",
+                    ja: "ペットの支出", ko: "반려동물 지출", it: "Spese per animali"
+                ),
                 value: lockedValue(.expense, visible: monthlyExpenseText),
                 subtitle: lockedSubtitle(.expense, visible: expenseSubtitle),
                 icon: "creditcard.fill",
@@ -575,13 +773,61 @@ struct HumanAllFeaturesSheet: View {
         [
             item(
                 id: "profile",
-                title: l.tr(zh: "账户资料", en: "Account", de: "Konto"),
+                title: l.tr(
+                    zh: "成员资料", en: "Member profile", de: "Mitgliederprofil",
+                    es: "Perfil del miembro", pt: "Perfil do membro", fr: "Profil du membre",
+                    ja: "メンバープロフィール", ko: "구성원 프로필", it: "Profilo del membro"
+                ),
                 value: accountStateText,
                 subtitle: accountSubtitle,
                 icon: accountIcon,
                 tint: Color(hex: "64748B"),
                 chart: FeatureHubMiniChartData(style: .bar, points: summary.profileChartPoints),
                 destination: .basicInfo
+            )
+        ]
+    }
+
+    private var growthItems: [FeatureHubDestinationItem<HumanAllFeatureDestination>] {
+        [
+            item(
+                id: "achievements",
+                title: l.tr(
+                    zh: "成就",
+                    en: "Achievements",
+                    de: "Erfolge",
+                    es: "Logros",
+                    pt: "Conquistas",
+                    fr: "Succès",
+                    ja: "実績",
+                    ko: "업적",
+                    it: "Obiettivi"
+                ),
+                value: l.tr(
+                    zh: "查看",
+                    en: "View",
+                    de: "Öffnen",
+                    es: "Ver",
+                    pt: "Ver",
+                    fr: "Voir",
+                    ja: "表示",
+                    ko: "보기",
+                    it: "Apri"
+                ),
+                subtitle: l.tr(
+                    zh: "个人、伙伴与全岛进度",
+                    en: "Personal, companion, and island progress",
+                    de: "Persönlicher, Begleiter- und Inselfortschritt",
+                    es: "Progreso personal, de compañeros y de la isla",
+                    pt: "Progresso pessoal, de companheiros e da ilha",
+                    fr: "Progression personnelle, des compagnons et de l’île",
+                    ja: "個人・仲間・島の進捗",
+                    ko: "개인·동료·섬 진행도",
+                    it: "Progressi personali, dei compagni e dell’isola"
+                ),
+                icon: "trophy.fill",
+                tint: Color.goYellow,
+                destination: .achievements
             )
         ]
     }
@@ -637,7 +883,7 @@ struct HumanAllFeaturesSheet: View {
         guard let latestWeightKg = summary.latestWeightKg else {
             return l.tr(zh: "未记录", en: "None", de: "Keine")
         }
-        return String(format: "%.1fkg", latestWeightKg)
+        return AppMeasurementSystem.formatWeightKilograms(latestWeightKg)
     }
 
     private var latestWeightSubtitle: String {
@@ -647,7 +893,9 @@ struct HumanAllFeaturesSheet: View {
         return l.tr(
             zh: "上次 \(relativeDayText(latestWeightDate))",
             en: "Last \(relativeDayText(latestWeightDate))",
-            de: "Zuletzt \(relativeDayText(latestWeightDate))"
+            de: "Zuletzt \(relativeDayText(latestWeightDate))",
+            es: "Último: \(relativeDayText(latestWeightDate))", pt: "Último: \(relativeDayText(latestWeightDate))", fr: "Dernier : \(relativeDayText(latestWeightDate))",
+            ja: "前回：\(relativeDayText(latestWeightDate))", ko: "최근: \(relativeDayText(latestWeightDate))", it: "Ultimo: \(relativeDayText(latestWeightDate))"
         )
     }
 
@@ -662,41 +910,46 @@ struct HumanAllFeaturesSheet: View {
         return l.tr(
             zh: "上次 \(relativeDayText(latestWorkoutDate))",
             en: "Last \(relativeDayText(latestWorkoutDate))",
-            de: "Zuletzt \(relativeDayText(latestWorkoutDate))"
+            de: "Zuletzt \(relativeDayText(latestWorkoutDate))",
+            es: "Último: \(relativeDayText(latestWorkoutDate))", pt: "Último: \(relativeDayText(latestWorkoutDate))", fr: "Dernier : \(relativeDayText(latestWorkoutDate))",
+            ja: "前回：\(relativeDayText(latestWorkoutDate))", ko: "최근: \(relativeDayText(latestWorkoutDate))", it: "Ultimo: \(relativeDayText(latestWorkoutDate))"
         )
     }
 
     private var medicationMetric: String {
-        let active = myMeds.count
+        let active = summary.activeMedicationPlanCount
         guard active > 0 else { return l.tr(zh: "无", en: "None", de: "Keine") }
         return "\(active)"
     }
 
     private var medicationSubtitle: String {
-        guard !myMeds.isEmpty else {
-            return l.tr(zh: "添加药物和提醒", en: "Add meds and reminders", de: "Medikamente und Erinnerungen")
-        }
-        if let nextDose = myMeds
-            .flatMap({ HumanMedicationSchedulePlan.futureDoses(for: $0, days: 7) })
-            .sorted(by: { $0.scheduledTime < $1.scheduledTime })
-            .first {
+        if let nextDate = summary.nextScheduledDoseDate {
+            let time = nextDate.formatted(Date.FormatStyle(
+                date: Calendar.current.isDateInToday(nextDate) ? .omitted : .abbreviated,
+                time: .shortened
+            ).locale(AppLanguage.effectiveLocale))
             return l.tr(
-                zh: "下次 \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))",
-                en: "Next \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))",
-                de: "Nächste \(nextDose.scheduledTime.formatted(date: .omitted, time: .shortened))"
+                zh: "下次计划 \(time)", en: "Next scheduled \(time)", de: "Nächster Termin \(time)",
+                es: "Próxima toma programada: \(time)", pt: "Próxima dose programada: \(time)", fr: "Prochaine prise prévue : \(time)",
+                ja: "次の服薬予定：\(time)", ko: "다음 복약 예정: \(time)", it: "Prossima dose prevista: \(time)"
             )
+        }
+        guard summary.activeMedicationPlanCount > 0 else {
+            return l.tr(zh: "添加药物和提醒", en: "Add meds and reminders", de: "Medikamente und Erinnerungen")
         }
         return l.tr(zh: "按需记录", en: "As needed", de: "Nach Bedarf")
     }
 
     private var reportSubtitle: String {
-        guard let latest = myReports.max(by: { $0.reportDate < $1.reportDate }) else {
+        guard let latest = summary.latestReportDate else {
             return l.tr(zh: "体检、检查和档案", en: "Checkups and files", de: "Checks und Akten")
         }
         return l.tr(
-            zh: "上次 \(relativeDayText(latest.reportDate))",
-            en: "Last \(relativeDayText(latest.reportDate))",
-            de: "Zuletzt \(relativeDayText(latest.reportDate))"
+            zh: "上次 \(relativeDayText(latest))",
+            en: "Last \(relativeDayText(latest))",
+            de: "Zuletzt \(relativeDayText(latest))",
+            es: "Último: \(relativeDayText(latest))", pt: "Último: \(relativeDayText(latest))", fr: "Dernier : \(relativeDayText(latest))",
+            ja: "前回：\(relativeDayText(latest))", ko: "최근: \(relativeDayText(latest))", it: "Ultimo: \(relativeDayText(latest))"
         )
     }
 
@@ -717,26 +970,37 @@ struct HumanAllFeaturesSheet: View {
     }
 
     private var monthlyExpenseText: String {
-        AppCurrency.format(monthlyExpenses.reduce(0) { $0 + $1.amount }, fractionDigits: 0)
+        AppCurrency.format(
+            monthlyExpenses.reduce(0) {
+                $0 + ExpenseSummaryBuilder.amountPaid(by: human.id, for: $1)
+            },
+            fractionDigits: 0
+        )
     }
 
     private var expenseSubtitle: String {
         guard let latest = myExpenses.first else {
-            return l.tr(zh: "记录这个月花了什么", en: "Track this month's spending", de: "Ausgaben dieses Monats")
+            return l.tr(
+                zh: "查看此人支付的份额", en: "View this person's share", de: "Bezahlten Anteil ansehen",
+                es: "Ver la parte pagada", pt: "Ver a parte paga", fr: "Voir la part payée",
+                ja: "この人の負担分を見る", ko: "이 사람이 낸 금액 보기", it: "Vedi la quota pagata"
+            )
         }
         return l.tr(
             zh: "上次 \(relativeDayText(latest.date))",
             en: "Last \(relativeDayText(latest.date))",
-            de: "Zuletzt \(relativeDayText(latest.date))"
+            de: "Zuletzt \(relativeDayText(latest.date))",
+            es: "Último: \(relativeDayText(latest.date))", pt: "Último: \(relativeDayText(latest.date))", fr: "Dernier : \(relativeDayText(latest.date))",
+            ja: "前回：\(relativeDayText(latest.date))", ko: "최근: \(relativeDayText(latest.date))", it: "Ultimo: \(relativeDayText(latest.date))"
         )
     }
 
     private var noteMetric: String {
-        noteEntries.isEmpty ? l.tr(zh: "无", en: "None", de: "Keine") : "\(noteEntries.count)"
+        summary.noteCount == 0 ? l.tr(zh: "无", en: "None", de: "Keine") : "\(summary.noteCount)"
     }
 
     private var noteSubtitle: String {
-        noteEntries.isEmpty
+        summary.noteCount == 0
             ? l.tr(zh: "记录今天的一句话", en: "Save a quick note", de: "Kurze Notiz speichern")
             : l.tr(zh: "最近有记录", en: "Recent notes", de: "Aktuelle Notizen")
     }
@@ -765,27 +1029,12 @@ struct HumanAllFeaturesSheet: View {
         HumanProfileOptions.localizedRoleTitle(raw, l: l)
     }
 
-    private var myMeds: [HumanMedication] {
-        allMeds.filter { $0.humanId == human.id.uuidString && $0.isActive && $0.isActiveToday }
-    }
-
-    private var myReports: [HumanHealthReport] {
-        allReports.filter { $0.humanId == human.id.uuidString }
-    }
-
     private var myExpenses: [PetExpenseLog] {
-        allExpenses.filter { $0.executorId == human.id.uuidString }
+        ExpenseSummaryBuilder.paidBy(human.id, from: allExpenses)
     }
 
     private var monthlyExpenses: [PetExpenseLog] {
         myExpenses.filter { Calendar.current.isDate($0.date, equalTo: Date(), toGranularity: .month) }
-    }
-
-    private var noteEntries: [String] {
-        human.notes
-            .components(separatedBy: "\n\n")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
     }
 
     private func relativeDayText(_ date: Date) -> String {
@@ -803,7 +1052,7 @@ private struct HumanOwnerPrivacyHint: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 22, height: 22) // a11y: allow decorative non-interactive glyph; hint text is combined by parent
                 .accessibilityHidden(true)
@@ -827,14 +1076,14 @@ private struct HumanMemorialBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "纪念模式", en: "Memorial mode", de: "Gedenkmodus"))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -860,9 +1109,19 @@ private struct HumanMemorialBanner: View {
             return l.tr(
                 zh: "离世 \(date.formatted(.dateTime.year().month().day())) · 相伴 \(days) 天",
                 en: "Passed \(date.formatted(.dateTime.year().month().day())) · \(days) days together",
-                de: "Verstorben \(date.formatted(.dateTime.year().month().day())) · \(days) Tage zusammen"
+                de: "Verstorben \(date.formatted(.dateTime.year().month().day())) · \(days) Tage zusammen",
+                es: "Falleció el \(date.formatted(.dateTime.year().month().day())) · \(days) días juntos",
+                pt: "Faleceu em \(date.formatted(.dateTime.year().month().day())) · \(days) dias juntos",
+                fr: "Décès le \(date.formatted(.dateTime.year().month().day())) · \(days) jours ensemble",
+                ja: "逝去日 \(date.formatted(.dateTime.year().month().day())) · 一緒に過ごした\(days)日",
+                ko: "별세일 \(date.formatted(.dateTime.year().month().day())) · 함께한 \(days)일",
+                it: "Decesso il \(date.formatted(.dateTime.year().month().day())) · \(days) giorni insieme"
             )
         }
-        return l.tr(zh: "相伴 \(days) 天", en: "\(days) days together", de: "\(days) Tage zusammen")
+        return l.tr(
+            zh: "相伴 \(days) 天", en: "\(days) days together", de: "\(days) Tage zusammen",
+            es: "\(days) días juntos", pt: "\(days) dias juntos", fr: "\(days) jours ensemble",
+            ja: "一緒に過ごした\(days)日", ko: "함께한 \(days)일", it: "\(days) giorni insieme"
+        )
     }
 }

@@ -15,10 +15,10 @@ struct QuickFeedModeInfoPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -35,7 +35,7 @@ struct QuickFeedSectionHeader: View {
 
     var body: some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.top, 2)
     }
@@ -52,17 +52,17 @@ struct QuickFeedTreatOverviewHero: View {
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 22, weight: .black))
+                .font(OhanaFont.adaptive(size: 22, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(lastSeenText)
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -71,11 +71,11 @@ struct QuickFeedTreatOverviewHero: View {
 
             VStack(alignment: .trailing, spacing: 3) {
                 Text("\(todayCount)")
-                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 34, weight: .semibold, design: .default))
                     .foregroundStyle(tint)
                     .contentTransition(.numericText())
                 Text(todaySubtitle)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -98,11 +98,11 @@ struct QuickFeedTreatFilterChip: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 Text("\(count)")
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .contentTransition(.numericText())
             }
             .foregroundStyle(isSelected ? Color.arkInk : tint)

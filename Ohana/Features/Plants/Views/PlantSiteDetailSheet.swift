@@ -62,7 +62,7 @@ struct PlantSiteDetailSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative site glyph; heading and stats name this sheet.
-                    .font(OhanaFont.adaptive(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary.opacity(0.16), in: Circle())
@@ -70,11 +70,11 @@ struct PlantSiteDetailSheet: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "位置总览", en: "Site overview", de: "Standortübersicht"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .textCase(.uppercase)
                     Text(siteName)
-                        .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 21, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
@@ -155,14 +155,14 @@ struct PlantSiteDetailSheet: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "line.3.horizontal.decrease.circle.fill") // a11y: allow decorative filter glyph; button label names action.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "在 Plants 视图查看此位置", en: "View this site in Plants", de: "Diesen Standort in Pflanzen anzeigen"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
             .background(Color.goPrimary, in: Capsule())
@@ -176,7 +176,7 @@ struct PlantSiteDetailSheet: View {
 
         return HStack(spacing: 10) {
             Image(systemName: careSymbol(for: task.careType)) // a11y: decorative care glyph; row text names task.
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(careTint(for: task.careType))
                 .frame(width: 34, height: 34) // a11y: allow non-interactive care glyph; adjacent row text names the task.
                 .background(careTint(for: task.careType).opacity(0.16), in: Circle())
@@ -184,12 +184,12 @@ struct PlantSiteDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(plant.name) · \(careTypeName)")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
                 Text(task.subtitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -200,8 +200,8 @@ struct PlantSiteDetailSheet: View {
                 onOpenCareLog(plant, task.careType)
             } label: {
                 Image(systemName: "checkmark") // a11y: allow decorative completion glyph; accessibility label names action.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary, in: Circle())
                     .accessibilityHidden(true)
@@ -237,12 +237,12 @@ struct PlantSiteDetailSheet: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(plant.name)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                     Text(plant.species.isEmpty ? l.tr(zh: "未设置品种", en: "Species unset", de: "Art fehlt") : plant.species)
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
@@ -266,14 +266,14 @@ struct PlantSiteDetailSheet: View {
     private func metricPill(icon: String, value: String, label: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon) // a11y: decorative metric glyph; adjacent text gives value.
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(value)
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
-                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
@@ -286,11 +286,11 @@ struct PlantSiteDetailSheet: View {
     private func sectionHeader(title: String, detail: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer(minLength: 8)
             Text(detail)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         }
@@ -299,10 +299,10 @@ struct PlantSiteDetailSheet: View {
     private func statusPill(for plant: Plant) -> some View {
         HStack(spacing: 4) {
             Image(systemName: plant.healthStatus == .stressed ? "exclamationmark.triangle.fill" : "info.circle.fill")
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                 .accessibilityHidden(true)
             Text(plant.healthStatus.displayName)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
         }

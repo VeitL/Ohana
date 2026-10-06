@@ -556,18 +556,30 @@ struct InsuranceCommandExecutor {
     let revisions: DomainRevisionPublishing
 
     init(context: ModelContext) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher())
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher()
+        )
     }
 
     init(context: ModelContext, revisionCenter: ReadModelRevisionCenter) {
-        self.init(context: context, revisions: SharedDomainRevisionPublisher(center: revisionCenter))
+        self.init(
+            context: context,
+            revisions: SharedDomainRevisionPublisher(center: revisionCenter)
+        )
     }
 
     init(context: ModelContext, services: AppServices) {
-        self.init(context: context, revisions: services.domainRevisions)
+        self.init(
+            context: context,
+            revisions: services.domainRevisions
+        )
     }
 
-    init(context: ModelContext, revisions: DomainRevisionPublishing) {
+    init(
+        context: ModelContext,
+        revisions: DomainRevisionPublishing
+    ) {
         self.context = context
         self.revisions = revisions
     }

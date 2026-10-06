@@ -11,7 +11,7 @@ extension AchievementWallContentView {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "成就解锁", en: "Badges", de: "Abzeichen"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.brandTitle(.title3, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(activeMemberName)
                     .font(OhanaFont.caption(.bold))
@@ -27,15 +27,7 @@ extension AchievementWallContentView {
             }
             .accessibilityLabel(l.tr(zh: "椰子历史", en: "Coconut history", de: "Kokosnuss-Verlauf"))
 
-            Button { dismiss() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+
         }
     }
 
@@ -74,7 +66,7 @@ extension AchievementWallContentView {
                 activeMemberAvatar(size: 58)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(unlocked.count)/\(achievements.count)")
-                        .font(OhanaFont.metric(size: 42))
+                        .font(OhanaFont.brandMetric(size: 42))
                         .foregroundStyle(Color.goPrimary)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -85,7 +77,7 @@ extension AchievementWallContentView {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("\(Int(percent * 100))%")
-                        .font(OhanaFont.metric(size: 30))
+                        .font(OhanaFont.brandMetric(size: 30))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -428,7 +420,17 @@ extension AchievementWallContentView {
         case "human_first_record": l.tr(zh: "自己的第一条记录，也值得被纪念。", en: "Your first record deserves to be remembered too.", de: "Auch dein erster Eintrag verdient Erinnerung.")
         case "human_weight_starter": l.tr(zh: "建立基线，是照顾自己的第一步。", en: "A baseline is a gentle first step in self-care.", de: "Eine Basislinie ist ein sanfter erster Schritt.")
         case "human_weight_keeper": l.tr(zh: "趋势被看见，身体的声音就更清楚。", en: "Seeing the trend makes the body's signals clearer.", de: "Der Trend macht Körpersignale klarer.")
-        case "human_expense_tracker": l.tr(zh: "家庭里的花费，也开始有迹可循。", en: "Household spending now has a clearer trail.", de: "Familienausgaben werden nun nachvollziehbarer.")
+        case "human_expense_tracker": l.tr(
+            zh: "你参与的宠物花费，也开始有迹可循。",
+            en: "The pet spending you contribute to now has a clearer trail.",
+            de: "Deine Beiträge zu Haustierausgaben werden nachvollziehbar.",
+            es: "Tus aportes a gastos de mascotas ya quedan claros.",
+            pt: "As suas contribuições para despesas com pets ficam claras.",
+            fr: "Vos contributions aux dépenses animales sont mieux suivies.",
+            ja: "負担したペット費用が分かりやすくなりました。",
+            ko: "함께 부담한 반려동물 지출이 한눈에 보여요.",
+            it: "I tuoi contributi alle spese per animali sono più chiari."
+        )
         case "human_medication_setup": l.tr(zh: "计划建好了，照顾就少一点慌张。", en: "With a plan in place, care feels calmer.", de: "Mit Plan fühlt sich Fürsorge ruhiger an.")
         case "human_medication_keeper": l.tr(zh: "按时完成的小事，最能托住日常。", en: "Small on-time routines can hold the day together.", de: "Pünktliche kleine Routinen tragen den Alltag.")
         case "human_workout_starter": l.tr(zh: "开始活动，就是身体收到的第一封回信。", en: "Starting to move is the body's first reply.", de: "Loszugehen ist die erste Antwort des Körpers.")

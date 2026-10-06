@@ -277,6 +277,9 @@ nonisolated enum PetBreedDatabase {
         BreedInfo(name: "中华田园猫",
                   coatColors: [CoatColor(name: "橘猫", hex: "C8622A"), CoatColor(name: "黑猫", hex: "1A1A1A"), CoatColor(name: "白猫", hex: "F5F5F0"), CoatColor(name: "三花（黑白橘）", hex: "D4B896"), CoatColor(name: "狸花（虎斑）", hex: "7A5C3A"), CoatColor(name: "玳瑁", hex: "6E2C00"), CoatColor(name: "奶牛（黑白）", hex: "F5F5F0")],
                   suggestedThemeHex: "FF8F00"),
+        BreedInfo(name: "狸花猫",
+                  coatColors: [CoatColor(name: "棕狸花", hex: "7A5C3A"), CoatColor(name: "银灰狸花", hex: "9A9A92")],
+                  suggestedThemeHex: "795548"),
         BreedInfo(name: "银渐层",
                   coatColors: [CoatColor(name: "银底渐层", hex: "C0C0C0"), CoatColor(name: "浅银色", hex: "E0E0E0")],
                   suggestedThemeHex: "90A4AE"),
@@ -370,6 +373,20 @@ nonisolated enum PetBreedDatabase {
         "其他"
     ]
 
+    private static let countryRegionCodes: [String: String] = [
+        "中国": "CN", "美国": "US", "英国": "GB", "法国": "FR", "德国": "DE",
+        "日本": "JP", "韩国": "KR", "澳大利亚": "AU", "加拿大": "CA", "意大利": "IT",
+        "西班牙": "ES", "荷兰": "NL", "比利时": "BE", "爱尔兰": "IE", "俄罗斯": "RU",
+        "瑞典": "SE", "挪威": "NO", "丹麦": "DK", "芬兰": "FI", "冰岛": "IS",
+        "瑞士": "CH", "奥地利": "AT", "葡萄牙": "PT", "希腊": "GR", "土耳其": "TR",
+        "波兰": "PL", "捷克": "CZ", "匈牙利": "HU", "罗马尼亚": "RO", "保加利亚": "BG",
+        "克罗地亚": "HR", "塞尔维亚": "RS", "乌克兰": "UA", "以色列": "IL", "阿联酋": "AE",
+        "沙特阿拉伯": "SA", "印度": "IN", "泰国": "TH", "新加坡": "SG", "马来西亚": "MY",
+        "印度尼西亚": "ID", "越南": "VN", "菲律宾": "PH", "新西兰": "NZ", "巴西": "BR",
+        "阿根廷": "AR", "智利": "CL", "哥伦比亚": "CO", "秘鲁": "PE", "墨西哥": "MX",
+        "南非": "ZA", "埃及": "EG", "摩洛哥": "MA", "肯尼亚": "KE"
+    ]
+
     static let citiesByCountry: [String: [String]] = [
         "中国": ["北京", "上海", "广州", "深圳", "成都", "杭州", "武汉", "南京", "重庆", "西安", "苏州", "长沙", "天津", "青岛", "宁波", "郑州", "厦门", "济南", "合肥", "福州", "昆明", "大连", "哈尔滨", "沈阳", "贵阳", "南昌", "长春", "石家庄", "太原", "兰州", "乌鲁木齐", "海口", "三亚", "香港", "澳门", "台北", "其他"],
         "美国": ["纽约", "洛杉矶", "芝加哥", "旧金山", "西雅图", "波士顿", "华盛顿", "迈阿密", "奥兰多", "休斯敦", "达拉斯", "奥斯汀", "亚特兰大", "费城", "凤凰城", "圣迭戈", "拉斯维加斯", "波特兰", "丹佛", "圣何塞", "其他"],
@@ -429,6 +446,29 @@ nonisolated enum PetBreedDatabase {
 
     static func cities(for country: String) -> [String] {
         citiesByCountry[country] ?? ["其他"]
+    }
+
+    static func localizedRegionName(_ value: String, l: L10n) -> String {
+        guard !value.isEmpty else { return value }
+        if value == "其他" {
+            return l.tr(
+                zh: "其他", en: "Other", de: "Andere", es: "Otro", pt: "Outro",
+                fr: "Autre", ja: "その他", ko: "기타", it: "Altro"
+            )
+        }
+        guard let regionCode = countryRegionCodes[value] else {
+            return l.resourceName(value)
+        }
+        let locale = Locale(identifier: AppLanguage.option(for: l.languageCode).localeIdentifier)
+        return locale.localizedString(forRegionCode: regionCode) ?? l.resourceName(value)
+    }
+
+    static func sortedCountries(l: L10n) -> [String] {
+        l.sortedCatalogKeys(countries) { localizedRegionName($0, l: l) }
+    }
+
+    static func sortedCities(for country: String, l: L10n) -> [String] {
+        l.sortedCatalogKeys(cities(for: country)) { localizedRegionName($0, l: l) }
     }
 
     // MARK: - P1: 品种护理小贴士

@@ -97,6 +97,7 @@ enum AppPresentationPolicyProvider {
                 cornerRadius: OhanaRadius.sheetCompact
             )
         case .settings,
+             .guardianSafety,
              .streakDetail:
             AppPresentationPolicy(
                 surface: .sheetPage,
@@ -137,6 +138,7 @@ enum AppPresentationPolicyProvider {
 struct AppDeferredRouteContent<Content: View>: View {
     let routeID: String
     let policy: AppPresentationPolicy
+    var onCloseWhileLoading: (() -> Void)? = nil
     @ViewBuilder let content: () -> Content
 
     @State private var isMounted = false
@@ -148,7 +150,7 @@ struct AppDeferredRouteContent<Content: View>: View {
                 content()
                     .transition(.opacity)
             } else {
-                AppRouteLoadingShell(policy: policy)
+                AppRouteLoadingShell(policy: policy, onClose: onCloseWhileLoading)
                     .transition(.opacity)
             }
         }
@@ -196,8 +198,22 @@ struct AppDeferredRouteContent<Content: View>: View {
 
 struct AppRouteLoadingShell: View {
     let policy: AppPresentationPolicy
+    var onClose: (() -> Void)? = nil
 
     var body: some View {
+        if let onClose {
+            NavigationStack {
+                placeholder
+                    .navigationTitle(loadingLabel)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { OhanaModalToolbar(onClose: onClose) }
+            }
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
         ZStack {
             OhanaStaticAppBackground()
                 .ignoresSafeArea()
@@ -348,6 +364,10 @@ private extension AppSheetRoute {
             "humanWorkoutDashboard"
         case .humanMetrics:
             "humanMetrics"
+        case .humanObservationQuick:
+            "humanObservationQuick"
+        case .humanConditions:
+            "humanConditions"
         case .humanReport:
             "humanReport"
         case .humanExpenseQuick:
@@ -360,6 +380,8 @@ private extension AppSheetRoute {
             "humanNoteQuick"
         case .humanNote:
             "humanNote"
+        case .guardianSafety:
+            "guardianSafety"
         case .requiredAccountSwitch:
             "requiredAccountSwitch"
         case .settings:

@@ -11,11 +11,11 @@ extension PlantDetailContentView {
     func plantSectionHeader(_ title: String, subtitle: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 18, weight: .heavy, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if let subtitle {
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -32,7 +32,7 @@ extension PlantDetailContentView {
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
             Text(title)
-                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
             Spacer()
         }
     }
@@ -57,7 +57,7 @@ extension PlantDetailContentView {
 
     func detailRowTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -65,7 +65,7 @@ extension PlantDetailContentView {
 
     func detailRowValue(_ value: String) -> some View {
         Text(value)
-            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryText)
             .fixedSize(horizontal: false, vertical: true)
     }

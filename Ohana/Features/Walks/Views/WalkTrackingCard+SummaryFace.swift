@@ -56,14 +56,14 @@ extension WalkTrackingCard {
     func summaryRewardBadge(delta: Int) -> some View {
         Label {
             Text(L10n(appLanguage).tr(zh: "+\(delta) 椰子", en: "+\(delta) coconuts", de: "+\(delta) Kokosnüsse"))
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         } icon: {
             Image(systemName: "plus.circle.fill") // a11y: allow decorative reward glyph; label text names the reward.
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
         }
-        .foregroundStyle(Color.arkInk)
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
@@ -90,11 +90,11 @@ extension WalkTrackingCard {
                     petAvatar(pet: pet, size: 38)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(L10n(appLanguage).tr(zh: "本次遛狗", en: "This walk", de: "Dieser Spaziergang"))
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.goPrimary)
                             .tracking(1.2)
                         Text(L10n(appLanguage).tr(zh: "\(pet.name) 到家啦", en: "\(pet.name) is home", de: "\(pet.name) ist zurück"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.goCardWhite)
                             .lineLimit(1)
                     }
@@ -127,7 +127,7 @@ extension WalkTrackingCard {
     var summaryCloseButton: some View {
         Button { closeSummaryBack() } label: {
             Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goCardWhite)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.arkInk.opacity(0.42), in: Circle())
@@ -148,8 +148,8 @@ extension WalkTrackingCard {
             showingGoalSetter = true
         } label: {
             Image(systemName: "slider.horizontal.3") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.arkInk)
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary, in: Circle())
         }
@@ -226,7 +226,7 @@ extension WalkTrackingCard {
                         goalFlagIcon
                         goalTextBlock(
                             title: L10n(appLanguage).tr(zh: "还没有遛狗目标", en: "No walk goal yet", de: "Noch kein Spaziergangsziel"),
-                            subtitle: L10n(appLanguage).tr(zh: "设一个每周目标，之后会显示完成率", en: "Set a weekly goal to see progress here.", de: "Setze ein Wochenziel, um Fortschritt zu sehen.")
+                            subtitle: L10n(appLanguage).tr(zh: "设置每周目标", en: "Set weekly goal", de: "Wochenziel festlegen")
                         )
                         Spacer(minLength: 8)
                         editGoalButton
@@ -237,7 +237,7 @@ extension WalkTrackingCard {
                             goalFlagIcon
                             goalTextBlock(
                                 title: L10n(appLanguage).tr(zh: "还没有遛狗目标", en: "No walk goal yet", de: "Noch kein Spaziergangsziel"),
-                                subtitle: L10n(appLanguage).tr(zh: "设一个每周目标，之后会显示完成率", en: "Set a weekly goal to see progress here.", de: "Setze ein Wochenziel, um Fortschritt zu sehen.")
+                                subtitle: L10n(appLanguage).tr(zh: "设置每周目标", en: "Set weekly goal", de: "Wochenziel festlegen")
                             )
                             Spacer(minLength: 0)
                         }
@@ -267,7 +267,7 @@ extension WalkTrackingCard {
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
             Text(subtitle)
-                .font(OhanaFont.footnote(.black))
+                .font(OhanaFont.footnote(.semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -284,7 +284,7 @@ extension WalkTrackingCard {
                 .rotationEffect(.degrees(-90))
                 .animation(GoMotion.feedback, value: progress)
             Text("\(Int(progress * 100))%")
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.goCardWhite)
         }
         .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
@@ -304,8 +304,8 @@ extension WalkTrackingCard {
             showingGoalSetter = true
         } label: {
             Text(L10n(appLanguage).tr(zh: "编辑目标", en: "Edit goal", de: "Ziel ändern"))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(Color.arkInk)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -317,12 +317,12 @@ extension WalkTrackingCard {
     var walkGoalSetterSheet: some View {
         VStack(spacing: 20) {
             Text(L10n(appLanguage).tr(zh: "设定每周步行目标", en: "Set weekly walk goal", de: "Wochenziel festlegen"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .padding(.top, 20)
 
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(weeklyGoalDisplay(goalDraft))
-                    .font(OhanaFont.adaptive(size: 52, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 52, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .contentTransition(.numericText())
                     .animation(GoMotion.feedback, value: goalDraft)
@@ -368,8 +368,8 @@ extension WalkTrackingCard {
                 Text(goalDraft == 0
                     ? L10n(appLanguage).tr(zh: "清除目标", en: "Clear goal", de: "Ziel löschen")
                     : L10n(appLanguage).tr(zh: "保存目标", en: "Save goal", de: "Ziel speichern"))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row))
@@ -384,7 +384,7 @@ extension WalkTrackingCard {
     func summaryStatCell(label: String, value: String, accent: Color, identifier: String) -> some View {
         VStack(spacing: 5) {
             Text(value)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

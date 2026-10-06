@@ -108,14 +108,14 @@ struct HumanPrivateDataNotice: View {
         if HumanLocalPrivacyPolicy.isEnabled, isOwner, isFieldPrivate {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(Color.goYellow)
                     .frame(width: 28, height: 28) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goYellow.opacity(0.16), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "只有你能看到", en: "Only you can see this", de: "Nur du kannst das sehen"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "\(field.localizedTitle(l))数据已设为隐私，其他家庭成员不会看到这些内容。", en: "\(field.localizedTitle(l)) is private. Other family members will not see it.", de: "\(field.localizedTitle(l)) ist privat. Andere Familienmitglieder sehen es nicht."))
                         .font(OhanaFont.caption2(.bold))
@@ -139,7 +139,7 @@ private extension HumanPrivateField {
     func localizedTitle(_ l: L10n) -> String {
         switch self {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

@@ -21,11 +21,11 @@ struct IslandMedicationDashboardContentView: View {
     var onOpenPet: ((Pet) -> Void)?
     let pets: [Pet]
     let medicationsByPetID: [UUID: [PetMedication]]
+    var todayDoseCounts: [UUID: Int] = [:]
     var onMedicationDataChanged: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
@@ -43,8 +43,8 @@ struct IslandMedicationDashboardContentView: View {
     private var summaries: [MedicationPetSummary] {
         selectedPets.map { pet in
             let meds = medications(for: pet).filter(\.isActiveToday).sorted { $0.createdAt > $1.createdAt }
-            let due = meds.reduce(0) { $0 + max(0, $1.frequency.dosesPerDay) }
-            let taken = meds.reduce(0) { $0 + min(appServices.medicationReminders.dosesTakenToday(for: $1.id), max(0, $1.frequency.dosesPerDay)) }
+            let due = meds.reduce(0) { $0 + requiredToday(for: $1) }
+            let taken = meds.reduce(0) { $0 + min(todayDoseCounts[$1.id] ?? 0, requiredToday(for: $1)) }
             _ = doseRefreshToken
             return MedicationPetSummary(id: pet.id, pet: pet, activeMeds: meds, dueDoses: due, takenDoses: taken)
         }
@@ -67,14 +67,18 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private var dueDoses: Int {
-        activeMeds.reduce(0) { $0 + max(0, $1.frequency.dosesPerDay) }
+        activeMeds.reduce(0) { $0 + requiredToday(for: $1) }
     }
 
     private var takenDoses: Int {
         _ = doseRefreshToken
         return activeMeds.reduce(0) { total, med in
-            total + min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(0, med.frequency.dosesPerDay))
+            total + min(todayDoseCounts[med.id] ?? 0, requiredToday(for: med))
         }
+    }
+
+    private func requiredToday(for medication: PetMedication) -> Int {
+        max(0, PetMedicationDoseLogging.requiredDoses(on: Date(), for: medication))
     }
 
     private var completion: Double {
@@ -109,8 +113,9 @@ struct IslandMedicationDashboardContentView: View {
                     OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
-                .ignoresSafeArea(edges: .top)
-                .navigationBarHidden(true)
+                .navigationTitle(l.tr(zh: "用药总览", en: "Medication overview", de: "Medikationsübersicht"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { OhanaModalToolbar(onClose: { dismiss() }) }
             }
         } else {
             scrollContent
@@ -120,7 +125,6 @@ struct IslandMedicationDashboardContentView: View {
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 16) {
-                if standalone { navBar }
                 memberSelector
                 pillboxHero
                 todayMedicationStrip
@@ -128,29 +132,11 @@ struct IslandMedicationDashboardContentView: View {
                 Color.clear.frame(height: 36)
             }
             .padding(.horizontal, 16)
-            .padding(.top, standalone ? 0 : 14)
+            .padding(.top, 14)
         }
     }
 
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                    .foregroundStyle(Color.goCardWhite)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .goGlassBackground(Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            Spacer()
-            Text(l.tr(zh: "今日药盒", en: "Today's pillbox", de: "Heutige Medikamentenbox"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.goCardWhite)
-            Spacer()
-            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-        }
-        .padding(.top, 64)
-    }
+
 
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -180,27 +166,27 @@ struct IslandMedicationDashboardContentView: View {
                     .frame(width: 104, height: 104)
                 VStack(spacing: 1) {
                     Text("\(takenDoses)")
-                        .font(OhanaFont.adaptive(size: 31, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 31, weight: .semibold, design: .default))
                         .foregroundStyle(Color.goCardWhite)
                     Text("/ \(dueDoses)")
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.goCardWhite.opacity(0.48))
                 }
             }
 
             VStack(alignment: .leading, spacing: 7) {
                 Text(l.tr(zh: "今日服药进度", en: "Today's medication progress", de: "Heutiger Medikationsfortschritt"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goCardWhite.opacity(0.56))
                 Text(todayMedicationStatus)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goCardWhite)
                 Text(l.tr(
                     zh: "\(activeMeds.count) 个当前用药 · \(endingSoonCount) 个 7 天内结束",
                     en: "\(activeMeds.count) active medications · \(endingSoonCount) ending within 7 days",
                     de: "\(activeMeds.count) aktive Medikamente · \(endingSoonCount) enden innerhalb von 7 Tagen"
                 ))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.goCardWhite.opacity(0.52))
             }
             Spacer()
@@ -219,14 +205,14 @@ struct IslandMedicationDashboardContentView: View {
     private var todayMedicationStrip: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "药盒格", en: "Pill slots", de: "Medikamentenfaecher"))
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goCardWhite.opacity(0.72))
 
             if activeMeds.isEmpty {
                 emptyState(l.tr(
-                    zh: "暂无当前用药\n进入成员页添加药物计划",
-                    en: "No active medications yet\nOpen a member page to add a medication plan",
-                    de: "Noch keine aktiven Medikamente\nOeffne eine Mitgliederseite, um einen Plan hinzuzufuegen"
+                    zh: "暂无当前用药",
+                    en: "No active medications",
+                    de: "Keine aktiven Medikamente"
                 ))
             } else {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 10)], spacing: 10) {
@@ -241,8 +227,8 @@ struct IslandMedicationDashboardContentView: View {
     }
 
     private func pillCell(_ med: PetMedication) -> some View {
-        let need = max(0, med.frequency.dosesPerDay)
-        let taken = min(appServices.medicationReminders.dosesTakenToday(for: med.id), max(need, 1))
+        let need = requiredToday(for: med)
+        let taken = min(todayDoseCounts[med.id] ?? 0, max(need, 1))
         let done = need > 0 && taken >= need
         _ = doseRefreshToken
         return VStack(spacing: 8) {
@@ -262,11 +248,11 @@ struct IslandMedicationDashboardContentView: View {
                     }
             }
             Text(med.name.isEmpty ? l.tr(zh: "未命名", en: "Unnamed", de: "Unbenannt") : med.name)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
             Text(medicationPetNamesByID[med.id] ?? med.frequency.rawValue)
-                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default))
                 .foregroundStyle(Color.goCardWhite.opacity(0.42))
                 .lineLimit(1)
         }
@@ -278,7 +264,7 @@ struct IslandMedicationDashboardContentView: View {
     private var medicationRows: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "成员药盒", en: "Member pillboxes", de: "Medikamentenboxen der Mitglieder"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goCardWhite)
             ForEach(summaries) { summary in
                 Button { open(summary.pet) } label: {
@@ -286,18 +272,18 @@ struct IslandMedicationDashboardContentView: View {
                         FMPetAvatar(pet: summary.pet, size: 42)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(summary.pet.name)
-                                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                                 .foregroundStyle(Color.goCardWhite)
                             Text(summary.activeMeds.isEmpty ? l.tr(zh: "暂无当前用药", en: "No active medications", de: "Keine aktiven Medikamente") : l.tr(zh: "\(summary.activeMeds.count) 个当前用药", en: "\(summary.activeMeds.count) active medications", de: "\(summary.activeMeds.count) aktive Medikamente"))
-                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                                 .foregroundStyle(Color.goCardWhite.opacity(0.48))
                         }
                         Spacer()
                         Text(summary.dueDoses == 0 ? "--" : "\(summary.takenDoses)/\(summary.dueDoses)")
-                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                             .foregroundStyle(summary.dueDoses > 0 && summary.takenDoses >= summary.dueDoses ? Color.goPrimary : medAccent)
                         Image(systemName: "chevron.right").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 11, weight: .black))
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                             .foregroundStyle(Color.goCardWhite.opacity(0.3))
                     }
                     .padding(14)
@@ -314,9 +300,9 @@ struct IslandMedicationDashboardContentView: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.goCardWhite)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goCardWhite)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -332,7 +318,7 @@ struct IslandMedicationDashboardContentView: View {
 
     private func emptyState(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
             .multilineTextAlignment(.center)
             .foregroundStyle(Color.goCardWhite.opacity(0.42))
             .frame(maxWidth: .infinity, minHeight: 100)

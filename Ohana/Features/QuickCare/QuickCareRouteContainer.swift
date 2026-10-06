@@ -107,6 +107,7 @@ struct QuickFeedDetailRouteContainer: View {
                     showsCloseButton: showsCloseButton,
                     opensManualSheetOnAppear: opensManualSheetOnAppear,
                     allEvents: routeData.allEvents,
+                    eventRevision: routeData.eventRevision,
                     allHumans: routeData.allHumans,
                     allPets: routeData.allPets,
                     feedingLedgerEntries: routeData.feedingLedgerEntries,
@@ -147,21 +148,25 @@ struct QuickWaterDetailRouteContainer: View {
     let id: UUID
     let onRemove: () -> Void
     let onClose: (() -> Void)?
+    let showsCloseButton: Bool
 
     init(
         id: UUID,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.id = id
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
         QuickWaterDetailSheetHost(
             id: id,
             onRemove: onRemove,
+            showsCloseButton: showsCloseButton,
             onClose: onClose
         )
     }
@@ -176,15 +181,18 @@ struct QuickPottyDetailRouteContainer: View {
     let id: UUID
     let onRemove: () -> Void
     let onClose: (() -> Void)?
+    let showsCloseButton: Bool
 
     init(
         id: UUID,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.id = id
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
@@ -193,6 +201,7 @@ struct QuickPottyDetailRouteContainer: View {
                 QuickPottyDetailSheet(
                     pet: pet,
                     onRemove: onRemove,
+                    showsCloseButton: showsCloseButton,
                     onClose: onClose,
                     onRecordChanged: {
                         scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
@@ -271,6 +280,7 @@ private struct QuickPlayRouteData {
 private struct QuickFeedRouteData {
     var pet: Pet?
     var allEvents: [Event] = []
+    var eventRevision = QuickFeedRouteRevision(events: [])
     var allHumans: [Human] = []
     var allPets: [Pet] = []
     var feedingLedgerEntries: [QuickFeedLedgerEntry] = []
@@ -312,6 +322,7 @@ private struct QuickFeedRouteData {
         return QuickFeedRouteData(
             pet: pet,
             allEvents: allEvents,
+            eventRevision: QuickFeedRouteRevision(events: allEvents),
             allHumans: fetch(
                 FetchDescriptor<Human>(sortBy: [SortDescriptor(\.createdAt)]),
                 context: context,
@@ -540,7 +551,7 @@ struct QuickCareMissingRouteEntityView: View {
                 .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color.goOrange)
             Text(L10n.current.tr(zh: "找不到对应资料", en: "Missing \(kind)", de: "\(kind) nicht gefunden"))
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -556,7 +567,7 @@ private struct QuickCareLoadingRouteEntityView: View {
             ProgressView()
                 .controlSize(.regular)
             Text(kind)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

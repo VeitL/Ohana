@@ -13,7 +13,7 @@ extension QuickFeedDetailContent {
                     title: treatFrequencyTitle,
                     points: filteredTreatChartPoints,
                     tint: treatTint,
-                    emptyText: l.tr(zh: "记录零食后会显示频率", en: "Log treats to see frequency", de: "Snack eintragen, dann erscheint die Frequenz")
+                    emptyText: l.tr(zh: "暂无零食记录", en: "No treat logs", de: "Keine Snack-Einträge")
                 )
 
                 let logs = Array(filteredTreatLogsInRange.prefix(4))
@@ -21,7 +21,7 @@ extension QuickFeedDetailContent {
                     emptyInlineState(icon: "birthday.cake", text: l.tr(zh: "还没有零食记录", en: "No treat logs yet", de: "Noch keine Snack-Einträge"))
                 } else {
                     Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     ForEach(logs) { log in
                         feedLogRow(log, compact: true)

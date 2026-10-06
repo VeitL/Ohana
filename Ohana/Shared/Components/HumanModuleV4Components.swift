@@ -45,32 +45,26 @@ struct HumanModulePageHeader<Trailing: View>: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Spacer(minLength: 8)
             trailing
 
+
+        }
+        .toolbar {
             if showsCloseButton {
-                Button(action: onClose) {
-                    Image(systemName: "xmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .ohanaGlassIconButton()
-                .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
+                OhanaModalToolbar(onClose: onClose, closeIdentifier: "human-module-close-action")
             }
         }
+
     }
 }
 
@@ -109,10 +103,10 @@ struct HumanModulePrivacyLockedView: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: "lock.shield.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 34, weight: .black))
+                .font(OhanaFont.adaptive(size: 34, weight: .semibold))
                 .foregroundStyle(Color.goYellow)
             Text(title)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .multilineTextAlignment(.center)
             Text(message)
@@ -140,13 +134,15 @@ struct HumanModuleFloatingActionButton: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 Text(title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 22)
-            .frame(height: 54)
+            .padding(.vertical, 12)
+            .frame(minHeight: 54)
         }
         .ohanaGlassProminentButton()
     }

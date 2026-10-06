@@ -1,8 +1,8 @@
-/* English fallback for protected-resource prompts until reviewed Italian copy is approved. */
-"NSCameraUsageDescription" = "Used when you choose to take a member or pet avatar, Moment photo, or receipt attachment.";
-"NSPhotoLibraryUsageDescription" = "Used to import avatars, Moment images, or receipt attachments that you select.";
-"NSHealthShareUsageDescription" = "Used when you set up Apple Health to read steps, distance, active energy, exercise and stand time, activity goals, and workouts for this member's local summary.";
-"NSLocationWhenInUseUsageDescription" = "Used when you add a location to a Moment or start a walk so Ohana can record that route.";
-"NSLocationAlwaysAndWhenInUseUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";
-"NSLocationAlwaysUsageDescription" = "Used only during an active walk to keep recording the current route when the app is in the background or the screen is locked.";
-"NSFaceIDUsageDescription" = "Used to verify protected member switching with Face ID instead of entering the local PIN.";
+/* Descrizioni localizzate delle autorizzazioni (italiano) */
+"NSCameraUsageDescription" = "Viene utilizzata quando scegli di acquisire un avatar, un Momento, una ricevuta o un referto sanitario. Il testo del referto viene elaborato solo su questo dispositivo.";
+"NSPhotoLibraryUsageDescription" = "Viene utilizzata per importare gli avatar, i Momenti, le ricevute o i referti sanitari che selezioni. Il testo del referto viene riconosciuto solo su questo dispositivo.";
+"NSHealthShareUsageDescription" = "Viene utilizzata quando configuri Apple Health per leggere passi, distanza, energia attiva, tempo di allenamento e ore in piedi, obiettivi di attività e allenamenti nel riepilogo locale di questo membro.";
+"NSLocationWhenInUseUsageDescription" = "Viene utilizzata quando aggiungi un luogo a un Momento o inizi una passeggiata, così Ohana può registrare il percorso.";
+"NSLocationAlwaysAndWhenInUseUsageDescription" = "Viene utilizzata solo durante una passeggiata attiva per continuare a registrare il percorso quando l’app è in background o lo schermo è bloccato.";
+"NSLocationAlwaysUsageDescription" = "Viene utilizzata solo durante una passeggiata attiva per continuare a registrare il percorso quando l’app è in background o lo schermo è bloccato.";
+"NSFaceIDUsageDescription" = "Viene utilizzata per confermare con Face ID il cambio protetto di membro, invece di inserire il PIN locale.";

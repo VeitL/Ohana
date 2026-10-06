@@ -5,16 +5,16 @@ extension QuickFeedDetailContent {
     var manualFeedSettingSummary: some View {
         HStack(spacing: 12) {
             Image(systemName: pet.mainFoodKind.systemIconName)
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
-                .foregroundStyle(Color.arkInk)
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold))
+                .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "当前打卡设置", en: "Current log setting", de: "Aktuelle Einstellung"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(manualFeedSettingSummaryText)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -24,8 +24,8 @@ extension QuickFeedDetailContent {
                 openManualFeedSheet(settingsOnly: true)
             } label: {
                 Image(systemName: "slider.horizontal.3").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: Circle())
             }
@@ -58,7 +58,7 @@ extension QuickFeedDetailContent {
                     shiftFeedPlanCalendarMonth(by: -1)
                 } label: {
                     Image(systemName: "chevron.left").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
@@ -72,10 +72,10 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(spacing: 6) {
                         Text(feedPlanCalendarMonthTitle)
-                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Image(systemName: draftStore.showFeedPlanMonthPicker ? "chevron.up" : "chevron.down")
-                            .font(OhanaFont.adaptive(size: 10, weight: .black))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .padding(.horizontal, 4)
@@ -88,7 +88,7 @@ extension QuickFeedDetailContent {
                     setFeedPlanCalendarMonth(today, direction: direction)
                 } label: {
                     Text(l.tr(zh: "今天", en: "Today", de: "Heute"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .padding(.horizontal, 12)
                         .frame(height: 36)
@@ -99,7 +99,7 @@ extension QuickFeedDetailContent {
                     shiftFeedPlanCalendarMonth(by: 1)
                 } label: {
                     Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
@@ -150,7 +150,7 @@ extension QuickFeedDetailContent {
                     setFeedPlanCalendarYear(year - 1)
                 } label: {
                     Image(systemName: "chevron.left").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
@@ -158,7 +158,7 @@ extension QuickFeedDetailContent {
                 .buttonStyle(ScaleButtonStyle())
 
                 Text(feedPlanPlainYearText(year))
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity)
 
@@ -166,7 +166,7 @@ extension QuickFeedDetailContent {
                     setFeedPlanCalendarYear(year + 1)
                 } label: {
                     Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 36, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)
@@ -181,7 +181,7 @@ extension QuickFeedDetailContent {
                         selectFeedPlanCalendarMonth(year: year, month: month)
                     } label: {
                         Text(feedPlanMonthTitle(month, year: year))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 34)

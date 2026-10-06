@@ -10,6 +10,7 @@
 | `docs/testing-progress.md` | Current release phase, release bar, latest validation snapshot, active module pointers. | Long logs, full historical module transcripts, detailed open-item descriptions. |
 | `docs/task-follow-ups.md` | The active open follow-up backlog, priority, blocker, next action, and close condition. | Closed-item history, repeated validation output, detailed CloudKit device scripts. |
 | `docs/cloud-sync-todo.md` | CloudKit and real-device sync work that is deferred while CloudKit is disabled or unproven. | General app P1/P2 backlog outside sync. |
+| `docs/specs/GuardianSafety-logic.md` | Family guardian product contract, minimum-data boundary, fail-closed runtime and complete launch gate. | CloudKit sync plans or current pass/fail status. |
 | `docs/planning/gap-acceptance-track-list.md` | Manual acceptance debt that cannot be proven in repo tests or simulator-only runs. | Normal code follow-ups that can be closed by repo changes. |
 | `docs/release-true-device-test-plan.md` | Chinese operator checklist for first-release physical-device testing, derived from the active ledgers. | Canonical release status, historical evidence, or follow-up ownership. |
 | `docs/audits/<date>/` | Dated audit, market, release-classification, roadmap, and PR evidence for one commit. | Current release status, open-count ownership, or authority over later source changes. |

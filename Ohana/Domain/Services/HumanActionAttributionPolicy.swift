@@ -33,7 +33,8 @@ extension ExpenseActorAttribution {
         return ExpenseActorAttribution(
             executorId: HumanActionAttributionPolicy.activeHumanID(normalizedExecutorId, context: context)
                 ?? normalizedExecutorId,
-            recordedByHumanId: HumanActionAttributionPolicy.activeHumanID(recordedByHumanId, context: context)
+            recordedByHumanId: HumanActionAttributionPolicy.activeHumanID(recordedByHumanId, context: context),
+            payerContributions: payerContributions
         )
     }
 }

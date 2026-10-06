@@ -18,6 +18,7 @@ struct PetHygieneActionHumanConfirmationSheet: View {
     let draft: PetHygieneActionHumanDraft
     let humans: [ActionHumanOption]
     let tint: Color
+    let tintForeground: Color
     let onConfirm: (UUID?) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -28,11 +29,13 @@ struct PetHygieneActionHumanConfirmationSheet: View {
         draft: PetHygieneActionHumanDraft,
         humans: [ActionHumanOption],
         tint: Color,
+        tintForeground: Color,
         onConfirm: @escaping (UUID?) -> Void
     ) {
         self.draft = draft
         self.humans = humans
         self.tint = tint
+        self.tintForeground = tintForeground
         self.onConfirm = onConfirm
         _selectedExecutorID = State(initialValue: draft.initialExecutorID)
     }
@@ -58,24 +61,15 @@ struct PetHygieneActionHumanConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: draft.type.systemIconName)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black))
-                        .foregroundStyle(Color.arkInk)
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold))
+                        .foregroundStyle(tintForeground)
                         .frame(width: 44, height: 44)
                         .background(tint, in: Circle())
                         .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(draft.type.localizedLabel(l))
-                            .font(OhanaFont.callout(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                        Text(l.tr(
-                            zh: "确认本次已经完成",
-                            en: "Confirm this care is complete",
-                            de: "Diese Pflege als erledigt bestätigen"
-                        ))
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    }
+                    Text(draft.type.localizedLabel(l))
+                        .font(OhanaFont.callout(.semibold))
+                        .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer(minLength: 0)
                 }
 
@@ -96,8 +90,8 @@ struct PetHygieneActionHumanConfirmationSheet: View {
                         l.tr(zh: "确认已完成", en: "Confirm completed", de: "Als erledigt bestätigen"),
                         systemImage: "checkmark.circle.fill"
                     )
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(tintForeground)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(tint, in: Capsule())
                 }

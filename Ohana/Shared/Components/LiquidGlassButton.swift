@@ -14,6 +14,8 @@ struct LiquidGlassButton<Content: View>: View {
     var tintColor: Color?
     let content: Content
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     init(isPressed: Bool, isDone: Bool = false, cornerRadius: CGFloat = 18, tintColor: Color? = nil, @ViewBuilder content: @escaping () -> Content) {
         self.isPressed = isPressed
         self.isDone = isDone
@@ -70,8 +72,9 @@ struct LiquidGlassButton<Content: View>: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
         }
-        .scaleEffect(isPressed ? 0.90 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isPressed) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
+        .scaleEffect(isPressed && !reduceMotion ? 0.97 : 1)
+        .opacity(isPressed ? 0.92 : 1)
+        .animation(reduceMotion ? GoMotion.reduced : GoMotion.tap, value: isPressed)
     }
 }
 

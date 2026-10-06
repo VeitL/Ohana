@@ -225,9 +225,11 @@ enum PlantReminderControlService {
         context: ModelContext,
         now: Date = Date(),
         scheduleNotifications: Bool = true,
-        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        defaults: UserDefaults = .standard
     ) -> PlantReminderToggleResult {
         guard plant.remindersEnabled != enabled else { return .noChange }
+        let originalEnabled = plant.remindersEnabled
         plant.remindersEnabled = enabled
         CloudSyncMutationRecorder.markModified(plant, context: context, modifiedAt: now)
         let scheduleResult = PlantCarePlanScheduleService.sync(
@@ -236,10 +238,17 @@ enum PlantReminderControlService {
             now: now,
             scheduleNotifications: scheduleNotifications,
             notifications: notifications,
+            defaults: defaults,
             saveChanges: false
         )
+        guard scheduleResult.didPersist else {
+            plant.remindersEnabled = originalEnabled
+            context.rollback()
+            return .failed(scheduleResult.persistenceErrorDescription)
+        }
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            plant.remindersEnabled = originalEnabled
             context.rollback()
             return .failed(saveResult.errorDescription)
         }
@@ -249,6 +258,48 @@ enum PlantReminderControlService {
             notifications: notifications
         )
         return .changed
+    }
+
+    @discardableResult
+    static func enableWateringCheck(
+        plant: Plant,
+        intervalDays: Int,
+        context: ModelContext,
+        now: Date = Date(),
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current,
+        defaults: UserDefaults = .standard
+    ) -> PlantReminderToggleResult {
+        guard !plant.remindersEnabled, !plant.isArchived else { return .noChange }
+        let originalInterval = plant.wateringIntervalDays
+        let types = PlantReminderPreferenceStore.controllableCareTypes
+        let previous = types.map { type in
+            (
+                type,
+                PlantReminderPreferenceStore.planCalendarOverride(forPlantID: plant.id, careType: type, defaults: defaults),
+                PlantReminderPreferenceStore.systemReminderOverride(forPlantID: plant.id, careType: type, defaults: defaults)
+            )
+        }
+        for type in types {
+            PlantReminderPreferenceStore.setPlanCalendarEnabled(type == .watering, forPlantID: plant.id, careType: type, defaults: defaults)
+            PlantReminderPreferenceStore.setSystemReminderEnabled(type == .watering, forPlantID: plant.id, careType: type, defaults: defaults)
+        }
+        plant.wateringIntervalDays = min(max(intervalDays, 1), 90)
+        let result = setPlantRemindersEnabled(
+            true,
+            plant: plant,
+            context: context,
+            now: now,
+            notifications: notifications,
+            defaults: defaults
+        )
+        if !result.didPersist {
+            plant.wateringIntervalDays = originalInterval
+            for (type, plan, system) in previous {
+                PlantReminderPreferenceStore.restorePlanCalendarOverride(plan, forPlantID: plant.id, careType: type, defaults: defaults)
+                PlantReminderPreferenceStore.restoreSystemReminderOverride(system, forPlantID: plant.id, careType: type, defaults: defaults)
+            }
+        }
+        return result
     }
 
     @discardableResult
@@ -270,7 +321,27 @@ enum PlantReminderControlService {
         var scheduleResults: [PlantCarePlanScheduleResult] = []
 
         for plant in plants {
-            let dueTasks = PlantCarePlanService.tasks(for: plant, now: now, calendar: calendar)
+            let planningHistory: PlantCarePlanningHistory
+            do {
+                planningHistory = try PlantCarePlanningHistoryQuery.build(
+                    plantID: plant.id,
+                    context: context
+                )
+            } catch {
+                context.rollback()
+                return PlantReminderBulkDeferResult(
+                    deferredTaskCount: deferredTaskCount,
+                    affectedPlantCount: affectedPlantIDs.count,
+                    didPersist: false,
+                    persistenceErrorDescription: error.localizedDescription
+                )
+            }
+            let dueTasks = PlantCarePlanService.tasks(
+                for: plant,
+                history: planningHistory,
+                now: now,
+                calendar: calendar
+            )
                 .filter { $0.daysUntilDue <= 0 }
             guard !dueTasks.isEmpty else { continue }
             affectedPlantIDs.insert(plant.id)
@@ -304,6 +375,15 @@ enum PlantReminderControlService {
                 notifications: notifications,
                 saveChanges: false
             )
+            guard scheduleResult.didPersist else {
+                context.rollback()
+                return PlantReminderBulkDeferResult(
+                    deferredTaskCount: deferredTaskCount,
+                    affectedPlantCount: affectedPlantIDs.count,
+                    didPersist: false,
+                    persistenceErrorDescription: scheduleResult.persistenceErrorDescription
+                )
+            }
             scheduleResults.append(scheduleResult)
         }
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
@@ -328,6 +408,69 @@ enum PlantReminderControlService {
             deferredTaskCount: deferredTaskCount,
             affectedPlantCount: affectedPlantIDs.count
         )
+    }
+
+    /// Moving the next check is feedback about the plan, not a completed care action.
+    @discardableResult
+    static func deferTask(
+        plant: Plant,
+        careType: PlantCareType,
+        until date: Date,
+        wetSoil: Bool = false,
+        skip: Bool = false,
+        context: ModelContext,
+        executorId: String?,
+        now: Date = Date(),
+        calendar: Calendar = .current,
+        notifications: ReminderNotificationScheduling = ReminderNotificationSchedulerRegistry.current
+    ) -> PlantReminderToggleResult {
+        guard !plant.isArchived,
+              PlantCareCategory.schedulableCareTypes.contains(careType),
+              calendar.startOfDay(for: date) > calendar.startOfDay(for: now) else {
+            return .noChange
+        }
+        do {
+            let history = try PlantCarePlanningHistoryQuery.build(plantID: plant.id, context: context)
+            let hasTask = PlantCarePlanService.tasks(for: plant, history: history, now: now, calendar: calendar)
+                .contains { $0.careType == careType }
+            guard hasTask else { return .noChange }
+            let prefix = "\(skip ? "skip" : "defer"):\(careType.rawValue):"
+            let latestActualCare: Date? = switch careType {
+            case .watering: plant.lastWateredDate
+            case .fertilizing: plant.lastFertilizedDate
+            default: history.latestCareDates[careType]
+            }
+            if let latest = history.recentCustomNotes.first(where: { $0.note.hasPrefix(prefix) }),
+               latest.date > (latestActualCare ?? .distantPast),
+               let previousDate = ISO8601DateFormatter().date(from: String(latest.note.dropFirst(prefix.count)).components(separatedBy: "|")[0]),
+               calendar.isDate(previousDate, inSameDayAs: date),
+               latest.note.hasSuffix("|soilWet") == (wetSoil && careType == .watering && !plant.isHydroponic) {
+                return .noChange
+            }
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        let note = "\(skip ? "skip" : "defer"):\(careType.rawValue):\(ISO8601DateFormatter().string(from: date))" + (wetSoil && careType == .watering && !plant.isHydroponic ? "|soilWet" : "")
+        recordDeferFeedback(note, plant: plant, executorId: executorId, context: context, now: now)
+        let schedule = PlantCarePlanScheduleService.sync(
+            plant: plant,
+            context: context,
+            now: now,
+            scheduleNotifications: true,
+            notifications: notifications,
+            saveChanges: false
+        )
+        guard schedule.didPersist else {
+            context.rollback()
+            return .failed(schedule.persistenceErrorDescription)
+        }
+        let save = context.safeSaveResult(publishFailureEvent: true)
+        guard save.didSave else {
+            context.rollback()
+            return .failed(save.errorDescription)
+        }
+        PlantCarePlanScheduleService.commitSideEffects(for: schedule, context: context, notifications: notifications)
+        return .changed
     }
 
     private static func recordDeferFeedback(

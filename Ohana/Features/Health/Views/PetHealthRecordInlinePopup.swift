@@ -32,6 +32,12 @@ struct PetHealthRecordInlinePopup: View {
     @State private var nextCheckupDate = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var selectedRecorderHumanID: UUID?
     @State private var requiresRecorderSelection = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [selectedType.rawValue, String(date.timeIntervalSince1970), name, note, vetName, cost,
+         String(hasExpiration), String(expirationDate.timeIntervalSince1970),
+         String(hasNextCheckup), String(nextCheckupDate.timeIntervalSince1970)]
+    }
     @State private var isSaving = false
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -94,9 +100,11 @@ struct PetHealthRecordInlinePopup: View {
                         Picker(l.tr(zh: "记录类型", en: "Record type", de: "Eintragstyp"), selection: $selectedType) {
                             ForEach(healthSubtypeOptions(mode: entryMode), id: \.self) { type in
                                 Label(healthTypeTitle(type), systemImage: healthIcon(for: type))
+                                    .accessibilityIdentifier(healthSubtypeAccessibilityIdentifier(type))
                                     .tag(type)
                             }
                         }
+                        .accessibilityIdentifier("pet-health-record-type-picker")
                     }
                 }
 
@@ -156,25 +164,20 @@ struct PetHealthRecordInlinePopup: View {
             }
             .navigationTitle(typeLabel)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) {
-                        guard !isSaving else { return }
-                        onClose()
-                    }
-                    .accessibilityIdentifier("pet-health-record-close-action")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
-                        save()
-                    }
-                    .disabled(isSaving || !pet.canWriteHealthFacts || requiresRecorderSelection)
-                    .accessibilityIdentifier("pet-health-record-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, canSave: pet.canWriteHealthFacts && !requiresRecorderSelection,
+                closeIdentifier: "pet-health-record-close-action",
+                saveIdentifier: "pet-health-record-save-action",
+                onCancel: onClose, onSave: save
+            )
         }
         .accessibilityIdentifier("pet-health-record-sheet")
-        .onAppear(perform: applyDefaultsForSelectedType)
+        .onAppear {
+            guard initialDraft == nil else { return }
+            applyDefaultsForSelectedType()
+            initialDraft = editorDraft
+        }
         .onChange(of: selectedType) { _, _ in applyDefaultsForSelectedType() }
         .onChange(of: date) { _, newDate in
             if hasExpiration {
@@ -192,6 +195,23 @@ struct PetHealthRecordInlinePopup: View {
             [.vaccine, .dewormingInternal, .dewormingExternal, .checkup]
         case .visit:
             [.surgery, .general]
+        }
+    }
+
+    private func healthSubtypeAccessibilityIdentifier(_ type: HealthLogType) -> String {
+        switch type {
+        case .vaccine:
+            "pet-health-record-type-vaccine"
+        case .dewormingInternal:
+            "pet-health-record-type-dewormingInternal"
+        case .dewormingExternal:
+            "pet-health-record-type-dewormingExternal"
+        case .checkup:
+            "pet-health-record-type-checkup"
+        case .surgery:
+            "pet-health-record-type-surgery"
+        default:
+            "pet-health-record-type-general"
         }
     }
 
@@ -222,9 +242,9 @@ struct PetHealthRecordInlinePopup: View {
                 } label: {
                     HStack(spacing: 5) {
                         Image(systemName: healthIcon(for: type))
-                            .font(OhanaFont.adaptive(size: 11, weight: .black))
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         Text(title)
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                     }
                     .foregroundStyle(selectedType == type ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity)
@@ -245,7 +265,7 @@ struct PetHealthRecordInlinePopup: View {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 22)
             content()
@@ -265,7 +285,7 @@ struct PetHealthRecordInlinePopup: View {
         VStack(spacing: 10) {
             HStack {
                 Text(title)
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Toggle("", isOn: isOn)
@@ -300,7 +320,13 @@ struct PetHealthRecordInlinePopup: View {
     private func applyDefaultsForSelectedType() {
         switch selectedType {
         case .vaccine:
-            if name.isEmpty { name = "\(pet.name)疫苗" }
+            if name.isEmpty {
+                name = l.tr(
+                    zh: "\(pet.name)接种疫苗",
+                    en: "\(pet.name) vaccination",
+                    de: "\(pet.name) Impfung"
+                )
+            }
             hasExpiration = true
             expirationDate = defaultExpirationDate(from: date)
         case .dewormingInternal, .dewormingExternal, .medication:
@@ -333,7 +359,7 @@ struct PetHealthRecordInlinePopup: View {
         )
         let command = DomainCommand.petHealthRecord(petID: pet.id, type: selectedType.rawValue)
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        OhanaFeedback.light()
         commandQueue.enqueue(command) {
             guard PetHealthCommandExecutor(context: modelContext, services: appServices).recordHealth(
                 pet: pet,

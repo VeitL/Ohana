@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import UIKit
 
 private enum HygieneDashboardRange: Hashable, CaseIterable {
     case days7
     case days30
     case days90
     case all
+
+    var requiresPersonal: Bool {
+        self == .days90 || self == .all
+    }
 
     func title(_ l: L10n) -> String {
         switch self {
@@ -62,10 +67,12 @@ struct IslandHygieneDashboardContentView: View {
     let hygieneLedgerEntries: [HygieneDashboardLedgerEntry]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var selectedPetId: UUID? = nil
     @State private var selectedRange: HygieneDashboardRange = .days30
+    @State private var showingPersonalPlan = false
     @State private var sheetPet: Pet? = nil
     @State private var chartProgress: Double = 0
 
@@ -154,6 +161,15 @@ struct IslandHygieneDashboardContentView: View {
             .sheet(item: $sheetPet) { pet in
                 PetHygieneDetailView(pet: pet)
             }
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if selectedRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    selectedRange = .days30
+                }
+            }
             .onAppear { playChartEntrance() }
             .onChange(of: selectedPetId) { _, _ in playChartEntrance() }
             .onChange(of: selectedRange) { _, _ in playChartEntrance() }
@@ -168,8 +184,9 @@ struct IslandHygieneDashboardContentView: View {
                     OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
-                .ignoresSafeArea(edges: .top)
-                .navigationBarHidden(true)
+                .navigationTitle(l.tr(zh: "清洁总览", en: "Hygiene overview", de: "Hygieneübersicht"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { OhanaModalToolbar(onClose: { dismiss() }) }
             }
         } else {
             scrollContent
@@ -179,7 +196,6 @@ struct IslandHygieneDashboardContentView: View {
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 18) {
-                if standalone { navBar }
                 memberSelector
                 hygienePlanetHero
                 hygieneTrendCard
@@ -188,30 +204,11 @@ struct IslandHygieneDashboardContentView: View {
                 Color.clear.frame(height: 40)
             }
             .padding(.horizontal, 16)
-            .padding(.top, standalone ? 0 : 14)
+            .padding(.top, 14)
         }
     }
 
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.ohanaControlFill, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
 
-            Spacer()
-            Text(l.tr(zh: "清洁星球", en: "Clean Planet", de: "Putzplanet"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-        }
-        .padding(.top, 50)
-    }
 
     private var memberSelector: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -245,23 +242,23 @@ struct IslandHygieneDashboardContentView: View {
                     .fill(heroTint.opacity(0.16))
                     .frame(width: 62, height: 62)
                 Image(systemName: overdueCount > 0 ? "exclamationmark.bubbles.fill" : "bubbles.and.sparkles.fill")
-                    .font(OhanaFont.adaptive(size: 26, weight: .black))
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold))
                     .foregroundStyle(heroTint)
                     .scaleEffect(chartProgress > 0.5 ? 1 : 0.92)
             }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(overdueCount > 0 ? l.tr(zh: "待补护理", en: "Due care", de: "Fällige Pflege") : l.tr(zh: "今日护理", en: "Today", de: "Heute"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
 
                 HStack(alignment: .lastTextBaseline, spacing: 6) {
                     Text("\(overdueCount > 0 ? overdueCount : todayCount)")
-                        .font(OhanaFont.adaptive(size: 40, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 40, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .ohanaNumericMotion(overdueCount > 0 ? overdueCount : todayCount)
                     Text(overdueCount > 0 ? l.tr(zh: "项", en: "due", de: "fällig") : l.tr(zh: "次", en: "done", de: "erledigt"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
 
@@ -279,10 +276,14 @@ struct IslandHygieneDashboardContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Label(l.tr(zh: "护理频率", en: "Care rhythm", de: "Pflegerhythmus"), systemImage: "chart.bar.fill")
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
-                DashboardRangePicker(ranges: HygieneDashboardRange.allCases, selection: $selectedRange) {
+                DashboardRangePicker(
+                    ranges: HygieneDashboardRange.allCases,
+                    selection: personalRangeSelection,
+                    isLocked: { $0.requiresPersonal && !appServices.commerce.allows(.extendedTrends) }
+                ) {
                     $0.title(l)
                 }
             }
@@ -305,6 +306,20 @@ struct IslandHygieneDashboardContentView: View {
         }
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+    }
+
+    private var personalRangeSelection: Binding<HygieneDashboardRange> {
+        Binding(
+            get: { selectedRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                selectedRange = range
+            }
+        )
     }
 
     private var hygieneBadgeStrip: some View {
@@ -333,7 +348,7 @@ struct IslandHygieneDashboardContentView: View {
     private var hygieneRows: some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(l.tr(zh: "成员护理", en: "Care status", de: "Pflegestatus"), systemImage: "pawprint.fill")
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             if petSummaries.isEmpty {
@@ -363,7 +378,7 @@ struct IslandHygieneDashboardContentView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(summary.pet.name)
-                        .font(OhanaFont.body(.black))
+                        .font(OhanaFont.body(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     if summary.overdueCount > 0 {
@@ -386,12 +401,12 @@ struct IslandHygieneDashboardContentView: View {
 
             if let date = summary.latestDate {
                 Text(relativeDayText(date))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
 
             Image(systemName: "chevron.right").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(Color.ohanaTertiaryText)
         }
         .padding(.vertical, 13)
@@ -417,9 +432,9 @@ struct IslandHygieneDashboardContentView: View {
             HStack(spacing: 6) {
                 avatar()
                 Text(title)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 36)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -430,22 +445,22 @@ struct IslandHygieneDashboardContentView: View {
     private func selectorChip(title: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         selectorChip(title: title, avatar: {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
         }, isSelected: isSelected, action: action)
     }
 
     private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(value)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
@@ -456,11 +471,11 @@ struct IslandHygieneDashboardContentView: View {
         HStack(spacing: 4) {
             if let icon {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 8, weight: .black))
+                    .font(OhanaFont.adaptive(size: 8, weight: .semibold))
             }
             Text(text)
         }
-        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
         .foregroundStyle(color)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -470,7 +485,7 @@ struct IslandHygieneDashboardContentView: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                 .foregroundStyle(Color.ohanaTertiaryText)
             Text(text)
                 .font(OhanaFont.caption(.semibold))

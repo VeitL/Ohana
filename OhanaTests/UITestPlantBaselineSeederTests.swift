@@ -33,6 +33,40 @@ struct UITestPlantBaselineSeederTests {
         ))
     }
 
+    @Test func plantBaselineRoomCountDefaultsToTwoAndClampsToSix() {
+        #expect(OhanaUITestLaunchOptions.plantBaselineRoomCount(
+            defaultCount: 2,
+            arguments: []
+        ) == 2)
+        #expect(OhanaUITestLaunchOptions.plantBaselineRoomCount(
+            defaultCount: 2,
+            arguments: ["-OHANA_UI_TEST_PLANT_BASELINE_ROOM_COUNT", "4"]
+        ) == 4)
+        #expect(OhanaUITestLaunchOptions.plantBaselineRoomCount(
+            defaultCount: 2,
+            arguments: ["-OHANA_UI_TEST_PLANT_BASELINE_ROOM_COUNT", "99"]
+        ) == 6)
+    }
+
+    @Test func storeOpenFailureCountSupportsOneShotAndBoundedRepeatedFailures() {
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: []) == 0)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_ONCE"
+        ]) == 1)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "2"
+        ]) == 2)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "99"
+        ]) == 8)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "-3"
+        ]) == 0)
+        #expect(OhanaUITestLaunchOptions.storeOpenFailureCount(arguments: [
+            "-OHANA_UI_TEST_FAIL_STORE_OPEN_COUNT", "invalid"
+        ]) == 0)
+    }
+
     @Test func seedAddsMissingPlantsWithoutDuplicatingExistingBaseline() throws {
         let container = try makeInMemoryContainer()
         let services = AppServices(modelContainer: container)
@@ -79,6 +113,32 @@ struct UITestPlantBaselineSeederTests {
             "Codex Pothos Seed-5",
             "Codex Pothos Seed-6"
         ])
+    }
+
+    @Test func seedCanSpreadPlantsAcrossSixRoomsForScrollingRoomStackCoverage() throws {
+        let container = try makeInMemoryContainer()
+        let services = AppServices(modelContainer: container)
+        let context = container.mainContext
+
+        UITestPlantBaselineSeeder.seed(
+            modelContext: context,
+            services: services,
+            desiredCount: 24,
+            roomCount: 6,
+            revisionNote: "test.ui.sixRoomPlantSeed"
+        )
+
+        let seeded = try seededPlants(in: context)
+        #expect(seeded.count == 24)
+        #expect(Set(seeded.map(\.roomNameRaw)) == Set([
+            "Living room",
+            "Balcony",
+            "Kitchen",
+            "Bedroom",
+            "Office",
+            "Study"
+        ]))
+        #expect(Dictionary(grouping: seeded, by: \.roomNameRaw).values.allSatisfy { $0.count == 4 })
     }
 
     private func seededPlants(in context: ModelContext) throws -> [Plant] {

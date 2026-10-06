@@ -115,10 +115,10 @@ elif [[ ${#TEST_SELECTORS[@]} -gt 0 ]]; then
     fi
     case "${normalized_selector}" in
       OhanaTests/*)
-        UNIT_TEST_ARGUMENTS+=("-only-testing:${normalized_selector}")
+        UNIT_TEST_ARGUMENTS+=(--only-testing "${normalized_selector}")
         ;;
       OhanaUITests/*)
-        UI_TEST_ARGUMENTS+=("-only-testing:${normalized_selector}")
+        UI_TEST_ARGUMENTS+=(--only-testing "${normalized_selector}")
         ;;
       *)
         echo "Unsupported test selector: ${normalized_selector}" >&2
@@ -130,12 +130,12 @@ elif [[ ${#TEST_SELECTORS[@]} -gt 0 ]]; then
   if [[ ${#UNIT_TEST_ARGUMENTS[@]} -gt 0 ]]; then
     run_step \
       "targeted Unit/Integration lane (iPhone 17 Tests simulator)" \
-      env SCHEME=OhanaUnitTests scripts/test-simulator.sh "${UNIT_TEST_ARGUMENTS[@]}"
+      env SCHEME=OhanaUnitTests scripts/xcode-test.sh "${UNIT_TEST_ARGUMENTS[@]}"
   fi
   if [[ ${#UI_TEST_ARGUMENTS[@]} -gt 0 ]]; then
     run_step \
       "one targeted UI path (iPhone 17 Tests simulator)" \
-      env SCHEME=OhanaUITests scripts/test-simulator.sh -parallel-testing-enabled NO "${UI_TEST_ARGUMENTS[@]}"
+      env SCHEME=OhanaUITests scripts/xcode-test.sh "${UI_TEST_ARGUMENTS[@]}"
   fi
 else
   echo "=== [gate] simulator tests: not selected for this low-risk lane ==="

@@ -19,8 +19,11 @@ struct QuickPottySheet: View {
     @State private var selectedType: PottyType = .perfectPoop
     @State private var date = Date()
     @State private var isSaving = false
+    @State private var savedRecord: PetRecordReference?
+    @State private var saveError: String?
+    @State private var moreOptionsExpanded = false
     @State private var selectedActionHumanID: UUID?
-    @State private var requiresActionHumanSelection = false
+    @State private var requiresActionHumanSelection = true
 
     private var l: L10n { L10n(appLanguage) }
     private var commandExecutor: QuickPottyCommandExecutor {
@@ -37,8 +40,8 @@ struct QuickPottySheet: View {
             VStack(spacing: 24) {
                 // 标题
                 HStack {
-                    Text(l.tr(zh: "噗噗打卡", en: "Poop check-in", de: "Häufchen-Check-in"))
-                        .font(OhanaFont.title3(.black))
+                    Text("\(pet.name) · \(l.homeQAPotty)")
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Button { dismiss() } label: {
@@ -49,17 +52,6 @@ struct QuickPottySheet: View {
                     }
                 }
                 .padding(.horizontal, 20).padding(.top, 20)
-
-                HStack {
-                    QuickCareActionHumanPickerContainer(
-                        selectedHumanID: $selectedActionHumanID,
-                        requiresSelection: $requiresActionHumanSelection,
-                        role: .executor,
-                        tint: Color.goYellow
-                    )
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
 
                 // 类型选择
                 HStack(spacing: 12) {
@@ -82,27 +74,27 @@ struct QuickPottySheet: View {
                 }
                 .padding(.horizontal, 20)
 
-                // 时间选择
-                UltimateGlassCard {
-                    HStack {
-                        Text(l.tr(zh: "记录时间", en: "Log time", de: "Zeit"))
-                            .font(OhanaFont.footnote(.bold))
-                            .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
-                        Spacer()
-                        DatePicker("", selection: $date, displayedComponents: [.hourAndMinute])
-                            .labelsHidden()
-                            .tint(Color.goYellow)
-                    }
-                    .padding(.horizontal, 14).padding(.vertical, 10)
+                DisclosureGroup(PetCareExperienceCopy(l: l).moreOptions, isExpanded: $moreOptionsExpanded) {
+                    DatePicker(PetCareExperienceCopy(l: l).recordTime, selection: $date, in: ...Date())
+                HStack {
+                    QuickCareActionHumanPickerContainer(
+                        selectedHumanID: $selectedActionHumanID,
+                        requiresSelection: $requiresActionHumanSelection,
+                        role: .executor,
+                        tint: Color.goYellow
+                    )
+                    Spacer()
                 }
                 .padding(.horizontal, 20)
 
+                }.padding(.horizontal, 20)
+                if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.goRed) }
                 // 记录按钮
                 Button { savePotty() } label: {
                     HStack(spacing: 8) {
                         Text(selectedType.emoji).font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        Text(l.tr(zh: "记录 \(selectedType.localizedLabel(l))", en: "Log \(selectedType.localizedLabel(l))", de: "\(selectedType.localizedLabel(l)) loggen"))
-                            .font(OhanaFont.headline(.black))
+                        Text(isSaving ? PetCareExperienceCopy(l: l).saving : l.tr(zh: "记录 \(selectedType.localizedLabel(l))", en: "Log \(selectedType.localizedLabel(l))", de: "\(selectedType.localizedLabel(l)) loggen"))
+                            .font(OhanaFont.headline(.semibold))
                     }
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity).padding(.vertical, 14)
@@ -115,6 +107,8 @@ struct QuickPottySheet: View {
                 Spacer()
             }
         }
+        .petRecordFeedback($savedRecord)
+        .petRecordAttribution(selectedHumanID: $selectedActionHumanID, requiresSelection: $requiresActionHumanSelection)
         .onDisappear {
             isSaving = false
             commandQueue.cancelAll()
@@ -127,6 +121,7 @@ struct QuickPottySheet: View {
         let isLitter = ["猫", "兔子", "仓鼠", "龙猫", "豚鼠"].contains(pet.species)
         let action = isLitter ? CareType.litter.rawValue : selectedType.rawValue
         isSaving = true
+        savedRecord = nil
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
         commandQueue.enqueue(.quickCare(entityID: pet.id, action: action)) {
             let result = commandExecutor.record(
@@ -137,12 +132,14 @@ struct QuickPottySheet: View {
                 date: date
             )
             isSaving = false
-            guard result != nil else {
+            guard let result else {
+                saveError = PetCareExperienceCopy(l: l).saveFailed
                 UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 return
             }
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            dismiss()
+            savedRecord = result.recordReference
+            date = Date()
         }
     }
 }

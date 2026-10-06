@@ -262,9 +262,9 @@ struct PoopCoreCard: View {
                     Button(action: primaryAction) {
                         HStack(spacing: 5) {
                             Image(systemName: primaryIcon)
-                                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                             Text(primaryTitle)
-                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         }
                         .foregroundStyle(Color.arkInk)
                         .frame(minWidth: 72)
@@ -278,7 +278,7 @@ struct PoopCoreCard: View {
                     if let secondaryTitle, let secondaryAction {
                         Button(action: secondaryAction) {
                             Text(secondaryTitle)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                                 .foregroundStyle(tint)
                                 .frame(minWidth: 72)
                                 .padding(.horizontal, 10)
@@ -330,16 +330,16 @@ struct PoopCoreCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -428,10 +428,10 @@ struct PoopHeroCard: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(l.tr(zh: "今日噗噗", en: "Today's poop", de: "Heute Häufchen"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(l.tr(zh: "\(pottyCount) 次", en: "\(pottyCount)x", de: "\(pottyCount)x"))
-                        .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 32, weight: .semibold, design: .default))
                         .foregroundStyle(tint)
                     HStack(spacing: 12) {
                         MiniPoopGauge(title: l.tr(zh: "铲砂", en: "Scoop", de: "Klo"), progress: scoopProgress, tint: scoopTint)
@@ -479,7 +479,7 @@ struct MiniPoopGauge: View {
                         .frame(width: max(6, 34 * min(max(progress, 0), 1)), height: 8)
                 }
             Text(title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
@@ -506,18 +506,18 @@ struct PoopLogRow: View {
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title(l))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .accessibilityIdentifier("quick-potty-recent-row-\(item.id)")
                 if let detail = item.detail(l) {
                     Text(detail)
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             Spacer()
             Text(item.date, format: .dateTime.month().day().hour().minute())
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if let logId = item.claimablePottyLogId, !claimTargets.isEmpty, let onClaim {
                 Menu {
@@ -560,18 +560,18 @@ struct PoopSheetHero: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 48, height: 48)
                 .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
             }
@@ -588,11 +588,11 @@ struct PoopInlineNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 18)
             Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -613,7 +613,7 @@ struct PoopPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
@@ -650,16 +650,16 @@ struct PoopCheckInSheet: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 22, weight: .black))
+                        .font(OhanaFont.adaptive(size: 22, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 54, height: 54)
                         .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                     VStack(alignment: .leading, spacing: 4) {
                         Text(l.tr(zh: "当前状态", en: "Status now", de: "Status"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                         Text(value)
-                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
@@ -692,7 +692,7 @@ struct PoopCheckInSheet: View {
 
                 Button(action: secondaryAction) {
                     Label(secondaryTitle, systemImage: "calendar.badge.clock")
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
@@ -741,7 +741,7 @@ struct PottyTypeSheet: View {
                                     .font(OhanaFont.adaptive(size: 22, weight: .bold))
                                     .foregroundStyle(color(for: type))
                                 Text(type.localizedLabel(l))
-                                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.75)
@@ -758,7 +758,7 @@ struct PottyTypeSheet: View {
                 if let unknownGroupTitle, let onUnknownGroup {
                     Button(action: onUnknownGroup) {
                         Label(unknownGroupTitle, systemImage: "questionmark.circle.fill")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                             .foregroundStyle(Color.arkInk)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -821,6 +821,17 @@ struct PoopCycleSettingsSheet: View {
     @Binding var reminderOn: Bool
     var accessibilityIDPrefix: String?
     let onSave: () -> Void
+    let onCancel: () -> Void
+    var isSaving = false
+    private struct Draft: Equatable {
+        let intervalDays: Int
+        let anchorDate: Date
+        let reminderOn: Bool
+    }
+    @State private var initialDraft: Draft?
+    private var draft: Draft {
+        Draft(intervalDays: draftIntervalDays, anchorDate: draftAnchorDate, reminderOn: draftReminderOn)
+    }
     let onDelete: () -> Void
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -830,6 +841,17 @@ struct PoopCycleSettingsSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    private var draftReminderBinding: Binding<Bool> {
+        #if DEBUG
+        OhanaUITestTouchTrace.observingToggle(
+            $draftReminderOn,
+            identifier: accessibilityIDPrefix.map { "\($0)-reminder-toggle" } ?? "potty-plan-reminder-toggle"
+        )
+        #else
+        $draftReminderOn
+        #endif
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -837,21 +859,21 @@ struct PoopCycleSettingsSheet: View {
 
                 HStack(spacing: 12) {
                     Image(systemName: "calendar.badge.clock").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black))
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 46, height: 46)
                         .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(statusTitle)
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-status-title" } ?? "")
                         Text(statusValue)
-                            .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                             .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-status-value" } ?? "")
                         Text(statusDetail)
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(2)
                     }
@@ -870,11 +892,11 @@ struct PoopCycleSettingsSheet: View {
                     DatePicker(selection: $draftAnchorDate, displayedComponents: .date) {
                         Text(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"))
                     }
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .tint(tint)
                     .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-anchor-date-picker" } ?? "")
 
-                    Toggle(isOn: $draftReminderOn) {
+                    Toggle(isOn: draftReminderBinding) {
                         settingsRow(
                             l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"),
                             value: draftReminderOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
@@ -886,45 +908,60 @@ struct PoopCycleSettingsSheet: View {
                 .padding(14)
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
 
-                PoopPrimaryButton(title: l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"), icon: "checkmark", tint: tint) {
-                    intervalDays = draftIntervalDays
-                    anchorDate = draftAnchorDate
-                    reminderOn = draftReminderOn
-                    onSave()
-                }
-                .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-save-action" } ?? "")
 
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Label(l.tr(zh: "删除当前计划", en: "Delete this plan", de: "Plan löschen"), systemImage: "trash")
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goRed)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-                }
-                .buttonStyle(ScaleButtonStyle())
+                OhanaDeletePlanButton(title: l.tr(zh: "删除当前计划", en: "Delete this plan", de: "Plan löschen")) { onDelete() }
                 .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-delete-action" } ?? "")
             }
             .padding(20)
         }
         .accessibilityIdentifier(accessibilityIDPrefix.map { "\($0)-sheet" } ?? "")
+        #if DEBUG
+        .onChange(of: draftReminderOn) { _, value in
+            OhanaUITestTouchTrace.record("\(accessibilityIDPrefix ?? "potty-plan") draftReminderChanged=\(value)")
+        }
+        #endif
         .onAppear {
+            guard initialDraft == nil else { return }
+            #if DEBUG
+            OhanaUITestTouchTrace.record(
+                "\(accessibilityIDPrefix ?? "potty-plan") appeared reminder=\(reminderOn) previousDraft=\(draftReminderOn)"
+            )
+            #endif
             draftIntervalDays = intervalDays
             draftAnchorDate = anchorDate
             draftReminderOn = reminderOn
+            initialDraft = draft
         }
+        .ohanaEditorChrome(
+            hasChanges: initialDraft.map { $0 != draft } ?? false,
+            isSaving: isSaving,
+            closeIdentifier: "quick-potty-sheet-cancel-action",
+            saveIdentifier: accessibilityIDPrefix.map { "\($0)-save-action" } ?? "ohana-sheet-save-action",
+            onCancel: {
+                if let initialDraft {
+                    intervalDays = initialDraft.intervalDays
+                    anchorDate = initialDraft.anchorDate
+                    reminderOn = initialDraft.reminderOn
+                }
+                onCancel()
+            },
+            onSave: {
+                intervalDays = draftIntervalDays
+                anchorDate = draftAnchorDate
+                reminderOn = draftReminderOn
+                onSave()
+            }
+        )
     }
 
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
         }
     }
@@ -951,7 +988,7 @@ struct PoopHistorySheet: View {
             List {
                 if items.isEmpty {
                     Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     ForEach(items) { item in

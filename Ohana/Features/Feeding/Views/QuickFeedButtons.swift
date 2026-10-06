@@ -16,8 +16,10 @@ struct FoodPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.arkInk)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 44)
                 .padding(.horizontal, 16)

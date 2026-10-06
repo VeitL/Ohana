@@ -8,6 +8,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct PetHealthDetailContentView: View {
     let pet: Pet
@@ -34,6 +35,7 @@ struct PetHealthDetailContentView: View {
     @State var showingPDFPreview = false
     @State var pdfURL: URL? = nil
     @State var isRenderingPDF = false
+    @State var showingPersonalPlan = false
     @State var healthAlerts: [HealthAlert] = []
     @State var scatterRevealProgress: CGFloat = 0.0
     @State var showingHistory = false
@@ -462,12 +464,26 @@ struct PetHealthDetailContentView: View {
         urgentPreventiveCount > 0 ? Color.goRed : chromeAccent
     }
 
+    var preventionActionForeground: Color {
+        urgentPreventiveCount > 0
+            ? (OhanaResolvedPrimaryAccent(customHex: "FF4757")?.actionTextColor ?? Color.arkInk)
+            : Color.ohanaPrimaryActionText
+    }
+
     var medicationTint: Color {
         isDark ? Color.goPrimary : Color.goBlue
     }
 
+    var medicationActionForeground: Color { Color.ohanaPrimaryActionText }
+
     var symptomVisitTint: Color {
         latestSymptomLog == nil ? chromeAccent : Color.goOrange
+    }
+
+    var symptomVisitActionForeground: Color {
+        latestSymptomLog == nil
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: "FF8C42")?.actionTextColor ?? Color.arkInk)
     }
 
     var preventiveDashboardDetail: String {
@@ -664,11 +680,12 @@ struct PetHealthDetailContentView: View {
                     }
                     healthDashboardCards
                     recentActivityCard
-                    Spacer(minLength: 108)
+                    Spacer(minLength: 24)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             }
+            .accessibilityIdentifier("pet-health-detail-screen")
             .onAppear {
                 refreshHealthAlerts()
                 openInitialSectionIfNeeded()
@@ -677,24 +694,16 @@ struct PetHealthDetailContentView: View {
                 refreshHealthAlerts()
             }
 
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    if healthPlusDestination == nil, !showingMedicationPopup {
-                        healthAddMenu
-                            .padding(.trailing, 18)
-                            .padding(.bottom, 24)
-                    }
-                }
-            }
-            .zIndex(12)
         }
-        .navigationTitle("")
+        .navigationTitle(l.tr(zh: "健康护理", en: "Health care", de: "Gesundheitspflege"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .navigationBar)
-        .accessibilityIdentifier("pet-health-detail-screen")
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { healthAddMenu }
+            if isModal {
+                OhanaModalToolbar(onClose: { if let onFullDismiss { onFullDismiss() } else { dismiss() } }, closeIdentifier: "pet-health-detail-close-action")
+            }
+        }
         .sheet(item: sheetHealthPlusDestination) { dest in
             switch dest {
             case .guided, .direct:
@@ -740,6 +749,10 @@ struct PetHealthDetailContentView: View {
             if let url = pdfURL {
                 PetVetPDFShareSheet(pdfURL: url, pet: pet)
             }
+        }
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
         }
         .sheet(item: $activeHealthSheet) { sheet in
             healthOverviewSheet(sheet)

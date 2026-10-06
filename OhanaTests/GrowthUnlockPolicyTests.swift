@@ -2,14 +2,20 @@ import Foundation
 import Testing
 @testable import Ohana
 
+@MainActor
 @Suite(.serialized)
 struct GrowthUnlockPolicyTests {
     @Test func dailyCareIsOpenAtLevelOne() {
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureGroup(.dailyCare), currentLevel: 1).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.food), currentLevel: 1).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.potty), currentLevel: 1).isUnlocked)
-        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.health), currentLevel: 1).isUnlocked)
-        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.medications), currentLevel: 1).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: PetFeature.health, currentLevel: 1).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: PetFeature.medications, currentLevel: 1).isUnlocked)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.health), currentLevel: 1).isUnlocked)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.medications), currentLevel: 1).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.health), currentLevel: 2).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.medications), currentLevel: 2).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.weight), currentLevel: 1).isUnlocked)
         #expect(GrowthUnlockPolicy.status(for: FMDest.featureAggregate(.expense), currentLevel: 1).isUnlocked)
     }
 
@@ -22,11 +28,24 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.status(for: FMDest.gacha, currentLevel: 7).isUnlocked)
     }
 
-    @Test func homeToolbarMatchesItsIconToTheAvailableDestination() {
-        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0) == .growthRoadmap)
-        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 0) == "tree.fill")
+    @Test func homeToolbarOnlyShowsHouseholdInsightsWhenTheyAreAvailable() {
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0) == nil)
+        #expect(HomeToolbarPrimaryActionPolicy.homeIcon == "chart.bar.xaxis")
         #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 1) == .featureGroup(.householdHub))
-        #expect(HomeToolbarPrimaryActionPolicy.homeIcon(currentLevel: 1) == "chart.bar.xaxis")
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0, plan: .personal) == .featureGroup(.householdHub))
+        #expect(HomeToolbarPrimaryActionPolicy.homeDestination(currentLevel: 0, plan: .family) == .featureGroup(.householdHub))
+    }
+
+    @Test func weeklyAndLongTermReviewHaveDistinctMilestones() {
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyWeeklyReport, currentLevel: 5).step.id == .rewards)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.familyWeeklyReport, currentLevel: 5).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyWeeklyReport, currentLevel: 6).isUnlocked)
+        #expect(GrowthUnlockPolicy.primaryDestination(for: .rewards) == .coconutShop)
+
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyLongTermReview, currentLevel: 8).step.id == .memoryReview)
+        #expect(!GrowthUnlockPolicy.status(for: FMDest.familyLongTermReview, currentLevel: 8).isUnlocked)
+        #expect(GrowthUnlockPolicy.status(for: FMDest.familyLongTermReview, currentLevel: 9).isUnlocked)
+        #expect(GrowthUnlockPolicy.primaryDestination(for: .memoryReview) == .familyLongTermReview)
     }
 
     @Test func currentAndNextStagesTrackLevelProgression() {
@@ -34,6 +53,27 @@ struct GrowthUnlockPolicyTests {
         #expect(GrowthUnlockPolicy.currentStep(currentLevel: 4).id == .household)
         #expect(GrowthUnlockPolicy.nextLockedStep(currentLevel: 4)?.id == .oasisPlants)
         #expect(GrowthUnlockPolicy.nextLockedStep(currentLevel: 10) == nil)
+    }
+
+    @Test func stageExplorerStartsAtTheNextMilestoneAndLabelsTheWholePath() {
+        #expect(GrowthUnlockStageExplorerPolicy.defaultStageID(currentLevel: 0) == .dailyCare)
+        #expect(GrowthUnlockStageExplorerPolicy.defaultStageID(currentLevel: 4) == .oasisPlants)
+        #expect(GrowthUnlockStageExplorerPolicy.defaultStageID(currentLevel: 10) == .mastery)
+        #expect(
+            GrowthUnlockStageExplorerPolicy.defaultStageID(
+                currentLevel: 4,
+                preferredStageID: .advancedInsights
+            ) == .advancedInsights
+        )
+
+        let levelOne = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.dailyCare, currentLevel: 4).step
+        let levelFive = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.oasisPlants, currentLevel: 4).step
+        let levelEight = GrowthUnlockPolicy.status(for: GrowthUnlockStageID.advancedInsights, currentLevel: 4).step
+
+        #expect(GrowthUnlockStageExplorerPolicy.displayState(for: levelOne, currentLevel: 4) == .unlocked)
+        #expect(GrowthUnlockStageExplorerPolicy.displayState(for: levelFive, currentLevel: 4) == .next(missingLevels: 1))
+        #expect(GrowthUnlockStageExplorerPolicy.displayState(for: levelEight, currentLevel: 4) == .locked(missingLevels: 4))
+        #expect(GrowthUnlockStageExplorerPolicy.unlockedStageCount(currentLevel: 4) == 4)
     }
 
     @Test func newlyUnlockedStagesOnlyReturnsCrossedThresholds() {
@@ -97,6 +137,28 @@ struct GrowthUnlockPolicyTests {
         }
     }
 
+    @Test func plantLockedPreviewTitleIsLocalizedForEveryRegisteredLanguage() throws {
+        let expected = [
+            "zh": PlantUnlockPolicy.lockedTitleZh,
+            "en": "Plant care unlocks at Life Canopy Lv.4",
+            "de": "Pflanzenpflege ab Lebenskrone Lv.4",
+            "es": "El cuidado de plantas se desbloquea en Vida Lv.4",
+            "pt": "O cuidado de plantas desbloqueia no nível 4",
+            "fr": "Le soin des plantes se débloque au niveau 4",
+            "ja": "植物ケアは生命樹Lv.4で解放",
+            "ko": "식물 돌봄은 생명의 나무 Lv.4에서 잠금 해제",
+            "it": "La cura delle piante si sblocca al livello 4"
+        ]
+        #expect(Set(expected.keys) == Set(AppLanguage.supported.map(\.code)))
+        for language in AppLanguage.supported {
+            let expectedTitle = try #require(expected[language.code])
+            #expect(
+                PlantUnlockCopy.lockedTitle(language: language.code)
+                    == expectedTitle
+            )
+        }
+    }
+
     @Test func existingPlantDataSuppressesLockedPreviewBeforeLevelFour() {
         let suiteName = "GrowthUnlockPolicyTests.existingPlantDataSuppressesLockedPreviewBeforeLevelFour.\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
@@ -115,6 +177,37 @@ struct GrowthUnlockPolicyTests {
     @Test func growthRoadmapIsAlwaysVisible() {
         #expect(GrowthUnlockPolicy.availability(for: FMDest.growthRoadmap, currentLevel: 0).isVisibleInApp)
         #expect(GrowthUnlockPolicy.availability(for: FMDest.growthRoadmap, currentLevel: 10).isVisibleInApp)
+    }
+
+    @Test func zenRoadmapKeepsSharedLevelsWhileLabelingStandardOnlyStages() throws {
+        let standardOnlyStages = GrowthUnlockStageID.allCases.filter {
+            GrowthUnlockExperiencePolicy.isStandardOnlyInZen($0)
+        }
+        #expect(standardOnlyStages == [
+            .dailyCare,
+            .bodyHealth,
+            .household,
+            .advancedInsights,
+            .memoryReview
+        ])
+
+        let household = try #require(
+            GrowthUnlockPolicy.roadmapStages().first(where: { $0.id == .household })
+        )
+        #expect(
+            GrowthUnlockExperiencePolicy.detail(
+                for: household,
+                experienceMode: .standard,
+                language: "zh-Hans"
+            ) == household.detail(language: "zh-Hans")
+        )
+        #expect(
+            GrowthUnlockExperiencePolicy.detail(
+                for: household,
+                experienceMode: .zen,
+                language: "zh-Hans"
+            ).contains("第一天就显示植物卡片")
+        )
     }
 
     @Test func featureRouteGuardRedirectsLockedAndSuppressesGatedDestinations() {
@@ -203,7 +296,7 @@ struct GrowthUnlockPolicyTests {
         }
     }
 
-    @Test func visibleHomeTabsOnlyAppendWhenOasisUnlocksBeforeGrandfatheredPlants() {
+    @Test func committedGiftRevealsOasisBeforeCeremonyAndKeepsGrandfatheredPlantsOrdered() {
         PlantUnlockPolicy.clearExistingPlantData()
         defer { PlantUnlockPolicy.clearExistingPlantData() }
 
@@ -219,19 +312,18 @@ struct GrowthUnlockPolicyTests {
         defaults.set(false, forKey: StarterGiftStorageKey.ceremonySeen)
 
         #expect(AppFeatureRouteGuard.allowsHomeTab(.plants, currentLevel: 3, starterGiftDefaults: defaults))
-        let beforeOasisUnlock = AppFeatureRouteGuard.visibleHomeTabs(
+        let afterGiftCommit = AppFeatureRouteGuard.visibleHomeTabs(
             currentLevel: 3,
             starterGiftDefaults: defaults
         )
-        #expect(beforeOasisUnlock == [.home, .calendar])
+        #expect(afterGiftCommit == [.home, .calendar, .oasis, .plants])
 
         defaults.set(true, forKey: StarterGiftStorageKey.ceremonySeen)
 
-        let afterOasisUnlock = AppFeatureRouteGuard.visibleHomeTabs(
+        let afterCeremony = AppFeatureRouteGuard.visibleHomeTabs(
             currentLevel: 3,
             starterGiftDefaults: defaults
         )
-        #expect(afterOasisUnlock == [.home, .calendar, .oasis, .plants])
-        #expect(Array(afterOasisUnlock.prefix(beforeOasisUnlock.count)) == beforeOasisUnlock)
+        #expect(afterCeremony == afterGiftCommit)
     }
 }

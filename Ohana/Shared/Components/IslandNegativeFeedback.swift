@@ -35,13 +35,15 @@ nonisolated enum IslandNegativeFeedback {
         pets: [Pet],
         plants: [Plant] = [],
         healthAlerts: PetHealthAlerting,
-        careLedgerEntries: [IslandNegativeCareLedgerEntry] = []
+        careLedgerEntries: [IslandNegativeCareLedgerEntry] = [],
+        doseEvents: [Event] = []
     ) -> [IslandNegativeSignal] {
         signals(
             pets: pets,
             plants: plants,
             clinicalAlerts: healthAlerts.scanAlerts(pets: pets),
-            careLedgerEntries: careLedgerEntries
+            careLedgerEntries: careLedgerEntries,
+            doseEvents: doseEvents
         )
     }
 
@@ -49,7 +51,8 @@ nonisolated enum IslandNegativeFeedback {
         pets: [Pet],
         plants: [Plant] = [],
         clinicalAlerts: [HealthAlert],
-        careLedgerEntries: [IslandNegativeCareLedgerEntry] = []
+        careLedgerEntries: [IslandNegativeCareLedgerEntry] = [],
+        doseEvents: [Event] = []
     ) -> [IslandNegativeSignal] {
         var result: [IslandNegativeSignal] = []
         let calendar = Calendar.current
@@ -117,9 +120,9 @@ nonisolated enum IslandNegativeFeedback {
 
         for pet in pets {
             for med in pet.medications where med.isActiveToday {
-                let need = med.frequency.dosesPerDay
+                let need = PetMedicationDoseLogging.requiredDoses(on: now, for: med)
                 guard need > 0 else { continue }
-                let taken = MedicationDoseProgressStore.dosesTakenToday(for: med.id)
+                let taken = PetMedicationDoseLogging.doseCount(on: now, events: doseEvents, medicationId: med.id, calendar: calendar)
                 let hour = calendar.component(.hour, from: now)
                 if hour >= 22, taken < need {
                     result.append(IslandNegativeSignal(

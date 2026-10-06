@@ -181,26 +181,14 @@ struct QuickHumanMedicationSheet: View {
                     )
                 }
             }
+            .accessibilityIdentifier("quick-human-medication-sheet")
             .navigationTitle(l.tr(zh: "添加药物", en: "Add Medication", de: "Medikament hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { close() }
-                }
-                if onManage != nil {
-                    ToolbarItem(placement: .secondaryAction) {
-                        Button(l.tr(zh: "管理药物", en: "Manage medications", de: "Medikamente verwalten")) {
-                            onManage?()
-                            close()
-                        }
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!canSave || isSaving)
-                        .accessibilityIdentifier("quick-human-medication-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: !medicationName.isEmpty || !notes.isEmpty, isSaving: isSaving, canSave: canSave,
+                closeIdentifier: "ohana-sheet-close-action", saveIdentifier: "quick-human-medication-save-action",
+                onCancel: close, onSave: save
+            )
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
@@ -251,16 +239,15 @@ struct QuickHumanMedicationSheet: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
                 Image(systemName: "pill.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 58, height: 58)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "添加药物", en: "Add Medication", de: "Medikament hinzufügen"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .accessibilityIdentifier("quick-human-medication-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -276,7 +263,7 @@ struct QuickHumanMedicationSheet: View {
     private var nameBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "药品名称", en: "Medication name", de: "Medikamentenname"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextField(l.tr(zh: "例如：维生素 D", en: "e.g. Vitamin D", de: "z. B. Vitamin D"), text: $medicationName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.body(.bold))
@@ -294,8 +281,8 @@ struct QuickHumanMedicationSheet: View {
                             withAnimation(GoMotion.feedback) { medicationName = option }
                         } label: {
                             Text(option)
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(medicationName == option ? Color.arkInk : Color.ohanaPrimaryText)
+                                .font(OhanaFont.caption(.semibold))
+                                .foregroundStyle(medicationName == option ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 8)
                                 .background(medicationName == option ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -312,7 +299,7 @@ struct QuickHumanMedicationSheet: View {
     private var formAndDoseBlock: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "剂型与剂量", en: "Form and dose", de: "Form und Dosis"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
             HStack(spacing: 8) {
@@ -322,13 +309,13 @@ struct QuickHumanMedicationSheet: View {
                     } label: {
                         VStack(spacing: 5) {
                             Image(systemName: item.icon)
-                                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                             Text(item.title(l))
-                                .font(OhanaFont.caption2(.black))
+                                .font(OhanaFont.caption2(.semibold))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
                         }
-                        .foregroundStyle(form == item ? Color.arkInk : Color.ohanaPrimaryText)
+                        .foregroundStyle(form == item ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 56)
                         .background(form == item ? Color.goPrimary : Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
@@ -343,8 +330,9 @@ struct QuickHumanMedicationSheet: View {
                     placeholder: "1",
                     maxFractionDigits: 2,
                     accent: Color.goPrimary,
+                    accentForeground: Color.ohanaPrimaryActionText,
                     step: 0.5,
-                    valueFont: OhanaFont.title3(.black),
+                    valueFont: OhanaFont.title3(.semibold),
                     fill: Color.ohanaCardSurface,
                     cornerRadius: OhanaRadius.controlLarge,
                     horizontalPadding: 8,
@@ -359,8 +347,8 @@ struct QuickHumanMedicationSheet: View {
                                 withAnimation(GoMotion.feedback) { doseUnit = unit }
                             } label: {
                                 Text(unit)
-                                    .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(doseUnit == unit ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .font(OhanaFont.caption(.semibold))
+                                    .foregroundStyle(doseUnit == unit ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 14)
                                     .frame(height: 36)
                                     .background(doseUnit == unit ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -378,7 +366,7 @@ struct QuickHumanMedicationSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $reminderEnabled.animation(GoMotion.feedback)) {
                 Label(l.tr(zh: "添加提醒", en: "Add reminder", de: "Erinnerung hinzufügen"), systemImage: "bell.badge.fill")
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .tint(Color.goPrimary)
@@ -391,8 +379,8 @@ struct QuickHumanMedicationSheet: View {
                                 withAnimation(GoMotion.feedback) { frequency = option }
                             } label: {
                                 Text(option.displayTitle(l: l))
-                                    .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(frequency == option ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .font(OhanaFont.caption(.semibold))
+                                    .foregroundStyle(frequency == option ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 12)
                                     .frame(height: 36)
                                     .background(frequency == option ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -404,7 +392,7 @@ struct QuickHumanMedicationSheet: View {
 
                 HStack {
                     Label(l.tr(zh: "首次时间", en: "First dose", de: "Erste Einnahme"), systemImage: "clock.fill")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     DatePicker("", selection: $firstDoseTime, displayedComponents: .hourAndMinute)
@@ -423,7 +411,7 @@ struct QuickHumanMedicationSheet: View {
     private var noteBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextField(l.tr(zh: "例如：饭后、睡前", en: "After meal, before bed", de: "Nach dem Essen, vor dem Schlafen"), text: $notes) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.callout(.bold))
@@ -439,14 +427,14 @@ struct QuickHumanMedicationSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存药物", en: "Save Medication", de: "Medikament speichern")
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(canSave && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -480,7 +468,6 @@ struct QuickHumanMedicationSheet: View {
         let shouldScheduleReminders = reminderEnabled
         let command = DomainCommand.quickHumanMedication(humanID: human.id)
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
             guard HumanCareCommandExecutor(context: modelContext, services: appServices).createQuickMedication(
                 human: human,
@@ -497,6 +484,7 @@ struct QuickHumanMedicationSheet: View {
                 isSaving = false
                 return
             }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved?()
             close()
         }

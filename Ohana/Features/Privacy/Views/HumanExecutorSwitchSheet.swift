@@ -64,13 +64,13 @@ struct HumanExecutorSwitchSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: "person.crop.circle.badge.checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "切换本机当前成员", en: "Switch current member", de: "Aktuelles Mitglied wechseln"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "后续任务和记录会默认使用此成员", en: "Tasks and records will default to this member", de: "Aufgaben und Einträge verwenden standardmäßig dieses Mitglied"))
                     .font(OhanaFont.caption(.semibold))
@@ -79,7 +79,7 @@ struct HumanExecutorSwitchSheet: View {
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.primary.opacity(0.08), in: Circle())
@@ -109,7 +109,7 @@ struct HumanExecutorSwitchSheet: View {
                 accountAvatar(human, size: 42)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(displayName(human))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(executorSwitchSubtitle(for: human, isActive: isActive))
                         .font(OhanaFont.caption2(.bold))
@@ -118,18 +118,18 @@ struct HumanExecutorSwitchSheet: View {
                 Spacer()
                 if isActive {
                     Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                 } else if HumanLocalPrivacyPolicy.isEnabled,
                           appServices.passcodes.hasPasscode(human) {
                     Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goYellow)
                         .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goYellow.opacity(0.14), in: Circle())
                 } else {
                     Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -152,7 +152,7 @@ struct HumanExecutorSwitchSheet: View {
                 accountAvatar(human, size: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "输入 \(displayName(human)) 的 4 位密码", en: "Enter \(displayName(human))'s 4-digit PIN", de: "4-stellige PIN für \(displayName(human)) eingeben"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(statusMessage.isEmpty ? l.tr(zh: "验证后切换成员", en: "Verify to switch member", de: "Zum Mitgliedswechsel verifizieren") : statusMessage)
                         .font(OhanaFont.caption(.bold))
@@ -166,7 +166,7 @@ struct HumanExecutorSwitchSheet: View {
                     isError = false
                 } label: {
                     Text(l.tr(zh: "换人", en: "Choose another", de: "Andere wählen"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.goPrimary)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -189,8 +189,8 @@ struct HumanExecutorSwitchSheet: View {
                             : l.tr(zh: "使用 \(biometricAvailability.label)", en: "Use \(biometricAvailability.label)", de: "\(biometricAvailability.label) verwenden"),
                         systemImage: biometricAvailability.symbolName
                     )
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.callout(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

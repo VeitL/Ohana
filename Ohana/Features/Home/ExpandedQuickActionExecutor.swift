@@ -16,6 +16,7 @@ enum ExpandedQuickActionExecutor {
         let cardId: UUID
         let coconutDelta: Int
         let label: String?
+        var recordReference: PetRecordReference? = nil
     }
 
     struct Request {
@@ -89,7 +90,7 @@ enum ExpandedQuickActionExecutor {
                 )
                 guard result.didPersist, result.didRecord, result.allowsDerivedEffects else { return false }
                 let coconutDelta = result.coconutDelta
-                feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: rewardLabel(actionType: "feed", delta: coconutDelta)))
+                feedback(Feedback(cardId: pet.id, coconutDelta: coconutDelta, label: rewardLabel(actionType: "feed", delta: coconutDelta), recordReference: result.recordReference))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 return true
             case .manualReminder:
@@ -162,7 +163,7 @@ enum ExpandedQuickActionExecutor {
                 )
                 guard result.didRecord, result.allowsDerivedEffects else { return false }
                 let delta = result.coconutDelta
-                feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
+                feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta), recordReference: result.logID.map { PetRecordReference(petID: pet.id, recordID: $0) }))
                 UINotificationFeedbackGenerator().notificationOccurred(.success)
                 return true
             }
@@ -184,7 +185,7 @@ enum ExpandedQuickActionExecutor {
         )
         guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta)))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "water", delta: delta), recordReference: PetRecordReference(petID: pet.id, recordID: recorded.result.logID)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
@@ -284,7 +285,7 @@ enum ExpandedQuickActionExecutor {
             )
             guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
             let delta = recorded.reward.humanGot + recorded.reward.petGot
-            feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "litter", delta: delta)))
+            feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "litter", delta: delta), recordReference: PetRecordReference(petID: pet.id, recordID: recorded.result.logID)))
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             return true
         case .play:
@@ -368,7 +369,7 @@ enum ExpandedQuickActionExecutor {
         )
         guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().hygieneTypeUILabel(type), delta: delta)))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().hygieneTypeUILabel(type), delta: delta), recordReference: PetRecordReference(petID: pet.id, recordID: recorded.result.logID)))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
@@ -388,7 +389,7 @@ enum ExpandedQuickActionExecutor {
         let recorded = careEvents.recordPottyFact(pet: pet, type: type, context: modelContext, executorId: executorId, date: Date())
         guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().pottyTypeUILabel(type), delta: delta)))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().pottyTypeUILabel(type), delta: delta), recordReference: recorded.result.logID.map { PetRecordReference(petID: pet.id, recordID: $0) }))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
@@ -425,7 +426,7 @@ enum ExpandedQuickActionExecutor {
         )
         guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "health", delta: delta)))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(actionType: "health", delta: delta), recordReference: recorded.result.logID.map { PetRecordReference(petID: pet.id, recordID: $0, filter: .health) }))
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         return true
     }
@@ -465,7 +466,7 @@ enum ExpandedQuickActionExecutor {
         )
         guard recorded.result.didWriteFact, recorded.result.allowsDerivedEffects else { return false }
         let delta = recorded.reward.humanGot + recorded.reward.petGot
-        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().careTypeUILabel(type), delta: delta)))
+        feedback(Feedback(cardId: pet.id, coconutDelta: delta, label: rewardLabel(title: L10n().careTypeUILabel(type), delta: delta), recordReference: PetRecordReference(petID: pet.id, recordID: recorded.result.logID)))
         return true
     }
 

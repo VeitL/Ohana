@@ -38,7 +38,7 @@ private struct AttachmentFullScreenPreview: View {
                     Spacer()
                     Button(action: onClose) {
                         Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.title(.black))
+                            .font(OhanaFont.title(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .padding(16)
@@ -69,7 +69,10 @@ struct AddDocumentContentSheet: View {
     @State private var attachments: [DocAttachment] = []
     @State private var showingCamera = false
     @State private var showCameraPermissionAlert = false
+    @State private var importErrorMessage: String?
+    @State private var showImportErrorAlert = false
     @State private var showingFilePicker = false
+    @State private var fileImportTask: Task<Void, Never>?
     @State private var photoPickerItems: [PhotosPickerItem] = []
     // B4: 拍照暂存（避免 sheet dismiss 冲突）
     @State private var pendingCapturedImage: UIImage? = nil
@@ -85,6 +88,9 @@ struct AddDocumentContentSheet: View {
     private var showDocumentNumber: Bool { selectedCategory == .passport || selectedCategory == .registration }
     private var petThemeColor: Color {
         Color(hex: pet.safeThemeColorHex)
+    }
+    private var petThemeActionForeground: Color {
+        OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText
     }
     private var l: L10n { L10n(appLanguage) }
 
@@ -104,9 +110,9 @@ struct AddDocumentContentSheet: View {
                             )
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(pet.name)
-                                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 Text(selectedCategory.localizedLabel(l))
-                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(petThemeColor)
                             }
                             Spacer()
@@ -123,7 +129,7 @@ struct AddDocumentContentSheet: View {
                                         .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(petThemeColor)
                                     Text(l.tr(zh: "证件类型", en: "Document type", de: "Dokumenttyp"))
-                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
@@ -132,9 +138,9 @@ struct AddDocumentContentSheet: View {
                                                 HStack(spacing: 5) {
                                                     Text(cat.emoji)
                                                     Text(cat.localizedLabel(l))
-                                                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 }
-                                                .foregroundStyle(selectedCategory == cat ? Color.arkInk : .primary)
+                                                .foregroundStyle(selectedCategory == cat ? petThemeActionForeground : Color.ohanaPrimaryText)
                                                 .padding(.horizontal, 14).padding(.vertical, 8)
                                                 .background(
                                                     selectedCategory == cat ? petThemeColor : Color.primary.opacity(0.08),
@@ -155,7 +161,7 @@ struct AddDocumentContentSheet: View {
                                 text: $title,
                                 capitalization: .words
                             )
-                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .tint(Color.goTeal)
                         }
 
@@ -166,7 +172,7 @@ struct AddDocumentContentSheet: View {
                                 text: $issuingAuthority,
                                 capitalization: .words
                             )
-                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .tint(Color.goCardCyan)
                         }
 
@@ -203,7 +209,7 @@ struct AddDocumentContentSheet: View {
                                         keyboardType: .decimalPad,
                                         capitalization: .never
                                     )
-                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .tint(Color.goPrimary)
                                     .frame(maxWidth: 80)
                                 }
@@ -219,7 +225,7 @@ struct AddDocumentContentSheet: View {
                                             .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(petThemeColor.opacity(0.85))
                                         Text(l.tr(zh: "谁付的款", en: "Paid by", de: "Bezahlt von"))
-                                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     }
                                     ScrollView(.horizontal, showsIndicators: false) {
                                         HStack(spacing: 10) {
@@ -231,10 +237,10 @@ struct AddDocumentContentSheet: View {
                                                             .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                                         Image(systemName: "questionmark") // a11y: allow decorative icon covered by surrounding text or control
                                                             .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                                            .foregroundStyle(selectedPayerId == nil ? Color.arkInk : .primary.opacity(0.5))
+                                                            .foregroundStyle(selectedPayerId == nil ? petThemeActionForeground : Color.ohanaSecondaryText)
                                                     }
                                                     Text(l.tr(zh: "未指定", en: "Not set", de: "Nicht festgelegt"))
-                                                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                        .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                         .foregroundStyle(Color.ohanaSecondaryText)
                                                 }
                                             }
@@ -262,7 +268,7 @@ struct AddDocumentContentSheet: View {
                                                             }
                                                         }
                                                         Text(human.name)
-                                                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                            .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                             .foregroundStyle(isSelected ? .primary : .secondary)
                                                             .lineLimit(1)
                                                     }
@@ -283,7 +289,7 @@ struct AddDocumentContentSheet: View {
                                         .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaSecondaryText)
                                     Text(attachmentSectionTitle)
-                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                                 .padding(.horizontal, 4)
 
@@ -363,7 +369,7 @@ struct AddDocumentContentSheet: View {
                                 text: $notes,
                                 axis: .vertical
                             )
-                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .tint(Color.goPrimary)
                             .lineLimit(2 ... 4)
                         }
@@ -375,7 +381,7 @@ struct AddDocumentContentSheet: View {
                                     l.tr(zh: "编号", en: "Number", de: "Nummer"),
                                     text: $documentNumber
                                 )
-                                .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 15, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .tint(Color.goCardCyan)
                             }
                         }
@@ -391,8 +397,8 @@ struct AddDocumentContentSheet: View {
                                 Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
                                 Text(l.tr(zh: "保存证件", en: "Save document", de: "Dokument speichern"))
                             }
-                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.arkInk)
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(petThemeActionForeground)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(petThemeColor, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -416,7 +422,7 @@ struct AddDocumentContentSheet: View {
                     Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                         GoKeyboard.dismiss()
                     }
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 }
             }
@@ -446,6 +452,11 @@ struct AddDocumentContentSheet: View {
         } message: {
             Text(l.tr(zh: "请在系统设置中允许 Ohana 访问相机。", en: "Allow Ohana to access the camera in System Settings.", de: "Erlaube Ohana den Kamerazugriff in den Systemeinstellungen."))
         }
+        .alert(l.tr(zh: "无法导入附件", en: "Attachment import failed", de: "Anhang konnte nicht importiert werden"), isPresented: $showImportErrorAlert) {
+            Button(l.tr(zh: "好的", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "")
+        }
         // F3: 附件图片全屏预览
         .fullScreenCover(item: $previewAttachment) { att in
             AttachmentFullScreenPreview(data: att.data) {
@@ -455,23 +466,28 @@ struct AddDocumentContentSheet: View {
         .fileImporter(isPresented: $showingFilePicker,
                       allowedContentTypes: [UTType.pdf, UTType.image, UTType.data]) { result in
             if case let .success(url) = result {
-                Task {
-                    if let data = await AttachmentImageDecoder.readFileData(url) {
+                fileImportTask?.cancel()
+                fileImportTask = Task {
+                    do {
                         let isImage = AttachmentPrivacySanitizer.isImageFilename(url.lastPathComponent)
-                        let payload = AttachmentPrivacySanitizer.sanitizedAttachment(
-                            data,
-                            filename: url.lastPathComponent,
+                        let fallbackFilename = "attachment_\(attachments.count + 1).jpg"
+                        let payload = try await AttachmentImageDecoder.readSanitizedDocument(
+                            url,
                             isImage: isImage,
-                            fallbackFilename: "attachment_\(attachments.count + 1).jpg"
+                            fallbackFilename: fallbackFilename
                         )
+                        try Task.checkCancellation()
                         let att = DocAttachment(
                             data: payload.data,
                             filename: payload.filename,
                             isImage: payload.isImage
                         )
-                        await MainActor.run {
-                            attachments.append(att)
-                        }
+                        attachments.append(att)
+                    } catch is CancellationError {
+                        return
+                    } catch {
+                        importErrorMessage = error.localizedDescription
+                        showImportErrorAlert = true
                     }
                 }
             }
@@ -480,6 +496,10 @@ struct AddDocumentContentSheet: View {
             guard selectedPayerId == nil else { return }
             let stored = appServices.activeHumanSelection.currentHumanIdRaw
             selectedPayerId = humans.contains(where: { $0.id.uuidString == stored }) ? stored : humans.first?.id.uuidString
+        }
+        .onDisappear {
+            fileImportTask?.cancel()
+            fileImportTask = nil
         }
     }
 
@@ -504,7 +524,7 @@ struct AddDocumentContentSheet: View {
                 .frame(width: 44, height: 44)
                 .background(color.opacity(0.15), in: RoundedRectangle(cornerRadius: OhanaRadius.chip))
             Text(label)
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
         }
         .frame(maxWidth: .infinity)
@@ -532,7 +552,7 @@ struct AddDocumentContentSheet: View {
                     .foregroundStyle(iconColor)
                     .frame(width: 22)
                 Text(label)
-                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Spacer()
                 content()
             }

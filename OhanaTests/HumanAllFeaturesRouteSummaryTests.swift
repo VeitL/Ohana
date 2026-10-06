@@ -4,6 +4,67 @@ import Testing
 
 struct HumanAllFeaturesRouteSummaryTests {
     @MainActor
+    @Test func healthTilesShareOwnerNormalizationAndCalendarBasedScheduleSummary() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = date(year: 2026, month: 7, day: 7, hour: 12)
+        let human = Human(name: "Lin")
+        let owner = human.id.uuidString.lowercased()
+        let current = HumanMedication(
+            humanId: owner, name: "Current", frequency: .daily,
+            firstDoseTime: date(year: 2026, month: 7, day: 7, hour: 20),
+            startDate: date(year: 2026, month: 7, day: 6)
+        )
+        let endingToday = HumanMedication(
+            humanId: owner, name: "Ends today", frequency: .asNeeded,
+            startDate: date(year: 2026, month: 7, day: 6), endDate: date(year: 2026, month: 7, day: 7, hour: 0)
+        )
+        let notStarted = HumanMedication(humanId: owner, startDate: date(year: 2026, month: 7, day: 9))
+        let ended = HumanMedication(humanId: owner, startDate: date(year: 2026, month: 7, day: 1), endDate: date(year: 2026, month: 7, day: 6))
+        let other = HumanMedication(humanId: UUID().uuidString, startDate: date(year: 2026, month: 7, day: 1))
+        let reportDate = date(year: 2026, month: 7, day: 6)
+        let summary = HumanAllFeaturesActivitySummary.load(
+            human: human, allMeds: [current, endingToday, notStarted, ended, other],
+            allReports: [
+                HumanHealthReport(humanId: owner, reportDate: reportDate),
+                HumanHealthReport(humanId: UUID().uuidString, reportDate: now)
+            ], allExpenses: [], now: now, calendar: calendar
+        )
+        #expect(summary.activeMedicationPlanCount == 2)
+        #expect(summary.nextScheduledDoseDate == date(year: 2026, month: 7, day: 7, hour: 20))
+        #expect(summary.medicationChartPoints.map(\.value) == [2, 2])
+        #expect(summary.reportCount == 1)
+        #expect(summary.latestReportDate == reportDate)
+    }
+
+    @Test func quickRecordRoutesPreservePrivacyAndMemorialRules() {
+        #expect(HumanAllFeatureDestination.weightQuick.privacyField == .weight)
+        #expect(HumanAllFeatureDestination.workoutQuick.privacyField == .workout)
+        #expect(HumanAllFeatureDestination.noteQuick.privacyField == .note)
+        #expect(!HumanAllFeatureDestination.weightQuick.isAvailableInMemorialMode)
+        #expect(!HumanAllFeatureDestination.workoutQuick.isAvailableInMemorialMode)
+        #expect(HumanAllFeatureDestination.noteQuick.isAvailableInMemorialMode)
+    }
+
+    @MainActor
+    @Test func noteSummaryCountsVisibleTimelineEntriesRatherThanProfileMetadata() {
+        let human = Human(name: "Lin")
+        human.notes = "性别:female｜关系:妈妈\n\n[2026-10-04] Morning walk\n\n[2026-10-04] Felt rested"
+        let summary = HumanAllFeaturesActivitySummary.load(
+            human: human, allMeds: [], allReports: [], allExpenses: []
+        )
+        #expect(summary.noteCount == 2)
+        #expect(summary.noteChartPoints.first?.value == 2)
+
+        human.notes = "性别:female｜关系:妈妈"
+        let emptySummary = HumanAllFeaturesActivitySummary.load(
+            human: human, allMeds: [], allReports: [], allExpenses: []
+        )
+        #expect(emptySummary.noteCount == 0)
+        #expect(emptySummary.noteChartPoints.first?.value == 0)
+    }
+
+    @MainActor
     @Test func humanAllFeaturesSummaryUsesRouteScopedRows() throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = date(year: 2026, month: 7, day: 7, hour: 12)
@@ -35,6 +96,19 @@ struct HumanAllFeaturesRouteSummaryTests {
             date: date(year: 2026, month: 7, day: 5),
             human: human
         )
+        let condition = HumanHealthCondition(
+            humanId: human.id.uuidString,
+            name: "Seasonal allergy",
+            category: .allergy,
+            trackingStatus: .monitoring
+        )
+        let observation = HumanHealthObservation(
+            humanId: human.id.uuidString,
+            conditionId: condition.id.uuidString,
+            recordedAt: date(year: 2026, month: 7, day: 6),
+            severity: 4,
+            symptomTags: ["congestion"]
+        )
 
         let summary = HumanAllFeaturesActivitySummary.load(
             human: human,
@@ -44,6 +118,8 @@ struct HumanAllFeaturesRouteSummaryTests {
             weightLogs: [olderWeight, latestWeight],
             workoutLogs: [olderWorkout, latestWorkout],
             healthMetricLogs: [metric],
+            healthConditions: [condition],
+            healthObservations: [observation],
             now: now,
             calendar: calendar
         )
@@ -59,6 +135,35 @@ struct HumanAllFeaturesRouteSummaryTests {
         #expect(summary.weightChartPoints.map(\.value) == [66, 67.2])
         #expect(summary.workoutChartPoints.reduce(0) { $0 + $1.value } == 45)
         #expect(summary.metricsChartPoints.reduce(0) { $0 + $1.value } == 1)
+        #expect(summary.activeHealthConditionCount == 1)
+        #expect(summary.recentHealthObservationCount == 1)
+        #expect(summary.conditionChartPoints.reduce(0) { $0 + $1.value } == 1)
+    }
+
+    @MainActor
+    @Test func humanAllFeaturesSummaryUsesCanonicalProfileCompletionPolicy() {
+        let human = Human(name: "Defaults do not count")
+
+        let emptySummary = HumanAllFeaturesActivitySummary.load(
+            human: human,
+            allMeds: [],
+            allReports: [],
+            allExpenses: []
+        )
+        #expect(emptySummary.profileChartPoints.first?.value == 0)
+
+        human.avatarEmoji = "🧑‍🚀"
+        human.birthday = Date(timeIntervalSince1970: 1_000_000)
+        human.genderIdentityRaw = "private"
+        let resolvedSummary = HumanAllFeaturesActivitySummary.load(
+            human: human,
+            allMeds: [],
+            allReports: [],
+            allExpenses: []
+        )
+
+        #expect(resolvedSummary.profileChartPoints.first?.value == 3)
+        #expect(MemberProfileCompletenessPolicy.human(human).completionPercent == 75)
     }
 
     @Test func humanAllFeaturesSheetDoesNotReadRelationshipLogs() throws {
@@ -80,9 +185,15 @@ struct HumanAllFeaturesRouteSummaryTests {
         #expect(routeSource.contains("FetchDescriptor<HumanWeightLog>"))
         #expect(routeSource.contains("FetchDescriptor<HumanWorkoutLog>"))
         #expect(routeSource.contains("FetchDescriptor<HumanHealthMetricLog>"))
+        #expect(routeSource.contains("FetchDescriptor<HumanHealthCondition>"))
+        #expect(routeSource.contains("FetchDescriptor<HumanHealthObservation>"))
         #expect(routeSource.contains("weightLogs: weightLogs"))
         #expect(routeSource.contains("workoutLogs: workoutLogs"))
         #expect(routeSource.contains("healthMetricLogs: healthMetricLogs"))
+        #expect(routeSource.contains("healthConditions: healthRows.conditions"))
+        #expect(routeSource.contains("healthObservations: healthRows.observations"))
+        #expect(routeSource.contains("conditionDescriptor.fetchLimit = 64"))
+        #expect(routeSource.contains("observationDescriptor.fetchLimit = 256"))
     }
 
     private func repositoryRootURL() -> URL {

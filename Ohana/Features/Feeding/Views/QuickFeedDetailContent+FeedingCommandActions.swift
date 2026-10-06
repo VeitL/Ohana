@@ -23,12 +23,15 @@ extension QuickFeedDetailContent {
             return
         }
         draftStore.inputError = nil
-        commandExecutor.saveManualSettings(
+        guard commandExecutor.saveManualSettings(
             pet: pet,
             foodKind: draftStore.manualFoodKindDraft,
             grams: grams,
             defaultEnabled: draftStore.manualDefaultEnabled
-        )
+        ) else {
+            showFeedPersistenceFailure()
+            return
+        }
         defaultFeedGrams = draftStore.manualDefaultEnabled ? grams : 0
         reloadFeedSnapshots(forceSnapshot: true)
         collapseEmbeddedPanel()
@@ -45,11 +48,17 @@ extension QuickFeedDetailContent {
         foodKind selectedFoodKind: FeedFoodKind? = nil,
         date: Date = Date()
     ) {
-        guard validateActionHumanSelection() else { return }
+        guard !isRecordingFeed, validateActionHumanSelection() else { return }
         draftStore.inputError = nil
         let foodKind = selectedFoodKind ?? draftStore.manualFoodKindDraft
         let executorId = selectedActionExecutorId
         let action = {
+            guard !isRecordingFeed else { return }
+            isRecordingFeed = true
+            savedRecord = nil
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            recordCommandQueue.enqueue(.quickCare(entityID: pet.id, action: "feeding")) {
+            defer { isRecordingFeed = false }
             let result = commandExecutor.recordManual(
                 pet: pet,
                 targets: selectedFeedTargets,
@@ -57,15 +66,17 @@ extension QuickFeedDetailContent {
                 foodKind: foodKind,
                 saveAsDefault: saveAsDefault,
                 foodRecords: observedFoodRecords,
-                allEvents: allEvents,
+                allEvents: latestAllEvents(),
                 executorId: executorId,
-                date: date
+                date: date,
+                note: draftStore.manualNote
             )
             guard result.didPersist else {
                 showFeedPersistenceFailure()
                 return
             }
             guard result.didRecord else { return }
+            savedRecord = result.recordReference
             selectedActionHumanID = nil
             guard result.allowsDerivedEffects else {
                 reloadFeedSnapshots(forceSnapshot: true)
@@ -84,7 +95,9 @@ extension QuickFeedDetailContent {
             let message = result.targetCount > 1
                 ? l.tr(zh: "共同喂食 · \(result.targetCount)只", en: "Shared feeding · \(result.targetCount)", de: "Gemeinsam gefüttert · \(result.targetCount)")
                 : l.tr(zh: "已记录\(result.foodKind.title(l))", en: "\(result.foodKind.title(l)) saved", de: "\(result.foodKind.title(l)) gespeichert")
+            draftStore.selectedSharedFeedPetIds = [pet.id]
             afterFoodLogSaved(message: message, tint: mainFoodTint, stockReminders: result.stockReminders)
+            }
         }
         performWithAntiRepeat(action)
     }
@@ -100,14 +113,20 @@ extension QuickFeedDetailContent {
     }
 
     func completePlannedFeed(_ reminder: Reminder) {
-        guard validateActionHumanSelection() else { return }
+        guard !isRecordingFeed, validateActionHumanSelection() else { return }
         let executorId = selectedActionExecutorId
         let action = {
+            guard !isRecordingFeed else { return }
+            isRecordingFeed = true
+            savedRecord = nil
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            recordCommandQueue.enqueue(.quickCare(entityID: pet.id, action: "feeding")) {
+            defer { isRecordingFeed = false }
             let result = commandExecutor.completePlanned(
                 pet: pet,
                 reminder: reminder,
                 foodRecords: observedFoodRecords,
-                allEvents: allEvents,
+                allEvents: latestAllEvents(),
                 executorId: executorId
             )
             guard result.didPersist else {
@@ -122,6 +141,7 @@ extension QuickFeedDetailContent {
                 )
                 return
             }
+            savedRecord = result.recordReference
             selectedActionHumanID = nil
             guard result.allowsDerivedEffects else {
                 reloadFeedSnapshots(forceSnapshot: true)
@@ -135,11 +155,16 @@ extension QuickFeedDetailContent {
                 tint: Color.goPurple,
                 stockReminders: result.stockReminders
             )
+            }
         }
         performWithAntiRepeat(action)
     }
 
     func showFeedPersistenceFailure() {
+        draftStore.inputError = l.tr(
+            zh: "保存失败，请检查存储空间后重试", en: "Couldn't save. Check storage and try again.",
+            de: "Speichern fehlgeschlagen. Speicher prüfen und erneut versuchen."
+        )
         reloadFeedSnapshots(forceSnapshot: true)
         triggerToast(
             l.tr(
@@ -166,26 +191,34 @@ extension QuickFeedDetailContent {
 
     func commitTreatFeed() {
         dismissFeedKeyboard()
-        guard validateActionHumanSelection() else { return }
+        guard !isRecordingFeed, validateActionHumanSelection() else { return }
         let grams = parsePositiveDouble(draftStore.treatGramsText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "0" : draftStore.treatGramsText)
         guard let grams else {
             draftStore.inputError = l.tr(zh: "请输入有效克数，或留空。", en: "Enter valid grams or leave it empty.", de: "Gültige Gramm oder leer lassen.")
             return
         }
-        let result = commandExecutor.recordTreat(
-            pet: pet,
-            grams: grams,
-            treatKind: draftStore.selectedTreatKind,
-            executorId: selectedActionExecutorId
-        )
-        guard result.didRecord else { return }
-        selectedActionHumanID = nil
-        guard result.allowsDerivedEffects else {
-            reloadFeedSnapshots(forceSnapshot: true)
-            return
+        let treatKind = draftStore.selectedTreatKind
+        let executorId = selectedActionExecutorId
+        isRecordingFeed = true
+        savedRecord = nil
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        recordCommandQueue.enqueue(.quickCare(entityID: pet.id, action: "treat")) {
+            defer { isRecordingFeed = false }
+            let result = commandExecutor.recordTreat(
+                pet: pet,
+                grams: grams,
+                treatKind: treatKind,
+                executorId: executorId
+            )
+            guard result.didRecord else { showFeedPersistenceFailure(); return }
+            savedRecord = result.recordReference
+            selectedActionHumanID = nil
+            guard result.allowsDerivedEffects else {
+                reloadFeedSnapshots(forceSnapshot: true)
+                return
+            }
+            triggerTreatCheckInFeedback(grams: result.grams)
+            afterFoodLogSaved(message: l.tr(zh: "已记录零食", en: "Treat saved", de: "Snack gespeichert"), tint: treatTint)
         }
-        showTreatSavedCelebration()
-        triggerTreatCheckInFeedback(grams: result.grams)
-        afterFoodLogSaved(message: l.tr(zh: "已记录零食", en: "Treat saved", de: "Snack gespeichert"), tint: treatTint)
     }
 }

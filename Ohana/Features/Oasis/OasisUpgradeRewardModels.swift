@@ -19,7 +19,7 @@ enum OasisUpgradeRewardKind: String, Codable, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-nonisolated enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable {
+nonisolated enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identifiable, Sendable {
     case common
     case rare
     case epic
@@ -55,12 +55,13 @@ nonisolated enum OasisElectronicPetRarity: String, Codable, CaseIterable, Identi
     }
 }
 
-nonisolated enum OasisCritterLifeState: String, Codable, CaseIterable, Identifiable {
+nonisolated enum OasisCritterLifeState: String, Codable, CaseIterable, Identifiable, Sendable {
     case healthy
     case needsCare
     case atRisk
     case sick
     case critical
+    case sleeping
     case dead
 
     var id: String { rawValue }
@@ -76,14 +77,16 @@ nonisolated enum OasisCritterLifeState: String, Codable, CaseIterable, Identifia
         case .sick:
             l.tr(zh: "有点不舒服", en: "A little unwell", de: "Etwas unwohl")
         case .critical:
-            l.tr(zh: "需要救回", en: "Needs rescue", de: "Braucht Rettung")
+            l.tr(zh: "正在休眠", en: "Sleeping", de: "Schläft")
+        case .sleeping:
+            l.tr(zh: "正在休眠", en: "Sleeping", de: "Schläft")
         case .dead:
-            l.tr(zh: "纪念中", en: "Remembered", de: "In Erinnerung")
+            l.tr(zh: "正在休眠", en: "Sleeping", de: "Schläft")
         }
     }
 }
 
-enum OasisCritterDeathReason: String, Codable, CaseIterable, Identifiable {
+nonisolated enum OasisCritterDeathReason: String, Codable, CaseIterable, Identifiable, Sendable {
     case hungry
     case sick
     case bored
@@ -105,7 +108,7 @@ enum OasisCritterDeathReason: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct OasisCritterLifecycleSnapshot: Equatable {
+nonisolated struct OasisCritterLifecycleSnapshot: Equatable, Sendable {
     let state: OasisCritterLifeState
     let deathReason: OasisCritterDeathReason?
     let recommendedAction: OasisCritterAction?
@@ -113,6 +116,101 @@ struct OasisCritterLifecycleSnapshot: Equatable {
     let hoursUntilDeath: Int?
     let ageDays: Int
     let urgencyScore: Int
+}
+
+/// The reserved inventory row used for island-wide companion stardust. It is
+/// intentionally stored in `OasisCritterFragmentBalance` so backup, restore,
+/// and transaction rollback share the existing inventory boundary.
+nonisolated enum OasisCompanionCurrency {
+    static let stardustCatalogID = "system:companion_stardust"
+    static let maxStarLevel = 5
+}
+
+nonisolated enum CompanionGrowthAction: String, Codable, Sendable {
+    case awaken
+    case levelUpgrade
+    case starUpgrade
+}
+
+nonisolated enum CompanionActionUnavailableReason: String, Codable, Sendable {
+    case noActiveHuman
+    case treeLevelLocked
+    case insufficientCoconuts
+    case insufficientGrowthCurrency
+    case insufficientXP
+    case processing
+    case maxLevel
+    case maxStars
+    case sleeping
+    case alreadyOwned
+    case unknownCompanion
+}
+
+/// Exact funding split for a companion growth command. Companion-specific
+/// fragments are always consumed first; stardust only fills the remainder.
+nonisolated struct CompanionFundingPlan: Equatable, Sendable {
+    let requiredGrowthCurrency: Int
+    let specificFragmentBalance: Int
+    let stardustBalance: Int
+    let specificFragmentsUsed: Int
+    let stardustUsed: Int
+    let coconutCost: Int
+    let coconutBalance: Int
+
+    var missingGrowthCurrency: Int {
+        max(0, requiredGrowthCurrency - specificFragmentsUsed - stardustUsed)
+    }
+
+    var missingCoconuts: Int {
+        max(0, coconutCost - coconutBalance)
+    }
+
+    var isFullyFunded: Bool {
+        missingGrowthCurrency == 0 && missingCoconuts == 0
+    }
+
+    static func make(
+        requiredGrowthCurrency: Int,
+        coconutCost: Int,
+        specificFragmentBalance: Int,
+        stardustBalance: Int,
+        coconutBalance: Int
+    ) -> CompanionFundingPlan {
+        let required = max(0, requiredGrowthCurrency)
+        let specific = max(0, specificFragmentBalance)
+        let stardust = max(0, stardustBalance)
+        let specificUsed = min(required, specific)
+        let stardustUsed = min(max(0, required - specificUsed), stardust)
+        return CompanionFundingPlan(
+            requiredGrowthCurrency: required,
+            specificFragmentBalance: specific,
+            stardustBalance: stardust,
+            specificFragmentsUsed: specificUsed,
+            stardustUsed: stardustUsed,
+            coconutCost: max(0, coconutCost),
+            coconutBalance: max(0, coconutBalance)
+        )
+    }
+}
+
+nonisolated struct CompanionActionAvailability: Equatable, Sendable {
+    let action: CompanionGrowthAction
+    let isAvailable: Bool
+    let reason: CompanionActionUnavailableReason?
+    let fundingPlan: CompanionFundingPlan
+}
+
+nonisolated struct OasisCompanionSnapshot: Equatable, Sendable, Identifiable {
+    let id: UUID
+    let catalogID: String
+    let level: Int
+    let starLevel: Int
+    let appearanceStage: Int
+    let bond: Int
+    let lifeState: OasisCritterLifeState
+    let specificFragments: Int
+    let stardust: Int
+    let starAvailability: CompanionActionAvailability
 }
 
 // MARK: - Persistence models
@@ -275,7 +373,7 @@ struct OasisCritterInteractionOutcome: Equatable {
     }
 }
 
-enum OasisCritterAction: String, CaseIterable, Identifiable {
+nonisolated enum OasisCritterAction: String, CaseIterable, Identifiable, Sendable {
     case feed
     case play
     case rest

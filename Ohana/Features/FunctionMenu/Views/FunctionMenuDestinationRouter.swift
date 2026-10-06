@@ -18,7 +18,8 @@ struct FunctionMenuDestinationRouter: View {
     var body: some View {
         let decision = AppFeatureRouteGuard.functionDestinationDecision(
             destination,
-            currentLevel: appServices.oasisTree.treeLevel.rawValue
+            currentLevel: appServices.oasisTree.treeLevel.rawValue,
+            plan: appServices.commerce.ohanaPlanLevel
         )
         switch decision {
         case .rootMenu:
@@ -47,6 +48,30 @@ struct FunctionMenuDestinationRouter: View {
 
     @ViewBuilder
     private func destinationView(_ dest: FMDest) -> some View {
+        switch dest {
+        case .growthRoadmap, .featureGroup, .petFeatureCollection,
+             .petSharedCheckIn, .plantFeatureCollection, .featureAggregate:
+            collectionDestinationView(dest)
+        case .petHealth, .petMedications, .petFood, .petWater, .petHygiene,
+             .petWalks, .petPotty:
+            petCareDestinationView(dest)
+        case .petBasicInfo, .petDocuments, .petInsurance, .petMoments,
+             .petTimeline, .petAchievements, .petRetention, .petWeight, .petExpense:
+            petProfileDestinationView(dest)
+        case .humanWeight, .humanWorkout, .humanMedication, .humanNote, .humanExpense:
+            humanDestinationView(dest)
+        case .plantsDashboard, .plantsBatchCare, .plantsBatchCareFiltered,
+             .plantsBatchQuickRecord, .plantsList, .plantsPhotos, .plantDetail,
+             .plantFeature, .plantCare, .plantCareAggregate:
+            plantDestinationView(dest)
+        case .wealthDashboard, .bountyBoard, .familyWeeklyReport, .familyLongTermReview,
+             .careLedgerAnalysis, .reminderObservability, .coconutShop, .gacha:
+            householdDestinationView(dest)
+        }
+    }
+
+    @ViewBuilder
+    private func collectionDestinationView(_ dest: FMDest) -> some View {
         switch dest {
         case .growthRoadmap:
             GrowthUnlockRoadmapView(
@@ -91,48 +116,80 @@ struct FunctionMenuDestinationRouter: View {
                 petAggregateSummaries: petAggregateSummaries,
                 showsEntityChips: false
             )
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func petCareDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case let .petHealth(id):
             if let pet = pet(for: id) { PetHealthDetailView(pet: pet, isModal: false) }
         case let .petMedications(id):
-            if let pet = pet(for: id) { PetMedicationView(pet: pet) }
+            if let pet = pet(for: id) { PetMedicationView(pet: pet, showsCloseButton: false) }
         case let .petFood(id):
             if let pet = pet(for: id) { PetFoodManagementView(pet: pet) }
         case let .petWater(id):
-            if let pet = pet(for: id) { QuickWaterDetailRouteContainer(id: pet.id, onRemove: {}, onClose: nil) }
+            if let pet = pet(for: id) { QuickWaterDetailRouteContainer(id: pet.id, onRemove: {}, showsCloseButton: false) }
         case let .petHygiene(id):
-            if let pet = pet(for: id) { PetHygieneDetailView(pet: pet) }
+            if let pet = pet(for: id) { PetHygieneDetailView(pet: pet, showsCloseButton: false) }
         case let .petWalks(id):
-            if let pet = pet(for: id) { WalkSummarySheet(pet: pet) }
+            if let pet = pet(for: id) { WalkSummarySheet(pet: pet, showsCloseButton: false) }
         case let .petPotty(id):
-            if let pet = pet(for: id) { QuickPottyDetailRouteContainer(id: pet.id, onRemove: {}) }
+            if let pet = pet(for: id) { QuickPottyDetailRouteContainer(id: pet.id, onRemove: {}, showsCloseButton: false) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func petProfileDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case let .petBasicInfo(id):
             if let pet = pet(for: id) { PetBasicInfoDetailView(pet: pet) }
         case let .petDocuments(id):
             if let pet = pet(for: id) { DocumentsListView(pet: pet) }
         case let .petInsurance(id):
-            if let pet = pet(for: id) { PetInsuranceView(pet: pet) }
+            if let pet = pet(for: id) { PetInsuranceView(pet: pet, showsCloseButton: false) }
         case let .petMoments(id):
-            if let pet = pet(for: id) { PetMomentsHubRouteContainer(pet: pet) }
+            if let pet = pet(for: id) { PetMomentsHubRouteContainer(pet: pet, showsCloseButton: false) }
         case let .petTimeline(id):
-            if let pet = pet(for: id) { PetMomentsHubRouteContainer(pet: pet) }
+            if let pet = pet(for: id) { PetMomentsHubRouteContainer(pet: pet, showsCloseButton: false) }
         case let .petAchievements(id):
-            if let pet = pet(for: id) { AchievementWallView(pet: pet) }
+            if let pet = pet(for: id) { AchievementWallView(pet: pet, showsCloseButton: false) }
         case let .petRetention(id):
             if let pet = pet(for: id) { PetRetentionHubView(pet: pet) }
         case let .petWeight(id):
-            if let pet = pet(for: id) { WeightHistoryView(pet: pet) }
+            if let pet = pet(for: id) { WeightHistoryView(pet: pet, showsCloseButton: false) }
         case let .petExpense(id):
-            if let pet = pet(for: id) { ExpenseHistoryView(pet: pet) }
+            if let pet = pet(for: id) { ExpenseHistoryView(pet: pet, showsCloseButton: false) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func humanDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case let .humanWeight(id):
-            if let human = human(for: id) { HumanWeightHistoryView(human: human) }
+            if let human = human(for: id) { HumanWeightHistoryView(human: human, showsCloseButton: false) }
         case let .humanWorkout(id):
-            if let human = human(for: id) { HumanWorkoutSummaryView(human: human) }
+            if let human = human(for: id) { HumanWorkoutSummaryView(human: human, showsCloseButton: false) }
         case let .humanMedication(id):
-            if let human = human(for: id) { HumanMedicationView(human: human) }
+            if let human = human(for: id) { HumanMedicationView(human: human, showsDoneButton: false) }
         case let .humanNote(id):
-            if let human = human(for: id) { HumanNoteHistorySheet(human: human) }
+            if let human = human(for: id) { HumanNoteHistorySheet(human: human, showsCloseButton: false) }
         case let .humanExpense(id):
-            if let human = human(for: id) { HumanExpenseDetailView(human: human) }
+            if let human = human(for: id) { HumanExpenseDetailView(human: human, showsCloseButton: false) }
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func plantDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case .plantsDashboard:
             PlantDashboardView(
                 plants: plants,
@@ -220,22 +277,34 @@ struct FunctionMenuDestinationRouter: View {
                 focusedPlantID: nil,
                 focusedCareType: nil
             )
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func householdDestinationView(_ dest: FMDest) -> some View {
+        switch dest {
         case .wealthDashboard:
-            IslandWealthDashboardView()
+            IslandWealthDashboardView(showsCloseButton: false)
         case .bountyBoard:
             if OnlineFeatureGate.allows(.onlineCollaboration) {
                 BountyBoardView()
             }
         case .familyWeeklyReport:
             FamilyWeeklyReportDashboardView()
+        case .familyLongTermReview:
+            FamilyLongTermReviewView()
         case .careLedgerAnalysis:
             CareLedgerAnalysisView()
         case .reminderObservability:
             ReminderObservabilityView()
         case .coconutShop:
-            CoconutShopRouteContainer()
+            CoconutShopRouteContainer(showsCloseButton: false)
         case .gacha:
-            GachaRouteContainer()
+            GachaRouteContainer(showsCloseButton: false)
+        default:
+            EmptyView()
         }
     }
 

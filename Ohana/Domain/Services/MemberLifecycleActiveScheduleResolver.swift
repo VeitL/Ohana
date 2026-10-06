@@ -6,6 +6,53 @@
 //
 
 import Foundation
+import SwiftData
+
+@MainActor
+struct MemberLifecycleActiveScheduleSnapshot {
+    let activePets: [Pet]
+    let activeHumans: [Human]
+    let petMedications: [PetMedication]
+    let humanMedications: [HumanMedication]
+    let insurances: [PetInsurance]
+
+    init(context: ModelContext) {
+        activePets = Self.fetch(FetchDescriptor<Pet>(), context: context, name: "Pet")
+            .filter { !$0.hasPassedAway }
+        activeHumans = Self.fetch(FetchDescriptor<Human>(), context: context, name: "Human")
+            .filter { !$0.hasPassedAway }
+        petMedications = Self.fetch(FetchDescriptor<PetMedication>(), context: context, name: "PetMedication")
+        humanMedications = Self.fetch(FetchDescriptor<HumanMedication>(), context: context, name: "HumanMedication")
+        insurances = Self.fetch(FetchDescriptor<PetInsurance>(), context: context, name: "PetInsurance")
+    }
+
+    func includes(_ reminder: Reminder) -> Bool {
+        MemberLifecycleActiveScheduleResolver.reminderTargetsActiveMember(
+            reminder,
+            activePets: activePets,
+            activeHumans: activeHumans,
+            petMedications: petMedications,
+            humanMedications: humanMedications,
+            insurances: insurances
+        )
+    }
+
+    private static func fetch<T: PersistentModel>(
+        _ descriptor: FetchDescriptor<T>,
+        context: ModelContext,
+        name: String
+    ) -> [T] {
+        do {
+            return try context.fetch(descriptor)
+        } catch {
+            OhanaLog.warning(
+                "Member lifecycle reminder filter failed to fetch \(name): \(error.localizedDescription)",
+                category: "Care"
+            )
+            return []
+        }
+    }
+}
 
 nonisolated enum MemberLifecycleActiveScheduleResolver {
     static func petTarget(

@@ -8,34 +8,37 @@ import SwiftUI
 extension OasisRewardView {
     // MARK: - Star positions (deterministic)
     var starPositions: [(CGFloat, CGFloat)] {
-        (0 ..< 24).map { i in
+        (0 ..< 8).map { i in
             let x = CGFloat((i * 53) % 320) - 160
             let y = CGFloat((i * 37) % 220) - 160
             return (x, y)
         }
     }
 
-    func oasisToolbarButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button {
-            OhanaFeedback.light()
-            action()
-        } label: {
-            Image(systemName: systemName)
-                .font(OhanaFont.body(.semibold))
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(width: 44, height: 44)
-                .background(Color.ohanaControlFill, in: Circle())
-                .overlay {
-                    Circle()
-                        .strokeBorder(Color.ohanaGlassStroke.opacity(0.72), lineWidth: 0.6)
-                }
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
 
+
+    @ViewBuilder
     var body: some View {
-        oasisRuntimeContent
+        if hideToolbar {
+            oasisRuntimeContent
+        } else {
+            NavigationStack {
+                oasisRuntimeContent
+                    .navigationTitle(l.tr(zh: "绿洲", en: "Oasis", de: "Oase"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        OhanaModalToolbar(onClose: { dismiss() })
+                        ToolbarItemGroup(placement: .primaryAction) {
+                            Button { openSheet(.coconutRules) } label: {
+                                Label(l.tr(zh: "椰子规则", en: "Coconut rules", de: "Kokosnuss-Regeln"), systemImage: "info.circle")
+                            }
+                            Button { openSheet(.inventory) } label: {
+                                Label(l.tr(zh: "库存", en: "Inventory", de: "Inventar"), systemImage: "shippingbox.fill")
+                            }
+                        }
+                    }
+            }
+        }
     }
 
     var oasisRuntimeContent: AnyView {
@@ -88,6 +91,7 @@ extension OasisRewardView {
                         sheetRoute: $activeSheetRoute,
                         fullScreenRoute: $activeFullScreenRoute,
                         pets: pets,
+                        humans: humans,
                         onPresentCoconutLog: onPresentCoconutLog
                     )
                 )
@@ -102,12 +106,29 @@ extension OasisRewardView {
                 .zIndex(99)
 
             oasisScrollContent
-
-            oasisToolbarLayer
-
-            critterNestLayer
-
-            bentoFeatureInfoLayer
+        }
+        .sheet(isPresented: $showCritterNest) {
+            OasisCritterCodexRouteContainer(
+                mode: .nest,
+                onClose: { showCritterNest = false },
+                onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .alert(
+            activeBentoFeatureInfo?.feature.title(l) ?? "",
+            isPresented: Binding(
+                get: { activeBentoFeatureInfo != nil },
+                set: { if !$0 { activeBentoFeatureInfo = nil } }
+            )
+        ) {
+            Button(l.tr(zh: "知道了", en: "Got it", de: "Verstanden"), role: .cancel) {
+                activeBentoFeatureInfo = nil
+            }
+        } message: {
+            if let info = activeBentoFeatureInfo {
+                Text("\(info.statusText(l))\n\n\(info.feature.detail(l))")
+            }
         }
     }
 
@@ -122,7 +143,7 @@ extension OasisRewardView {
     var energyParticleLayer: some View {
         ForEach(energyParticles) { p in
             Image(systemName: "sparkles") // a11y: allow decorative energy particle
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.brandTitle(.title3, weight: .bold))
                 .foregroundStyle(Color.goPrimary)
                 .offset(x: p.offsetX, y: p.offsetY)
                 .opacity(p.opacity)
@@ -167,39 +188,11 @@ extension OasisRewardView {
         }
     }
 
-    @ViewBuilder
-    var oasisToolbarLayer: some View {
-        if !hideToolbar {
-            oasisFixedToolbar
-                .padding(.horizontal, 24)
-                .padding(.top, 8)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .zIndex(120)
-        }
-    }
 
-    @ViewBuilder
-    var critterNestLayer: some View {
-        if showCritterNest || critterNestPopupProgress > 0.001 {
-            critterNestPopupOverlay
-                .zIndex(180)
-        }
-    }
 
-    @ViewBuilder
-    var bentoFeatureInfoLayer: some View {
-        if let activeBentoFeatureInfo {
-            OasisBentoFeatureInfoOverlay(
-                info: activeBentoFeatureInfo,
-                localization: l
-            ) {
-                withAnimation(GoMotion.stateChange) {
-                    self.activeBentoFeatureInfo = nil
-                }
-            }
-            .zIndex(190)
-        }
-    }
+
+
+
 
     func handleOasisAppear() {
         if isOasisPrepared {
@@ -293,8 +286,6 @@ extension OasisRewardView {
         coconutBalanceVisualOverride = nil
         isInjecting = false
         treeInjectionLocked = false
-        treeInjectionProgress = 0
-        treeInjectionBoost = 0.026
         preparedWorkTask?.cancel()
         preparedWorkTask = nil
         visibleWorkTask?.cancel()
@@ -308,12 +299,6 @@ extension OasisRewardView {
         renderSnapshotTask = nil
         treeStageAppearTask?.cancel()
         treeStageAppearTask = nil
-        critterNestCloseTask?.cancel()
-        critterNestCloseTask = nil
-        critterNestOpenTask?.cancel()
-        critterNestOpenTask = nil
-        injectionResetTask?.cancel()
-        injectionResetTask = nil
         levelUpFeedbackTask?.cancel()
         levelUpFeedbackTask = nil
         particleCleanupTask?.cancel()

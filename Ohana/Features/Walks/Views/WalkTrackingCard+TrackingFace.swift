@@ -22,6 +22,7 @@ extension WalkTrackingCard {
                 if !isWalking, let checkpoint = snapshot.recoverableWalkCheckpoint {
                     walkRecoveryPrompt(checkpoint: checkpoint)
                 }
+                if isWalking { activeWalkerPicker }
                 controlPanel
             }
             .background(Color.ohanaCardSurface)
@@ -182,7 +183,7 @@ extension WalkTrackingCard {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             Spacer(minLength: 8)
             Text(status.detail)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(status.tint)
                 .lineLimit(1)
         }
@@ -258,8 +259,8 @@ extension WalkTrackingCard {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             } label: {
                 Text(l.tr(zh: "继续", en: "Resume", de: "Fortsetzen"))
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.arkInk)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(minHeight: 36)
                     .padding(.horizontal, 12)
                     .background(Color.goPrimary, in: Capsule())

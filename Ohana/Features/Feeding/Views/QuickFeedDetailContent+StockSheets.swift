@@ -5,13 +5,6 @@ extension QuickFeedDetailContent {
     var stockSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                sheetHero(
-                    icon: "shippingbox.fill",
-                    title: draftStore.editingFoodRecord == nil
-                        ? l.tr(zh: "补粮", en: "Restock", de: "Nachfüllen")
-                        : l.tr(zh: "修改余粮", en: "Edit stock", de: "Vorrat bearbeiten"),
-                    tint: stockTint
-                )
                 foodKindPicker(selection: $draftStore.selectedStockFoodKind)
                 stockCalculationModePicker
                 VStack(spacing: 12) {
@@ -51,7 +44,7 @@ extension QuickFeedDetailContent {
                 VStack(alignment: .leading, spacing: 12) {
                     Toggle(isOn: $draftStore.stockReminderEnabled) {
                         Text(l.tr(zh: "低余粮提醒", en: "Low stock reminder", de: "Vorrats-Erinnerung"))
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     }
                     .tint(stockTint)
 
@@ -72,16 +65,7 @@ extension QuickFeedDetailContent {
                 }
             }
             .padding(18)
-            .padding(.bottom, 88)
-            .ohanaAdaptiveSheetContentHeight(
-                adaptiveSheetHeightBinding,
-                minHeight: 620,
-                maxHeight: 820,
-                chromePadding: 112
-            )
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            stockSheetFooter
+            .padding(.bottom, 12)
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollBounceBehavior(.basedOnSize)
@@ -96,7 +80,6 @@ extension QuickFeedDetailContent {
             configureStockExpenseFields(for: nil)
             draftStore.stockExpenseAmountKeypadVisible = false
         }
-        .navigationTitle(l.tr(zh: "余粮", en: "Stock", de: "Vorrat"))
     }
 
     var stockCalculationModePicker: some View {
@@ -152,34 +135,6 @@ extension QuickFeedDetailContent {
         }
     }
 
-    var stockSheetFooter: some View {
-        VStack(spacing: 0) {
-            FoodPrimaryButton(
-                title: draftStore.editingFoodRecord == nil
-                    ? l.tr(zh: "保存补粮", en: "Save restock", de: "Speichern")
-                    : l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen speichern"),
-                icon: "checkmark",
-                tint: stockTint
-            ) {
-                saveStock()
-            }
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 10)
-        .padding(.bottom, 14)
-        .background {
-            LinearGradient(
-                colors: [
-                    Color.ohanaCardSurface.opacity(0.02),
-                    Color.ohanaCardSurface.opacity(0.62)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
-        }
-    }
-
     func optionalStockDateRow(title: String, isOn: Binding<Bool>, date: Binding<Date>) -> some View {
         QuickFeedOptionalStockDateRow(
             title: title,
@@ -193,7 +148,7 @@ extension QuickFeedDetailContent {
         VStack(spacing: 10) {
             HStack {
                 Text(l.tr(zh: "支付人", en: "Payer", de: "Zahlende Person"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Menu {
@@ -208,9 +163,9 @@ extension QuickFeedDetailContent {
                 } label: {
                     HStack(spacing: 6) {
                         Text(stockExpensePayerName)
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         Image(systemName: "chevron.down").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 10, weight: .black))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                     }
                     .foregroundStyle(stockTint)
                 }
@@ -432,7 +387,7 @@ extension QuickFeedDetailContent {
                         openFeedSheet(.stockManage)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                             .foregroundStyle(stockTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)

@@ -14,6 +14,7 @@ struct AppLifecycleCoordinatorTests {
             .allowSystemAutoLock,
             .updateWorkloadPhase(.active),
             .walkForeground,
+            .refreshHumanMedicationReminders,
             .refreshWorkload(reason: "contentAppear"),
             .runAutomaticBackupIfDue(reason: "rootAppeared")
         ])
@@ -29,7 +30,8 @@ struct AppLifecycleCoordinatorTests {
         #expect(notificationCommands == [
             .allowSystemAutoLock,
             .updateWorkloadPhase(.active),
-            .walkForeground
+            .walkForeground,
+            .refreshHumanMedicationReminders
         ])
         #expect(scenePhaseCommands == [.allowSystemAutoLock])
     }

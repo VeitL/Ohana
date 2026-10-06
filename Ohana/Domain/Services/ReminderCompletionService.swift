@@ -298,10 +298,36 @@ final class ReminderCompletionService: ReminderCompleting {
         else {
             return false
         }
+        let plantCareSyncResult: PlantCareScheduleSyncResult?
+        if let event = reminder.event,
+           PlantCareScheduleSyncService.isPlantCareEvent(event) {
+            let result = PlantCareScheduleSyncService.syncReopenedReminder(
+                reminder,
+                executorId: humanId,
+                context: context,
+                now: now,
+                saveChanges: false
+            )
+            guard result.allowsScheduleCompletion else {
+                context.rollback()
+                return false
+            }
+            plantCareSyncResult = result
+        } else {
+            plantCareSyncResult = nil
+        }
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
             context.rollback()
             return false
+        }
+        if let plantCareSyncResult {
+            PlantCareScheduleSyncService.syncPlanAfterCompletion(
+                plantCareSyncResult,
+                context: context,
+                now: now,
+                scheduleNotifications: reschedule
+            )
         }
         if reschedule {
             Task { @MainActor in

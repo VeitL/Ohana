@@ -84,7 +84,7 @@ private struct CrewRosterWalletCard: View {
                     if card.homePrimaryMetricValue != "\(card.coconutBalance)"
                         || card.homePrimaryMetricUnit != "c" {
                         Label("\(card.coconutBalance)", systemImage: "wallet.bifold.fill")
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 6)
@@ -155,9 +155,9 @@ private struct CrewRosterWalletCard: View {
         let loader = SwiftDataMediaBlobLoader(modelContainer: modelContext.container)
         let data: Data? = switch mediaRequest.source {
         case .pet:
-            await loader.petAvatarImageData(modelID: mediaRequest.modelID)
+            await loader.petAvatarImageData(id: mediaRequest.id)
         case .human:
-            await loader.humanAvatarImageData(modelID: mediaRequest.modelID)
+            await loader.humanAvatarImageData(id: mediaRequest.id)
         }
         guard !Task.isCancelled, let data, !data.isEmpty else { return }
         _ = await FocusWalletAvatarCache.preload(payloads: [
@@ -249,7 +249,12 @@ struct CrewRosterProfileSummarySnapshot: Equatable {
             rows.append(.init(id: "mbti", title: "MBTI", value: mbti, icon: "brain.head.profile"))
         }
         if !card.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            rows.append(.init(id: "breed", title: l.tr(zh: "品种", en: "Breed", de: "Rasse"), value: card.breed, icon: "tag.fill"))
+            rows.append(.init(
+                id: "breed",
+                title: l.tr(zh: "品种", en: "Breed", de: "Rasse"),
+                value: l.resourceName(card.breed),
+                icon: "tag.fill"
+            ))
         }
         if rows.count < 4, !card.kind.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             rows.append(.init(id: "type", title: l.tr(zh: "类型", en: "Type", de: "Typ"), value: card.kind, icon: memberKindIcon))
@@ -263,15 +268,15 @@ struct CrewRosterProfileSummarySnapshot: Equatable {
             statusText: statusText?.isEmpty == false ? statusText : nil,
             statusIcon: card.statusBadgeIsWarning ? "exclamationmark.triangle.fill" : "checkmark.seal.fill",
             eyebrow: l.tr(zh: "基本信息", en: "Profile", de: "Profil"),
-            summaryText: card.personalityHint ?? secondaryIdentityText(for: card),
+            summaryText: card.personalityHint ?? secondaryIdentityText(for: card, l: l),
             metrics: metrics,
             rows: Array(rows.prefix(4))
         )
     }
 
-    private static func secondaryIdentityText(for card: FocusCard) -> String {
+    private static func secondaryIdentityText(for card: FocusCard, l: L10n) -> String {
         if !card.breed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return card.breed
+            return l.resourceName(card.breed)
         }
         if let days = card.daysTogetherText, !days.isEmpty {
             return days
@@ -310,11 +315,11 @@ struct CrewRosterProfileSummaryHeader: View {
             HStack(alignment: .bottom, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(snapshot.eyebrow)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.goCardWhite.opacity(0.64))
                         .textCase(.uppercase)
                     Text(snapshot.summaryText)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.goCardWhite.opacity(0.84))
                         .lineLimit(2)
                         .minimumScaleFactor(0.76)
@@ -341,9 +346,9 @@ struct CrewRosterProfileSummaryHeader: View {
     private func inlineFact(_ text: String, icon: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
             Text(text)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .lineLimit(1)
         }
         .foregroundStyle(Color.goCardWhite.opacity(0.78))
@@ -353,10 +358,10 @@ struct CrewRosterProfileSummaryHeader: View {
     private func plainMetric(_ metric: CrewRosterProfileSummaryMetric) -> some View {
         VStack(alignment: .trailing, spacing: 2) {
             Image(systemName: metric.icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
             Text(metric.value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .monospacedDigit()
                 .lineLimit(1)
@@ -374,12 +379,12 @@ struct CrewRosterProfileSummaryHeader: View {
     private func compactInfoTile(_ row: CrewRosterProfileSummaryRow) -> some View {
         HStack(spacing: 8) {
             Image(systemName: row.icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.value)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goCardWhite)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)

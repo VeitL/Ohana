@@ -5,6 +5,21 @@ import Testing
 
 @MainActor
 struct OnboardingJourneyCoordinatorTests {
+    @Test func humanOnlyGiftClaimDoesNotWaitForAPetHomeSnapshot() {
+        #expect(StarterGiftClaimPresentationPolicy.isReady(
+            requiredEntityID: nil,
+            isRequiredEntitySnapshotReady: false
+        ))
+        #expect(!StarterGiftClaimPresentationPolicy.isReady(
+            requiredEntityID: UUID(),
+            isRequiredEntitySnapshotReady: false
+        ))
+        #expect(StarterGiftClaimPresentationPolicy.isReady(
+            requiredEntityID: UUID(),
+            isRequiredEntitySnapshotReady: true
+        ))
+    }
+
     @Test func freshJourneyMovesFromHumanNameThroughDeferredPetChoice() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
@@ -32,7 +47,7 @@ struct OnboardingJourneyCoordinatorTests {
             defaults: defaults
         )
         #expect(needsHuman.phase == .needsHumanName)
-        #expect(needsHuman.starterGiftResult == .pendingFirstPet)
+        #expect(needsHuman.starterGiftResult == .waitingForFirstHuman)
         #expect(!StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
 
         let human = Human(name: "Ava")
@@ -47,6 +62,10 @@ struct OnboardingJourneyCoordinatorTests {
             defaults: defaults
         )
         #expect(choice.phase == .petChoice)
+        #expect(choice.starterGiftResult == .readyToClaim(
+            recipient: .island,
+            amount: StarterGiftService.giftAmount
+        ))
         #expect(defaults.string(forKey: OnboardingJourneyCoordinator.Key.firstHumanID) == human.id.uuidString)
 
         OnboardingJourneyCoordinator.markPetCreationStarted(defaults: defaults)
@@ -63,11 +82,11 @@ struct OnboardingJourneyCoordinatorTests {
             activeHumanID: human.id.uuidString,
             context: context,
             defaults: defaults
-        ) == .awaitingPet)
+        ) == .starterGiftReady(amount: StarterGiftService.giftAmount))
         #expect(!StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
     }
 
-    @Test func completedOnboardingWithHumanAndNoPetDefaultsToAwaitingPet() throws {
+    @Test func completedOnboardingWithHumanAndNoPetMakesGiftReady() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -86,11 +105,14 @@ struct OnboardingJourneyCoordinatorTests {
             defaults: defaults
         )
 
-        #expect(evaluation.phase == .awaitingPet)
-        #expect(evaluation.starterGiftResult == .pendingFirstPet)
+        #expect(evaluation.phase == .starterGiftReady(amount: StarterGiftService.giftAmount))
+        #expect(evaluation.starterGiftResult == .readyToClaim(
+            recipient: .island,
+            amount: StarterGiftService.giftAmount
+        ))
     }
 
-    @Test func petMakesGiftReadyBeforeCareAndClaimUnlocksOnlyAfterAcknowledgement() throws {
+    @Test func humanMakesGiftReadyAndCommittedClaimUnlocksBeforeAcknowledgement() throws {
         let container = try makeContainer()
         let context = ModelContext(container)
         let suiteName = makeDefaultsSuiteName()
@@ -104,9 +126,7 @@ struct OnboardingJourneyCoordinatorTests {
             now: startedAt
         )
         let human = Human(name: "Ava")
-        let pet = Pet(name: "Momo", species: "cat")
         context.insert(human)
-        context.insert(pet)
         context.safeSave()
 
         let ready = OnboardingJourneyCoordinator.evaluate(
@@ -132,7 +152,7 @@ struct OnboardingJourneyCoordinatorTests {
             defaults: defaults
         )
         #expect(claim == .claimed(recipient: .island, amount: StarterGiftService.giftAmount))
-        #expect(!StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
+        #expect(StarterGiftService.isOasisHomeTabUnlocked(defaults: defaults))
         #expect(OnboardingJourneyCoordinator.currentPhase(
             hasOnboarded: true,
             activeHumanID: human.id.uuidString,

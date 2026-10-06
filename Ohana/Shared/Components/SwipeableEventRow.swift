@@ -13,6 +13,7 @@ struct SwipeableEventRow: View {
     var occurrenceDate: Date = .init()
     var petThemeColor: Color?
     var allowsUserEventDetail = true
+    var allowsMutation = true
     /// Returns `true` when the occurrence completed immediately. A `false`
     /// result means the parent presented a lightweight choice first, so the row
     /// must stay in place instead of playing a premature success animation.
@@ -36,7 +37,6 @@ struct SwipeableEventRow: View {
     @State private var activeDragAxis: DragAxis? = nil
 
     // Overdue emphasis stays static in list geometry; rows must not drift while the user scans.
-    @State private var overdueBreath: Bool = false
 
     private let triggerThreshold: CGFloat = 100
     private let dampFactor: CGFloat = 0.4
@@ -45,15 +45,18 @@ struct SwipeableEventRow: View {
         case vertical
     }
 
-    private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
-    }
-
     private var leftProgress: CGFloat { max(0, -offsetX) / triggerThreshold }
     private var rightProgress: CGFloat { max(0, offsetX) / triggerThreshold }
     private var l: L10n { L10n(appLanguage) }
     private var accessibilityHint: String {
-        allowsUserEventDetail
+        if allowsUserEventDetail, !allowsMutation {
+            return l.tr(
+                zh: "查看只读日历事项详情",
+                en: "View read-only calendar event details",
+                de: "Schreibgeschützte Termindetails anzeigen"
+            )
+        }
+        return allowsUserEventDetail
             ? l.tr(zh: "查看日历事项详情", en: "View calendar event details", de: "Kalendertermin-Details anzeigen")
             : l.tr(zh: "打开相关功能", en: "Open related feature", de: "Zugehorige Funktion offnen")
     }
@@ -86,14 +89,14 @@ struct SwipeableEventRow: View {
             .animation(GoMotion.feedback, value: celebrationParticles.count)
 
             // 左滑背景（完成，仅行动任务才可完成）
-            if offsetX < 0, event.isActionableTask {
+            if allowsMutation, offsetX < 0, event.isActionableTask {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {
                         Image(systemName: leftProgress >= 1 ? "checkmark.circle.fill" : "checkmark.circle")
                             .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text(l.tr(zh: "完成", en: "Done", de: "Erledigt")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        Text(l.tr(zh: "完成", en: "Done", de: "Erledigt")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, leftProgress * 1.5))
@@ -106,13 +109,13 @@ struct SwipeableEventRow: View {
             }
 
             // 右滑背景（删除）
-            if offsetX > 0 {
+            if allowsMutation, offsetX > 0 {
                 HStack {
                     VStack(spacing: 4) {
                         Image(systemName: "trash.fill").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text(l.tr(zh: "删除", en: "Delete", de: "Löschen")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        Text(l.tr(zh: "删除", en: "Delete", de: "Löschen")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, rightProgress * 1.5))
@@ -153,15 +156,6 @@ struct SwipeableEventRow: View {
                 ? l.tr(zh: "这是一个重复事件，请选择删除方式", en: "This event repeats. Choose how to delete it.", de: "Dieser Termin wiederholt sich. Wähle die Löschart.")
                 : l.tr(zh: "确定要删除「\(event.title)」吗？此操作不可撤回。", en: "Delete \"\(event.title)\"? This cannot be undone.", de: "\"\(event.title)\" löschen? Dies kann nicht rückgängig gemacht werden."))
         }
-        .onAppear {
-            guard rowState == .overdue, !shouldReduceWork else {
-                overdueBreath = false
-                return
-            }
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy. // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-                overdueBreath = true
-            }
-        }
     }
 
     // MARK: - Event Card
@@ -188,18 +182,17 @@ struct SwipeableEventRow: View {
                     Circle()
                         .fill(Color(hex: "FF5A00"))
                         .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                        .scaleEffect(overdueBreath ? 1.05 : 1.0)
                     if leftProgress > 0.3 {
                         Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 16, weight: .black))
-                            .foregroundStyle(Color.goCardWhite)
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.arkInk)
                             .opacity(Double((leftProgress - 0.3) / 0.7))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
                         Image(systemName: event.silhouetteListSymbol)
                             .font(OhanaFont.adaptive(size: 17, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                            .foregroundStyle(Color.goCardWhite)
+                            .foregroundStyle(Color.arkInk)
                             .opacity(1 - Double(leftProgress / 0.3))
                     }
                 }
@@ -221,8 +214,8 @@ struct SwipeableEventRow: View {
                     // Morph icon → checkmark as swipe deepens
                     if leftProgress > 0.4 {
                         Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 16, weight: .black))
-                            .foregroundStyle(Color.goCardWhite)
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
+                            .foregroundStyle(Color.arkInk)
                             .opacity(Double((leftProgress - 0.4) / 0.6))
                             .scaleEffect(0.5 + leftProgress * 0.5)
                     } else {
@@ -238,7 +231,7 @@ struct SwipeableEventRow: View {
             // 中间信息区
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .foregroundStyle(rowState == .completed ? titleMuted : titlePrimary)
                     .strikethrough(rowState == .completed, color: titleMuted.opacity(0.9))
                     .lineLimit(1)
@@ -246,7 +239,7 @@ struct SwipeableEventRow: View {
 
                 HStack(spacing: 6) {
                     Text(event.eventTypeEnum?.localizedLabel(l) ?? event.eventType)
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                         .foregroundStyle(eventNodeColor)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(eventNodeColor.opacity(0.15), in: Capsule())
@@ -259,7 +252,7 @@ struct SwipeableEventRow: View {
                     }
                     if rowState == .overdue {
                         Text(l.tr(zh: "逾期", en: "Overdue", de: "Überfällig"))
-                            .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                             .foregroundStyle(Color(hex: "FF5A00"))
                             .padding(.horizontal, 5).padding(.vertical, 1)
                             .background(Color(hex: "FF5A00").opacity(0.12), in: Capsule())
@@ -279,11 +272,11 @@ struct SwipeableEventRow: View {
                         .foregroundStyle(Color.goPrimary)
                 } else if event.isAllDay {
                     Text(l.tr(zh: "全天", en: "All day", de: "Ganztägig"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(timeSecondary)
                 } else {
                     Text(occurrenceDisplayStart, style: .time)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(rowState == .overdue ? Color(hex: "FF5A00") : timeSecondary)
                         .monospacedDigit()
                 }
@@ -321,7 +314,7 @@ struct SwipeableEventRow: View {
     private var rowSwipeGesture: some Gesture {
         DragGesture(minimumDistance: 12, coordinateSpace: .local)
             .onChanged { value in
-                guard !isTriggerred else { return }
+                guard allowsMutation, !isTriggerred else { return }
                 let dx = value.translation.width
                 let dy = value.translation.height
 
@@ -352,7 +345,12 @@ struct SwipeableEventRow: View {
             }
             .onEnded { value in
                 defer { activeDragAxis = nil }
-                guard !isTriggerred else { return }
+                guard allowsMutation, !isTriggerred else {
+                    if offsetX != 0 {
+                        withAnimation(GoMotion.feedback) { offsetX = 0 }
+                    }
+                    return
+                }
                 guard activeDragAxis == .horizontal else {
                     if offsetX != 0 {
                         withAnimation(GoMotion.feedback) { offsetX = 0 }
@@ -377,6 +375,7 @@ struct SwipeableEventRow: View {
     }
 
     private func triggerComplete() {
+        guard allowsMutation else { return }
         isTriggerred = true
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
 
@@ -408,12 +407,14 @@ struct SwipeableEventRow: View {
 
     // E1: 右滑只弹确认 alert，回弹到原位
     private func pendingDelete() {
+        guard allowsMutation else { return }
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         withAnimation(GoMotion.feedback) { offsetX = 0 }
         showDeleteConfirmAlert = true
     }
 
     private func triggerDelete() {
+        guard allowsMutation else { return }
         isTriggerred = true
         withAnimation(GoMotion.page) { offsetX = 800 }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.28) {
@@ -438,6 +439,7 @@ struct SwipeableEventRow: View {
     }
 
     private func deleteEvent(scope: CalendarEventDeletionScope) {
+        guard allowsMutation else { return }
         let command = DomainCommand.calendarEventDeletion(eventID: event.id, scope: scope.revisionActionKey)
         do {
             try CalendarCommandExecutor(context: modelContext, services: appServices).delete(
@@ -562,7 +564,7 @@ struct CalendarEventDetailPage: View {
             currentLocalHumanID: UUID(uuidString: currentLocalHumanIDRaw),
             humans: options
         )
-        guard eligible.count > 1 else {
+        guard eligible.count > 1, preferredID == nil else {
             completeAndDismiss(executorID: preferredID?.uuidString)
             return
         }
@@ -584,7 +586,7 @@ struct CalendarEventDetailPage: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "事项详情", en: "Event details", de: "Termindetails"))
-                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .accessibilityIdentifier("calendar-event-detail-page")
@@ -600,7 +602,7 @@ struct CalendarEventDetailPage: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -627,7 +629,7 @@ struct CalendarEventDetailPage: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(event.title)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -690,7 +692,8 @@ struct CalendarEventDetailPage: View {
                 actionButton(
                     title: l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"),
                     systemImage: "pencil",
-                    fill: Color.goPrimary
+                    fill: Color.goPrimary,
+                    foreground: Color.ohanaPrimaryActionText
                 ) {
                     showEditEvent = true
                 }
@@ -703,7 +706,8 @@ struct CalendarEventDetailPage: View {
                         ? l.tr(zh: "标记未完成", en: "Mark incomplete", de: "Als offen markieren")
                         : l.tr(zh: "标记完成", en: "Mark complete", de: "Als erledigt markieren"),
                     systemImage: isOccurrenceComplete ? "xmark.circle" : "checkmark.circle.fill",
-                    fill: Color.goTeal
+                    fill: Color.goTeal,
+                    foreground: Color.arkInk
                 ) {
                     requestCompletion()
                 }
@@ -714,7 +718,8 @@ struct CalendarEventDetailPage: View {
                 actionButton(
                     title: l.tr(zh: "删除", en: "Delete", de: "Loeschen"),
                     systemImage: "trash.fill",
-                    fill: Color.goRed
+                    fill: Color.goRed,
+                    foreground: Color.arkInk
                 ) {
                     showDeleteConfirm = true
                 }
@@ -746,12 +751,13 @@ struct CalendarEventDetailPage: View {
         title: String,
         systemImage: String,
         fill: Color,
+        foreground: Color,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.arkInk)
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
+                .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 52)
                 .background(fill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
@@ -872,11 +878,11 @@ struct CalendarEventDetailPage: View {
                 .foregroundStyle(nodeColor)
                 .frame(width: 22)
             Text(label)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)

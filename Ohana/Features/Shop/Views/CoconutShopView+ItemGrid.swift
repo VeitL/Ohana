@@ -10,27 +10,44 @@ extension CoconutShopView {
     func shopItemCard(_ item: ShopItem) -> some View {
         let state = itemState(item)
         return VStack(alignment: .leading, spacing: 10) {
-            itemPreview(item)
+            itemPreview(item, isEquipped: state.isEquipped)
                 .frame(height: previewHeight(for: item))
                 .frame(maxWidth: .infinity)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(item.name(l))
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(primaryText)
-                        .lineLimit(1)
+                        .lineLimit(nil)
                     if state.isEquipped {
                         Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                     }
                 }
 
                 Text(item.description(l))
-                    .font(OhanaFont.caption2(.semibold))
+                    .font(OhanaFont.caption())
                     .foregroundStyle(tertiaryText)
-                    .lineLimit(2)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(l.text(item.isConsumable ? ShopShelfCopy.singleUse : ShopShelfCopy.permanent))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
+                Spacer(minLength: 0)
+                Text("🥥 \(item.cost)")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(primaryText)
+            }
+            if item.application == .effect(.popoutCard) {
+                Text(l.text(ShopShelfCopy.transparentRequired))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -39,28 +56,26 @@ extension CoconutShopView {
             shopItemAction(item, state: state)
         }
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: item.category == .appIcon ? 214 : 198, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: dynamicTypeSize.isAccessibilitySize ? nil : (item.category == .appIcon ? 214 : 198), alignment: .topLeading)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .contentShape(RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(state.isEquipped ? Color.goPrimary.opacity(0.52) : Color.clear, lineWidth: 1.5)
         }
-        .ohanaMarchingBorder(accent: state.tint, cornerRadius: OhanaRadius.cardSoft, isActive: state.isEquipped)
-        .ohanaShine(trigger: state.isEquipped, cornerRadius: OhanaRadius.cardSoft, isEnabled: state.isEquipped)
-        .opacity(state.isDisabled ? 0.58 : 1)
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder
-    func itemPreview(_ item: ShopItem) -> some View {
+    func itemPreview(_ item: ShopItem, isEquipped: Bool) -> some View {
         if let icon = item.appIcon {
-            AppIconPreview(descriptor: icon, isSelected: itemState(item).isEquipped)
+            AppIconPreview(descriptor: icon, isSelected: isEquipped)
         } else {
             ShopAppliedPreview(
                 item: item,
                 human: currentHuman,
-                pet: pets.first,
-                isEquipped: itemState(item).isEquipped,
+                pet: activePets.first,
+                isEquipped: isEquipped,
                 appLanguage: appLanguage
             )
         }
@@ -80,71 +95,89 @@ extension CoconutShopView {
     struct ItemState {
         var label: String
         var tint: Color
-        var showCost: Bool = false
         var isEquipped: Bool = false
         var isDisabled: Bool = false
     }
 
     @ViewBuilder
     func shopItemAction(_ item: ShopItem, state: ItemState) -> some View {
-        if showsShopSwitch(for: item) {
-            Toggle(
-                isOn: Binding(
-                    get: { state.isEquipped },
-                    set: { nextValue in
-                        guard nextValue != state.isEquipped, !state.isDisabled else { return }
-                        handleItemTap(item)
-                    }
-                )
-            ) {
+        Button {
+            guard !state.isDisabled else { return }
+            handleItemTap(item)
+        } label: {
+            HStack(spacing: 8) {
                 Text(state.label)
                     .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(state.tint)
                     .lineLimit(1)
-            }
-            .toggleStyle(.switch)
-            .tint(Color.goPrimary)
-            .disabled(state.isDisabled)
-            .accessibilityIdentifier("coconut-shop-item-\(item.id)")
-        } else {
-            Button {
-                guard !state.isDisabled else { return }
-                handleItemTap(item)
-            } label: {
-                HStack(spacing: 8) {
-                    Text(state.label)
-                        .font(OhanaFont.caption(.semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                    Spacer()
-                    if state.showCost {
-                        Text("🥥 \(item.cost)")
-                            .font(OhanaFont.caption(.semibold))
-                    }
+                    .minimumScaleFactor(0.75)
+                Spacer()
+                if item.isPurchased, item.appIcon == nil {
+                    Image(systemName: "chevron.forward") // a11y: allow decorative disclosure; the button names its action.
+                        .font(OhanaFont.caption2(.bold))
+                        .accessibilityHidden(true)
                 }
-                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
-            .tint(state.tint)
-            .disabled(state.isDisabled)
-            .accessibilityIdentifier("coconut-shop-item-\(item.id)")
+            .frame(maxWidth: .infinity, minHeight: 44)
         }
+        .buttonStyle(.bordered)
+        .tint(state.tint)
+        .disabled(state.isDisabled)
+        .accessibilityLabel("\(item.name(l)), \(state.label), \(item.cost)🥥")
+        .accessibilityHint(
+            purchaseSettlements[item.id] == .needsAttention
+                ? purchaseRecoverySafetyHint
+                : item.description(l)
+        )
+        .accessibilityIdentifier("coconut-shop-item-\(item.id)")
     }
 
     func itemState(_ item: ShopItem) -> ItemState {
+        if let settlement = purchaseSettlements[item.id] {
+            switch settlement {
+            case .pending:
+                return .init(
+                    label: l.tr(zh: "正在完成兑换", en: "Finalizing", de: "Wird abgeschlossen"),
+                    tint: Color.goTeal,
+                    isDisabled: true
+                )
+            case .needsAttention:
+                let canRetry = ShopManualRecoveryActionPolicy.canRetry(
+                    reasonCode: purchaseSettlementReasons[item.id]
+                )
+                return .init(
+                    label: recoveryInFlightItemID == item.id
+                        ? l.tr(zh: "正在检查…", en: "Checking…", de: "Wird geprüft…")
+                        : canRetry
+                        ? l.tr(zh: "重新尝试恢复", en: "Retry recovery", de: "Wiederherstellung erneut versuchen")
+                        : l.tr(zh: "需要安全检查", en: "Safety review needed", de: "Sicherheitsprüfung nötig"),
+                    tint: Color.goOrange,
+                    isDisabled: !canRetry || recoveryInFlightItemID != nil
+                )
+            }
+        }
+        if blockedPurchaseItemIDs.contains(item.id) {
+            return .init(
+                label: l.tr(zh: "正在读取恢复状态", en: "Checking recovery state", de: "Wiederherstellungsstatus wird geprüft"),
+                tint: Color.goOrange,
+                isDisabled: true
+            )
+        }
         if let appIcon = item.appIcon {
             if !appIcon.isDefault, !appServices.appIcons.supportsAlternateIcons {
                 return .init(label: l.tr(zh: "设备不支持", en: "Unsupported", de: "Nicht unterstützt"), tint: tertiaryText, isDisabled: true)
             }
             let isCurrent = appServices.appIcons.currentDescriptor.itemId == appIcon.itemId
             if isCurrent {
-                return .init(label: l.tr(zh: "使用中", en: "In use", de: "Aktiv"), tint: Color.goPrimary, isEquipped: true)
+                return .init(
+                    label: l.tr(zh: "使用中", en: "In use", de: "Aktiv"),
+                    tint: Color.goPrimary,
+                    isEquipped: true
+                )
             }
             if item.isPurchased {
-                return .init(label: l.tr(zh: "点击切换", en: "Tap to switch", de: "Zum Wechseln tippen"), tint: Color.goTeal)
+                return .init(label: l.text(ShopShelfCopy.ownedManage), tint: Color.goTeal)
             }
-            let missing = max(0, item.cost - islandSpendableHumanBalance)
-            return .init(label: canAfford(item) ? l.tr(zh: "买断", en: "Unlock", de: "Freischalten") : l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥", de: "Noch \(missing)🥥"), tint: canAfford(item) ? Color.goYellow : tertiaryText, showCost: true)
+            return purchaseItemState(item)
         }
 
         if item.id == Avatar2DAccess.shopItemId, Avatar2DAccess.extraPassCount > 0 {
@@ -160,28 +193,110 @@ extension CoconutShopView {
         }
 
         if item.isPurchased {
-            return .init(label: ownedItemStatus(for: item), tint: Color.goPrimary, isEquipped: isOwnedItemEquipped(item))
+            let equipped = isOwnedItemEquipped(item)
+            return .init(
+                label: equipped
+                    ? l.tr(zh: "使用中", en: "In use", de: "Aktiv")
+                    : l.text(ShopShelfCopy.ownedManage),
+                tint: Color.goPrimary,
+                isEquipped: equipped
+            )
         }
 
         if let status = activeConsumableStatus(for: item) {
             return .init(label: status, tint: Color.goPrimary)
         }
 
-        return .init(label: canAfford(item) ? l.tr(zh: "兑换", en: "Redeem", de: "Einlösen") : l.tr(zh: "不足", en: "Not enough", de: "Zu wenig"), tint: canAfford(item) ? Color.goYellow : tertiaryText, showCost: true)
+        return purchaseItemState(item)
     }
 
-    func canAfford(_ item: ShopItem) -> Bool {
-        item.cost <= 0 || islandSpendableHumanBalance >= item.cost
+    func purchaseItemState(_ item: ShopItem) -> ItemState {
+        switch purchaseReadiness(for: item) {
+        case .ready:
+            .init(label: l.tr(zh: "兑换", en: "Redeem", de: "Einlösen"), tint: Color.goYellow)
+        case let .insufficient(missing):
+            .init(
+                label: l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥", de: "Noch \(missing)🥥"),
+                tint: tertiaryText,
+                isDisabled: true
+            )
+        case .walletFrozen:
+            .init(label: l.tr(zh: "钱包已冻结", en: "Wallet frozen", de: "Wallet eingefroren"), tint: Color.goOrange, isDisabled: true)
+        case .requiresActivePet:
+            .init(
+                label: l.tr(
+                    zh: "需要在世宠物",
+                    en: "Active pet required",
+                    de: "Aktives Tier erforderlich",
+                    es: "Requiere mascota activa",
+                    pt: "Requer pet ativo",
+                    fr: "Animal actif requis",
+                    ja: "有効なペットが必要",
+                    ko: "활성 반려동물 필요",
+                    it: "Serve un animale attivo"
+                ),
+                tint: tertiaryText,
+                isDisabled: true
+            )
+        case .requiresActiveDog:
+            .init(
+                label: l.tr(
+                    zh: "需要在世狗狗",
+                    en: "Active dog required",
+                    de: "Aktiver Hund erforderlich",
+                    es: "Requiere un perro activo",
+                    pt: "Requer cão ativo",
+                    fr: "Chien actif requis",
+                    ja: "有効な犬が必要",
+                    ko: "활성 반려견 필요",
+                    it: "Serve un cane attivo"
+                ),
+                tint: tertiaryText,
+                isDisabled: true
+            )
+        case .missingBuyer:
+            .init(label: l.tr(zh: "先选择成员", en: "Choose a member", de: "Mitglied wählen"), tint: tertiaryText, isDisabled: true)
+        case .loading:
+            .init(label: l.tr(zh: "读取中", en: "Loading", de: "Wird geladen"), tint: tertiaryText, isDisabled: true)
+        }
+    }
+
+    func purchaseReadiness(for item: ShopItem) -> ShopPurchaseReadiness {
+        switch item.applicationRequirement {
+        case .none:
+            break
+        case .activePet where activePets.isEmpty:
+            return .requiresActivePet
+        case .activeDog where !activePets.contains(where: { Pet.isDogSpecies($0.species) }):
+            return .requiresActiveDog
+        case .activePet, .activeDog:
+            break
+        }
+        return ShopPurchaseReadiness.resolve(
+            dataState: dataState,
+            hasBuyer: currentHuman != nil,
+            buyerCanWrite: currentHuman.map { EconomyWalletWritePolicy.canWrite($0) } ?? false,
+            spendableBalance: islandSpendableHumanBalance,
+            cost: item.cost
+        )
     }
 
     func handleItemTap(_ item: ShopItem) {
-        if let appIcon = item.appIcon {
-            handleAppIconTap(item, descriptor: appIcon)
+        if purchaseSettlements[item.id] == .needsAttention {
+            if ShopManualRecoveryActionPolicy.canRetry(
+                reasonCode: purchaseSettlementReasons[item.id]
+            ) {
+                retryRecovery(for: item.id)
+            }
+            return
+        }
+        if item.isPurchased {
+            showInventory = true
             return
         }
 
-        if item.isPurchased {
-            toggleOwnedItem(item)
+        if let appIcon = item.appIcon {
+            handleAppIconTap(item, descriptor: appIcon)
             return
         }
 
@@ -195,10 +310,8 @@ extension CoconutShopView {
             return
         }
 
-        guard canAfford(item) else {
-            let missing = max(0, item.cost - islandSpendableHumanBalance)
-            UINotificationFeedbackGenerator().notificationOccurred(.error)
-            showToast(l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig"), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
+        guard purchaseReadiness(for: item) == .ready else {
+            showReadinessFailure(for: item)
             return
         }
 
@@ -216,12 +329,52 @@ extension CoconutShopView {
             return
         }
 
-        guard canAfford(item) else {
-            let missing = max(0, item.cost - islandSpendableHumanBalance)
-            showToast(l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig"), icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
+        guard purchaseReadiness(for: item) == .ready else {
+            showReadinessFailure(for: item)
             return
         }
 
         pendingPurchaseItem = item
+    }
+
+    func showReadinessFailure(for item: ShopItem) {
+        OhanaFeedback.error()
+        let message: String = switch purchaseReadiness(for: item) {
+        case let .insufficient(missing):
+            l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥 more", de: "Noch \(missing)🥥 nötig")
+        case .walletFrozen:
+            l.tr(zh: "当前成员的钱包已冻结。", en: "The current member's wallet is frozen.", de: "Das Wallet des aktuellen Mitglieds ist eingefroren.")
+        case .requiresActivePet:
+            l.tr(
+                zh: "请先添加一位在世宠物，才能使用这个商品。",
+                en: "Add an active pet before using this item.",
+                de: "Füge ein aktives Tier hinzu, bevor du diesen Artikel verwendest.",
+                es: "Añade una mascota activa antes de usar este artículo.",
+                pt: "Adicione um pet ativo antes de usar este item.",
+                fr: "Ajoutez un animal actif avant d’utiliser cet article.",
+                ja: "この商品を使う前に有効なペットを追加してください。",
+                ko: "이 상품을 사용하려면 먼저 활성 반려동물을 추가하세요.",
+                it: "Aggiungi un animale attivo prima di usare questo articolo."
+            )
+        case .requiresActiveDog:
+            l.tr(
+                zh: "这个商品用于遛狗体验，请先添加一位在世狗狗。",
+                en: "This item is for dog-walk experiences. Add an active dog first.",
+                de: "Dieser Artikel ist für Hundespaziergänge. Füge zuerst einen aktiven Hund hinzu.",
+                es: "Este artículo es para paseos de perros. Añade primero un perro activo.",
+                pt: "Este item é para passeios com cães. Adicione primeiro um cão ativo.",
+                fr: "Cet article concerne les promenades de chien. Ajoutez d’abord un chien actif.",
+                ja: "この商品は犬の散歩用です。先に有効な犬を追加してください。",
+                ko: "이 상품은 반려견 산책용입니다. 먼저 활성 반려견을 추가하세요.",
+                it: "Questo articolo è per le passeggiate con il cane. Aggiungi prima un cane attivo."
+            )
+        case .missingBuyer:
+            l.tr(zh: "请先选择一位在世家庭成员。", en: "Choose an active family member first.", de: "Wähle zuerst ein aktives Familienmitglied.")
+        case .loading:
+            l.tr(zh: "商店仍在读取，请稍候。", en: "The shop is still loading.", de: "Der Shop wird noch geladen.")
+        case .ready:
+            l.tr(zh: "暂时无法兑换。", en: "This cannot be redeemed right now.", de: "Dies kann gerade nicht eingelöst werden.")
+        }
+        showToast(message, icon: "exclamationmark.triangle.fill", tint: Color.goOrange)
     }
 }

@@ -44,6 +44,7 @@ extension CareEventService {
         executorId: String? = nil,
         quality: DomainCareRewardQuality = .none,
         date: Date = Date(),
+        note: String = "",
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
         let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
@@ -59,6 +60,7 @@ extension CareEventService {
                 quality: quality,
                 date: date,
                 foodKind: foodKind,
+                note: note,
                 dependencies: dependencies
             )
             return sharedResult(
@@ -84,6 +86,7 @@ extension CareEventService {
                 totalAmountGrams: totalGrams,
                 foodKind: foodKind,
                 stockOwnerPet: stockOwner,
+                note: note,
                 childLogStrategy: .care(type: .feeding),
                 reward: .feed,
                 rewardQuality: quality,
@@ -130,6 +133,7 @@ extension CareEventService {
         context: ModelContext,
         executorId: String? = nil,
         date: Date = Date(),
+        note: String = "",
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> SharedPetActionResult {
         let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
@@ -145,6 +149,7 @@ extension CareEventService {
                 executorId: executorId,
                 reward: .water,
                 date: date,
+                note: note,
                 dependencies: dependencies
             )
             return sharedResult(
@@ -167,6 +172,7 @@ extension CareEventService {
                 executorId: executorId,
                 allocationMode: totalMl > 0 ? .equal : .unknown,
                 totalAmountMl: totalMl,
+                note: note,
                 childLogStrategy: .care(type: .watering),
                 reward: .water,
                 rewardTitle: sharedCareRewardTitle(.watering, targetCount: liveTargets.count, l: l),
@@ -406,6 +412,27 @@ extension CareEventService {
     ) -> SharedPetActionResult {
         let targetCount = SharedPetTargetResolver.normalizedTargets(targets, fallback: sourcePet).count
         let attribution = attribution.validated(context: context)
+        let payerContributions: [ExpensePayerContribution]
+        if attribution.payerContributions.isEmpty {
+            payerContributions = []
+        } else {
+            guard let validated = try? ExpensePayerContributionPolicy.validated(
+                attribution.payerContributions,
+                total: amount
+            ) else {
+                return .noOp()
+            }
+            guard validated.allSatisfy({ contribution in
+                guard let humanID = contribution.humanID else { return false }
+                return HumanActionAttributionPolicy.activeHumanID(
+                    humanID.uuidString,
+                    context: context
+                ) != nil
+            }) else {
+                return .noOp()
+            }
+            payerContributions = validated
+        }
         return SharedPetActionRecorder.record(
             SharedPetActionDescriptor(
                 actionKind: .expense,
@@ -413,7 +440,9 @@ extension CareEventService {
                 targets: targets,
                 date: date,
                 executorId: attribution.executorId,
+                executorIds: payerContributions.compactMap { $0.humanID?.uuidString },
                 recordedByHumanId: attribution.recordedByHumanId,
+                payerContributions: payerContributions,
                 allocationMode: .equal,
                 totalExpenseAmount: amount,
                 currencyCode: currencyCode,

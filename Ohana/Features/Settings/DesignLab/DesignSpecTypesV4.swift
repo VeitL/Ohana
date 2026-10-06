@@ -207,7 +207,7 @@ struct DesignSpecSelectionV4: Codable, Equatable {
         chip: "pill",
         segment: "capsule",
         progress: "bar",
-        type: "rounded",
+        type: "system",
         icon: "monochromePrimary",
         settingIcon: "plainGlyph",
         navigation: "floating",

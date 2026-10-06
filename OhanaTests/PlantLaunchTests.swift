@@ -174,6 +174,24 @@ struct PlantLaunchTests {
         #expect(!task.isOverdue)
     }
 
+    @Test func realWateringClearsAnEarlierDeferral() throws {
+        let now = makeDate(year: 2026, month: 6, day: 8)
+        let calendar = Calendar.current
+        let plant = Plant(name: "Fern", wateringIntervalDays: 3)
+        plant.createdAt = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+        let deferredUntil = calendar.date(byAdding: .day, value: 7, to: now) ?? now
+        plant.careLogs.append(PlantCareLog(
+            date: calendar.date(byAdding: .day, value: -1, to: now) ?? now,
+            careType: .customNote,
+            note: "defer:watering:\(ISO8601DateFormatter().string(from: deferredUntil))"
+        ))
+        plant.careLogs.append(PlantCareLog(date: now, careType: .watering))
+        plant.lastWateredDate = now
+
+        let task = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        #expect(task.daysUntilDue < 7)
+    }
+
     @Test func carePlanReadsWetSoilDeferralReasonAndExtendsWateringCadence() throws {
         let now = makeDate(year: 2026, month: 6, day: 8)
         let calendar = Calendar.current
@@ -777,7 +795,8 @@ struct PlantLaunchTests {
         try TestDataBackupManagerProjection.manager.applyBackup(
             backup,
             context: target.mainContext,
-            projectionManager: nil
+            projectionManager: nil,
+            schedulePlantNotifications: false
         )
 
         let restoredLogs = try target.mainContext.fetch(FetchDescriptor<PlantCareLog>())
@@ -847,12 +866,14 @@ struct PlantLaunchTests {
 
         let restoredEvents = try target.mainContext.fetch(FetchDescriptor<Event>())
         let restoredReminders = try target.mainContext.fetch(FetchDescriptor<Reminder>())
-        let planEvents = restoredEvents.filter { $0.title.contains("植物计划") }
+        let planEvents = restoredEvents.filter {
+            PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        }
         let fertilizingReminder = try #require(restoredReminders.first {
             $0.event?.eventType == EventType.fertilizing.rawValue
         })
 
-        #expect(backup.schemaVersion == 31)
+        #expect(backup.schemaVersion == 34)
         #expect(PlantReminderPreferenceStore.timeWindow(defaults: targetDefaults) == .evening)
         #expect(PlantReminderPreferenceStore.isWeekendQuietEnabled(defaults: targetDefaults))
         #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: targetDefaults))
@@ -1074,7 +1095,9 @@ struct PlantLaunchTests {
 
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
-        let planEvents = events.filter { $0.isAllDay && $0.title.contains("植物计划") }
+        let planEvents = events.filter {
+            PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        }
         #expect(result.eventIDs.count == 7)
         #expect(result.reminderIDs.count == 7)
         #expect(planEvents.count == 7)
@@ -1216,8 +1239,14 @@ struct PlantLaunchTests {
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(result.removedEventIDs.isEmpty)
         #expect(!result.removedReminderIDs.isEmpty)
-        #expect(events.contains { $0.eventType == EventType.watering.rawValue && $0.title.contains("植物计划") })
-        #expect(events.contains { $0.eventType == EventType.fertilizing.rawValue && $0.title.contains("植物计划") })
+        #expect(events.contains {
+            $0.eventType == EventType.watering.rawValue &&
+                PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        })
+        #expect(events.contains {
+            $0.eventType == EventType.fertilizing.rawValue &&
+                PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        })
         #expect(!reminders.contains { $0.event?.eventType == EventType.watering.rawValue })
         #expect(reminders.contains { $0.event?.eventType == EventType.fertilizing.rawValue })
     }
@@ -1254,8 +1283,14 @@ struct PlantLaunchTests {
         let events = try context.fetch(FetchDescriptor<Event>())
         let reminders = try context.fetch(FetchDescriptor<Reminder>())
         #expect(!result.removedEventIDs.isEmpty)
-        #expect(!events.contains { $0.eventType == EventType.watering.rawValue && $0.title.contains("植物计划") })
-        #expect(events.contains { $0.eventType == EventType.fertilizing.rawValue && $0.title.contains("植物计划") })
+        #expect(!events.contains {
+            $0.eventType == EventType.watering.rawValue &&
+                PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        })
+        #expect(events.contains {
+            $0.eventType == EventType.fertilizing.rawValue &&
+                PlantCarePlanScheduleService.isGeneratedCalendarPlan($0)
+        })
         #expect(!reminders.contains { $0.event?.eventType == EventType.watering.rawValue })
         #expect(reminders.contains { $0.event?.eventType == EventType.fertilizing.rawValue })
     }
@@ -1476,13 +1511,15 @@ struct PlantLaunchTests {
         let saturday = makeDate(year: 2026, month: 6, day: 20, hour: 9)
         let plant = Plant(name: "Fern")
         let event = Event(
-            title: "给蕨类浇水植物计划",
+            title: "给蕨类浇水",
             startDate: saturday,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
         event.recurrenceDays = 2
         let reminder = Reminder(event: event, scheduledAt: saturday)
         PlantReminderPreferenceStore.setTimeWindow(.midday, defaults: defaults)
@@ -1552,22 +1589,26 @@ struct PlantLaunchTests {
         context.insert(firstPlant)
         context.insert(secondPlant)
         let firstEvent = Event(
-            title: "给薄荷浇水植物计划",
+            title: "给薄荷浇水",
             startDate: scheduledAt,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: firstPlant.id.uuidString
+            relatedEntityId: firstPlant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        firstEvent.id = PlantCarePlanIdentity.expectedEventID(plantID: firstPlant.id, careType: .watering)
         firstEvent.recurrenceDays = 1
         let secondEvent = Event(
-            title: "给蕨类浇水植物计划",
+            title: "给蕨类浇水",
             startDate: scheduledAt,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: secondPlant.id.uuidString
+            relatedEntityId: secondPlant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        secondEvent.id = PlantCarePlanIdentity.expectedEventID(plantID: secondPlant.id, careType: .watering)
         secondEvent.recurrenceDays = 1
         let firstReminder = Reminder(event: firstEvent, scheduledAt: scheduledAt)
         let secondReminder = Reminder(event: secondEvent, scheduledAt: scheduledAt)
@@ -1687,6 +1728,77 @@ struct PlantLaunchTests {
         #expect(reminders.isEmpty)
     }
 
+    @Test func wateringOptInPreservesOtherGlobalReminderSettings() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let plant = Plant(name: "Mint", wateringIntervalDays: 7)
+        plant.remindersEnabled = false
+        context.insert(plant)
+        try context.save()
+        PlantReminderPreferenceStore.setTimeWindow(.evening, defaults: defaults)
+        PlantReminderPreferenceStore.setTravelModeEnabled(true, defaults: defaults)
+
+        let result = PlantReminderControlService.enableWateringCheck(
+            plant: plant,
+            intervalDays: 5,
+            context: context,
+            notifications: NoopReminderNotificationScheduler(),
+            defaults: defaults
+        )
+
+        #expect(result.didPersist && result.didChange)
+        #expect(plant.remindersEnabled)
+        #expect(plant.wateringIntervalDays == 5)
+        #expect(PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .watering, defaults: defaults))
+        #expect(!PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .fertilizing, defaults: defaults))
+        #expect(PlantReminderPreferenceStore.timeWindow(defaults: defaults) == .evening)
+        #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: defaults))
+
+        let disabled = PlantReminderControlService.setPlantRemindersEnabled(
+            false,
+            plant: plant,
+            context: context,
+            scheduleNotifications: false,
+            notifications: NoopReminderNotificationScheduler(),
+            defaults: defaults
+        )
+        #expect(disabled.didPersist && disabled.didChange)
+        #expect(!plant.remindersEnabled)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .watering, defaults: defaults))
+    }
+
+    @Test func deferringOneCareTaskDoesNotCompleteCareOrHealthReview() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 19, hour: 9)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 1)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        context.insert(plant)
+        try context.save()
+        let oldWateredDate = plant.lastWateredDate
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now
+
+        let result = PlantReminderControlService.deferTask(
+            plant: plant,
+            careType: .watering,
+            until: tomorrow,
+            context: context,
+            executorId: nil,
+            now: now,
+            notifications: NoopReminderNotificationScheduler()
+        )
+
+        #expect(result.didPersist && result.didChange)
+        #expect(plant.lastWateredDate == oldWateredDate)
+        #expect(plant.lastHealthCheckDate == nil)
+        #expect(plant.careLogs.filter { $0.careType == .watering }.isEmpty)
+        #expect(plant.careLogs.contains { $0.note.hasPrefix("defer:watering:") })
+    }
+
     @Test func explicitPlantReminderPayloadDeepLinksToPlantCareFeature() {
         let plant = Plant(name: "Fern")
         let payload = OhanaReminderRoutePayload(userInfo: [
@@ -1767,7 +1879,8 @@ struct PlantLaunchTests {
 
         let events = try context.fetch(FetchDescriptor<Event>())
         let wateringPlan = try #require(events.first {
-            $0.isAllDay && $0.title.contains("植物计划") && $0.eventType == EventType.watering.rawValue
+            PlantCarePlanScheduleService.isGeneratedCalendarPlan($0) &&
+                $0.eventType == EventType.watering.rawValue
         })
         let expectedDue = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: now))
         #expect(wateringPlan.startDate == expectedDue)
@@ -1781,13 +1894,15 @@ struct PlantLaunchTests {
         let now = makeDate(year: 2026, month: 6, day: 9, hour: 8)
         let plant = Plant(name: "Monstera", wateringIntervalDays: 3)
         let event = Event(
-            title: "给龟背竹浇水植物计划",
+            title: "给龟背竹浇水",
             startDate: now,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
         event.recurrenceDays = 3
         context.insert(plant)
         context.insert(event)
@@ -1815,6 +1930,70 @@ struct PlantLaunchTests {
                 $0.source == CareLedgerSource.calendar.rawValue &&
                 $0.sourceEventId == event.id.uuidString &&
                 $0.legacyModelName == "PlantCareLog"
+        })
+    }
+
+    @Test func reopeningPlantCalendarEventRemovesGeneratedCareAndRestoresPreviousDate() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 9, hour: 8)
+        let previousWateredDate = makeDate(year: 2026, month: 6, day: 4, hour: 7)
+        let plant = Plant(name: "Monstera", wateringIntervalDays: 3)
+        plant.lastWateredDate = previousWateredDate
+        let event = Event(
+            title: "给龟背竹浇水",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.watering.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
+        )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
+        event.recurrenceDays = 3
+        context.insert(plant)
+        context.insert(event)
+        try context.save()
+
+        let completed = try CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [],
+            context: context,
+            executorId: nil,
+            now: now,
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
+        )
+        let generatedLog = try #require(context.fetch(FetchDescriptor<PlantCareLog>()).first)
+        let generatedLedger = try #require(context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.legacyModelId == generatedLog.id.uuidString
+        })
+
+        let reopened = try CalendarEventCommandService.toggleCompletion(
+            event: event,
+            occurrenceDate: now,
+            pets: [],
+            context: context,
+            executorId: nil,
+            now: now.addingTimeInterval(60),
+            options: CalendarEventCompletionOptions(schedulePlantCareNotifications: false)
+        )
+
+        #expect(completed.isCompleted)
+        #expect(!reopened.isCompleted)
+        #expect(reopened.didChange)
+        #expect(plant.lastWateredDate == previousWateredDate)
+        #expect(try context.fetchCount(FetchDescriptor<PlantCareLog>()) == 0)
+        #expect(try context.fetchCount(FetchDescriptor<CareLedgerEvent>()) == 0)
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).contains {
+            $0.entityName == String(describing: PlantCareLog.self) &&
+                $0.localRecordId == generatedLog.id.uuidString.lowercased() &&
+                $0.isDeletionTombstone
+        })
+        #expect(try context.fetch(FetchDescriptor<CloudSyncRecordState>()).contains {
+            $0.entityName == String(describing: CareLedgerEvent.self) &&
+                $0.localRecordId == generatedLedger.id.uuidString.lowercased() &&
+                $0.isDeletionTombstone
         })
     }
 
@@ -1858,13 +2037,15 @@ struct PlantLaunchTests {
         let now = makeDate(year: 2026, month: 6, day: 10, hour: 10)
         let plant = Plant(name: "Basil", fertilizingIntervalDays: 14)
         let event = Event(
-            title: "给罗勒施肥植物计划",
+            title: "给罗勒施肥",
             startDate: now,
             isAllDay: true,
             eventType: EventType.fertilizing.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantFertilizing.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .fertilizing)
         event.recurrenceDays = 14
         let reminder = Reminder(event: event, scheduledAt: now)
         context.insert(plant)
@@ -1897,6 +2078,81 @@ struct PlantLaunchTests {
             $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
             $0.actionType == "complete" &&
                 $0.sourceReminderId == reminder.id.uuidString
+        })
+    }
+
+    @Test func reopeningPlantReminderRemovesOnlyGeneratedCareAndRestoresPreviousDate() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 10, hour: 10)
+        let previousFertilizedDate = makeDate(year: 2026, month: 5, day: 20, hour: 9)
+        let human = Human(name: "Plant Keeper")
+        let plant = Plant(name: "Basil", fertilizingIntervalDays: 14)
+        plant.lastFertilizedDate = previousFertilizedDate
+        let event = Event(
+            title: "给罗勒施肥",
+            startDate: now,
+            isAllDay: true,
+            eventType: EventType.fertilizing.rawValue,
+            relatedEntityType: EntityKind.plant.rawValue,
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantFertilizing.rawValue
+        )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .fertilizing)
+        event.recurrenceDays = 14
+        let reminder = Reminder(event: event, scheduledAt: now)
+        context.insert(human)
+        context.insert(plant)
+        context.insert(event)
+        context.insert(reminder)
+        try context.save()
+
+        let didComplete = ReminderCompletionService.complete(
+            reminder,
+            by: human.id.uuidString,
+            context: context,
+            notifications: NoopReminderNotificationScheduler(),
+            schedulePlantCareNotifications: false
+        )
+        let generatedLog = try #require(context.fetch(FetchDescriptor<PlantCareLog>()).first)
+        let generatedLedger = try #require(context.fetch(FetchDescriptor<CareLedgerEvent>()).first {
+            $0.eventKind == CareLedgerEventKind.plantCare.rawValue
+        })
+
+        let didReopen = ReminderCompletionService.reopen(
+            reminder,
+            by: human.id.uuidString,
+            context: context,
+            reschedule: false
+        )
+        let ledgers = try context.fetch(FetchDescriptor<CareLedgerEvent>())
+
+        #expect(didComplete)
+        #expect(didReopen)
+        #expect(reminder.statusEnum == .pending)
+        #expect(plant.lastFertilizedDate == previousFertilizedDate)
+        #expect(try context.fetchCount(FetchDescriptor<PlantCareLog>()) == 0)
+        #expect(!ledgers.contains { $0.eventKind == CareLedgerEventKind.plantCare.rawValue })
+        #expect(ledgers.contains {
+            $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
+                $0.actionType == "complete"
+        })
+        #expect(ledgers.contains {
+            $0.eventKind == CareLedgerEventKind.reminder.rawValue &&
+                $0.actionType == "reopen"
+        })
+        let syncStates = try context.fetch(FetchDescriptor<CloudSyncRecordState>())
+        #expect(syncStates.contains {
+            $0.recordKey == CloudSyncRecordState.recordKey(
+                entityName: String(describing: PlantCareLog.self),
+                localRecordId: generatedLog.id
+            ) && $0.isDeletionTombstone
+        })
+        #expect(syncStates.contains {
+            $0.recordKey == CloudSyncRecordState.recordKey(
+                entityName: String(describing: CareLedgerEvent.self),
+                localRecordId: generatedLedger.id
+            ) && $0.isDeletionTombstone
         })
     }
 
@@ -1989,13 +2245,15 @@ struct PlantLaunchTests {
         let plant = Plant(name: "Fern", wateringIntervalDays: 1)
         plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
         let event = Event(
-            title: "给蕨类浇水植物计划",
+            title: "给蕨类浇水",
             startDate: now,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
         event.recurrenceDays = 1
         let reminder = Reminder(event: event, scheduledAt: now)
         context.insert(plant)
@@ -2076,13 +2334,15 @@ struct PlantLaunchTests {
         plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -3, to: now)
         plant.lastFertilizedDate = now
         let event = Event(
-            title: "给绿萝浇水植物计划",
+            title: "给绿萝浇水",
             startDate: now,
             isAllDay: true,
             eventType: EventType.watering.rawValue,
             relatedEntityType: EntityKind.plant.rawValue,
-            relatedEntityId: plant.id.uuidString
+            relatedEntityId: plant.id.uuidString,
+            taskCareKindRaw: TaskCareKind.plantWatering.rawValue
         )
+        event.id = PlantCarePlanIdentity.expectedEventID(plantID: plant.id, careType: .watering)
         event.recurrenceDays = 1
         human.weightLogs.append(humanWeightLog)
         pet.careLogs.append(playLog)
@@ -2370,7 +2630,8 @@ struct PlantLaunchTests {
                 careType: .watering,
                 plant: plant,
                 executorID: human.id.uuidString,
-                now: now
+                now: now,
+                rewardOperationDate: now
             ),
             context: context,
             options: PlantCareCommandOptions(
@@ -2482,7 +2743,8 @@ struct PlantLaunchTests {
                 careType: .watering,
                 plant: first,
                 executorID: human.id.uuidString,
-                now: now
+                now: now,
+                rewardOperationDate: now
             ),
             context: context,
             options: PlantCareCommandOptions(economy: economy, syncCarePlan: false)
@@ -2492,7 +2754,8 @@ struct PlantLaunchTests {
                 careType: .watering,
                 plant: second,
                 executorID: human.id.uuidString,
-                now: now
+                now: now,
+                rewardOperationDate: now
             ),
             context: context,
             options: PlantCareCommandOptions(economy: economy, syncCarePlan: false)
@@ -2637,7 +2900,8 @@ struct PlantLaunchTests {
                 careType: .watering,
                 plant: plant,
                 executorID: human.id.uuidString,
-                now: now
+                now: now,
+                rewardOperationDate: now
             ),
             context: context,
             options: PlantCareCommandOptions(
@@ -3044,39 +3308,132 @@ struct PlantLaunchTests {
         #expect(CareLedgerMetadata.stringValue(named: "careTransactionId", in: ledger.metadataJSON) == token.batchID.uuidString)
     }
 
-    @Test func plantBatchCareReplayUsesStableOccurrenceAndTargetKey() throws {
+    @Test func plantBatchCareReplayRequiresSameCallerOperationAndPayload() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let now = Date(timeIntervalSince1970: 1_720_000_000)
         let first = Plant(name: "Fern", wateringIntervalDays: 3)
         let second = Plant(name: "Palm", wateringIntervalDays: 4)
+        let executor = Human(name: "Plant Keeper")
+        let otherExecutor = Human(name: "Other Keeper")
         context.insert(first)
         context.insert(second)
+        context.insert(executor)
+        context.insert(otherExecutor)
         try context.save()
         let selections = [
             PlantBatchCareSelection(plantID: first.id, careType: .watering),
             PlantBatchCareSelection(plantID: second.id, careType: .watering)
         ]
+        let operationID = UUID()
 
         let initial = PlantBatchCareCommandService.recordQuickCare(
             selections: selections,
             context: context,
-            executorId: nil,
+            executorId: executor.id.uuidString,
             now: now,
-            syncCarePlan: false
+            syncCarePlan: false,
+            operationID: operationID
         )
         let replay = PlantBatchCareCommandService.recordQuickCare(
             selections: Array(selections.reversed()),
             context: context,
-            executorId: nil,
-            now: now.addingTimeInterval(60),
-            syncCarePlan: false
+            executorId: executor.id.uuidString,
+            now: now,
+            syncCarePlan: false,
+            operationID: operationID
+        )
+        let conflictingReplay = PlantBatchCareCommandService.recordQuickCare(
+            selections: [selections[0]],
+            context: context,
+            executorId: executor.id.uuidString,
+            now: now,
+            syncCarePlan: false,
+            operationID: operationID
+        )
+        let conflictingExecutorReplay = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: otherExecutor.id.uuidString,
+            now: now,
+            syncCarePlan: false,
+            operationID: operationID
         )
 
         #expect(initial.didWrite)
         #expect(!replay.didWrite)
         #expect(replay.didPersist)
         #expect(initial.batchID == replay.batchID)
+        #expect(!conflictingReplay.didWrite)
+        #expect(!conflictingReplay.didPersist)
+        #expect(conflictingReplay.persistenceErrorDescription == "plantBatchCareOperationConflict")
+        #expect(!conflictingExecutorReplay.didWrite)
+        #expect(!conflictingExecutorReplay.didPersist)
+        #expect(conflictingExecutorReplay.persistenceErrorDescription == "plantBatchCareOperationConflict")
+        #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).count == 2)
+
+        let eventID = try #require(initial.items.first?.eventID)
+        let event = try #require(try context.fetch(FetchDescriptor<Event>()).first { $0.id == eventID })
+        event.assigneeId = otherExecutor.id.uuidString
+        try context.save()
+        let corruptedReplay = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: executor.id.uuidString,
+            now: now,
+            syncCarePlan: false,
+            operationID: operationID
+        )
+        #expect(!corruptedReplay.didWrite)
+        #expect(!corruptedReplay.didPersist)
+        #expect(corruptedReplay.persistenceErrorDescription == "plantBatchCareOperationConflict")
+
+        event.assigneeId = executor.id.uuidString
+        try context.save()
+        context.delete(event)
+        try context.save()
+        let incompleteReplay = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: executor.id.uuidString,
+            now: now,
+            syncCarePlan: false,
+            operationID: operationID
+        )
+        #expect(!incompleteReplay.didWrite)
+        #expect(!incompleteReplay.didPersist)
+        #expect(incompleteReplay.persistenceErrorDescription == "plantBatchCareOperationIncomplete")
+    }
+
+    @Test func plantBatchQuickCareAllowsSameTargetsTwiceInOneDayWithDifferentOperations() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = Date(timeIntervalSince1970: 1_720_000_000)
+        let plant = Plant(name: "Fern", wateringIntervalDays: 3)
+        context.insert(plant)
+        try context.save()
+        let selections = [PlantBatchCareSelection(plantID: plant.id, careType: .watering)]
+
+        let first = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: nil,
+            now: now,
+            syncCarePlan: false,
+            operationID: UUID()
+        )
+        let second = PlantBatchCareCommandService.recordQuickCare(
+            selections: selections,
+            context: context,
+            executorId: nil,
+            now: now.addingTimeInterval(60),
+            syncCarePlan: false,
+            operationID: UUID()
+        )
+
+        #expect(first.didWrite)
+        #expect(second.didWrite)
+        #expect(first.batchID != second.batchID)
         #expect(try context.fetch(FetchDescriptor<PlantCareLog>()).count == 2)
     }
 
@@ -3332,6 +3689,29 @@ struct PlantLaunchTests {
                 careObjectKey: careObjectKey
             ))
             return reward
+        }
+
+        func awardIdempotentCareAction(
+            type: DomainCareRewardAction,
+            pet: Pet?,
+            context: ModelContext,
+            quality: DomainCareRewardQuality,
+            date: Date,
+            executorId: String?,
+            careObjectKey: UUID?,
+            idempotencyKey _: String,
+            idempotencyID _: UUID
+        ) -> (humanGot: Int, petGot: Int, didPersist: Bool) {
+            let reward = awardCareAction(
+                type: type,
+                pet: pet,
+                context: context,
+                quality: quality,
+                date: date,
+                executorId: executorId,
+                careObjectKey: careObjectKey
+            )
+            return (reward.humanGot, reward.petGot, true)
         }
 
         func awardSharedCareAction(

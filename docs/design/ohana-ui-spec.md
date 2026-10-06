@@ -1,6 +1,6 @@
 # Ohana UI Specification
 
-Updated: 2026-07-04
+Updated: 2026-10-05
 
 This document is Ohana's UI pattern contract. It explains how screens,
 components, motion, and validation should be composed from the existing Ohana
@@ -82,6 +82,9 @@ Use these as the first references when generating or reviewing similar UI:
 | Settings rows and debug tools | `Ohana/Features/Settings/Views/SettingsView+Debug.swift` |
 | UI token console / developer previews | `Ohana/Features/Settings/DesignLab/UIGuidelinesView.swift` |
 | Home card spatial motion | `VerticalSolidHomeView`, `FocusHomeVerticalSolidScene`, `OhanaMotionScene` |
+| Zen check-in card stack and full-card score gesture | `ZenHomeView`, reusing `FocusHomeVerticalSolidCardSurface` geometry |
+| Human, Pet, and Plant read-first profile | `ProfileDetailScaffold`, `ProfileCompletionCard`, and the three basic-info views |
+| Oasis surface in either app mode | Shared `OasisHomeTabHost` and `VerticalSolidHomeOasisFrozenTreeStage`; Zen may only overlay its one-time starter gift |
 | Plant care detail | Follow the QuickFeed guided care structure before adding plant-specific modules |
 | Performance diagnostics | `Ohana/Features/Settings/Views/SettingsPerformanceDiagnosticsView.swift` |
 
@@ -96,22 +99,26 @@ then the one with the same presentation style.
   member theme colors, domain colors, and text/surface tokens.
 - `goPrimary` is reserved for the global primary action, selection, focus,
   confirmation, and functional icons.
+- Product defaults are Go Blue (`#2563EB`) in light appearance and Go Lime
+  (`#C8F34A`) in dark appearance. A device-local Debug lab may compare
+  candidate accents; Release builds always ignore those developer selections.
 - Pet/human theme colors must not reuse primary aliases.
 - Domain colors carry meaning: feeding, reminders, danger, success, rewards,
   charts, and plant care should not borrow each other's semantics.
 - Never hardcode white/black for app UI; use text, surface, stroke, and action
   tokens so dark and light modes stay aligned.
+- Solid `goPrimary` surfaces pair with `ohanaPrimaryActionText`. Member themes,
+  custom hex colors, and other dynamic solid tints derive their foreground from
+  `OhanaResolvedPrimaryAccent.actionTextColor`; bright teal/orange surfaces must
+  not inherit a fixed white foreground.
 
 ### Typography
 
-- Use `OhanaFont` helpers.
-- Reserve large title scale for true page identity. Compact panels, cards,
-  settings rows, and dashboards use smaller, tighter headings.
-- Body text should be purposeful. If the user must read a paragraph to use the
-  screen, the information architecture is probably wrong.
-- Prefer labels, values, chips, and short hints over explanatory blocks.
-- Support Dynamic Type and long localized text. German strings are the stress
-  test, not an afterthought.
+- Use rounded `OhanaFont` system semantic helpers throughout the app. Titles
+  and headings use bold; body, callout, subheadline, footnote, and caption default
+  to medium, with semibold for emphasis. Keep Dynamic Type and native controls.
+- `brandTitle` and `brandMetric` preserve member/Oasis/reward expression; measured
+  values retain monospaced digits. Heavy/black is reserved for intentional heroes.
 
 ### Iconography
 
@@ -123,7 +130,11 @@ then the one with the same presentation style.
 
 ### Spacing And Density
 
-- Start compact. Add space only when it improves scanning or prevents overlap.
+- Custom pages use `OhanaSpacing`: pageMargin 16pt, section 24pt, row 12pt,
+  related 8pt. Native List/Form keep system spacing.
+- Reflow adjacent labels and actions vertically when the available width or
+  accessibility text size cannot fit them. Long names wrap instead of shrinking
+  into unreadable text.
 - Use stable dimensions for repeated controls, grids, tiles, boards, quick
   actions, counters, and charts.
 - Avoid card-in-card layouts. Use spacing, headers, hairlines, and row rhythm
@@ -143,6 +154,11 @@ then the one with the same presentation style.
   for system navigation chrome, toolbars, back/close/floating controls, sheet
   control regions, popups, native system-control interaction surfaces, or an
   explicitly documented exception.
+- Zen status selection is a documented interaction exception: one noninteractive
+  full-card Liquid Glass layer may cover the touched card while the underlying
+  gesture owns input. It must match the card bounds and corner radius, use
+  high-contrast text, and become an opaque contrast surface under Reduce
+  Transparency.
 - Pet, Human, and Plant identity hero cards are the only standing content-layer
   exception: one noninteractive regular-glass surface beneath a translucent
   member-theme atmosphere. Reduce Transparency and reduced-effects modes use
@@ -159,8 +175,9 @@ then the one with the same presentation style.
 - Destructive button: semantic danger color and explicit confirmation.
 - Icon-only content button: SF Symbol, 44pt hit target, accessibility label.
   Back, close, and toolbar controls use the system glass button style.
-- Tap feedback uses `ScaleButtonStyle()` or the local mature sibling's existing
-  button style.
+- Native controls keep system press and selection feedback. `ScaleButtonStyle()`
+  and `GoMotion` are for custom brand content, never layered over native
+  Picker, Menu, toolbar or glass button interactions.
 
 ### Settings Rows
 
@@ -178,16 +195,37 @@ then the one with the same presentation style.
   dividers, or compact metric blocks.
 - Interactive cards must keep hit testing stable during expand/collapse. Users
   should not wait for animation completion before the next valid tap.
+- Starter-task cards complete short profile fields in place. A successful save
+  keeps the editor open with a persistent saved status; only structured,
+  safety-sensitive, or real-action workflows navigate to a dedicated surface.
 
 ### Chips And Segmented Controls
 
-- Use chips for compact filters, modes, and status.
+- Use `ohanaContentTabsPickerStyle` for native list/calendar content switching
+  and `ohanaRoundedTextFieldStyle` for native inputs. Both adopt iOS 27 behavior
+  while retaining iOS 26.2 fallbacks.
+- Use quiet labels for passive status; avoid adding repeated decorative pills.
 - Toggle, Slider, segmented Picker, and DatePicker stay native so the system
   owns rest, press, drag, selection, disabled state, refraction, and Reduce
   Motion behavior. Do not rebuild their glass with opacity-only capsules.
 - Selected state uses solid `goPrimary` or the domain semantic color.
 - Unselected state uses solid elevated surface, not a barely visible tint.
 - State must not be color-only; include label, icon, position, or value.
+
+### Feedback And Statistics
+
+- `OhanaFeedbackState` defaults to a page state. Use `layout: .compact` inside
+  an existing section; it adds no nested card or fixed large minimum height.
+- Loading, no records, an actual zero, and a failed read have different meanings.
+  Never show 0.0 kg or “new data” as a substitute for absent weight records.
+- One weight observation remains a point at its actual time and value. It must
+  not create a flat trend from fabricated endpoints.
+- Object and time range each have one menu. Keep all six household insight
+  categories and their locks discoverable. Preserve entitlement checks.
+- Shared charts own one line reveal (`GoMotion.chartLine`, 0.72s ease-out),
+  without a second parent animation or a y-axis rise from zero. An unchanged
+  chart does not replay when scrolling back. AppWorkloadPolicy owns the motion
+  budget and Reduce Motion behavior.
 
 ### Inputs
 
@@ -239,8 +277,8 @@ Required structure:
 1. Native `NavigationStack` sheet chrome with one system cancel/back affordance.
 2. Care target identity and current status.
 3. Primary quick record card high on the page.
-4. Habit/recommendation block.
-5. Recent history or chart.
+4. Recent history or chart.
+5. Optional habit/recommendation details.
 6. Reminder/schedule management.
 7. Secondary settings/details.
 8. Empty, disabled, failed-write, and private states.
@@ -248,16 +286,38 @@ Required structure:
 Interaction rule: quick record must give local visual feedback immediately, then
 defer writes, reward sync, reminder sync, and read-model refresh.
 
-### Quick Action Secondary Menu
+### Root Navigation And Contextual Actions
 
-Use when a home quick action has multiple valid intents.
+- Standard mode has one bottom row, reserved by `safeAreaInset`: a native Picker
+  followed by a native Button for one action or Menu for several actions.
+- Keep Home / Tasks / Oasis / Plants order and existing unlock rules. Use
+  `ohanaContentTabsPickerStyle` (`.tabs` on iOS 27, `.segmented` on 26.2).
+- Prefer localized text. At accessibility sizes or when text cannot fit, use
+  SF Symbols while retaining full accessible names, selected state and task
+  count. Each segment and context action has at least a 44pt target.
+- Home and Plants open quick logging, Tasks adds an event, Oasis injects energy.
+  Reuse the existing subject/action catalog. Skip subject selection for one
+  eligible subject, retaining action choices and business confirmations.
+- Do not draw a second glass layer, animate menu items flying in, delay taps
+  until an animation finishes, or manually reserve the same bottom inset twice.
+- Zen retains its native three-page TabView and shares modal/navigation rules.
 
-Required structure:
+### Modal And Editor Ownership
 
-- First card is the primary common action.
-- Secondary actions appear in a compact dock/list below.
-- No large background card behind the eventual record popup.
-- Opening a record popup should present only the foreground popup.
+- Each modal host provides one title and `OhanaModalToolbar`. Browsing uses a
+  trailing `.close` on the title row; editing uses leading `.cancel` and trailing Save. Pushed
+  children inherit system Back and edge-swipe, without an extra close action.
+- `ohanaEditorChrome` / `OhanaEditorSheet` own dirty-draft confirmation and
+  submission UI. Dirty editors cannot swipe away. Cancel asks with a system
+  confirmationDialog; failure keeps inputs, attachments and route context.
+- Save disables duplicate submission and dismissal. Only a committed domain
+  result permits success feedback or closing. Loading shells expose title and
+  close immediately, and route tasks cancel on dismissal.
+- Member creation keeps its branded step card and progressive bottom CTA; its
+  standard modal uses native Cancel and the same draft guard. Required first-run
+  steps keep their product-defined back/defer semantics. Photos, avatar crops,
+  Oasis and member-card motion remain documented brand content exceptions;
+  they do not authorize custom modal transitions or duplicate exit controls.
 
 ### Short Record Popup
 
@@ -269,8 +329,8 @@ Required structure:
   and native `sheet(item:)` for record, restock, or management content.
 - Let SwiftUI own the sheet surface, safe areas, keyboard avoidance, drag gesture,
   transition, and dismissal.
-- Use `NavigationStack`, `Form`/`List`, native toolbar actions, and one
-  `borderedProminent` primary CTA where applicable.
+- Use `NavigationStack`, `Form`/`List`, medium/large detents and shared native
+  toolbar actions. Editors have one Save action in the confirmation position.
 - Do not add an in-page scrim, replacement handle, fixed popup frame, or custom
   close capsule.
 
@@ -284,7 +344,23 @@ Required structure:
   needed.
 - A real navigation title and native toolbar actions.
 - `List` or `Form` with quiet `Section` headers where row semantics fit.
-- No duplicate or hand-drawn close controls.
+- No duplicate or hand-drawn close controls. Push details in the current stack;
+  present independent editing as a separate native sheet.
+
+### Household Insights Sheet
+
+- Keep one horizontally scrolling tab row in this fixed order: Weight,
+  Expenses, Weekly, Care Analysis, Reminder Health, Long-term Review.
+- Never remove a locked tab from the row. Show a lock plus the exact required
+  tree level, and mount only the currently selected tab's content.
+- Weight and Expenses are separate Lv.1 surfaces. Health and medication family
+  aggregates remain in their separate Lv.2 group.
+- A locked Reminder Health tab still renders the compact permission, overdue,
+  and failed-reminder safety summary. Detailed scheduling history stays locked.
+- Free range controls expose 7 and 30 days with one selected subject. Personal
+  adds 90 days, one year, all time, comparison, and analytical export.
+- Locks, status, and selection always use text or symbols in addition to color;
+  the tab row must remain usable at large Dynamic Type sizes and in RTL.
 
 ### Home Spatial Card
 
@@ -313,6 +389,20 @@ Motion rules:
 - Repeating/ambient motion must be visible, intentional, and budgeted.
 - Expanded/collapsed surfaces should accept valid taps as soon as the target is
   visually available, not only after animation completion.
+- Custom buttons use one shallow press: 0.985 scale, no default vertical
+  displacement or shadow, and a brief opacity response. Native controls keep
+  their system feedback. Reduce Motion removes custom spatial transforms.
+- List reveals keep content readable and tappable on the first frame, use
+  cancellable view tasks, and never scale the list. The existing 35 ms stagger
+  remains bounded at 240 ms. Floating menus use a lighter 25 ms entrance stagger
+  capped at 100 ms; all rows leave together in 160 ms before a submenu handoff.
+- Routine value feedback uses a numeric transition or one symbol pulse. Do not
+  combine symbol bounce and pulse. Reward pops remain reserved for meaningful
+  completion and use a small lift; ambient glow changes opacity without scaling
+  the content and stops under the workload policy.
+- Module selection updates local route state immediately. Animate the selected
+  pill and a light content handoff without applying a spring transaction to the
+  entire outgoing and incoming data-backed module.
 
 Smoothness compliance before calling a strict task complete:
 
@@ -426,3 +516,17 @@ A new or refactored Ohana UI is done when:
 - It passes the relevant UI and accessibility audits.
 - It names any remaining manual or real-device validation gap instead of hiding
   it in chat context.
+
+## 15. October 2026 Core-Page Alignment
+
+UI contract: existing QuickFeed detail, native Settings forms, FeatureHub shared
+components, and the member wallet-card motion scene. The accepted change keeps
+all business commands, data models, shop IDs, mode navigation, and unlock rules.
+Care screens prioritize member/status, record action, recent records, then
+plans and management. Modal hosts own one navigation title and one close action.
+The nine-item shop retains its three groups and legacy inventory support.
+
+References inform specific choices, not a new visual identity: [iOS 27](https://www.apple.com/os/ios/)
+for system material/readability, [Things](https://culturedcode.com/things/features/)
+for quiet grouping, [Gentler Streak](https://docs.gentler.app/release-notes-and-announcements/a-more-intuitive-streak)
+for concise status, and [Planta](https://getplanta.com/) for photo/status/action hierarchy.

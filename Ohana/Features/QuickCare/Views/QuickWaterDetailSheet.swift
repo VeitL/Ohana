@@ -12,6 +12,7 @@ struct QuickWaterDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)?
+    let showsCloseButton: Bool
     let allEvents: [Event]
     let allPets: [Pet]
     let waterEntries: [QuickWaterLedgerEntry]
@@ -56,6 +57,7 @@ struct QuickWaterDetailSheet: View {
     @State var waterPlanMaintenanceTask: Task<Void, Never>?
     @State var waterPlanSaveTask: Task<Void, Never>?
     @State var isSavingWaterPlan = false
+    @State var planSaveFailed = false
     @State var waterReminderSchedulingTask: Task<Void, Never>?
     @State var waterReminderSchedulingID: UUID?
     @State var carePlanReminderSchedulingTask: Task<Void, Never>?
@@ -68,14 +70,30 @@ struct QuickWaterDetailSheet: View {
     @State var waterActionTask: Task<Void, Never>?
     @State var inlineSheetDismissTask: Task<Void, Never>?
     @State var overviewChartReplayTask: Task<Void, Never>?
+    struct EditorDraft {
+        let waterIntervalDays: Int
+        let waterChangeAnchorDate: Date
+        let filterCleanIntervalDays: Int
+        let filterReplaceIntervalDays: Int
+        let waterAmountEnabled: Bool
+        let waterAmountMlText: String
+        let waterReminderOn: Bool
+        let filterReminderOn: Bool
+        let waterPlanCount: Int
+        let waterPlanTimes: [Date]
+        let selectedPetIDs: Set<UUID>
+    }
+    @State var initialWaterEditorDraft: EditorDraft?
     @State var selectedSharedWaterPetIds: Set<UUID> = []
     @State var selectedActionHumanID: UUID?
-    @State var requiresActionHumanSelection = false
+    @State var requiresActionHumanSelection = true
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @Namespace var waterModeSelectionNamespace
     typealias ActiveSheet = QuickWaterActiveSheet
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil,
         allEvents: [Event] = [],
         allPets: [Pet] = [],
@@ -85,6 +103,7 @@ struct QuickWaterDetailSheet: View {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
         self.allEvents = allEvents
         self.allPets = allPets
         self.waterEntries = waterEntries
@@ -104,12 +123,7 @@ struct QuickWaterDetailSheet: View {
             allEvents: allEvents,
             waterEntries: waterEntries
         ))
-        _selectedSharedWaterPetIds = State(initialValue: SharedPetSelectionMemory.restoredSelection(
-            sourcePet: pet,
-            scope: "quickCare.water",
-            candidates: Self.sameSpeciesWaterPets(sourcePet: pet, allPets: allPets),
-            defaultToAll: true
-        ))
+        _selectedSharedWaterPetIds = State(initialValue: Set([pet.id]))
     }
 
     var themeColor: Color { Color(hex: pet.safeThemeColorHex) }
@@ -154,7 +168,8 @@ struct QuickWaterDetailSheet: View {
             careEvents: appServices.careEvents,
             userNotifications: appServices.userNotifications,
             reminderScheduling: appServices.reminderScheduling,
-            revisions: appServices.domainRevisions
+            revisions: appServices.domainRevisions,
+            personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
         )
     }
 
@@ -216,8 +231,12 @@ struct QuickWaterDetailSheet: View {
     var isFilterOverdue: Bool { isFilterCleanOverdue || isFilterReplaceOverdue }
     var waterChangeStatusTint: Color { isWaterChangeOverdue ? Color.goRed : waterChangeTint }
     var filterStatusTint: Color { isFilterOverdue ? Color.goRed : filterTint }
+    @State var recordDate = Date()
+    @State var recordNote = ""
+    @State var recordOptionsExpanded = false
+    @State var savedRecord: PetRecordReference?
     var body: some View {
-        NavigationStack {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack {
                 OhanaAppBackground()
                     .ignoresSafeArea()
@@ -228,15 +247,25 @@ struct QuickWaterDetailSheet: View {
                             PetMemorialBanner(pet: pet)
                         }
                         if !pet.hasPassedAway {
-                            QuickCareActionHumanPickerContainer(
-                                selectedHumanID: $selectedActionHumanID,
-                                requiresSelection: $requiresActionHumanSelection,
-                                role: .executor,
-                                tint: chromeTint
-                            )
+                            DisclosureGroup(PetCareExperienceCopy(l: l).moreOptions, isExpanded: $recordOptionsExpanded) {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    DatePicker(PetCareExperienceCopy(l: l).recordTime, selection: $recordDate, in: ...Date())
+                                    TextField(PetCareExperienceCopy(l: l).note, text: $recordNote, axis: .vertical).textFieldStyle(.roundedBorder)
+                                    QuickCareActionHumanPickerContainer(
+                                        selectedHumanID: $selectedActionHumanID,
+                                        requiresSelection: $requiresActionHumanSelection,
+                                        role: .executor,
+                                        tint: chromeTint
+                                    )
+                                    if sameSpeciesWaterPets.count > 1 {
+                                        SharedCareTargetPicker(title: PetCareExperienceCopy(l: l).sharedCare, subtitle: pet.name, pets: sameSpeciesWaterPets, selectedPetIds: $selectedSharedWaterPetIds, tint: chromeTint, fixedPetId: pet.id)
+                                    }
+                                }.padding(.top, 12)
+                            }
                         }
                         waterDashboard
                         coreCards
+                        PetReminderNotificationStatus()
                         recentStrip
                     }
                     .padding(.horizontal, 18)
@@ -251,23 +280,34 @@ struct QuickWaterDetailSheet: View {
                     toastView
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "饮水记录", en: "Water log", de: "Trinkverlauf"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: closeDetail) } }
             .sheet(item: systemSheetBinding) { sheet in
                 NavigationStack {
                     sheetContent(sheet)
+                        .disabled(isSavingWaterPlan)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                         .petMemorialTone(isActive: pet.hasPassedAway)
                         .navigationTitle(waterSheetTitle(sheet))
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button(l.cancel) {
-                                    closeActiveWaterSheet()
-                                }
+                            if sheet == .history || sheet == .waterOverview || sheet == .waterChangeOverview || sheet == .filterOverview {
+                                OhanaModalToolbar(onClose: closeActiveWaterSheet)
                             }
                         }
                 }
+                .alert(l.tr(zh: "保存失败", en: "Save failed", de: "Speichern fehlgeschlagen", es: "Error al guardar", pt: "Falha ao salvar", fr: "Échec de l’enregistrement", ja: "保存できませんでした", ko: "저장 실패", it: "Salvataggio non riuscito"), isPresented: $planSaveFailed) {
+                    Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
+                } message: {
+                    Text(l.tr(zh: "输入已保留，请重试。", en: "Your changes are kept. Please try again.", de: "Deine Änderungen bleiben erhalten. Bitte versuche es erneut."))
+                }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
+            }
+            .petRecordFeedback($savedRecord)
+        .petRecordAttribution(selectedHumanID: $selectedActionHumanID, requiresSelection: $requiresActionHumanSelection)
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
             }
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .petMemorialTone(isActive: pet.hasPassedAway)
@@ -276,12 +316,7 @@ struct QuickWaterDetailSheet: View {
         .onAppear {
             loadSettings()
             rebuildWaterSnapshot(force: true)
-            selectedSharedWaterPetIds = SharedPetSelectionMemory.restoredSelection(
-                sourcePet: pet,
-                scope: "quickCare.water",
-                candidates: sameSpeciesWaterPets,
-                defaultToAll: true
-            )
+            selectedSharedWaterPetIds = Set([pet.id])
             syncDisplayedWaterMode(force: true)
             scheduleWaterPlanMaintenance(delayMilliseconds: 220)
             if filterReminderOn {
@@ -301,7 +336,15 @@ struct QuickWaterDetailSheet: View {
             scheduleWaterPlanMaintenance(delayMilliseconds: maintenanceDelay)
         }
         .onChange(of: waterEntriesRevisionKey) { _, _ in
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord queryChanged entries=\(waterEntries.count)")
+            #endif
             scheduleWaterSnapshotRefresh()
+        }
+        .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+            if !isEntitled, overviewRange == .days90 {
+                overviewRange = .days30
+            }
         }
         .onChange(of: activeSheet?.id) { _, _ in
             adaptiveSheetHeight = activeSheet?.inlineHeight ?? 430
@@ -322,6 +365,10 @@ struct QuickWaterDetailSheet: View {
             }
         }
         .onDisappear {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan detailDisappeared isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+            OhanaUITestTouchTrace.record("waterRecord detailDisappeared actionPending=\(waterActionTask != nil)")
+            #endif
             waterSnapshotRefreshTask?.cancel()
             waterModeTransitionTask?.cancel()
             waterModeMaintenanceTask?.cancel()
@@ -458,6 +505,18 @@ struct QuickWaterDetailSheet: View {
     }
 
     func openWaterSheet(_ sheet: ActiveSheet) {
+        switch sheet {
+        case .waterSettings, .waterAmount, .waterPlan, .filterSettings:
+            initialWaterEditorDraft = EditorDraft(
+                waterIntervalDays: waterIntervalDays, waterChangeAnchorDate: waterChangeAnchorDate,
+                filterCleanIntervalDays: filterCleanIntervalDays, filterReplaceIntervalDays: filterReplaceIntervalDays,
+                waterAmountEnabled: waterAmountEnabled, waterAmountMlText: waterAmountMlText,
+                waterReminderOn: waterReminderOn, filterReminderOn: filterReminderOn,
+                waterPlanCount: waterPlanCount, waterPlanTimes: waterPlanTimes,
+                selectedPetIDs: selectedSharedWaterPetIds
+            )
+        default: break
+        }
         if activeSheet?.usesInlineOverlay == false, sheet.usesInlineOverlay {
             nestedInlineSheet = sheet
             return
@@ -475,7 +534,28 @@ struct QuickWaterDetailSheet: View {
         activeSheet = sheet
     }
 
+    func cancelActiveWaterEditor() {
+        if let draft = initialWaterEditorDraft {
+            waterIntervalDays = draft.waterIntervalDays
+            waterChangeAnchorDate = draft.waterChangeAnchorDate
+            filterCleanIntervalDays = draft.filterCleanIntervalDays
+            filterReplaceIntervalDays = draft.filterReplaceIntervalDays
+            waterAmountEnabled = draft.waterAmountEnabled
+            waterAmountMlText = draft.waterAmountMlText
+            waterReminderOn = draft.waterReminderOn
+            filterReminderOn = draft.filterReminderOn
+            waterPlanCount = draft.waterPlanCount
+            waterPlanTimes = draft.waterPlanTimes
+            selectedSharedWaterPetIds = draft.selectedPetIDs
+        }
+        closeActiveWaterSheet()
+    }
+
     func closeActiveWaterSheet() {
+        initialWaterEditorDraft = nil
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan closeSheet sheet=\(activeSheet?.id ?? "nil") returns=\(waterSheetReturnStack.count)")
+        #endif
         if nestedInlineSheet != nil {
             nestedInlineSheet = nil
             return
@@ -499,26 +579,16 @@ struct QuickWaterDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(isAquatic ? l.tr(zh: "水体 / 换水 / 滤芯", en: "Water tank / Changes / Filter", de: "Wasserbecken / Wechsel / Filter") : l.tr(zh: "喂水 / 换水 / 滤芯", en: "Water / Changes / Filter", de: "Trinken / Wechsel / Filter"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
-            Button { closeDetail() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .contentShape(Rectangle())
-            }
-            .frame(width: 44, height: 44)
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            .accessibilityIdentifier("quick-water-detail-close-action")
+
         }
     }
 
@@ -548,9 +618,9 @@ struct QuickWaterDetailSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: mode == .manual ? "hand.tap.fill" : "bell.badge.fill")
-                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(mode == .manual ? l.tr(zh: "手动", en: "Manual", de: "Manuell") : l.tr(zh: "计划", en: "Plan", de: "Plan"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(selected ? Color.arkInk : tint)
             .frame(maxWidth: .infinity)
@@ -579,16 +649,16 @@ struct QuickWaterDetailSheet: View {
                         .fill((waterMode == .reminder ? Color.goTeal : chromeTint).opacity(0.14))
                         .frame(width: 66, height: 66)
                     Image(systemName: isAquatic ? "water.waves" : "drop.fill")
-                        .font(OhanaFont.adaptive(size: 28, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 28, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(waterMode == .reminder ? Color.goTeal : chromeTint)
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(isAquatic ? l.tr(zh: "水体管理", en: "Water tank care", de: "Wasserbeckenpflege") : l.tr(zh: "今日喂水", en: "Today's water", de: "Trinken heute"))
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(isAquatic ? l.tr(zh: "换水、滤芯和水体状态", en: "Water changes, filter, and tank status", de: "Wasserwechsel, Filter und Beckenstatus") : waterSubtitle)
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
@@ -629,13 +699,13 @@ struct QuickWaterDetailSheet: View {
                 Text(title)
                 if isWarning {
                     Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 8, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
             }
-            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(isWarning ? Color.goRed : Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -681,6 +751,9 @@ struct QuickWaterDetailSheet: View {
             primaryTitle: waterPrimaryTitle,
             primaryIcon: waterPrimaryIcon,
             primaryAction: {
+                #if DEBUG
+                OhanaUITestTouchTrace.record("waterRecord primaryAction reminderMode=\(waterMode == .reminder) aquatic=\(isAquatic) memorial=\(pet.hasPassedAway)")
+                #endif
                 guard !pet.hasPassedAway else {
                     openRootWaterSheet(.waterOverview)
                     return
@@ -693,13 +766,13 @@ struct QuickWaterDetailSheet: View {
                     commitWater()
                 }
             },
-            secondaryTitle: isAquatic ? nil : l.tr(zh: "设置", en: "Settings", de: "Einstellungen"),
+            secondaryTitle: isAquatic ? nil : (latestWaterPlanEvents().isEmpty ? PetCareExperienceCopy(l: l).setReminder : PetCareExperienceCopy(l: l).editReminder),
             secondaryAction: isAquatic ? nil : {
                 guard !pet.hasPassedAway else {
                     openRootWaterSheet(.waterOverview)
                     return
                 }
-                handleWaterSettingsTap()
+                openWaterPlanSettings()
             },
             tapAction: { openRootWaterSheet(.waterOverview) },
             feedbackToken: waterFeedbackToken,
@@ -773,19 +846,24 @@ struct QuickWaterDetailSheet: View {
             secondaryIdentifier: "quick-water-filter-manage-action"
         )
     }
+}
+
+// MARK: - Recent Activity and Copy
+
+extension QuickWaterDetailSheet {
 
     var recentStrip: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 Button {
                     openWaterSheet(.history)
                 } label: {
                     Text(l.tr(zh: "管理", en: "Manage", de: "Verwalten"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(chromeTint)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -793,7 +871,7 @@ struct QuickWaterDetailSheet: View {
 
             if allWaterLogs.isEmpty {
                 Text(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.62))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -811,8 +889,8 @@ struct QuickWaterDetailSheet: View {
 
     var toastView: some View {
         Text(saveToastMessage)
-            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .foregroundStyle(Color.arkInk)
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)
             .background(chromeTint, in: Capsule())

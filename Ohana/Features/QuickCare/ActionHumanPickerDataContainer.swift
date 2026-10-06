@@ -88,7 +88,11 @@ private struct LoadedActionHumanPicker: View {
     }
 
     var body: some View {
-        Group {
+        ZStack(alignment: .leading) {
+            Color.clear
+                .frame(maxWidth: .infinity, minHeight: 1)
+                .accessibilityHidden(true)
+
             if isLoaded {
                 ActionHumanPicker(
                     humans: humans,

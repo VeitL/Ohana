@@ -60,7 +60,7 @@ struct HumanQuickSwitchPasscodeSheet: View {
                     en: "Switch to \(displayName)",
                     de: "Zu \(displayName) wechseln"
                 ))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
@@ -75,7 +75,7 @@ struct HumanQuickSwitchPasscodeSheet: View {
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaControlFill, in: Capsule())
@@ -105,8 +105,8 @@ struct HumanQuickSwitchPasscodeSheet: View {
                     : l.tr(zh: "使用 \(biometricAvailability.label)", en: "Use \(biometricAvailability.label)", de: "\(biometricAvailability.label) verwenden"),
                 systemImage: biometricAvailability.symbolName
             )
-            .font(OhanaFont.callout(.black))
-            .foregroundStyle(Color.arkInk)
+            .font(OhanaFont.callout(.semibold))
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

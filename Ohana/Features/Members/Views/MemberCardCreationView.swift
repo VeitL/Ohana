@@ -32,6 +32,7 @@ struct MemberCardCreationContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(\.memberCreationCardFlipProgress) var memberCreationCardFlipProgress
+    @Environment(\.memberProfileExperienceStyle) var profileExperienceStyle
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
@@ -45,7 +46,9 @@ struct MemberCardCreationContentView: View {
     @SceneStorage("memberCreation.pet.mediaRecovery") var petMediaRecoveryRaw = ""
     @SceneStorage("memberCreation.human.mediaRecovery") var humanMediaRecoveryRaw = ""
 
+    @State var initialDraft: MemberCreationDraft?
     @State var draft: MemberCreationDraft
+    @FocusState var petCustomValueFieldFocused: Bool
     @State var decodedAvatar: UIImage?
     @State var decodedAvatarTransparent = false
     @State var decodeTask: Task<Void, Never>?
@@ -53,11 +56,11 @@ struct MemberCardCreationContentView: View {
     @State var isSaving = false
     @State var errorMessage = ""
     @State var showError = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var showPurchaseConfirm = false
     @State var didConfigureInitialAvatar = false
     @State var didConfigureAvatarStep = false
     @State var shouldApply2DAfterPurchase = false
-    @State var didShowSuccess = false
     @State var isPreparingCamera = false
     @State var currentStep: MemberCreationStep
     @State var lastCustomAvatarImageData: Data?
@@ -69,6 +72,8 @@ struct MemberCardCreationContentView: View {
     @State var mbtiDecision = ""
     @State var mbtiLifestyle = ""
     @State var usesCustomResidenceCity = false
+    @State var usesCustomNationality = false
+    @State var usesCustomResidenceCountry = false
     @State var isJoinHandoffRunning = false
     @State var joinHandoffProgress: CGFloat = 0
     @State var joinHandoffSnapshot: MemberCardRenderSnapshot?
@@ -131,7 +136,9 @@ struct MemberCardCreationContentView: View {
     }
 
     var hasRequiredPetProfile: Bool {
-        !draft.resolvedSpecies.isEmpty && !draft.resolvedBreed.isEmpty
+        !draft.resolvedSpecies.isEmpty
+            && !draft.resolvedBreed.isEmpty
+            && ["boy", "girl"].contains(draft.petGender)
     }
 
     var creationSteps: [MemberCreationStep] { MemberCreationStep.steps(for: kind) }
@@ -145,14 +152,14 @@ struct MemberCardCreationContentView: View {
         case .petIdentity:
             return !draft.resolvedSpecies.isEmpty && !draft.resolvedBreed.isEmpty
         case .petAppearance:
-            return ["boy", "girl"].contains(draft.petGender) && !draft.coatColor.isEmpty
+            return ["boy", "girl"].contains(draft.petGender)
         case .avatar, .petPersonality, .theme:
             return true
         }
     }
 
     var canRunHomeJoinHandoff: Bool {
-        true
+        presentationStyle == .onboarding
     }
 
     var mbtiSignature: String {
@@ -235,23 +242,35 @@ struct MemberCardCreationContentView: View {
     }
 
     var body: some View {
+        if presentationStyle == .standard {
+            NavigationStack {
+                creationContent
+                    .navigationTitle(kind.title(l))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .ohanaEditorChrome(
+                        hasChanges: initialDraft.map { $0 != draft } ?? false,
+                        isSaving: isSaving || isJoinHandoffRunning,
+                        closeIdentifier: "member-creation-cancel-action",
+                        onCancel: { clearMediaReturnStepStorage(); onCancel?() }, onSave: nil
+                    )
+            }
+        } else {
+            creationContent
+        }
+    }
+
+    private var creationContent: some View {
         ZStack {
             if presentationStyle != .onboarding && !usesTransparentHomeJoinHandoffBackdrop {
                 OhanaAppBackground()
             }
             GeometryReader { proxy in
                 let cardHeight = MemberCreationCardLayout.cardHeight(
-                    in: proxy.size.height,
-                    includesTopChrome: presentationStyle.showsTopChrome
+                    in: proxy.size.height - (kind == .pet && currentStep == .avatar ? 52 : 0),
+                    includesTopChrome: false
                 )
                 VStack(spacing: MemberCreationCardLayout.stackSpacing) {
                     Spacer(minLength: 0)
-                    if presentationStyle.showsTopChrome {
-                        topChrome
-                            .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
-                            .opacity(isJoinHandoffRunning ? (presentationStyle == .onboarding ? 0 : 0.28) : 1)
-                            .allowsHitTesting(!isJoinHandoffRunning)
-                    }
                     creationCardArea
                         .frame(height: cardHeight)
                         .opacity(profileCardFlipOpacity)
@@ -270,23 +289,14 @@ struct MemberCardCreationContentView: View {
                 .padding(.bottom, 10)
                 .frame(width: proxy.size.width, height: proxy.size.height)
             }
-            if didShowSuccess {
-                AddWizardJoinCelebrationOverlay(
-                    title: l.tr(zh: "\(draft.trimmedName) 已加入 Ohana", en: "\(draft.trimmedName) joined Ohana", de: "\(draft.trimmedName) ist bei Ohana"),
-                    subtitle: l.tr(zh: "成员竖卡已准备好", en: "The portrait card is ready", de: "Die Hochformatkarte ist bereit"),
-                    systemImage: kind == .pet ? "pawprint.fill" : "person.crop.circle.badge.checkmark",
-                    accent: Color(hex: draft.normalizedThemeHex)
-                )
-                .zIndex(50)
-            }
         }
-        .toolbar(.hidden, for: .navigationBar)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .toolbar(presentationStyle == .onboarding ? .hidden : .visible, for: .navigationBar)
         .onAppear {
             MemberCreationPerformance.event("Member Creation Appeared")
             restoreMediaRecoverySnapshotIfNeeded()
             restoreMediaReturnStepFromSceneStorage()
             configureInitialAvatarIfNeeded()
+            if initialDraft == nil { initialDraft = draft }
             scheduleAvatarDecode()
             OhanaFrameScheduler.runAfterNextFrame(milliseconds: presentationStyle.cameraPreparationDelayMilliseconds) {
                 media.prepareCameraIfNeeded()
@@ -389,6 +399,10 @@ struct MemberCardCreationContentView: View {
                 finishAvatarMediaPresentation()
             }
             .presentationDetents([.large]) // ui-v4: allow portrait crop editor needs full-height working area
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .alert(l.tr(zh: "无法打开相机", en: "Camera unavailable", de: "Kamera nicht verfügbar"), isPresented: permissionAlertBinding) {
             Button(l.done, role: .cancel) {

@@ -36,7 +36,8 @@ extension CareEventService {
         context: ModelContext,
         executorId: String?,
         quality: DomainCareRewardQuality,
-        date: Date
+        date: Date,
+        note: String
     ) -> SharedPetActionResult {
         CareEventService.recordSharedManualFeedFact(
             sourcePet: sourcePet,
@@ -47,6 +48,7 @@ extension CareEventService {
             executorId: executorId,
             quality: quality,
             date: date,
+            note: note,
             dependencies: dependencies
         )
     }
@@ -59,7 +61,8 @@ extension CareEventService {
         quality: DomainCareRewardQuality,
         date: Date,
         foodKind: FeedFoodKind,
-        source: CareLedgerSource
+        source: CareLedgerSource,
+        note: String
     ) -> (result: CareEventService.CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
         CareEventService.recordManualFeedFact(
             pet: pet,
@@ -70,6 +73,7 @@ extension CareEventService {
             date: date,
             foodKind: foodKind,
             source: source,
+            note: note,
             dependencies: dependencies
         )
     }
@@ -248,7 +252,8 @@ extension CareEventService {
         quality: DomainCareRewardQuality,
         date: Date,
         source: CareLedgerSource,
-        createsLinkedPottyLog: Bool
+        createsLinkedPottyLog: Bool,
+        note: String
     ) -> (result: CareEventService.CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
         CareEventService.recordCareFact(
             pet: pet,
@@ -261,6 +266,7 @@ extension CareEventService {
             date: date,
             source: source,
             createsLinkedPottyLog: createsLinkedPottyLog,
+            note: note,
             dependencies: dependencies
         )
     }
@@ -290,7 +296,8 @@ extension CareEventService {
         totalMl: Double,
         context: ModelContext,
         executorId: String?,
-        date: Date
+        date: Date,
+        note: String
     ) -> SharedPetActionResult {
         CareEventService.recordSharedWateringFact(
             sourcePet: sourcePet,
@@ -299,6 +306,7 @@ extension CareEventService {
             context: context,
             executorId: executorId,
             date: date,
+            note: note,
             dependencies: dependencies
         )
     }

@@ -39,7 +39,7 @@ struct FamilyCollaborationPresentationModifier<MoreContent: View>: ViewModifier 
                         Button(doneTitle) {
                             sheetRoute = nil
                         }
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.goPrimary)
                     }
                 }

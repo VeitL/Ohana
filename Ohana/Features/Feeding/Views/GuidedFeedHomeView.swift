@@ -133,12 +133,12 @@ private struct FeedGuidedModeStrip: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
                 Label(title, systemImage: "switch.2")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
                 if let selected = options.first(where: \.isSelected) {
                     Text(selected.title)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(selected.tint)
                         .contentTransition(.opacity)
                         .accessibilityIdentifier("quick-feed-current-mode-title")
@@ -150,9 +150,9 @@ private struct FeedGuidedModeStrip: View {
                     Button(action: option.action) {
                         HStack(spacing: 6) {
                             Image(systemName: option.icon)
-                                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                             Text(option.title)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.74)
                         }
@@ -254,7 +254,7 @@ private struct FeedPrimaryTaskSurface: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 8) {
                     Label(task.modeTitle, systemImage: task.modeIcon)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.arkInk)
                         .labelStyle(.titleAndIcon)
                         .padding(.horizontal, 11)
@@ -266,7 +266,7 @@ private struct FeedPrimaryTaskSurface: View {
 
                     Button(action: settingsAction) {
                         Image(systemName: "gearshape.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 14, weight: .black))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                             .foregroundStyle(task.modeTint)
                             .frame(width: 44, height: 44)
                             .background(Color.ohanaControlFill, in: Circle())
@@ -280,14 +280,14 @@ private struct FeedPrimaryTaskSurface: View {
                 HStack(alignment: .bottom, spacing: 14) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(task.title)
-                            .font(OhanaFont.adaptive(size: 23, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 23, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
                             .minimumScaleFactor(0.82)
                             .contentTransition(.opacity)
 
                         Text(task.detail)
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(2)
                             .minimumScaleFactor(0.82)
@@ -297,7 +297,7 @@ private struct FeedPrimaryTaskSurface: View {
                     Spacer(minLength: 8)
 
                     Text(task.metricValue)
-                        .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 34, weight: .semibold, design: .default))
                         .foregroundStyle(task.modeTint)
                         .lineLimit(1)
                         .minimumScaleFactor(0.58)
@@ -314,7 +314,7 @@ private struct FeedPrimaryTaskSurface: View {
 
                 Button(action: primaryAction) {
                     Label(task.primaryTitle, systemImage: task.primaryIcon)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.arkInk)
                         .labelStyle(.titleAndIcon)
                         .frame(maxWidth: .infinity)
@@ -355,22 +355,22 @@ private struct FeedGuidedMiniChartCard: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(chart.title)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(chart.subtitle)
-                            .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Text(chart.value)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                         .foregroundStyle(chart.tint)
                         .contentTransition(.numericText())
                 }
 
                 if chart.points.allSatisfy({ $0.value <= 0 }) {
                     Text(chart.emptyText)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .frame(maxWidth: .infinity, minHeight: 70)
                 } else {
@@ -399,18 +399,18 @@ private struct FeedGuidedMetricPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(metric.title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(metric.isHighlighted ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
                 .lineLimit(1)
             Text(metric.value)
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(metric.isHighlighted ? Color.arkInk : metric.tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .contentTransition(.numericText())
             if let detail = metric.detail {
                 Text(detail)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(metric.isHighlighted ? Color.arkInk.opacity(0.72) : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -461,18 +461,18 @@ private struct FeedDiscoveryLargeDockCard: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 9) {
                         Image(systemName: item.icon)
-                            .font(OhanaFont.adaptive(size: 21, weight: .black))
+                            .font(OhanaFont.adaptive(size: 21, weight: .semibold))
                             .foregroundStyle(item.tint)
                             .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .background(item.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                         Spacer(minLength: 0)
                         Text(item.title)
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         Text(item.value)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(item.tint)
                             .lineLimit(1)
                             .minimumScaleFactor(0.58)
@@ -493,7 +493,7 @@ private struct FeedDiscoveryLargeDockCard: View {
                         secondaryAction()
                     } label: {
                         Image(systemName: secondaryIcon)
-                            .font(OhanaFont.adaptive(size: 14, weight: .black))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 44, height: 44)
                             .background(item.tint, in: Circle())
@@ -530,20 +530,20 @@ private struct FeedDiscoveryCompactDockCard: View {
             } label: {
                 HStack(spacing: 11) {
                     Image(systemName: item.icon)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                         .foregroundStyle(item.tint)
                         .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(item.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                     Text(item.title)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text(item.value)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     if item.secondaryAction == nil {
                         Image(systemName: "chevron.right").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 10, weight: .black))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                             .foregroundStyle(Color.ohanaTertiaryText)
                     }
                 }
@@ -561,7 +561,7 @@ private struct FeedDiscoveryCompactDockCard: View {
                     secondaryAction()
                 } label: {
                     Image(systemName: secondaryIcon)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
                         .background(item.tint, in: Circle())

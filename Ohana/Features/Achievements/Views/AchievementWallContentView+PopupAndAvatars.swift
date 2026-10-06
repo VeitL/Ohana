@@ -44,80 +44,47 @@ extension AchievementWallContentView {
     }
 
     func achievementPopup(_ badge: Achievement) -> some View {
-        let state = rewardState(for: badge)
-        let completionText = achievementCompletionText(for: badge, state: state)
-
-        return ZStack {
-            Color.arkInk.opacity(0.34)
-                .ignoresSafeArea()
-                .onTapGesture { closePopup() }
-
-            achievementPopupArtwork(for: badge, state: state)
-                .overlay(alignment: .bottomLeading) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(badge.title)
-                            .font(OhanaFont.title2(.black))
-                            .foregroundStyle(Color.goCardWhite)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
-
-                        Text(statusTitle(for: state))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.goCardWhite.opacity(0.82))
-
-                        Text(achievementMomentLine(for: badge))
-                            .font(OhanaFont.body(.semibold))
-                            .foregroundStyle(Color.goCardWhite.opacity(0.92))
-                            .lineLimit(state == .claimable ? 2 : 3)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        Text(completionText)
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(Color.goCardWhite.opacity(0.78))
-                            .lineLimit(2)
-                            .fixedSize(horizontal: false, vertical: true)
-
-                        if state == .claimable {
-                            Button {
-                                pendingClaimAchievement = badge
-                            } label: {
-                                Text(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen"))
-                                    .font(OhanaFont.subheadline(.black))
-                                    .foregroundStyle(Color.ohanaPrimaryActionText)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(Color.goPrimary, in: Capsule())
-                            }
-                            .buttonStyle(ScaleButtonStyle())
-                            .padding(.top, 4)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    achievementDownloadCard(for: badge)
+                    if rewardState(for: badge) == .claimable {
+                        Button(l.tr(zh: "领取 +\(rewardPerAchievement)🥥", en: "Claim +\(rewardPerAchievement)🥥", de: "+\(rewardPerAchievement)🥥 abholen")) {
+                            pendingClaimAchievement = badge
                         }
+                        .buttonStyle(.borderedProminent)
                     }
-                    .padding(18)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .shadow(color: Color.arkInk.opacity(0.48), radius: 6, x: 0, y: 2) // ui-v4: allow enlarged artwork text readability without image wash
                 }
-                .overlay(alignment: .topTrailing) {
-                    HStack(spacing: 8) {
-                        achievementPopupIconButton(
-                            systemName: isRenderingAchievementShareImage ? "hourglass" : "square.and.arrow.down",
-                            label: l.tr(zh: "下载", en: "Download", de: "Laden")
-                        ) {
-                            Task { await renderAndShareAchievement(badge) }
-                        }
-                        .disabled(isRenderingAchievementShareImage)
-
-                        achievementPopupIconButton(
-                            systemName: "xmark",
-                            label: l.tr(zh: "关闭", en: "Close", de: "Schließen"),
-                            action: closePopup
-                        )
+                .padding(18)
+            }
+            .navigationTitle(badge.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                OhanaModalToolbar(onClose: closePopup)
+                ToolbarItem(placement: .primaryAction) {
+                    Button {
+                        Task { await renderAndShareAchievement(badge) }
+                    } label: {
+                        Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
                     }
-                    .padding(12)
+                    .disabled(isRenderingAchievementShareImage)
                 }
-                .frame(maxWidth: achievementPopupMaxImageWidth)
-                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.sheetCompact, style: .continuous))
-                .padding(.horizontal, 12)
-                .transition(.scale(scale: 0.94).combined(with: .opacity))
+            }
+            .confirmationDialog(
+                l.tr(zh: "领取成就奖励", en: "Claim badge reward", de: "Abzeichen-Belohnung abholen"),
+                isPresented: Binding(get: { pendingClaimAchievement != nil }, set: { if !$0 { pendingClaimAchievement = nil } }),
+                titleVisibility: .visible
+            ) {
+                Button(l.tr(zh: "确认", en: "Claim", de: "Abholen")) {
+                    guard let pending = pendingClaimAchievement else { return }
+                    pendingClaimAchievement = nil
+                    claimReward(for: pending)
+                }
+                Button(l.cancel, role: .cancel) { pendingClaimAchievement = nil }
+            }
+            .sheet(isPresented: $showingAchievementShareSheet) {
+                if let achievementShareImage { ShareSheet(image: achievementShareImage) }
+            }
         }
     }
 
@@ -140,22 +107,7 @@ extension AchievementWallContentView {
         .clipped()
     }
 
-    func achievementPopupIconButton(systemName: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 44, height: 44)
-                .background(Color.goCardWhite.opacity(0.78), in: Circle())
-                .overlay {
-                    Circle()
-                        .strokeBorder(Color.arkInk.opacity(0.08), lineWidth: 1)
-                        .allowsHitTesting(false)
-                }
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(label)
-    }
+
 
     @MainActor
     func renderAndShareAchievement(_ badge: Achievement) async {
@@ -206,72 +158,8 @@ extension AchievementWallContentView {
     }
 
     func closePopup() {
-        withAnimation(GoMotion.sheet) {
-            selectedAchievement = nil
-        }
-    }
-
-    @ViewBuilder
-    func claimConfirmPopup(_ badge: Achievement) -> some View {
-        ZStack {
-            Color.ohanaPrimaryText.opacity(0.22)
-                .ignoresSafeArea()
-                .onTapGesture { pendingClaimAchievement = nil }
-
-            VStack(spacing: 14) {
-                Text(badge.emoji)
-                    .font(OhanaFont.adaptive(size: 44)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .frame(width: 70, height: 70)
-                    .background(badge.color.opacity(0.18), in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
-
-                VStack(spacing: 5) {
-                    Text(badge.title)
-                        .font(OhanaFont.title3(.black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .multilineTextAlignment(.center)
-                    Text(l.tr(zh: "领取成就奖励", en: "Claim badge reward", de: "Abzeichen-Belohnung abholen"))
-                        .font(OhanaFont.caption(.bold))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-
-                Text("+\(rewardPerAchievement)🥥")
-                    .font(OhanaFont.metric(size: 34))
-                    .foregroundStyle(Color.goPrimary)
-                    .contentTransition(.numericText())
-
-                HStack(spacing: 10) {
-                    Button {
-                        pendingClaimAchievement = nil
-                    } label: {
-                        Text(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"))
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-
-                    Button {
-                        pendingClaimAchievement = nil
-                        claimReward(for: badge)
-                    } label: {
-                        Text(l.tr(zh: "确认", en: "Claim", de: "Abholen"))
-                            .font(OhanaFont.subheadline(.black))
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.goPrimary, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                }
-            }
-            .padding(18)
-            .frame(maxWidth: 300)
-            .background(Color.ohanaCardSurfaceElevated, in: RoundedRectangle(cornerRadius: OhanaRadius.sheetMini, style: .continuous))
-            .shadow(color: Color.ohanaPrimaryText.opacity(0.16), radius: 24, x: 0, y: 14) // ui-v4: allow centered confirmation popup needs lifted overlay
-            .transition(.scale(scale: 0.94).combined(with: .opacity))
-        }
+        selectedAchievement = nil
+        pendingClaimAchievement = nil
     }
 
     @ViewBuilder

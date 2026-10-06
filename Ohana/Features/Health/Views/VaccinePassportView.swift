@@ -101,7 +101,9 @@ struct VaccinePassportView: View {
                 }
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .sheet(isPresented: $showingAdd) {
             AddVaccineSheet(pet: pet, onSaved: onDataChanged)
         }
@@ -140,25 +142,15 @@ struct VaccinePassportView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "疫苗本", en: "Vaccine passport", de: "Impfpass"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
         }
         .padding(.top, 4)
     }
@@ -188,15 +180,15 @@ struct VaccinePassportView: View {
     private func passportMetric(title: String, value: String, detail: String, tint: Color = Color.ohanaPrimaryText) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
             Text(detail)
-                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         }
@@ -209,20 +201,17 @@ struct VaccinePassportView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "syringe.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                     .foregroundStyle(Color.ohanaFunctionalIcon)
                     .frame(width: 44, height: 44)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "添加第一针疫苗", en: "Add first vaccine", de: "Erste Impfung hinzufügen"))
-                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(l.tr(zh: "记录名称、日期和有效期", en: "Name, date, validity", de: "Name, Datum, Gültigkeit"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Image(systemName: "plus").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goPrimary, in: Circle())
@@ -238,7 +227,7 @@ struct VaccinePassportView: View {
             showingAdd = true
         } label: {
             Image(systemName: "plus").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
+                .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 58, height: 58)
                 .background(Color.goPrimary, in: Circle())
@@ -320,7 +309,7 @@ private struct VaccineRow: View {
         HStack(alignment: .top, spacing: 14) {
             VStack(spacing: 3) {
                 Text(log.date.formatted(.dateTime.month().day()))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaFunctionalIcon)
                 Text(log.date.formatted(.dateTime.year()))
                     .font(OhanaFont.adaptive(size: 10, weight: .medium))
@@ -334,7 +323,7 @@ private struct VaccineRow: View {
 
             VStack(alignment: .leading, spacing: 9) {
                 Text(log.note.isEmpty ? l.tr(zh: "疫苗接种", en: "Vaccine", de: "Impfung") : log.note)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
 
@@ -356,7 +345,7 @@ private struct VaccineRow: View {
             Spacer()
 
             Text(statusLabel)
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(statusColor)
                 .padding(.horizontal, 9)
                 .frame(height: 28)
@@ -374,10 +363,10 @@ private struct VaccineRow: View {
     private func rowInfoPill(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -390,10 +379,10 @@ private struct VaccineRow: View {
     private func rowInlineMeta(icon: String, text: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                 .foregroundStyle(Color.ohanaFunctionalIcon)
             Text(text)
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         }
@@ -420,6 +409,12 @@ struct AddVaccineSheet: View {
     @State private var enableReminder: Bool = true
     @State private var selectedRecorderHumanID: UUID?
     @State private var requiresRecorderSelection = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [vaccineName, String(date.timeIntervalSince1970), String(hasExpiry),
+         String(expiryDate.timeIntervalSince1970), vetName, costText,
+         String(reminderDaysBefore), String(enableReminder)]
+    }
     @State private var isSaving = false
 
     private let reminderOptions = [3, 7, 14, 30]
@@ -452,74 +447,30 @@ struct AddVaccineSheet: View {
     }
 
     var body: some View {
-        ZStack {
-            OhanaAppBackground().ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 12) {
-                        vaccineNameSection
-                        dateSection
-                        if hasExpiry {
-                            reminderSection
-                        }
-                        clinicSection
-                        costSection
-                        QuickCareActionHumanPickerContainer(
-                            selectedHumanID: $selectedRecorderHumanID,
-                            requiresSelection: $requiresRecorderSelection,
-                            role: .recorder,
-                            tint: Color.goPrimary
-                        )
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 8)
-                    .padding(.bottom, 96)
-                }
-                .scrollDismissesKeyboard(.interactively)
+        OhanaEditorSheet(
+            title: l.tr(zh: "添加疫苗", en: "Add Vaccine", de: "Impfung hinzufügen"),
+            hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+            isSaving: isSaving, canSave: canSave,
+            onCancel: { dismiss() }, onSave: save
+        ) {
+            VStack(spacing: 12) {
+                vaccineNameSection
+                dateSection
+                if hasExpiry { reminderSection }
+                clinicSection
+                costSection
+                QuickCareActionHumanPickerContainer(
+                    selectedHumanID: $selectedRecorderHumanID,
+                    requiresSelection: $requiresRecorderSelection,
+                    role: .recorder, tint: .goPrimary
+                )
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            saveBar
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onAppear { if initialDraft == nil { initialDraft = editorDraft } }
+        .onDisappear { commandQueue.cancelAll() }
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            PetAvatarPortraitView(
-                pet: pet,
-                fallbackText: pet.avatarEmoji,
-                themeColor: Color(hex: pet.safeThemeColorHex),
-                size: 46,
-                backgroundOpacity: 0.16
-            )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "添加疫苗", en: "Add Vaccine", de: "Impfung hinzufügen"))
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(pet.name)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-    }
+
 
     private var vaccineNameSection: some View {
         formBlock {
@@ -532,8 +483,8 @@ struct AddVaccineSheet: View {
                                 withAnimation(GoMotion.feedback) { vaccineName = suggestion }
                             } label: {
                                 Text(suggestion)
-                                    .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(vaccineName == suggestion ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .font(OhanaFont.caption(.semibold))
+                                    .foregroundStyle(vaccineName == suggestion ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .padding(.horizontal, 12)
                                     .frame(height: 34)
                                     .background(vaccineName == suggestion ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -545,7 +496,7 @@ struct AddVaccineSheet: View {
 
                 HStack(spacing: 10) {
                     Image(systemName: "pencil").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                         .frame(width: 24)
                     TextField(l.tr(zh: "自定义疫苗名称", en: "Custom vaccine name", de: "Eigener Impfstoffname"), text: $vaccineName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
@@ -580,8 +531,8 @@ struct AddVaccineSheet: View {
                             withAnimation(GoMotion.feedback) { hasExpiry.toggle() }
                         } label: {
                             Text(hasExpiry ? l.tr(zh: "清除", en: "Clear", de: "Leeren") : l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(hasExpiry ? Color.ohanaPrimaryText : Color.arkInk)
+                                .font(OhanaFont.caption(.semibold))
+                                .foregroundStyle(hasExpiry ? Color.ohanaPrimaryText : Color.ohanaPrimaryActionText)
                                 .padding(.horizontal, 12)
                                 .frame(height: 32)
                                 .background(hasExpiry ? Color.ohanaCardSurfaceElevated : Color.goPrimary, in: Capsule())
@@ -595,7 +546,7 @@ struct AddVaccineSheet: View {
                             .datePickerStyle(.compact)
                             .tint(Color.goYellow)
                     } else {
-                        Text(l.tr(zh: "可选。没有有效期时只保存接种记录。", en: "Optional. Without an expiry date, only the vaccination record is saved.", de: "Optional. Ohne Ablaufdatum wird nur der Impfeintrag gespeichert."))
+                        Text(l.tr(zh: "未设置有效期", en: "No expiry date", de: "Kein Ablaufdatum"))
                             .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
@@ -614,8 +565,8 @@ struct AddVaccineSheet: View {
                         withAnimation(GoMotion.feedback) { enableReminder.toggle() }
                     } label: {
                         Image(systemName: enableReminder ? "bell.fill" : "bell.slash.fill")
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
-                            .foregroundStyle(enableReminder ? Color.arkInk : Color.ohanaSecondaryText)
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold))
+                            .foregroundStyle(enableReminder ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                             .frame(width: 44, height: 32)
                             .background(enableReminder ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
                     }
@@ -629,8 +580,8 @@ struct AddVaccineSheet: View {
                                 withAnimation(GoMotion.feedback) { reminderDaysBefore = days }
                             } label: {
                                 Text(l.tr(zh: "\(days)天", en: "\(days)d", de: "\(days)T"))
-                                    .font(OhanaFont.caption(.black))
-                                    .foregroundStyle(reminderDaysBefore == days ? Color.arkInk : Color.ohanaPrimaryText)
+                                    .font(OhanaFont.caption(.semibold))
+                                    .foregroundStyle(reminderDaysBefore == days ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                     .frame(maxWidth: .infinity)
                                     .frame(height: 34)
                                     .background(reminderDaysBefore == days ? Color.goPrimary : Color.ohanaCardSurfaceElevated, in: Capsule())
@@ -665,6 +616,7 @@ struct AddVaccineSheet: View {
                     countryCode: AppCountry.code,
                     maxFractionDigits: 2,
                     accent: Color.goPrimary,
+                    accentForeground: Color.ohanaPrimaryActionText,
                     step: 10,
                     valueFont: .system(size: 18, weight: .black, design: .rounded),
                     valueAlignment: .leading,
@@ -678,32 +630,15 @@ struct AddVaccineSheet: View {
         }
     }
 
-    private var saveBar: some View {
-        VStack(spacing: 0) {
-            Button(action: save) {
-                Text(l.tr(zh: "保存疫苗记录", en: "Save Vaccine", de: "Impfung sichern"))
-                    .font(OhanaFont.subheadline(.black))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(!canSave)
-            .padding(.horizontal, 18)
-            .padding(.top, 10)
-            .padding(.bottom, 12)
-            .background(Color.clear)
-        }
-    }
+
 
     private func sectionLabel(_ title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             Text(title)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
     }

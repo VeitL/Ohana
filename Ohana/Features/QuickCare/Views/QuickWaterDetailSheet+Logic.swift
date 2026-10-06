@@ -49,32 +49,56 @@ extension QuickWaterDetailSheet {
         )
     }
 
-    func saveWaterChangePlanToCalendar(toast: String) {
-        let reminders = commandExecutor.saveWaterChangePlan(
-            pet: pet,
-            allEvents: allEvents,
-            intervalDays: waterIntervalDays,
-            reminderOn: waterReminderOn,
-            cycleAnchor: waterChangeAnchorDate
-        )
-        scheduleCarePlanReminders(reminders)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
-        showSaveConfirmation(toast)
+    @discardableResult
+    func saveWaterChangePlanToCalendar(toast: String) -> Bool {
+        do {
+            let reminders = try commandExecutor.saveWaterChangePlanEnforcingPersonalAccess(
+                pet: pet,
+                allEvents: latestAllEvents(),
+                intervalDays: waterIntervalDays,
+                reminderOn: waterReminderOn,
+                cycleAnchor: waterChangeAnchorDate
+            )
+            scheduleCarePlanReminders(reminders)
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            showSaveConfirmation(toast)
+            return true
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        } catch {
+            handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_water_change"))
+        }
+        return false
     }
 
-    func syncFilterPlan(showToast: Bool) {
-        let reminders = commandExecutor.syncFilterPlan(
-            pet: pet,
-            allEvents: allEvents,
-            cleanIntervalDays: filterCleanIntervalDays,
-            replaceIntervalDays: filterReplaceIntervalDays,
-            reminderOn: filterReminderOn
-        )
-        scheduleCarePlanReminders(reminders)
-        if showToast {
-            UINotificationFeedbackGenerator().notificationOccurred(.success)
-            showSaveConfirmation(filterReminderOn ? l.tr(zh: "已保存滤芯提醒", en: "Filter reminder saved", de: "Filtererinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+    @discardableResult
+    func syncFilterPlan(showToast: Bool) -> Bool {
+        do {
+            let reminders = try commandExecutor.syncFilterPlanEnforcingPersonalAccess(
+                pet: pet,
+                allEvents: latestAllEvents(),
+                cleanIntervalDays: filterCleanIntervalDays,
+                replaceIntervalDays: filterReplaceIntervalDays,
+                reminderOn: filterReminderOn
+            )
+            scheduleCarePlanReminders(reminders)
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                showSaveConfirmation(filterReminderOn ? l.tr(zh: "已保存滤芯提醒", en: "Filter reminder saved", de: "Filtererinnerung gespeichert") : l.tr(zh: "已保存", en: "Saved", de: "Gespeichert"))
+            }
+            return true
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            if showToast {
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            }
+        } catch {
+            if showToast {
+                handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_filter"))
+            }
         }
+        return false
     }
 
     func showSaveConfirmation(_ message: String) {
@@ -94,6 +118,7 @@ extension QuickWaterDetailSheet {
     }
 
     func handleWaterCommandFailure(_ error: Error, command: DomainCommand) {
+        if isSavingWaterPlan { planSaveFailed = true }
         appServices.domainRevisions.publishFailure(command: command, error: error)
         UINotificationFeedbackGenerator().notificationOccurred(.error)
         showSaveConfirmation(l.tr(
@@ -112,6 +137,9 @@ extension QuickWaterDetailSheet {
                 waterEntries: waterEntries
             )
             waterSnapshot = snapshot
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord snapshotBuilt entries=\(waterEntries.count) watering=\(snapshot.waterLogs.count) today=\(snapshot.todayWaterLogs.count)")
+            #endif
             if !snapshot.rule.planEvents.isEmpty {
                 optimisticWaterPlanEvents = []
             }
@@ -171,6 +199,7 @@ extension QuickWaterDetailSheet {
             return false
         }
         waterActionTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: milliseconds) {
+            savedRecord = nil
             action()
             waterActionTask = nil
         }
@@ -237,39 +266,41 @@ extension QuickWaterDetailSheet {
     }
 
     func startWaterPlanSave() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan saveAction isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+        #endif
         guard !isSavingWaterPlan else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             return
         }
         isSavingWaterPlan = true
         waterPlanSaveTask?.cancel()
-        dismissInlineWaterSheet()
-        performWaterModeUpdatesWithoutAnimation {
-            displayedWaterMode = .reminder
-        }
         UISelectionFeedbackGenerator().selectionChanged()
         waterPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: waterPlanSaveDelayMilliseconds) {
             saveWaterPlan()
         }
     }
 
-    func startWaterCalendarPlanSave(_ operation: @escaping @MainActor () -> Void) {
+    func startWaterCalendarPlanSave(_ operation: @escaping @MainActor () -> Bool) {
         guard !isSavingWaterPlan else {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             return
         }
         isSavingWaterPlan = true
         waterPlanSaveTask?.cancel()
-        dismissInlineWaterSheet()
         UISelectionFeedbackGenerator().selectionChanged()
         waterPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: waterPlanSaveDelayMilliseconds) {
-            operation()
+            if operation() { dismissInlineWaterSheet() }
+            else { planSaveFailed = true }
             isSavingWaterPlan = false
             waterPlanSaveTask = nil
         }
     }
 
     func saveWaterPlan() {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterPlan commandBegin isSaving=\(isSavingWaterPlan) sheet=\(activeSheet?.id ?? "nil")")
+        #endif
         SharedPetSelectionMemory.saveSelection(
             Set(selectedWaterTargets.map(\.id)),
             sourcePet: pet,
@@ -284,6 +315,10 @@ extension QuickWaterDetailSheet {
                 count: waterPlanCount,
                 allEvents: latestAllEvents()
             )
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan commandCommitted events=\(result.optimisticPlanEvents.count)")
+            #endif
+            dismissInlineWaterSheet()
             waterPlanTimes = result.normalizedTimes
             optimisticWaterPlanEvents = result.optimisticPlanEvents
             scheduleWaterReminders(
@@ -296,7 +331,18 @@ extension QuickWaterDetailSheet {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             setActiveWaterMode(.reminder)
             showSaveConfirmation(result.targetCount > 1 ? localizedSharedWaterPlanSaved(result.targetCount) : l.tr(zh: "已保存喂水计划", en: "Water plan saved", de: "Trinkplan gespeichert"))
+        } catch let PersonalPlanQuotaCommandError.personalUpgradeRequired(denial) {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan commandDenied personalPlanQuota")
+            #endif
+            optimisticWaterPlanEvents = []
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds, syncModeAfterRefresh: true)
         } catch {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterPlan commandFailed type=\(String(describing: type(of: error)))")
+            #endif
             optimisticWaterPlanEvents = []
             handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "save_drink"))
             scheduleWaterSnapshotRefresh(milliseconds: waterPlanPostSaveSnapshotDelayMilliseconds, syncModeAfterRefresh: true)
@@ -341,21 +387,22 @@ extension QuickWaterDetailSheet {
         }
     }
 
-    func deleteWaterPlanAndSwitchToManual() {
-        optimisticWaterPlanEvents = []
-        waterReminderSchedulingTask?.cancel()
-        waterReminderSchedulingID = nil
-        commitWaterModeSideEffects(.manual)
-        beginWaterModeVisualTransition(to: .manual, commitWhenUnchanged: true) {
-            scheduleSettledWaterModeMaintenance(for: .manual) {
-                do {
-                    try commandExecutor.deleteWaterPlan(pet: pet, allEvents: latestAllEvents())
-                    showSaveConfirmation(l.tr(zh: "已删除喂水计划", en: "Water plan deleted", de: "Trinkplan gelöscht"))
-                } catch {
-                    handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "delete_drink"))
-                    scheduleWaterSnapshotRefresh(milliseconds: 80, syncModeAfterRefresh: true)
-                }
+    @discardableResult
+    func deleteWaterPlanAndSwitchToManual() -> Bool {
+        do {
+            try commandExecutor.deleteWaterPlan(pet: pet, allEvents: latestAllEvents())
+            optimisticWaterPlanEvents = []
+            waterReminderSchedulingTask?.cancel()
+            waterReminderSchedulingID = nil
+            commitWaterModeSideEffects(.manual)
+            beginWaterModeVisualTransition(to: .manual, commitWhenUnchanged: true) {
+                scheduleWaterSnapshotRefresh(milliseconds: 80, syncModeAfterRefresh: true)
             }
+            showSaveConfirmation(l.tr(zh: "已删除喂水计划", en: "Water plan deleted", de: "Trinkplan gelöscht"))
+            return true
+        } catch {
+            handleWaterCommandFailure(error, command: .waterPlan(petID: pet.id, action: "delete_drink"))
+            return false
         }
     }
 
@@ -638,7 +685,11 @@ extension QuickWaterDetailSheet {
             amountMl: defaultWaterAmountMl ?? 0,
             executorId: executorId
         )
-        guard result.didRecord else { return }
+        guard result.didRecord else {
+            showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
+            return
+        }
+        savedRecord = result.recordReference
         selectedActionHumanID = nil
         guard result.allowsDerivedEffects else { return }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
@@ -648,19 +699,47 @@ extension QuickWaterDetailSheet {
     }
 
     func commitWater() {
-        guard validateActionHumanSelection() else { return }
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord commitRequested actionPending=\(waterActionTask != nil) requiresExecutor=\(requiresActionHumanSelection) targets=\(selectedWaterTargets.count)")
+        #endif
+        guard validateActionHumanSelection() else {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord selectionRejected")
+            #endif
+            return
+        }
         let executorId = selectedActionExecutorId
-        guard scheduleDeferredWaterAction({ commitWaterBusiness(executorId: executorId) }) else { return }
+        guard scheduleDeferredWaterAction({ commitWaterBusiness(executorId: executorId) }) else {
+            #if DEBUG
+            OhanaUITestTouchTrace.record("waterRecord scheduled=false")
+            #endif
+            return
+        }
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord scheduled=true")
+        #endif
     }
 
     func commitWaterBusiness(executorId: String?) {
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord commandBegin")
+        #endif
         let result = commandExecutor.recordWater(
             pet: pet,
             targets: selectedWaterTargets,
             amountMl: defaultWaterAmountMl ?? 0,
-            executorId: executorId
+            executorId: executorId,
+            date: recordDate,
+            note: recordNote
         )
-        guard result.didRecord else { return }
+        #if DEBUG
+        OhanaUITestTouchTrace.record("waterRecord commandReturned didRecord=\(result.didRecord) allowsDerivedEffects=\(result.allowsDerivedEffects) targets=\(result.targetCount) entries=\(waterEntries.count)")
+        #endif
+        guard result.didRecord else {
+            showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
+            return
+        }
+        savedRecord = result.recordReference
         selectedActionHumanID = nil
         guard result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
@@ -673,6 +752,9 @@ extension QuickWaterDetailSheet {
         triggerWaterFeedback()
         let actionText = result.targetCount > 1 ? localizedSharedWaterLogged(result.targetCount) : l.tr(zh: "已记录喂水", en: "Water logged", de: "Trinken eingetragen")
         showSaveConfirmation(result.coconutDelta > 0 ? "\(actionText) +\(result.coconutDelta)🥥" : actionText)
+        recordDate = Date()
+        recordNote = ""
+        selectedSharedWaterPetIds = [pet.id]
         onRecordChanged?()
     }
 
@@ -692,7 +774,11 @@ extension QuickWaterDetailSheet {
             cycleAnchor: waterChangeAnchorDate,
             executorId: executorId
         )
-        guard result.didRecord else { return }
+        guard result.didRecord else {
+            showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
+            return
+        }
+        savedRecord = result.recordReference
         selectedActionHumanID = nil
         guard result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
@@ -705,7 +791,11 @@ extension QuickWaterDetailSheet {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerWaterChangeFeedback()
         showSaveConfirmation(l.tr(zh: "已记录换水", en: "Water change logged", de: "Wasserwechsel eingetragen"))
+        selectedSharedWaterPetIds = [pet.id]
         onRecordChanged?()
+        if let denial = result.personalDenial {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        }
     }
 
     func doFilterClean() {
@@ -724,7 +814,11 @@ extension QuickWaterDetailSheet {
             reminderOn: filterReminderOn,
             executorId: executorId
         )
-        guard result.didRecord else { return }
+        guard result.didRecord else {
+            showSaveConfirmation(PetCareExperienceCopy(l: l).saveFailed)
+            return
+        }
+        savedRecord = result.recordReference
         selectedActionHumanID = nil
         guard result.allowsDerivedEffects else { return }
         SharedPetSelectionMemory.saveSelection(
@@ -737,7 +831,11 @@ extension QuickWaterDetailSheet {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         triggerFilterFeedback()
         showSaveConfirmation(l.tr(zh: "滤芯已清洗", en: "Filter cleaned", de: "Filter gereinigt"))
+        selectedSharedWaterPetIds = [pet.id]
         onRecordChanged?()
+        if let denial = result.personalDenial {
+            personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+        }
     }
 
     func validateActionHumanSelection() -> Bool {
@@ -887,6 +985,7 @@ extension QuickWaterDetailSheet {
     }
 
     var waterPrimaryTitle: String {
+        if waterActionTask != nil { return PetCareExperienceCopy(l: l).saving }
         if isAquatic { return l.tr(zh: "总览", en: "Overview", de: "Übersicht") }
         if waterMode == .reminder {
             if waterRuleState.missedCount > 0 { return l.tr(zh: "补打卡", en: "Catch up", de: "Nachholen") }

@@ -15,21 +15,23 @@ struct SettingsActiveHumanSwitchCommandResult: Equatable {
     var saveErrorDescription: String? = nil
 }
 
-struct SettingsCoconutBalanceCommandResult: Equatable {
-    let humanID: UUID?
-    let amount: Int
-    let legacyDelta: Int
-    var didApply: Bool = true
-    var saveErrorDescription: String? = nil
-}
+#if DEBUG
+    struct SettingsCoconutBalanceCommandResult: Equatable {
+        let humanID: UUID?
+        let amount: Int
+        let legacyDelta: Int
+        var didApply: Bool = true
+        var saveErrorDescription: String? = nil
+    }
 
-struct SettingsPetCoconutBalanceCommandResult: Equatable {
-    let petID: UUID
-    let amount: Int
-    let delta: Int
-    let didApply: Bool
-    var saveErrorDescription: String? = nil
-}
+    struct SettingsPetCoconutBalanceCommandResult: Equatable {
+        let petID: UUID
+        let amount: Int
+        let delta: Int
+        let didApply: Bool
+        var saveErrorDescription: String? = nil
+    }
+#endif
 
 enum SettingsCommandService {
     @MainActor
@@ -89,9 +91,10 @@ enum SettingsCommandService {
         )
     }
 
-    @discardableResult
-    @MainActor
-    static func applyCoconutBalanceTest(
+    #if DEBUG
+        @discardableResult
+        @MainActor
+        static func applyCoconutBalanceTest(
         amount rawAmount: Int,
         human: Human?,
         title _: String,
@@ -120,13 +123,18 @@ enum SettingsCommandService {
         }
         let delta = amount - current
         let displayName = actorName ?? human?.name ?? "Legacy island total"
-        // Developer overrides must not create wallet ledger entries or reward feedback.
-        wallet.setDeveloperOverrideBalance(
-            amount: amount,
-            for: human,
-            displayName: displayName,
-            context: context
-        )
+        // Debug balances need a replayable adjustment, never a care reward.
+        do {
+            try wallet.setDeveloperOverrideBalance(
+                amount: amount, for: human, displayName: displayName, context: context
+            )
+        } catch {
+            context.rollback()
+            return SettingsCoconutBalanceCommandResult(
+                humanID: human?.id, amount: current, legacyDelta: 0, didApply: false,
+                saveErrorDescription: error.localizedDescription
+            )
+        }
         let saveResult = saveSettingsChanges(context: context)
         guard saveResult.didSave else {
             return SettingsCoconutBalanceCommandResult(
@@ -150,11 +158,11 @@ enum SettingsCommandService {
             legacyDelta: delta,
             didApply: true
         )
-    }
+        }
 
-    @discardableResult
-    @MainActor
-    static func applyPetCoconutBalanceTest(
+        @discardableResult
+        @MainActor
+        static func applyPetCoconutBalanceTest(
         amount rawAmount: Int,
         pet: Pet,
         actorName: String?,
@@ -173,12 +181,17 @@ enum SettingsCommandService {
 
         let amount = max(0, rawAmount)
         let delta = amount - current
-        CoconutWalletService.setDeveloperOverrideBalance(
-            amount: amount,
-            for: pet,
-            displayName: actorName ?? pet.name,
-            context: context
-        )
+        do {
+            try CoconutWalletService.setDeveloperOverrideBalance(
+                amount: amount, for: pet, displayName: actorName ?? pet.name, context: context
+            )
+        } catch {
+            context.rollback()
+            return SettingsPetCoconutBalanceCommandResult(
+                petID: pet.id, amount: current, delta: 0, didApply: false,
+                saveErrorDescription: error.localizedDescription
+            )
+        }
         let saveResult = saveSettingsChanges(context: context)
         guard saveResult.didSave else {
             return SettingsPetCoconutBalanceCommandResult(
@@ -196,7 +209,8 @@ enum SettingsCommandService {
             delta: delta,
             didApply: true
         )
-    }
+        }
+    #endif
 }
 
 @MainActor
@@ -272,8 +286,9 @@ struct SettingsCommandExecutor {
         return result
     }
 
-    @discardableResult
-    func applyCoconutBalanceTest(
+    #if DEBUG
+        @discardableResult
+        func applyCoconutBalanceTest(
         amount: Int,
         human: Human?,
         title: String,
@@ -296,10 +311,10 @@ struct SettingsCommandExecutor {
             revisions.publishSettingsCoconutBalance(result, note: note)
         }
         return result
-    }
+        }
 
-    @discardableResult
-    func applyPetCoconutBalanceTest(
+        @discardableResult
+        func applyPetCoconutBalanceTest(
         amount: Int,
         pet: Pet,
         actorName: String?,
@@ -312,5 +327,6 @@ struct SettingsCommandExecutor {
             context: context,
             wallet: wallet
         )
-    }
+        }
+    #endif
 }

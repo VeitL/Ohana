@@ -268,7 +268,7 @@ extension PetBasicInfoDetailView {
                     .font(OhanaFont.adaptive(size: 13, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
                 Text(l.tr(zh: "就诊卡片", en: "Vet visit card", de: "Tierarztkarte"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 if let preparedVetVisitSummaryText {
@@ -302,8 +302,8 @@ extension PetBasicInfoDetailView {
             Image(systemName: "square.and.arrow.up") // a11y: allow decorative icon covered by surrounding text or control
             Text(l.tr(zh: "给兽医", en: "For vet", de: "Fuer Tierarzt"))
         }
-        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-        .foregroundStyle(Color.arkInk)
+        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+        .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(Color.goPrimary, in: Capsule())
@@ -330,7 +330,7 @@ extension PetBasicInfoDetailView {
 
     func compactSummaryLabel(_ label: String) -> some View {
         Text(label)
-            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.48))
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -338,7 +338,7 @@ extension PetBasicInfoDetailView {
 
     func compactSummaryValue(_ value: String) -> some View {
         Text(value)
-            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             .lineLimit(3)
             .fixedSize(horizontal: false, vertical: true)
@@ -385,7 +385,7 @@ extension PetBasicInfoDetailView {
     func prepareVetVisitSummaryText() async {
         preparedVetVisitSummaryText = nil
         await OhanaFrameScheduler.waitAfterNextFrame(milliseconds: 24)
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled, !isDeleting, PetDetailModelReadability.isReadable(pet) else { return }
         preparedVetVisitSummaryText = vetVisitSummaryText
     }
 

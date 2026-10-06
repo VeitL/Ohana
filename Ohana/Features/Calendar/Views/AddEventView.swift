@@ -40,6 +40,14 @@ struct AddEventContentView: View {
     @State var rewardCoconuts = 0
     @State private var showsTypePicker = false
     @State var isSaving = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [title, String(describing: eventType), String(startDate.timeIntervalSince1970), String(isAllDay),
+         relatedEntityType, relatedEntityId, String(describing: recurrenceOption), String(recurrenceDays),
+         String(recurrenceEndDate.timeIntervalSince1970), String(describing: reminderLeadOption),
+         String(hasReminder), assigneeId ?? "", String(rewardCoconuts)]
+    }
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State private var didSave = false
     @State private var keyboardHeight: CGFloat = 0
     @StateObject var commandQueue = DeferredDomainCommandQueue()
@@ -151,7 +159,14 @@ struct AddEventContentView: View {
         _recurrenceDays = State(initialValue: initial.recurrenceDays)
         _recurrenceEndDate = State(initialValue: initial.recurrenceEndDate)
         _reminderLeadOption = State(initialValue: initial.reminderLeadOption)
-        _hasReminder = State(initialValue: initial.hasReminder)
+        #if DEBUG
+            let hasReminder = ProcessInfo.processInfo.environment[
+                "OHANA_UI_TEST_ADD_EVENT_REMINDER_DEFAULT_OFF"
+            ] == "1" ? false : initial.hasReminder
+        #else
+            let hasReminder = initial.hasReminder
+        #endif
+        _hasReminder = State(initialValue: hasReminder)
         _assigneeId = State(initialValue: initial.assigneeId)
     }
 
@@ -299,25 +314,16 @@ extension AddEventContentView {
                         }
                         .accessibilityIdentifier("add-event-locked-care-subject")
                     } else {
-                        Picker(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"), selection: relatedEntitySelection) {
-                            Label(l.tr(zh: "无", en: "None", de: "Keine"), systemImage: "circle.slash")
-                                .tag("")
-                            ForEach(activePlants) { plant in
-                                Label(plant.name, systemImage: "leaf.fill")
-                                    .tag("\(EntityKind.plant.rawValue)|\(plant.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-plant-\(plant.name)")
-                            }
-                            ForEach(activePets) { pet in
-                                Label(pet.name, systemImage: "pawprint.fill")
-                                    .tag("\(EntityKind.pet.rawValue)|\(pet.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-pet-\(pet.name)")
-                            }
-                            ForEach(activeHumans) { human in
-                                Label(human.name, systemImage: "person.fill")
-                                    .tag("\(EntityKind.human.rawValue)|\(human.id.uuidString)")
-                                    .accessibilityIdentifier("add-event-related-human-\(human.name)")
-                            }
+                        LabeledContent(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen")) {
+                            Label(selectedRelatedEntityTitle, systemImage: selectedRelatedEntityIcon)
+                                .foregroundStyle(Color.ohanaSecondaryText)
                         }
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(l.tr(zh: "关联对象", en: "Link to", de: "Verknüpfen"))
+                        .accessibilityIdentifier("add-event-related-entity-picker")
+                        .accessibilityValue(selectedRelatedEntityTitle)
+
+                        relatedEntityOptions
                     }
                 }
 
@@ -375,12 +381,15 @@ extension AddEventContentView {
                         isOn: $hasReminder
                     )
                         .tint(Color.goPrimary)
+                        .accessibilityIdentifier("add-event-reminder-toggle")
                     if hasReminder {
                         Picker(l.tr(zh: "提前提醒", en: "Remind before", de: "Vorher erinnern"), selection: $reminderLeadOption) {
                             ForEach(allowedReminderLeadOptions) { option in
                                 Text(option.title(l)).tag(option)
                             }
                         }
+                        .accessibilityIdentifier("add-event-reminder-lead-picker")
+                        .accessibilityValue(reminderLeadOption.title(l))
                     }
                 }
 
@@ -424,41 +433,39 @@ extension AddEventContentView {
                     }
                 }
             }
+            .accessibilityIdentifier("add-event-form")
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(editorTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, isComplete: didSave, canSave: canSave,
+                saveTitle: primaryActionTitle,
+                saveIdentifier: "add-event-navigation-save-action",
+                onCancel: closeEditor, onSave: saveEvent
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) {
-                        closeEditor()
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
+                        titleFocused = false
+                        GoKeyboard.dismiss()
                     }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(didSave ? savedActionTitle : primaryActionTitle) {
-                        saveEvent()
+                    .accessibilityIdentifier("add-event-keyboard-dismiss-action")
+                    if canSave {
+                        Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
+                            saveEvent()
+                        }
+                        .fontWeight(.bold)
+                        .accessibilityIdentifier("add-event-keyboard-save-action")
                     }
-                    .disabled(!canSave)
-                    .accessibilityIdentifier("add-event-save-action")
                 }
             }
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
-        .interactiveDismissDisabled(isSaving)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
-                    titleFocused = false
-                    GoKeyboard.dismiss()
-                }
-                if canSave {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern")) {
-                        saveEvent()
-                    }
-                    .fontWeight(.bold)
-                    .accessibilityIdentifier("add-event-save-action")
-                }
-            }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .onChange(of: startDate) { _, newValue in
             keepDependentDatesAfter(newValue)
@@ -482,29 +489,126 @@ extension AddEventContentView {
                 rewardCoconuts = 0
             }
         }
+        #if DEBUG
+        .onChange(of: titleFocused) { _, focused in
+            OhanaUITestTouchTrace.record(
+                "add-event-title focus=\(focused) titleLength=\(title.count) canSave=\(canSave)"
+            )
+        }
+        .onChange(of: title) { _, value in
+            OhanaUITestTouchTrace.record(
+                "add-event-title changed length=\(value.count) focused=\(titleFocused) canSave=\(canSave)"
+            )
+        }
+        #endif
         .onAppear {
+            guard initialDraft == nil else { return }
             if !isEditing,
                assigneeId == nil,
                activeHumans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
                 assigneeId = currentActiveHumanId
             }
+            initialDraft = editorDraft
         }
         .onDisappear {
             commandQueue.cancelAll()
         }
     }
 
-    private var relatedEntitySelection: Binding<String> {
-        Binding(
-            get: {
-                guard !relatedEntityType.isEmpty, !relatedEntityId.isEmpty else { return "" }
-                return "\(relatedEntityType)|\(relatedEntityId)"
-            },
-            set: { value in
-                let parts = value.split(separator: "|", maxSplits: 1).map(String.init)
-                relatedEntityType = parts.first ?? ""
-                relatedEntityId = parts.count == 2 ? parts[1] : ""
+    private var selectedRelatedEntityTitle: String {
+        if relatedEntityType == EntityKind.plant.rawValue,
+           let plant = activePlants.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return plant.name
+        }
+        if relatedEntityType == EntityKind.pet.rawValue,
+           let pet = activePets.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return pet.name
+        }
+        if relatedEntityType == EntityKind.human.rawValue,
+           let human = activeHumans.first(where: { $0.id.uuidString == relatedEntityId }) {
+            return human.name
+        }
+        return l.tr(zh: "无", en: "None", de: "Keine")
+    }
+
+    private var selectedRelatedEntityIcon: String {
+        switch relatedEntityType {
+        case EntityKind.plant.rawValue: "leaf.fill"
+        case EntityKind.pet.rawValue: "pawprint.fill"
+        case EntityKind.human.rawValue: "person.fill"
+        default: "circle.slash"
+        }
+    }
+
+    @ViewBuilder
+    private var relatedEntityOptions: some View {
+        relatedEntitySelectionButton(
+            title: l.tr(zh: "无", en: "None", de: "Keine"),
+            icon: "circle.slash",
+            identifier: "add-event-related-none",
+            type: "",
+            id: ""
+        )
+
+        ForEach(activePlants) { plant in
+            relatedEntitySelectionButton(
+                title: plant.name,
+                icon: "leaf.fill",
+                identifier: "add-event-related-plant-\(plant.name)",
+                type: EntityKind.plant.rawValue,
+                id: plant.id.uuidString
+            )
+        }
+
+        ForEach(activePets) { pet in
+            relatedEntitySelectionButton(
+                title: pet.name,
+                icon: "pawprint.fill",
+                identifier: "add-event-related-pet-\(pet.name)",
+                type: EntityKind.pet.rawValue,
+                id: pet.id.uuidString
+            )
+        }
+
+        ForEach(activeHumans) { human in
+            relatedEntitySelectionButton(
+                title: human.name,
+                icon: "person.fill",
+                identifier: "add-event-related-human-\(human.name)",
+                type: EntityKind.human.rawValue,
+                id: human.id.uuidString
+            )
+        }
+    }
+
+    private func relatedEntitySelectionButton(
+        title: String,
+        icon: String,
+        identifier: String,
+        type: String,
+        id: String
+    ) -> some View {
+        Button {
+            relatedEntityType = type
+            relatedEntityId = id
+        } label: {
+            HStack {
+                Label(title, systemImage: icon)
+                Spacer()
+                if relatedEntityType == type, relatedEntityId == id {
+                    Image(systemName: "checkmark") // a11y: allow decorative selection mark; the Button exposes the selected trait
+                        .foregroundStyle(Color.goPrimary)
+                        .accessibilityHidden(true)
+                }
             }
+            .contentShape(Rectangle())
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityIdentifier(identifier)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(
+            relatedEntityType == type && relatedEntityId == id ? .isSelected : []
         )
     }
 
@@ -519,7 +623,7 @@ extension AddEventContentView {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(editorTitle)
-                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(dateSummary)
@@ -534,7 +638,7 @@ extension AddEventContentView {
                 closeEditor()
             } label: {
                 Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -558,9 +662,9 @@ extension AddEventContentView {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: eventType.silhouetteSymbol)
-                                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                             Image(systemName: "chevron.down").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 8, weight: .black))
+                                .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                                 .rotationEffect(.degrees(showsTypePicker ? 180 : 0))
                                 .offset(y: 1)
                         }
@@ -576,7 +680,7 @@ extension AddEventContentView {
                         .submitLabel(.done)
                         .textInputAutocapitalization(.sentences)
                         .autocorrectionDisabled()
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .onSubmit {
                             titleFocused = false
@@ -618,7 +722,7 @@ extension AddEventContentView {
                 Spacer()
                 Toggle(isOn: $isAllDay) {
                     Text(l.tr(zh: "全天", en: "All day", de: "Ganztägig"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .toggleStyle(.switch)
@@ -664,6 +768,7 @@ extension AddEventContentView {
                 }
 
                 ForEach(activePlants) { plant in
+                    let themeHex = plantChipHex(for: plant)
                     relatedPersonChip(
                         title: plant.name,
                         imageSignature: plant.avatarThumbnailSignature,
@@ -671,7 +776,8 @@ extension AddEventContentView {
                             plant.hasAvatarImageAttachment ? plant.avatarImageData : nil
                         },
                         fallback: plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji,
-                        tint: plantChipTint(for: plant),
+                        tint: Color(hex: themeHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: themeHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-plant-\(plant.name)",
                         isSelected: relatedEntityType == EntityKind.plant.rawValue && relatedEntityId == plant.id.uuidString
                     ) {
@@ -689,6 +795,7 @@ extension AddEventContentView {
                         },
                         fallback: pet.avatarEmoji.isEmpty ? pet.speciesEmoji : pet.avatarEmoji,
                         tint: Color(hex: pet.safeThemeColorHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-pet-\(pet.name)",
                         isSelected: relatedEntityType == EntityKind.pet.rawValue && relatedEntityId == pet.id.uuidString
                     ) {
@@ -706,6 +813,7 @@ extension AddEventContentView {
                         },
                         fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                         tint: Color(hex: human.safeThemeColorHex),
+                        selectedForeground: OhanaResolvedPrimaryAccent(customHex: human.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                         identifier: "add-event-related-human-\(human.name)",
                         isSelected: relatedEntityType == EntityKind.human.rawValue && relatedEntityId == human.id.uuidString
                     ) {
@@ -761,8 +869,8 @@ extension AddEventContentView {
                         OhanaFeedback.light()
                     } label: {
                         Text(option.title(l))
-                            .font(OhanaFont.caption(.black))
-                            .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
                             .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -800,6 +908,7 @@ extension AddEventContentView {
                             },
                             fallback: human.avatarEmoji.isEmpty ? "🙂" : human.avatarEmoji,
                             tint: Color(hex: human.safeThemeColorHex),
+                            selectedForeground: OhanaResolvedPrimaryAccent(customHex: human.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText,
                             identifier: "add-event-assignee-human-\(human.name)",
                             isSelected: assigneeId == human.id.uuidString
                         ) {
@@ -829,8 +938,8 @@ extension AddEventContentView {
                     Image(systemName: didSave ? "checkmark.circle.fill" : (isEditing ? "checkmark.circle" : "calendar.badge.plus"))
                     Text(didSave ? savedActionTitle : primaryActionTitle)
                 }
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(canSave ? Color.arkInk : Color.ohanaSecondaryText)
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
+                .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
                 .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -887,7 +996,7 @@ extension AddEventContentView {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
@@ -935,12 +1044,12 @@ extension AddEventContentView {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: type.silhouetteSymbol)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
                 Text(eventTypeTitle(type))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -949,7 +1058,7 @@ extension AddEventContentView {
 
                 if selected {
                     Image(systemName: "checkmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                 }
             }
@@ -969,12 +1078,12 @@ extension AddEventContentView {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer()
@@ -995,8 +1104,8 @@ extension AddEventContentView {
             OhanaFeedback.light()
         } label: {
             Text(option.title(l))
-                .font(OhanaFont.caption(.black))
-                .foregroundStyle(selected ? Color.arkInk : Color.ohanaPrimaryText)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(selected ? Color.goPrimary : Color.ohanaCardSurface, in: Capsule())
@@ -1028,12 +1137,12 @@ extension AddEventContentView {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 Text(title)
                     .lineLimit(1)
             }
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 12)
             .padding(.trailing, 14)
@@ -1049,6 +1158,7 @@ extension AddEventContentView {
         imageDataProvider: @escaping @MainActor () -> Data?,
         fallback: String,
         tint: Color,
+        selectedForeground: Color,
         identifier: String,
         isSelected: Bool,
         action: @escaping () -> Void
@@ -1072,8 +1182,8 @@ extension AddEventContentView {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .font(OhanaFont.caption(.black))
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .font(OhanaFont.caption(.semibold))
+            .foregroundStyle(isSelected ? selectedForeground : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 8)
             .padding(.trailing, 13)
@@ -1090,9 +1200,9 @@ extension AddEventContentView {
             : L10n.current.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt")
     }
 
-    private func plantChipTint(for plant: Plant) -> Color {
+    private func plantChipHex(for plant: Plant) -> String {
         let trimmed = plant.themeColorHex.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Color(hex: trimmed.isEmpty ? "2ED3B7" : trimmed)
+        return trimmed.isEmpty ? "2ED3B7" : trimmed
     }
 
     private func eventTypeTitle(_ type: EventType) -> String {
@@ -1136,10 +1246,8 @@ extension AddEventContentView {
 
     func finishSuccessfulSave() {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(GoMotion.feedback) { didSave = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            closeEditor()
-        }
+        didSave = true
+        closeEditor()
     }
 
     private func closeEditor() {

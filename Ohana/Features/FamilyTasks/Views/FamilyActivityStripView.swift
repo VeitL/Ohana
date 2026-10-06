@@ -173,7 +173,7 @@ struct FamilyActivityStripView: View {
 
                 // 描述文本
                 Text(compactDescription(uniqueCount: uniqueHumans.count, actionCount: entries.count))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                     .lineLimit(1)
 
@@ -235,7 +235,7 @@ struct FamilyActivityStripView: View {
             Image(systemName: "person.2.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "今日 · 谁在照顾 \(petName)", en: "Today · Who cared for \(petName)", de: "Heute · Wer versorgt \(petName)"))
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .tracking(0.4)
             Spacer(minLength: 0)
         }
@@ -256,7 +256,7 @@ struct FamilyActivityStripView: View {
                     .offset(x: 4, y: 4)
             }
             Text(display)
-                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.65))
                 .lineLimit(1)
                 .frame(maxWidth: 44)
@@ -298,7 +298,7 @@ struct FamilyActivityStripView: View {
                         )
                 )
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 8, weight: .heavy)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 8, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.arkInk.opacity(0.85))
         }
     }

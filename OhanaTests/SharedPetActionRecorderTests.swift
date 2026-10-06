@@ -1102,6 +1102,64 @@ struct SharedPetActionRecorderTests {
         #expect(expenseLogs.allSatisfy { !$0.note.contains("ohana_shared_") })
     }
 
+    @Test func sharedExpensePreservesPayerTotalsAcrossThreeChildLogs() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+        let primaryPayer = Human(name: "Guan")
+        let coPayer = Human(name: "Mia")
+        let first = Pet(name: "Milo", species: "猫")
+        let second = Pet(name: "Luna", species: "猫")
+        let third = Pet(name: "Nori", species: "猫")
+        context.insert(primaryPayer)
+        context.insert(coPayer)
+        context.insert(first)
+        context.insert(second)
+        context.insert(third)
+        try context.save()
+
+        let cleanup = isolateEconomy(activeHumanID: primaryPayer.id.uuidString)
+        defer { cleanup() }
+        let contributions = [
+            ExpensePayerContribution(humanID: primaryPayer.id, minorUnits: 6000),
+            ExpensePayerContribution(humanID: coPayer.id, minorUnits: 4000)
+        ]
+
+        let result = try ExpenseCommandService.recordSharedPetExpense(
+            sourcePet: first,
+            targets: [first, second, third],
+            amount: 100,
+            date: Date(timeIntervalSince1970: 2350),
+            category: .food,
+            note: "Shared bag",
+            context: context,
+            recordedByHumanId: coPayer.id.uuidString,
+            payerContributions: contributions
+        )
+
+        let session = try #require(try context.fetch(FetchDescriptor<SharedCareSession>()).first)
+        let expenseLogs = try context.fetch(FetchDescriptor<PetExpenseLog>())
+        var totalsByPayer: [UUID: Int64] = [:]
+        for log in expenseLogs {
+            let expectedRowTotal = try #require(ExpensePayerContributionPolicy.minorUnits(log.amount))
+            #expect(log.payerContributions.reduce(Int64(0)) { $0 + $1.minorUnits } == expectedRowTotal)
+            #expect(log.recordedByHumanId == coPayer.id.uuidString)
+            for contribution in log.payerContributions {
+                let payerID = try #require(contribution.humanID)
+                totalsByPayer[payerID, default: 0] += contribution.minorUnits
+            }
+        }
+
+        #expect(result.expenseLogIDs.count == 3)
+        #expect(Set(expenseLogs.map(\.id)) == Set(result.expenseLogIDs))
+        #expect(expenseLogs.reduce(Int64(0)) {
+            $0 + (ExpensePayerContributionPolicy.minorUnits($1.amount) ?? 0)
+        } == 10000)
+        #expect(totalsByPayer[primaryPayer.id] == 6000)
+        #expect(totalsByPayer[coPayer.id] == 4000)
+        #expect(session.executorId == primaryPayer.id.uuidString)
+        #expect(session.executorIds == [primaryPayer.id.uuidString, coPayer.id.uuidString])
+    }
+
     @Test func unknownSharedPottyCanBeClaimedByPetAndLedger() throws {
         let container = try makeContainer()
         let context = container.mainContext
@@ -1319,6 +1377,7 @@ struct SharedPetActionRecorderTests {
 
         let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
         defer { cleanup() }
+        let dependencies = CareEventServiceDependencies.live()
 
         let result = CareEventService.recordSharedWalk(
             sourcePet: first,
@@ -1328,7 +1387,8 @@ struct SharedPetActionRecorderTests {
             context: context,
             executorId: primary.id.uuidString,
             executorIds: [primary.id.uuidString, coWalker.id.uuidString],
-            startDate: Date(timeIntervalSince1970: 6100)
+            startDate: Date(timeIntervalSince1970: 6100),
+            dependencies: dependencies
         )
 
         #expect(result.didWriteFact)
@@ -1353,6 +1413,7 @@ struct SharedPetActionRecorderTests {
         let cleanup = isolateEconomy(activeHumanID: primary.id.uuidString)
         defer { cleanup() }
         let missingExecutorID = UUID().uuidString
+        let dependencies = CareEventServiceDependencies.live()
 
         let result = CareEventService.recordSharedWalk(
             sourcePet: first,
@@ -1362,7 +1423,8 @@ struct SharedPetActionRecorderTests {
             context: context,
             executorId: primary.id.uuidString,
             executorIds: [primary.id.uuidString, missingExecutorID],
-            startDate: Date(timeIntervalSince1970: 6100)
+            startDate: Date(timeIntervalSince1970: 6100),
+            dependencies: dependencies
         )
 
         #expect(result.didWriteFact)

@@ -61,7 +61,7 @@ struct QuickHumanExpenseSheet: View {
                         .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     amountBlock
-                    EmbeddedDecimalKeypad(
+                    OhanaDecimalInput(
                         text: $amountText,
                         countryCode: appCountry,
                         maxFractionDigits: 2,
@@ -88,18 +88,18 @@ struct QuickHumanExpenseSheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier("quick-human-expense-sheet")
             .navigationTitle(l.tr(zh: "快速记账", en: "Quick Expense", de: "Schnelle Ausgabe"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { close() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!isValid || isSaving)
-                        .accessibilityIdentifier("quick-human-expense-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: !amountText.isEmpty || !note.isEmpty,
+                isSaving: isSaving,
+                canSave: isValid,
+                closeIdentifier: "ohana-sheet-close-action",
+                saveIdentifier: "quick-human-expense-save-action",
+                onCancel: close,
+                onSave: save
+            )
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
@@ -164,16 +164,15 @@ struct QuickHumanExpenseSheet: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
                 Image(systemName: AppCurrency.systemIconName)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 58, height: 58)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "快速记账", en: "Quick Expense", de: "Schnelle Ausgabe"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                    .accessibilityIdentifier("quick-human-expense-sheet")
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
@@ -189,11 +188,11 @@ struct QuickHumanExpenseSheet: View {
     private var amountBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "金额", en: "Amount", de: "Betrag"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(AppCurrency.symbol)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.goPrimary)
                 Text(amountText.isEmpty ? "0" : amountText)
                     .font(OhanaFont.metric(size: 44))
@@ -216,7 +215,7 @@ struct QuickHumanExpenseSheet: View {
     private var quickAmountBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(l.quickExpenseCommonAmounts)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 22)
 
@@ -228,8 +227,8 @@ struct QuickHumanExpenseSheet: View {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                         } label: {
                             Text("\(AppCurrency.symbol)\(displayAmount(amount))")
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.arkInk : Color.ohanaPrimaryText)
+                                .font(OhanaFont.caption(.semibold))
+                                .foregroundStyle(isQuickAmountSelected(amount) ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                                 .padding(.horizontal, 13)
                                 .frame(height: 34)
                                 .background(
@@ -249,7 +248,7 @@ struct QuickHumanExpenseSheet: View {
     private var categoryBlock: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(l.quickExpenseCategory)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 22)
 
@@ -267,7 +266,7 @@ struct QuickHumanExpenseSheet: View {
     private var noteBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "备注（可选）", en: "Note (optional)", de: "Notiz (optional)"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextField(l.tr(zh: "例如：咖啡、药品、交通", en: "Coffee, meds, transit", de: "Kaffee, Medikamente, Fahrt"), text: $note) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .font(OhanaFont.callout(.bold))
@@ -288,10 +287,10 @@ struct QuickHumanExpenseSheet: View {
     private var dateBlock: some View {
         HStack(spacing: 12) {
             Image(systemName: "calendar").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
             Text(l.tr(zh: "日期", en: "Date", de: "Datum"))
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             DatePicker("", selection: $date, displayedComponents: .date)
@@ -311,14 +310,14 @@ struct QuickHumanExpenseSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存花费", en: "Save Expense", de: "Ausgabe speichern")
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(isValid && !isSaving ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -341,11 +340,11 @@ struct QuickHumanExpenseSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: category.systemIconName)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 Text(l.expenseCategoryTitle(category))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
+            .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .padding(.horizontal, 12)
             .frame(height: 34)
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -378,7 +377,6 @@ struct QuickHumanExpenseSheet: View {
     private func save() {
         guard !isSaving, !requiresRecorderSelection, let amount, amount > 0 else { return }
         isSaving = true
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         let savedNote = note
         let savedDate = date
         let savedCategory = selectedCategory
@@ -396,6 +394,7 @@ struct QuickHumanExpenseSheet: View {
                     command: command,
                     revisionNote: "quick.human.expense"
                 )
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 onSaved?()
                 close()
             } catch {

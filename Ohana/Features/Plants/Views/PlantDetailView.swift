@@ -7,6 +7,7 @@
 
 import SwiftData
 import SwiftUI
+import UserNotifications
 
 struct PlantDetailContentView: View {
     let plant: Plant
@@ -25,11 +26,16 @@ struct PlantDetailContentView: View {
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
     @State var showingEditSheet = false
+    @State var showingBasicInfo = false
     @State var showingAllFeaturesHub = false
     @State var showingPlantDetailExtras = false
     @State var showingDeleteConfirm = false
     @State var showingPhotoGallery = false
     @State var careLogDraftType: PlantCareType?
+    @State var careHistoryRoute: PlantCareHistoryRoute?
+    @State var growthDiaryShareItem: PlantGrowthDiaryShareItem?
+    @State var growthDiaryExportTask: Task<Void, Never>?
+    @State var isPreparingGrowthDiaryExport = false
     @State var careFeatureDraft: PlantDetailCareFeatureDraft?
     @State var quickCareConfirmDraft: PlantQuickCareConfirmDraft?
     @State var quickCareExecutorID: UUID?
@@ -46,8 +52,17 @@ struct PlantDetailContentView: View {
     @State var pendingDetailQuickCareTypes: Set<PlantCareType> = []
     @State var completedDetailQuickCareTypes: Set<PlantCareType> = []
     @State var failedDetailQuickCareTypes: Set<PlantCareType> = []
+    @State var quickCareOperationIDs: [PlantCareType: UUID] = [:]
+    @State var customDeferCareType: PlantCareType?
+    @State var customDeferDate = Date()
+    @State var showingCareActionFailure = false
+    @State var careActionFailureText = ""
+    @State var showingWaterReminderOptIn = false
+    @State var draftWateringCheckDays = 7
+    @State var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     @State var showingArchiveConfirm = false
     @State var showingRestoreConfirm = false
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State var isDeletePending = false
     @State var isDeleteCommitting = false
     @State var deleteUndoTask: Task<Void, Never>?
@@ -290,8 +305,8 @@ struct PlantDetailContentView: View {
     var galleryPhotoItems: [PlantDetailPhotoItem] {
         renderData?.galleryPhotoItems ?? []
     }
-    var growthDiaryMarkdown: String {
-        renderData?.growthDiaryMarkdown ?? ""
+    var growthComparisonPhotos: [PlantDetailPhotoItem] {
+        renderData?.growthComparisonPhotos ?? []
     }
     var growthDiaryDateRangeText: String {
         guard let first = logSummary?.firstLogDate else {
@@ -511,6 +526,15 @@ struct PlantDetailContentView: View {
     }
 
     var placementSafetyFitItem: PlantPlacementFitItem {
+        if catalogEntry == nil {
+            return PlantPlacementFitItem(
+                id: "safety-unknown",
+                icon: "questionmark.shield",
+                title: l.tr(zh: "安全资料待确认", en: "Safety information unknown", de: "Sicherheit noch unbekannt"),
+                detail: l.tr(zh: "品种尚未确认，暂不能判断对宠物或儿童是否安全。", en: "The species is unknown, so pet and child safety cannot be confirmed yet.", de: "Die Art ist unbekannt; die Sicherheit für Tiere und Kinder ist noch unklar."),
+                tint: Color.goYellow
+            )
+        }
         if activeSafetyWarningCount > 0 {
             return PlantPlacementFitItem(
                 id: "safety-review",
@@ -724,7 +748,7 @@ struct PlantDetailContentView: View {
             )
         }
     }
-    var body: some View {
+    private var pageContent: some View {
         ZStack {
             OhanaAppBackground()
 
@@ -737,6 +761,7 @@ struct PlantDetailContentView: View {
                         plantSectionHeader(l.tr(zh: "今日护理", en: "Today care", de: "Pflege heute"))
                         .id(PlantDetailFeatureAnchor.todayCare)
                         todayCarePanel
+                        reminderQuickSetupCard
                         plantSectionHeader(l.tr(zh: "成长记录", en: "Growth record", de: "Wachstumsakte"))
                         .id(PlantDetailFeatureAnchor.growthDiary)
                         growthDiaryCard
@@ -770,6 +795,7 @@ struct PlantDetailContentView: View {
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
             scheduleMediaAttachmentIndexRepair()
             scheduleInitialPlantFeatureDestinationIfNeeded()
+            Task { notificationAuthorizationStatus = await appServices.userNotifications.authorizationStatus() }
         }
         .onChange(of: appLanguage) { _, _ in
             schedulePlantDetailRenderDataRebuild(delayMilliseconds: 24)
@@ -785,7 +811,6 @@ struct PlantDetailContentView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 8) {
-                    #if DEBUG
                     Button {
                         showingDeleteConfirm = true
                     } label: {
@@ -795,7 +820,6 @@ struct PlantDetailContentView: View {
                     }
                     .accessibilityLabel(l.tr(zh: "删除植物", en: "Delete plant", de: "Pflanze löschen"))
                     .accessibilityIdentifier("plant-detail-delete-action")
-                    #endif
 
                     if !plant.isArchived, let onCreateCareTask {
                         Menu {
@@ -837,6 +861,10 @@ struct PlantDetailContentView: View {
         .overlay(alignment: .bottom) {
             plantQuickCareOverlay
         }
+    }
+
+    private var sheetContent: some View {
+        pageContent
         .sheet(isPresented: $showingAllFeaturesHub) {
             PlantAllFeaturesSheet(
                 plant: plant,
@@ -849,7 +877,20 @@ struct PlantDetailContentView: View {
             )
         }
         .sheet(isPresented: $showingEditSheet) {
-            EditPlantSheet(plant: plant)
+            EditPlantSheet(plant: plant, scope: .fullCare)
+        }
+        .sheet(isPresented: $showingBasicInfo) {
+            NavigationStack {
+                PlantBasicInfoDetailView(
+                    plant: plant,
+                    onClose: { showingBasicInfo = false },
+                    onChanged: { schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0) }
+                )
+            }
+        }
+        .sheet(item: $personalUpgradePrompt) { prompt in
+            PersonalPlanView(prompt: prompt)
+                .ohanaSheetPagePresentation()
         }
         .sheet(isPresented: $showingPhotoGallery) {
             PlantPhotoGallerySheet(
@@ -866,6 +907,67 @@ struct PlantDetailContentView: View {
                 currentHealthStatus: plant.healthStatus,
                 onSave: savePlantCareLog
             )
+        }
+        .sheet(isPresented: $showingWaterReminderOptIn) {
+            NavigationStack {
+                Form {
+                    Section {
+                        Stepper(
+                            l.tr(zh: "每 \(draftWateringCheckDays) 天检查一次", en: "Check every \(draftWateringCheckDays) days", de: "Alle \(draftWateringCheckDays) Tage prüfen"),
+                            value: $draftWateringCheckDays,
+                            in: 1...90
+                        )
+                    } footer: {
+                        Text(l.tr(
+                            zh: "提醒你检查是否需要浇水；实际浇水后再记录。",
+                            en: "This reminds you to check whether watering is needed. Log only when you water.",
+                            de: "Die Erinnerung lädt zur Wasserkontrolle ein. Erst nach dem Gießen protokollieren."
+                        ))
+                    }
+                    Button(l.tr(zh: "开启浇水检查提醒", en: "Enable watering checks", de: "Gießkontrollen aktivieren")) {
+                        enableWateringCheckReminder()
+                    }
+                    .accessibilityIdentifier("plant-detail-enable-watering-reminder-confirm")
+                }
+                .navigationTitle(l.tr(zh: "浇水提醒", en: "Watering reminder", de: "Gießerinnerung"))
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(l.tr(zh: "暂不开启", en: "Not now", de: "Nicht jetzt")) { showingWaterReminderOptIn = false }
+                    }
+                }
+            }
+        }
+        .sheet(item: $customDeferCareType) { careType in
+            NavigationStack {
+                Form {
+                    DatePicker(
+                        l.tr(zh: "下次检查", en: "Next check", de: "Nächste Kontrolle"),
+                        selection: $customDeferDate,
+                        in: Date()...,
+                        displayedComponents: .date
+                    )
+                }
+                .navigationTitle(l.tr(zh: "稍后再看", en: "Check later", de: "Später prüfen"))
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { customDeferCareType = nil }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(l.tr(zh: "确定", en: "Done", de: "Fertig")) {
+                            deferCare(careType, until: customDeferDate)
+                            customDeferCareType = nil
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(item: $careHistoryRoute) { route in
+            PlantCareHistoryEditSheet(route: route) { _ in
+                schedulePlantDetailRenderDataRebuild(delayMilliseconds: 0)
+            }
+        }
+        .sheet(item: $growthDiaryShareItem) { item in
+            PlantGrowthDiaryShareSheet(markdown: item.markdown)
         }
         .sheet(item: $careFeatureDraft) { draft in
             PlantCareFeatureDetailView(
@@ -887,6 +989,10 @@ struct PlantDetailContentView: View {
                 onRecord: recordBatchQuickCareFromDetail
             )
         }
+    }
+
+    private var alertContent: some View {
+        sheetContent
         .safeAreaInset(edge: .bottom) {
             pendingDeleteBanner
         }
@@ -937,9 +1043,19 @@ struct PlantDetailContentView: View {
         } message: {
             Text(batchCareFailureDetail)
         }
+        .alert(l.tr(zh: "未能更新护理", en: "Could not update care", de: "Pflege konnte nicht aktualisiert werden"), isPresented: $showingCareActionFailure) {
+            Button(l.tr(zh: "好的", en: "OK", de: "OK"), role: .cancel) {}
+        } message: {
+            Text(careActionFailureText)
+        }
+    }
+
+    var body: some View {
+        alertContent
         .onDisappear {
             renderDataRefreshTask?.cancel()
             mediaAttachmentIndexRepairTask?.cancel()
+            growthDiaryExportTask?.cancel()
             quickCareToastClearTask?.cancel()
             deleteUndoTask?.cancel()
             pendingBatchCareRewardTask?.cancel()
@@ -1051,7 +1167,7 @@ extension PlantDetailContentView {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "slider.horizontal.3") // a11y: allow decorative advanced-details glyph; button text labels the action.
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                         .foregroundStyle(Color.goTeal)
                         .frame(width: 44, height: 44)
                         .background(Color.goTeal.opacity(0.14), in: Circle())
@@ -1059,10 +1175,10 @@ extension PlantDetailContentView {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(l.tr(zh: "更多植物资料", en: "More plant details", de: "Weitere Pflanzendetails"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "节奏 · 位置 · 安全", en: "Rhythm · Place · Safety", de: "Rhythmus · Ort · Sicherheit"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
                     }
@@ -1070,7 +1186,7 @@ extension PlantDetailContentView {
                     Spacer(minLength: 8)
 
                     Image(systemName: "chevron.down") // a11y: allow decorative disclosure glyph; button value exposes expanded state.
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .rotationEffect(.degrees(showingPlantDetailExtras ? 180 : 0))
                         .accessibilityHidden(true)

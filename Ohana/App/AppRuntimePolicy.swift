@@ -20,8 +20,13 @@ enum AppPerformanceMode {
     }
 
     static var userPrefersReducedVisualEffects: Bool {
-        UserDefaults.standard.bool(forKey: reducedVisualEffectsKey)
-            || ProcessInfo.processInfo.arguments.contains("-OHANA_REDUCED_VISUAL_EFFECTS")
+        let storedPreference = UserDefaults.standard.bool(forKey: reducedVisualEffectsKey)
+        #if DEBUG
+            return storedPreference
+                || ProcessInfo.processInfo.arguments.contains("-OHANA_REDUCED_VISUAL_EFFECTS")
+        #else
+            return storedPreference
+        #endif
     }
 
     static var uiTestsDisableAnimations: Bool {
@@ -56,6 +61,12 @@ enum OhanaRefreshBudget: Equatable {
     case live
     case throttled
     case paused
+}
+
+nonisolated struct OhanaLiveActivityUpdateBudget: Equatable, Sendable {
+    let minimumDistanceDeltaMeters: Double
+    let maximumUpdateInterval: TimeInterval
+    let allowsAutomaticUpdates: Bool
 }
 
 enum OhanaVisualEffectsBudget: Equatable {
@@ -317,6 +328,12 @@ final class AppWorkloadPolicy: ObservableObject {
         isVisible && isForeground
     }
 
+    /// The first bounded snapshot is required to make a visible surface usable.
+    /// Once it exists, the normal thermal and power refresh budget takes over.
+    func allowsEssentialInitialSnapshotRead(isVisible: Bool, isLive: Bool, hasSnapshot: Bool) -> Bool {
+        isVisible && isLive && !hasSnapshot
+    }
+
     func shouldRunRepeatingAnimation(isVisible: Bool = true) -> Bool {
         ambientMotionBudget(isVisible: isVisible).allowsMotion
     }
@@ -403,6 +420,37 @@ final class AppWorkloadPolicy: ObservableObject {
         case .live: liveInterval
         case .throttled: throttledInterval
         case .paused: pausedInterval
+        }
+    }
+
+    func walkLiveActivityUpdateBudget() -> OhanaLiveActivityUpdateBudget {
+        switch refreshBudget(isVisible: true, allowDuringActiveWalk: true) {
+        case .live:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 50,
+                maximumUpdateInterval: 30,
+                allowsAutomaticUpdates: true
+            )
+        case .throttled:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: 100,
+                maximumUpdateInterval: 90,
+                allowsAutomaticUpdates: true
+            )
+        case .paused:
+            OhanaLiveActivityUpdateBudget(
+                minimumDistanceDeltaMeters: .infinity,
+                maximumUpdateInterval: .infinity,
+                allowsAutomaticUpdates: false
+            )
+        }
+    }
+
+    func systemSurfaceSnapshotDebounceMilliseconds() -> Int64 {
+        switch refreshBudget(isVisible: true) {
+        case .live: 350
+        case .throttled: 1200
+        case .paused: 2500
         }
     }
 
@@ -584,6 +632,7 @@ enum AppPerformanceFlows {
     static let calendarModeSwitch = "flow.calendar.mode_switch"
     static let calendarFilter = "flow.calendar.filter"
     static let calendarAddEventSheet = "flow.calendar.add_event_sheet"
+    static let settingsOpen = "flow.settings.open"
     static let oasisOpen = "flow.oasis.open"
     static let backupExport = "flow.backup.export"
     static let walkSession = "flow.walk.session"
@@ -688,6 +737,8 @@ private enum AppPerformanceSignposts {
             emit("flow.calendar.filter", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.calendarAddEventSheet:
             emit("flow.calendar.add_event_sheet", phase: phase, valueMS: valueMS, note: note)
+        case AppPerformanceFlows.settingsOpen:
+            emit("flow.settings.open", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.oasisOpen:
             emit("flow.oasis.open", phase: phase, valueMS: valueMS, note: note)
         case AppPerformanceFlows.backupExport:

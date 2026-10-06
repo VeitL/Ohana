@@ -108,6 +108,7 @@ nonisolated struct TodayFocusFamilyTaskSnapshot: Identifiable, Equatable, Sendab
         switch status {
         case .scheduled, .active: .active
         case .claimed: .claimed
+        case .declined: .declined
         case .pendingReview: .pendingReview
         case .completed: .completed
         case .cancelled: .cancelled
@@ -237,7 +238,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 pets: pets,
                 plants: visiblePlants,
                 healthAlerts: healthAlerts,
-                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries)
+                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries),
+                doseEvents: events
             ),
             dayToken: dayToken(for: now)
         )
@@ -315,7 +317,8 @@ nonisolated struct TodayFocusSnapshot: Equatable, Sendable {
                 pets: pets,
                 plants: visiblePlants,
                 clinicalAlerts: clinicalAlerts,
-                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries)
+                careLedgerEntries: negativeCareLedgerEntries(from: careLedgerEntries),
+                doseEvents: events
             ),
             dayToken: dayToken(for: now)
         )

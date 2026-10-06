@@ -56,10 +56,10 @@
       "id": "asset-catalog",
       "owner": "Design system owner",
       "path": "Ohana/Assets.xcassets",
-      "warningMiB": 60,
-      "hardLimitMiB": 70,
+      "warningMiB": 95,
+      "hardLimitMiB": 105,
       "maxGrowthMiB": 2,
-      "rationale": "Asset catalogs carry launch, icon, and UI imagery. Raw source size is an early review signal; compiled Assets.car and the Release archive are the shipped-size authority.",
+      "rationale": "Asset catalogs carry launch, icon, UI imagery, and the five-stage companion catalog. Raw source size is an early review signal; compiled Assets.car and the Release archive are the shipped-size authority.",
       "releaseGate": "scripts/audit-resource-integrity.sh",
       "evidence": "The current catalog may remain above the review target without blocking unrelated PRs; hard-limit breaches or more than 2 MiB of above-target PR growth fail."
     }

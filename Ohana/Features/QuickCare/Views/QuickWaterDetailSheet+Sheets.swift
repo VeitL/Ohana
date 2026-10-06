@@ -35,18 +35,15 @@ extension QuickWaterDetailSheet {
                         saveWaterChangePlanToCalendar(toast: l.tr(zh: "已保存换水周期", en: "Water change cycle saved", de: "Wasserwechselzyklus gespeichert"))
                     }
                 },
+                onCancel: cancelActiveWaterEditor,
+                isSaving: isSavingWaterPlan,
+                additionalDraft: selectedSharedWaterPetIds.map(\.uuidString).sorted(),
                 onDelete: {
                     waterReminderOn = false
                     startWaterCalendarPlanSave {
                         saveWaterChangePlanToCalendar(toast: l.tr(zh: "已关闭换水提醒", en: "Water change reminder off", de: "Wasserwechselerinnerung aus"))
                     }
                 }
-            )
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: 330,
-                maxHeight: 560,
-                chromePadding: 70
             )
         case .waterAmount:
             VStack(spacing: 12) {
@@ -70,15 +67,12 @@ extension QuickWaterDetailSheet {
                         persistWaterAmountSettings()
                         showSaveConfirmation(waterAmountEnabled ? l.tr(zh: "已保存默认水量", en: "Default water amount saved", de: "Standard-Trinkmenge gespeichert") : l.tr(zh: "已关闭默认水量", en: "Default water amount off", de: "Standard-Trinkmenge aus"))
                         dismissInlineWaterSheet()
-                    }
+                    },
+                    onCancel: cancelActiveWaterEditor,
+                    isSaving: isSavingWaterPlan,
+                    additionalDraft: selectedSharedWaterPetIds.map(\.uuidString).sorted()
                 )
             }
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: sameSpeciesWaterPets.count > 1 ? 420 : 320,
-                maxHeight: 620,
-                chromePadding: 70
-            )
         case .waterPlan:
             VStack(spacing: 12) {
                 if sameSpeciesWaterPets.count > 1 {
@@ -102,6 +96,9 @@ extension QuickWaterDetailSheet {
                     onSave: {
                         startWaterPlanSave()
                     },
+                    onCancel: cancelActiveWaterEditor,
+                    isSaving: isSavingWaterPlan,
+                    additionalDraft: selectedSharedWaterPetIds.map(\.uuidString).sorted(),
                     onDelete: {
                         startWaterCalendarPlanSave {
                             deleteWaterPlanAndSwitchToManual()
@@ -109,12 +106,6 @@ extension QuickWaterDetailSheet {
                     }
                 )
             }
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: sameSpeciesWaterPets.count > 1 ? 520 : 430,
-                maxHeight: 620,
-                chromePadding: 0
-            )
         case .filterSettings:
             FilterSettingsSheet(
                 tint: filterTint,
@@ -128,18 +119,15 @@ extension QuickWaterDetailSheet {
                         syncFilterPlan(showToast: true)
                     }
                 },
+                onCancel: cancelActiveWaterEditor,
+                isSaving: isSavingWaterPlan,
+                additionalDraft: selectedSharedWaterPetIds.map(\.uuidString).sorted(),
                 onDelete: {
                     filterReminderOn = false
                     startWaterCalendarPlanSave {
                         syncFilterPlan(showToast: true)
                     }
                 }
-            )
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: 360,
-                maxHeight: 620,
-                chromePadding: 70
             )
         case .history:
             WaterHistorySheet(
@@ -179,7 +167,7 @@ extension QuickWaterDetailSheet {
                         openWaterSheet(.history)
                     } label: {
                         Label(l.tr(zh: "全部记录", en: "All records", de: "Alle Einträge"), systemImage: "clock.arrow.circlepath")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(chromeTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
@@ -219,7 +207,7 @@ extension QuickWaterDetailSheet {
                 )
                 overviewLineChart(
                     title: l.tr(zh: "换水记录", en: "Water change records", de: "Wasserwechsel-Einträge"),
-                    subtitle: l.tr(zh: "按天统计换水次数。", en: "Water changes counted by day.", de: "Wasserwechsel pro Tag gezählt."),
+                    subtitle: nil,
                     points: careChartPoints(for: .waterChange),
                     tint: waterChangeStatusTint,
                     emptyText: l.tr(zh: "换水后会出现趋势", en: "Trends appear after water changes", de: "Trends erscheinen nach Wasserwechseln")
@@ -230,7 +218,7 @@ extension QuickWaterDetailSheet {
                         openWaterSheet(.waterSettings)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(waterChangeStatusTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
@@ -270,7 +258,7 @@ extension QuickWaterDetailSheet {
                 )
                 overviewLineChart(
                     title: l.tr(zh: "滤芯清洗", en: "Filter cleaning", de: "Filterreinigung"),
-                    subtitle: l.tr(zh: "按天统计清洗次数。", en: "Cleanings counted by day.", de: "Reinigungen pro Tag gezählt."),
+                    subtitle: nil,
                     points: careChartPoints(for: .filterClean),
                     tint: filterStatusTint,
                     emptyText: l.tr(zh: "清洗滤芯后会出现趋势", en: "Trends appear after filter cleanings", de: "Trends erscheinen nach Filterreinigungen")
@@ -281,7 +269,7 @@ extension QuickWaterDetailSheet {
                         openWaterSheet(.filterSettings)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(filterStatusTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
@@ -313,10 +301,10 @@ extension QuickWaterDetailSheet {
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
@@ -326,21 +314,35 @@ extension QuickWaterDetailSheet {
     func overviewRangePicker(tint: Color) -> some View {
         HStack(spacing: 8) {
             ForEach(WaterOverviewRange.allCases) { range in
+                let isLocked = range == .days90 && !appServices.commerce.allows(.extendedTrends)
                 Button {
+                    guard !isLocked else {
+                        personalUpgradePrompt = PersonalUpgradePrompt(feature: .extendedTrends)
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        return
+                    }
                     withAnimation(GoMotion.page) {
                         overviewRange = range
                         overviewChartProgress = 0
                     }
                     scheduleOverviewChartReplay(milliseconds: 60)
                 } label: {
-                    Text(range.title(l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    HStack(spacing: 4) {
+                        Text(range.title(l))
+                        if isLocked {
+                            Image(systemName: "lock.fill").accessibilityHidden(true)
+                        }
+                    }
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
                         .background(overviewRange == range ? tint : Color.ohanaControlFill.opacity(0.5), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityHint(isLocked
+                    ? l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Ohana Personal erforderlich")
+                    : "")
             }
         }
     }
@@ -406,11 +408,11 @@ extension QuickWaterDetailSheet {
     func waterSheetChromeTitleContent(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 30, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(title)
-                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
@@ -421,16 +423,16 @@ extension QuickWaterDetailSheet {
     func overviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -441,16 +443,18 @@ extension QuickWaterDetailSheet {
         .waterGlassSurface(cornerRadius: OhanaRadius.controlLarge, tint: tint, tintOpacity: 0.04)
     }
 
-    func overviewLineChart(title: String, subtitle: String, points: [WaterChartPoint], tint: Color, emptyText: String) -> some View {
+    func overviewLineChart(title: String, subtitle: String?, points: [WaterChartPoint], tint: Color, emptyText: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(subtitle)
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaSecondaryText)
+                    if let subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
                 }
                 Spacer()
             }
@@ -486,14 +490,14 @@ extension QuickWaterDetailSheet {
                     Text(title)
                     if isWarning {
                         Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                 }
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Spacer()
                 Text(localizedProgressDays(elapsed: elapsed, interval: max(interval, 1)))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
             }
             GeometryReader { proxy in
@@ -513,7 +517,7 @@ extension QuickWaterDetailSheet {
 
     func overviewSectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.top, 4)
     }
@@ -523,7 +527,7 @@ extension QuickWaterDetailSheet {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(text)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.ohanaSecondaryText)
         .frame(maxWidth: .infinity)

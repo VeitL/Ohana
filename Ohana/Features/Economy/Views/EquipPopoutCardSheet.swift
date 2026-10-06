@@ -124,7 +124,7 @@ struct EquipPopoutCardSheet: View {
                 .overlay(alignment: .topTrailing) {
                     Text(isPopoutActive ? l.tr(zh: "已启用", en: "Active", de: "Aktiv") : l.tr(zh: "预览", en: "Preview", de: "Vorschau"))
                         .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(Color.goPrimary, in: Capsule())

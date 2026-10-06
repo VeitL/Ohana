@@ -10,6 +10,8 @@ import SwiftUI
 
 struct PetMomentsHubRouteContainer: View {
     let pet: Pet
+    let showsCloseButton: Bool
+    let initialRoute: PetMomentsRoute
 
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
@@ -17,9 +19,12 @@ struct PetMomentsHubRouteContainer: View {
     @State private var routeData = PetMomentsHubRouteData()
     @State private var routeDataGeneration = 0
     @State private var dataLoadTask: Task<Void, Never>?
+    @State private var reloadRequested = false
 
-    init(pet: Pet) {
+    init(pet: Pet, initialRoute: PetMomentsRoute = .highlights, showsCloseButton: Bool = true) {
         self.pet = pet
+        self.showsCloseButton = showsCloseButton
+        self.initialRoute = initialRoute
     }
 
     var body: some View {
@@ -28,7 +33,10 @@ struct PetMomentsHubRouteContainer: View {
             sharedCareSessions: routeData.sharedCareSessions,
             renderData: routeData.renderData,
             albumRenderData: routeData.albumRenderData,
-            dataRevision: routeData.revision
+            dataRevision: routeData.revision,
+            initialRoute: initialRoute,
+            hasLoaded: routeData.hasLoaded,
+            showsCloseButton: showsCloseButton
         )
         .onAppear {
             scheduleRouteDataLoad()
@@ -47,7 +55,10 @@ struct PetMomentsHubRouteContainer: View {
 
     private func scheduleRouteDataLoad(delayMilliseconds: UInt64 = 120, force: Bool = false) {
         guard force || !routeData.hasLoaded else { return }
-        guard dataLoadTask == nil else { return }
+        guard dataLoadTask == nil else {
+            if force { reloadRequested = true }
+            return
+        }
         let petID = pet.id
         let targetRevision = routeData.revision &+ 1
         let container = modelContext.container
@@ -84,6 +95,10 @@ struct PetMomentsHubRouteContainer: View {
     private func clearDataLoadTask(generation: Int) {
         guard generation == routeDataGeneration else { return }
         dataLoadTask = nil
+        if reloadRequested {
+            reloadRequested = false
+            scheduleRouteDataLoad(force: true)
+        }
     }
 }
 

@@ -99,9 +99,9 @@ extension QuickFeedDetailContent {
             compactNotice(
                 icon: "hand.tap.fill",
                 text: l.tr(
-                    zh: "设置默认粮种和克数；关闭默认后，手动模式会回到需要先设置克数的状态。",
-                    en: "Set the default food and grams. Turning the default off makes manual mode ask for an amount first.",
-                    de: "Standardfutter und Gramm festlegen. Ohne Standard fragt der manuelle Modus zuerst nach der Menge."
+                    zh: "默认粮种与克数",
+                    en: "Default food and amount",
+                    de: "Standardfutter und -menge"
                 ),
                 tint: mainFoodTint
             )
@@ -135,7 +135,7 @@ extension QuickFeedDetailContent {
 
     func embeddedPlanSettingsCard(_ kind: FeedRuleKind) -> some View {
         let tint = kind == .manualReminder ? Color.goPurple : Color.goTeal
-        let hasExistingPlan = !FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents).isEmpty
+        let hasExistingPlan = !currentPlanRuleSnapshots(kind).isEmpty
 
         return VStack(alignment: .leading, spacing: 14) {
             embeddedPanelHeader(
@@ -148,8 +148,8 @@ extension QuickFeedDetailContent {
             compactNotice(
                 icon: kind.iconName,
                 text: kind == .manualReminder
-                    ? l.tr(zh: "每餐可独立设置时间、粮种和克数；到点后提醒你确认打卡。", en: "Each meal has its own time, food type, and grams. You will be reminded to confirm it.", de: "Jede Mahlzeit hat Zeit, Sorte und Gramm. Du wirst ans Bestätigen erinnert.")
-                    : l.tr(zh: "每餐可独立设置时间、粮种和克数；到点后自动补记并扣余粮。", en: "Each meal has its own time, food type, and grams. Due meals are logged automatically.", de: "Jede Mahlzeit hat Zeit, Sorte und Gramm. Fällige Mahlzeiten werden automatisch erfasst."),
+                    ? l.tr(zh: "到点提醒，手动确认", en: "Reminder, then manual confirmation", de: "Erinnerung, dann manuell bestätigen")
+                    : l.tr(zh: "到点自动记录并扣余粮", en: "Auto-log and deduct stock when due", de: "Bei Fälligkeit automatisch erfassen und Vorrat abziehen"),
                 tint: tint
             )
             if sameSpeciesFeedPets.count > 1 {
@@ -175,7 +175,7 @@ extension QuickFeedDetailContent {
             }
             VStack(alignment: .leading, spacing: 10) {
                 Text(l.tr(zh: "餐次", en: "Meals", de: "Mahlzeiten"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 ForEach(Array(draftStore.planMeals.indices), id: \.self) { index in
                     embeddedPlanMealEditor(index: index, tint: tint)
@@ -203,7 +203,7 @@ extension QuickFeedDetailContent {
                     deletePlan(kind)
                 } label: {
                     Label(l.tr(zh: "删除当前计划", en: "Delete current plan", de: "Aktuellen Plan löschen"), systemImage: "trash")
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.goRed)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
@@ -222,7 +222,7 @@ extension QuickFeedDetailContent {
     func embeddedPlanMealEditor(index: Int, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(FeedRuleMetadata.localizedMealName(for: draftStore.planMeals[index].time, l: l), systemImage: "clock.fill")
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
             DatePicker(
                 "",
@@ -282,7 +282,7 @@ extension QuickFeedDetailContent {
     var manualDefaultEnabledToggle: some View {
         Toggle(isOn: $draftStore.manualDefaultEnabled.animation(GoMotion.feedback)) {
             Text(l.tr(zh: "开启默认克数", en: "Enable default grams", de: "Standardgramm aktivieren"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .tint(mainFoodTint)
@@ -293,12 +293,12 @@ extension QuickFeedDetailContent {
     func embeddedPanelHeader(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             Text(title)
-                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
@@ -307,7 +307,7 @@ extension QuickFeedDetailContent {
                 collapseEmbeddedPanel()
             } label: {
                 Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())

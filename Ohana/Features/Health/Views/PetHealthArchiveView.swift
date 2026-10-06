@@ -63,6 +63,11 @@ struct PetHealthArchiveView: View {
 
     private var isDark: Bool { colorScheme == .dark }
     private var accent: Color { isDark ? Color.goPrimary : Color(hex: pet.themeColorHex) }
+    private var accentForeground: Color {
+        isDark
+            ? Color.ohanaPrimaryActionText
+            : (OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText)
+    }
     private var l: L10n { L10n(appLanguage) }
 
     private var items: [PetHealthArchiveItem] {
@@ -140,8 +145,8 @@ struct PetHealthArchiveView: View {
                     filter = option
                 } label: {
                     Text(filterTitle(option))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(filter == option ? Color.arkInk : .primary.opacity(0.68))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
+                        .foregroundStyle(filter == option ? accentForeground : .primary.opacity(0.68))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
                         .background(filter == option ? accent : Color.primary.opacity(isDark ? 0.10 : 0.06), in: Capsule())
@@ -157,7 +162,7 @@ struct PetHealthArchiveView: View {
                 .font(OhanaFont.adaptive(size: 34, weight: .bold))
                 .foregroundStyle(accent)
             Text(l.tr(zh: "暂无记录", en: "No records", de: "Keine Einträge"))
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
@@ -168,24 +173,24 @@ struct PetHealthArchiveView: View {
     private func archiveRow(_ item: PetHealthArchiveItem) -> some View {
         HStack(spacing: 12) {
             Image(systemName: item.icon)
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                 .foregroundStyle(item.tint)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
                 .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(item.detail)
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 6) {
                 Text(item.date.formatted(.dateTime.month().day()))
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(.tertiary)
                 Button(role: .destructive) {
                     delete(item)

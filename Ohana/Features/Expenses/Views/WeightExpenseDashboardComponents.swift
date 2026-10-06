@@ -31,6 +31,12 @@ enum WeightTrendDataBuilder {
             .sorted { $0.date < $1.date }
         guard !sorted.isEmpty else { return [] }
 
+        // One measurement is a point, not evidence of a stable trend over time.
+        if sorted.count == 1, let entry = sorted.first {
+            guard rangeStart.map({ entry.date >= $0 }) ?? true else { return [] }
+            return [WeightTrendPoint(date: entry.date, kilograms: entry.kilograms)]
+        }
+
         guard let rangeStart else {
             return sorted.map { WeightTrendPoint(date: $0.date, kilograms: $0.kilograms) }
         }
@@ -63,8 +69,6 @@ struct UnifiedWeightTrendChart: View {
     var xDomain: ClosedRange<Date>?
     var accent: Color = .goPrimary
 
-    @State private var chartProgress: Double = 0
-
     private var sortedPoints: [WeightTrendPoint] {
         points.sorted { $0.date < $1.date }
     }
@@ -89,45 +93,36 @@ struct UnifiedWeightTrendChart: View {
             xDomain: xDomain,
             yDomain: yDomain,
             tint: accent,
-            progress: chartProgress,
             showsLatestPoint: !actualPoints.isEmpty || !sortedPoints.isEmpty,
             yReferenceLineCount: 3,
             yReferenceFormatter: { OhanaChartStyle.weightReferenceLabel(kilograms: $0, domain: $1) }
         )
         .opacity(sortedPoints.isEmpty ? 0.35 : 1)
-        .onAppear { playEntrance() }
-        .onChange(of: chartSignature) { _, _ in playEntrance() }
-    }
-
-    private var chartSignature: String {
-        sortedPoints.map(\.id).joined(separator: "|")
-            + "|\(xDomain?.lowerBound.timeIntervalSinceReferenceDate ?? 0)"
-            + "|\(xDomain?.upperBound.timeIntervalSinceReferenceDate ?? 0)"
-    }
-
-    private func playEntrance() {
-        chartProgress = 0
-        withAnimation(GoMotion.page.delay(0.04)) {
-            chartProgress = 1
-        }
     }
 }
 
-struct ExpenseDashboardRange: CaseIterable, Hashable {
-    enum Kind: Hashable { case week, month, quarter, all }
+nonisolated struct ExpenseDashboardRange: CaseIterable, Hashable, Sendable {
+    nonisolated enum Kind: Hashable, Sendable { case week, month, quarter, year, all }
     let kind: Kind
 
     static let week = ExpenseDashboardRange(kind: .week)
     static let month = ExpenseDashboardRange(kind: .month)
     static let quarter = ExpenseDashboardRange(kind: .quarter)
+    static let year = ExpenseDashboardRange(kind: .year)
     static let all = ExpenseDashboardRange(kind: .all)
-    static let allCases: [ExpenseDashboardRange] = [.week, .month, .quarter, .all]
+    static let allCases: [ExpenseDashboardRange] = [.week, .month, .quarter, .year, .all]
 
+    var requiresPersonal: Bool {
+        kind == .quarter || kind == .year || kind == .all
+    }
+
+    @MainActor
     func title(_ l: L10n) -> String {
         switch kind {
         case .week: l.tr(zh: "7天", en: "7D", de: "7T")
         case .month: l.tr(zh: "30天", en: "30D", de: "30T")
         case .quarter: l.tr(zh: "90天", en: "90D", de: "90T")
+        case .year: l.tr(zh: "1年", en: "1Y", de: "1J")
         case .all: l.tr(zh: "全部", en: "All", de: "Alle")
         }
     }
@@ -140,6 +135,8 @@ struct ExpenseDashboardRange: CaseIterable, Hashable {
             calendar.date(byAdding: .day, value: -29, to: calendar.startOfDay(for: now))
         case .quarter:
             calendar.date(byAdding: .day, value: -89, to: calendar.startOfDay(for: now))
+        case .year:
+            calendar.date(byAdding: .day, value: -364, to: calendar.startOfDay(for: now))
         case .all:
             nil
         }
@@ -147,73 +144,75 @@ struct ExpenseDashboardRange: CaseIterable, Hashable {
 }
 
 struct ExpenseTimeBucket: Identifiable, Hashable {
-    let id = UUID()
     let date: Date
     let label: String
     let amount: Double
+
+    /// A bucket represents one fixed calendar interval. Keep its identity tied
+    /// to that interval so ordinary SwiftUI invalidations do not look like a
+    /// brand-new chart data set and restart the entrance animation.
+    var id: Date { date }
 }
 
 struct ExpenseBarDashboardChart: View {
     let buckets: [ExpenseTimeBucket]
     var accent: Color = .goPrimary
 
-    @State private var chartProgress: Double = 0
-
     var body: some View {
         OhanaMinimalBarChart(
             points: buckets.map {
-                OhanaMinimalChartPoint(date: $0.date, value: max(0, $0.amount), label: $0.label)
+                OhanaMinimalChartPoint(
+                    date: $0.date,
+                    value: max(0, $0.amount),
+                    label: $0.label,
+                    id: "expense-bucket-\($0.date.timeIntervalSinceReferenceDate)"
+                )
             },
             tint: accent,
-            progress: chartProgress,
             showsLabels: buckets.count <= 10,
             maxBarHeight: 124
         )
-        .onAppear { playEntrance() }
-        .onChange(of: buckets) { _, _ in playEntrance() }
-    }
-
-    private func playEntrance() {
-        chartProgress = 0
-        withAnimation(GoMotion.page.delay(0.04)) {
-            chartProgress = 1
-        }
     }
 }
 
 struct DashboardRangePicker<Range: Hashable>: View {
     let ranges: [Range]
     @Binding var selection: Range
+    var isLocked: (Range) -> Bool = { _ in false }
     let title: (Range) -> String
 
     var body: some View {
-        HStack(spacing: 7) {
+        Menu {
             ForEach(ranges, id: \.self) { range in
-                let selected = range == selection
                 Button {
-                    withAnimation(GoMotion.feedback) {
-                        selection = range
-                    }
-                    UISelectionFeedbackGenerator().selectionChanged()
+                    guard selection != range else { return }
+                    selection = range
+                    if !isLocked(range) { OhanaFeedback.selection() }
                 } label: {
-                    Text(title(range))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selected ? Color.arkInk : Color.ohanaSecondaryText)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                    Label(title(range), systemImage: isLocked(range) ? "lock.fill" : (range == selection ? "checkmark" : "calendar"))
                 }
-                .buttonStyle(ScaleButtonStyle())
+                .accessibilityLabel(isLocked(range) ? "\(title(range)), Ohana Personal" : title(range))
             }
+        } label: {
+            Label(title(selection), systemImage: "calendar")
+                .font(OhanaFont.subheadline())
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44)
         }
     }
 }
 
-func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange) -> [ExpenseTimeBucket] {
-    let calendar = Calendar.current
-    let now = Date()
+func makeExpenseBuckets(
+    from logs: [some ExpenseSummaryRecord],
+    range: ExpenseDashboardRange,
+    now: Date = Date(),
+    calendar: Calendar = .current,
+    locale: Locale = AppLanguage.effectiveLocale
+) -> [ExpenseTimeBucket] {
     let dateFormatter = DateFormatter()
-    dateFormatter.locale = AppLanguage.effectiveLocale
+    dateFormatter.calendar = calendar
+    dateFormatter.locale = locale
+    dateFormatter.timeZone = calendar.timeZone
 
     switch range.kind {
     case .week:
@@ -245,12 +244,61 @@ func makeExpenseBuckets(from logs: [PetExpenseLog], range: ExpenseDashboardRange
                 .reduce(0) { $0 + max(0, $1.amount) }
             return ExpenseTimeBucket(date: start, label: dateFormatter.string(from: start), amount: amount)
         }
-    case .all:
+    case .year:
         dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
+        guard let currentMonthStart = calendar.dateInterval(of: .month, for: now)?.start else {
+            return []
+        }
         return (0 ..< 12).compactMap { offset in
-            guard let date = calendar.date(byAdding: .month, value: offset - 11, to: now) else { return nil }
+            guard let date = calendar.date(
+                byAdding: .month,
+                value: offset - 11,
+                to: currentMonthStart
+            ) else { return nil }
             let amount = logs
                 .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }
+                .reduce(0) { $0 + max(0, $1.amount) }
+            return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
+        }
+    case .all:
+        guard let firstDate = logs.map(\.date).min(),
+              let firstMonthStart = calendar.dateInterval(of: .month, for: firstDate)?.start,
+              let currentMonthStart = calendar.dateInterval(of: .month, for: now)?.start
+        else { return [] }
+        let monthSpan = max(
+            0,
+            calendar.dateComponents([.month], from: firstMonthStart, to: currentMonthStart).month ?? 0
+        )
+        if monthSpan <= 24 {
+            dateFormatter.setLocalizedDateFormatFromTemplate("MMM")
+            return (0 ... monthSpan).compactMap { offset in
+                guard let date = calendar.date(
+                    byAdding: .month,
+                    value: offset,
+                    to: firstMonthStart
+                ) else { return nil }
+                let amount = logs
+                    .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .month) }
+                    .reduce(0) { $0 + max(0, $1.amount) }
+                return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
+            }
+        }
+        dateFormatter.setLocalizedDateFormatFromTemplate("yyyy")
+        guard let firstYearStart = calendar.dateInterval(of: .year, for: firstDate)?.start,
+              let currentYearStart = calendar.dateInterval(of: .year, for: now)?.start
+        else { return [] }
+        let yearSpan = max(
+            0,
+            calendar.dateComponents([.year], from: firstYearStart, to: currentYearStart).year ?? 0
+        )
+        return (0 ... yearSpan).compactMap { offset in
+            guard let date = calendar.date(
+                byAdding: .year,
+                value: offset,
+                to: firstYearStart
+            ) else { return nil }
+            let amount = logs
+                .filter { calendar.isDate($0.date, equalTo: date, toGranularity: .year) }
                 .reduce(0) { $0 + max(0, $1.amount) }
             return ExpenseTimeBucket(date: date, label: dateFormatter.string(from: date), amount: amount)
         }

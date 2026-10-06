@@ -33,6 +33,7 @@ struct GenericWeightEntrySheet: View {
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @AppStorage(AppCountry.storageKey) private var appCountry = AppCountry.detectedCode
+    @AppStorage("currentActiveHumanId") private var activeHumanIDRaw = ""
 
     @State private var weightText = ""
     @State private var selectedDate = Date()
@@ -46,6 +47,9 @@ struct GenericWeightEntrySheet: View {
     @State private var isClosing = false
     @State private var isSaving = false
     @State private var popupDragOffset: CGFloat = 0
+    @State private var saveFailed = false
+    @State private var latestHumanWeight: HumanHealthSummaryValue?
+    @State private var weightReferenceFailed = false
     @State private var latestPetWeightKg: Double?
     @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -83,6 +87,7 @@ struct GenericWeightEntrySheet: View {
     }
 
     private var recordDate: Date {
+        if case .human = target { return min(selectedDate, Date()) }
         let date = includesRecordTime ? selectedDate : Calendar.current.startOfDay(for: selectedDate)
         return min(date, Date())
     }
@@ -108,9 +113,8 @@ struct GenericWeightEntrySheet: View {
                 [0.5, 1, 2]
             }
             return uniqueWeights([latestPetWeightKg].compactMap(\.self) + defaults)
-        case let .human(human):
-            let latest = human.weightLogs.sorted { $0.date > $1.date }.first?.weight
-            return uniqueWeights([latest].compactMap(\.self) + [50, 60, 70])
+        case .human:
+            return []
         }
     }
 
@@ -122,7 +126,7 @@ struct GenericWeightEntrySheet: View {
                         .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     weightEntryBlock
-                    EmbeddedDecimalKeypad(
+                    OhanaDecimalInput(
                         text: $weightText,
                         countryCode: appCountry,
                         maxFractionDigits: weightUnit == "g" ? 0 : 2,
@@ -134,7 +138,22 @@ struct GenericWeightEntrySheet: View {
                         }
                     )
                     .padding(.horizontal, 20)
-                    quickWeightStrip
+                    if case .pet = target { quickWeightStrip }
+                    if let latestHumanWeight {
+                        Text("\(HumanHealthHomeText.previousRecord.title(l)) · \(latestHumanWeight.value.formatted(.number.precision(.fractionLength(1)))) kg · \(latestHumanWeight.date.formatted(date: .abbreviated, time: .omitted))")
+                            .font(OhanaFont.caption())
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .accessibilityIdentifier("generic-weight-entry-previous-record")
+                    }
+                    if weightReferenceFailed {
+                        Text(HumanHealthHomeText.loadFailed.title(l)).font(OhanaFont.caption())
+                        Button(l.tr(zh: "重试", en: "Retry", de: "Erneut versuchen"), action: scheduleLatestHumanWeightLoad)
+                    }
+                    if saveFailed {
+                        Text(HumanHealthHomeText.saveFailed.title(l))
+                            .foregroundStyle(Color.goRed)
+                            .accessibilityIdentifier("generic-weight-entry-save-error")
+                    }
                     dateAndTargetBlock
                     QuickCareActionHumanPickerContainer(
                         selectedHumanID: $selectedRecorderHumanID,
@@ -149,24 +168,29 @@ struct GenericWeightEntrySheet: View {
                 .padding(.vertical, 12)
             }
             .scrollDismissesKeyboard(.interactively)
+            .accessibilityIdentifier(sheetAccessibilityIdentifier)
             .navigationTitle(l.tr(zh: "记录体重", en: "Record weight", de: "Gewicht erfassen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { closeSheet() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!isValid || isSaving || requiresRecorderSelection)
-                        .accessibilityIdentifier("generic-weight-entry-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: !weightText.isEmpty,
+                isSaving: isSaving,
+                canSave: isValid && !requiresRecorderSelection,
+                closeIdentifier: "ohana-sheet-close-action",
+                saveIdentifier: "generic-weight-entry-save-action",
+                onCancel: closeSheet,
+                onSave: save
+            )
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .onAppear {
             isClosing = false
             scheduleLatestPetWeightLoad()
+            scheduleLatestHumanWeightLoad()
+        }
+        .onChange(of: activeHumanIDRaw) { _, _ in
+            latestHumanWeight = nil
+            scheduleLatestHumanWeightLoad()
         }
         .onChange(of: weightText) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(
@@ -239,7 +263,7 @@ struct GenericWeightEntrySheet: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "记录体重", en: "Record weight", de: "Gewicht erfassen"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .accessibilityIdentifier(sheetAccessibilityIdentifier)
                 Text(entityName)
@@ -276,13 +300,14 @@ struct GenericWeightEntrySheet: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(weightText.isEmpty ? (weightUnit == "g" ? "0" : CountryDecimalInput.placeholder(countryCode: appCountry)) : weightText)
-                    .font(OhanaFont.metric(size: 52, .black))
+                    .font(OhanaFont.metric(size: 52, .semibold))
                     .foregroundStyle(weightText.isEmpty ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .minimumScaleFactor(0.45)
                     .accessibilityIdentifier(weightValueAccessibilityIdentifier)
 
-                unitPicker
+                if case .pet = target { unitPicker }
+                else { Text("kg").font(OhanaFont.callout(.semibold)) }
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 16)
@@ -301,7 +326,7 @@ struct GenericWeightEntrySheet: View {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Text(unit)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(weightUnit == unit ? Color.arkInk : Color.ohanaSecondaryText)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -322,7 +347,7 @@ struct GenericWeightEntrySheet: View {
                         applyQuickWeight(weight)
                     } label: {
                         Text(CountryDecimalInput.format(weight, countryCode: appCountry, maxFractionDigits: 1) + " kg")
-                            .font(OhanaFont.subheadline(.black))
+                            .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(isQuickWeightSelected(weight) ? Color.arkInk : Color.ohanaPrimaryText)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
@@ -356,7 +381,7 @@ struct GenericWeightEntrySheet: View {
                             .environment(\.locale, AppLanguage.effectiveLocale)
                     } else {
                         Text(l.tr(zh: "可选", en: "Optional", de: "Optional"))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Toggle("", isOn: $includesRecordTime.animation(GoMotion.feedback))
@@ -367,7 +392,7 @@ struct GenericWeightEntrySheet: View {
 
             infoRow(icon: "person.crop.circle.fill", label: l.tr(zh: "对象", en: "For", de: "Für")) {
                 Text(entityName)
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -390,14 +415,14 @@ struct GenericWeightEntrySheet: View {
                 if let bcs = autoBcsForPet {
                     HStack(spacing: 12) {
                         Text("\(bcs)")
-                            .font(OhanaFont.metric(size: 30, .black))
+                            .font(OhanaFont.metric(size: 30, .semibold))
                             .foregroundStyle(Color.arkInk)
                             .frame(width: 48, height: 48)
                             .background(bcsColor(bcs), in: Circle())
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text(bcsLabel(bcs))
-                                .font(OhanaFont.callout(.black))
+                                .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(l.tr(
                                 zh: "根据品种、年龄与本次体重估算",
@@ -434,9 +459,9 @@ struct GenericWeightEntrySheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存体重记录", en: "Save weight", de: "Gewicht speichern")
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(isValid && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 14)
             .background(isValid && !isSaving ? accentColor : accentColor.opacity(0.38), in: Capsule())
@@ -519,6 +544,27 @@ struct GenericWeightEntrySheet: View {
         return abs(parsedWeight - kg) < 0.05
     }
 
+    private func scheduleLatestHumanWeightLoad() {
+        guard case let .human(human) = target else { return }
+        latestPetWeightLoadTask?.cancel()
+        latestPetWeightLoadTask = nil
+        guard !human.isPrivate(.weight, viewedBy: UUID(uuidString: activeHumanIDRaw)) else {
+            latestHumanWeight = nil
+            weightReferenceFailed = false
+            return
+        }
+        latestPetWeightLoadTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 24) {
+            guard !human.isPrivate(.weight, viewedBy: UUID(uuidString: activeHumanIDRaw)) else {
+                latestPetWeightLoadTask = nil
+                return
+            }
+            let reference = HumanWeightEntryReadModel.latest(humanID: human.id, context: modelContext)
+            latestHumanWeight = reference.value
+            weightReferenceFailed = !reference.didLoad
+            latestPetWeightLoadTask = nil
+        }
+    }
+
     private func scheduleLatestPetWeightLoad() {
         guard case let .pet(pet) = target else { return }
         latestPetWeightLoadTask?.cancel()
@@ -580,6 +626,7 @@ struct GenericWeightEntrySheet: View {
               let weight = parsedWeight,
               weight > 0 else { return }
         isSaving = true
+        saveFailed = false
         let executorId = selectedRecorderHumanID?.uuidString
         let savedDate = recordDate
         let savedUnit = weightUnit
@@ -608,6 +655,7 @@ struct GenericWeightEntrySheet: View {
                     closeSheet()
                 } catch {
                     isSaving = false
+                    saveFailed = true
                     appServices.domainRevisions.publishFailure(command: command, error: error)
                 }
             }
@@ -629,6 +677,7 @@ struct GenericWeightEntrySheet: View {
                     closeSheet()
                 } catch {
                     isSaving = false
+                    saveFailed = true
                     appServices.domainRevisions.publishFailure(command: command, error: error)
                 }
             }

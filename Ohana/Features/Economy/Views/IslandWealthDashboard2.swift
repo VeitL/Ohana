@@ -14,6 +14,7 @@ struct IslandWealthDashboardContentView: View {
     let humans: [Human]
     let walletAccounts: [CoconutAccount]
     let walletLedgerEntries: [CoconutLedgerEntry]
+    let showsCloseButton: Bool
     let presentation: IslandWealthDashboardPresentation
 
     @Environment(\.dismiss) private var dismiss
@@ -29,13 +30,15 @@ struct IslandWealthDashboardContentView: View {
         humans: [Human],
         walletAccounts: [CoconutAccount],
         walletLedgerEntries: [CoconutLedgerEntry],
-        presentation: IslandWealthDashboardPresentation = .standalone
+        presentation: IslandWealthDashboardPresentation = .standalone,
+        showsCloseButton: Bool = true
     ) {
         self.pets = pets
         self.humans = humans
         self.walletAccounts = walletAccounts
         self.walletLedgerEntries = walletLedgerEntries
         self.presentation = presentation
+        self.showsCloseButton = showsCloseButton
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -77,6 +80,17 @@ struct IslandWealthDashboardContentView: View {
     private var navBarHeight: CGFloat { safeTop + 46 }
 
     var body: some View {
+        if presentation == .standalone {
+            content
+                .navigationTitle(l.tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana-Vermögen"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }) } }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         ZStack {
             if presentation == .standalone {
                 OhanaAppBackground().ignoresSafeArea()
@@ -85,9 +99,6 @@ struct IslandWealthDashboardContentView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     if presentation == .standalone {
-                        // 顶部 navBar 占位
-                        Spacer().frame(height: navBarHeight)
-
                         // 全岛总资产
                         totalAssetsRow
                     }
@@ -112,12 +123,6 @@ struct IslandWealthDashboardContentView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, presentation == .embedded ? 12 : 0)
-            }
-        }
-        .navigationBarHidden(true)
-        .overlay(alignment: .top) {
-            if presentation == .standalone {
-                navBar
             }
         }
         .onAppear {
@@ -163,25 +168,7 @@ struct IslandWealthDashboardContentView: View {
 
     // MARK: - Nav Bar
 
-    private var navBar: some View {
-        HStack {
-            Text(l.tr(zh: "Ohana 财富", en: "Ohana Wealth", de: "Ohana-Vermögen"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, safeTop)
-        .padding(.bottom, 10)
-        .background(Color.ohanaCardSurface.opacity(0.01))
-    }
+
 
     // MARK: - Total Assets
 
@@ -399,6 +386,17 @@ struct IslandWealthDashboardContentView: View {
         let showsRank = SingleMemberFamilyShapePresentation.showsWealthRank(rowCount: rowCount)
         let isFirst = showsRank && rank == 1
         let isSelected = selectedCoconutActorId == row.entityId
+        let rankForeground: Color = {
+            guard showsRank else { return Color.ohanaPrimaryActionText }
+            switch rank {
+            case 1:
+                return Color.ohanaPrimaryActionText
+            case 2, 3:
+                return Color.arkInk
+            default:
+                return Color.ohanaSecondaryText
+            }
+        }()
         return Button {
             withAnimation(GoMotion.feedback) {
                 selectedCoconutActorId = isSelected ? nil : row.entityId
@@ -416,12 +414,12 @@ struct IslandWealthDashboardContentView: View {
                     if showsRank {
                         Text("\(rank)")
                             .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                            .foregroundStyle(rank <= 3 ? Color.arkInk : Color.ohanaSecondaryText)
+                            .foregroundStyle(rankForeground)
                     } else {
                         Image(systemName: "checkmark.seal.fill") // a11y: allow decorative account badge; row text carries the accessible meaning
                             .accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 12, weight: .black))
-                            .foregroundStyle(Color.arkInk)
+                            .foregroundStyle(rankForeground)
                     }
                 }
 

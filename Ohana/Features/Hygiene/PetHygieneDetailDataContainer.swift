@@ -30,12 +30,14 @@ struct PetHygieneLedgerEntry: Identifiable, Equatable {
 
 struct PetHygieneDetailView: View {
     let pet: Pet
+    let showsCloseButton: Bool
 
     @Query(sort: \Reminder.scheduledAt, order: .forward) private var allReminders: [Reminder]
     @Query private var hygieneLedgerEvents: [CareLedgerEvent]
 
-    init(pet: Pet) {
+    init(pet: Pet, showsCloseButton: Bool = true) {
         self.pet = pet
+        self.showsCloseButton = showsCloseButton
         let petId = pet.id.uuidString
         let petSubject = CareLedgerSubjectKind.pet.rawValue
         let hygieneKind = CareLedgerEventKind.hygiene.rawValue
@@ -53,6 +55,7 @@ struct PetHygieneDetailView: View {
     var body: some View {
         PetHygieneDetailContentView(
             pet: pet,
+            showsCloseButton: showsCloseButton,
             allReminders: allReminders,
             hygieneEntries: PetHygieneLedgerEntry.entries(from: hygieneLedgerEvents, petID: pet.id)
         )

@@ -372,16 +372,19 @@ struct PetVetSummaryPDFView: View {
             )
             VStack(alignment: .leading, spacing: 3) {
                 Text(snapshot.name)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                     .foregroundStyle(Color(hex: "1A1A2E"))
-                Text("\(snapshot.species) · \(snapshot.breed.isEmpty ? l.tr(zh: "未知品种", en: "Unknown breed", de: "Unbekannte Rasse") : snapshot.breed) · \(snapshot.genderSymbol)")
+                Text(
+                    "\(Pet.localizedSpeciesName(snapshot.species, l: l)) · " +
+                        "\(localizedSnapshotBreed) · \(snapshot.genderSymbol)"
+                )
                     .font(OhanaFont.adaptive(size: 11, weight: .medium))
                     .foregroundStyle(Color.gray.opacity(0.7))
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
                 Text(l.tr(zh: "兽医档案", en: "Vet summary", de: "Tierarztakte"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(themeColor)
                 Text(Date().formatted(.dateTime.year().month().day()))
                     .font(OhanaFont.adaptive(size: 10, weight: .medium))
@@ -405,7 +408,7 @@ struct PetVetSummaryPDFView: View {
         ]
         return VStack(alignment: .leading, spacing: 6) {
             Text(l.tr(zh: "基础信息", en: "Basic info", de: "Basisdaten"))
-                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 6) {
                 ForEach(cols, id: \.0) { label, value in
                     VStack(alignment: .leading, spacing: 2) {
@@ -422,11 +425,17 @@ struct PetVetSummaryPDFView: View {
         }
     }
 
+    private var localizedSnapshotBreed: String {
+        snapshot.breed.isEmpty
+            ? l.tr(zh: "未知品种", en: "Unknown breed", de: "Unbekannte Rasse")
+            : l.resourceName(snapshot.breed)
+    }
+
     // MARK: - 过敏 & 备注
     private var pdfAllergyNotes: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(l.tr(zh: "就诊速览", en: "Vet visit overview", de: "Tierarzt-Überblick"))
-                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)).foregroundStyle(.gray).tracking(1)
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 6) {
                 pdfSummaryCell(l.tr(zh: "过敏史", en: "Allergies", de: "Allergien"), snapshot.allergies.isEmpty ? l.tr(zh: "无记录", en: "No record", de: "Kein Eintrag") : snapshot.allergies)
                 pdfSummaryCell(l.tr(zh: "用药中", en: "Active medication", de: "Aktive Medikation"), medicationSummaryText)
@@ -492,7 +501,7 @@ struct PetVetSummaryPDFView: View {
     private var pdfHealthLogsTable: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(l.tr(zh: "近期健康记录（最近8条）", en: "Recent health records (latest 8)", de: "Aktuelle Gesundheitsdaten (letzte 8)"))
-                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)).foregroundStyle(.gray).tracking(1)
 
             if snapshot.recentHealthLogs.isEmpty {
                 Text(l.tr(zh: "暂无健康记录", en: "No health records", de: "Keine Gesundheitsdaten"))
@@ -548,7 +557,7 @@ struct PetVetSummaryPDFView: View {
     private var pdfWeightChart: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(l.tr(zh: "近3个月体重趋势", en: "Weight trend, last 3 months", de: "Gewichtstrend, 3 Monate"))
-                .font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(.gray).tracking(1)
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)).foregroundStyle(.gray).tracking(1)
 
             OhanaMinimalTrendChart(
                 points: snapshot.weightPoints3Mo.map {
@@ -603,7 +612,7 @@ struct PetVetPDFShareSheet: View {
                                 .font(OhanaFont.adaptive(size: 48))
                                 .foregroundStyle(pet.themeColor.color.opacity(0.8))
                             Text("\(pet.name)_\(l.tr(zh: "兽医档案", en: "VetSummary", de: "Tierarztakte")).pdf")
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             Text(l.tr(zh: "A4 · 兽医健康档案", en: "A4 · Vet health summary", de: "A4 · Tierarztakte"))
                                 .font(OhanaFont.adaptive(size: 11))
@@ -619,9 +628,9 @@ struct PetVetPDFShareSheet: View {
                             Image(systemName: "square.and.arrow.up").accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 15, weight: .bold))
                             Text(l.tr(zh: "分享 / 保存 PDF", en: "Share / save PDF", de: "PDF teilen / sichern"))
-                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                         }
-                        .foregroundStyle(.black) // ui-v4: allow ink on PDF action preview
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))

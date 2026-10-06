@@ -52,6 +52,9 @@ final class PetExpenseLog {
     var sharedSessionId: String = ""
     var executorId: String? // ArkSchemaV11: 花费支付者的 Human.id.uuidString
     var recordedByHumanId: String? // ArkSchemaV91: 本次录入者；与付款人分开
+    /// ArkSchemaV99: versioned, exact payer amounts for a single expense fact.
+    /// `executorId` remains the primary payer and legacy fallback.
+    var payerContributionsJSON: String = ""
     var pet: Pet?
     // Legacy recycle-bin columns kept only for stores that already migrated through the retired deletion model.
     // Active product code must not read or write these fields.
@@ -68,6 +71,7 @@ final class PetExpenseLog {
         pet: Pet? = nil,
         executorId: String? = nil,
         recordedByHumanId: String? = nil,
+        payerContributionsJSON: String = "",
         sharedSessionId: String = ""
     ) {
         self.id = UUID()
@@ -78,10 +82,66 @@ final class PetExpenseLog {
         self.sharedSessionId = sharedSessionId
         self.executorId = executorId
         self.recordedByHumanId = recordedByHumanId
+        self.payerContributionsJSON = payerContributionsJSON
         self.pet = pet
     }
 
     var expenseCategory: ExpenseCategory {
         ExpenseCategory(rawValue: category) ?? .other
+    }
+
+    var payerContributions: [ExpensePayerContribution] {
+        ExpensePayerContributionPolicy.effectiveContributions(
+            raw: payerContributionsJSON,
+            executorID: executorId,
+            total: amount
+        )
+    }
+
+    var payerIDs: [String] {
+        payerContributions.compactMap { $0.humanID?.uuidString }
+    }
+
+    func amountPaid(by humanID: String) -> Double {
+        payerContributions
+            .filter { $0.humanID?.uuidString == humanID }
+            .reduce(0) { $0 + $1.amount }
+    }
+
+    func setPayerContributions(_ contributions: [ExpensePayerContribution]) {
+        payerContributionsJSON = ExpensePayerContributionPolicy.encode(contributions)
+        if let primary = contributions.compactMap(\.humanID).first {
+            executorId = primary.uuidString
+        }
+    }
+
+    @discardableResult
+    func anonymizePayer(_ humanID: UUID) -> Bool {
+        guard payerContributionsJSON.localizedCaseInsensitiveContains(humanID.uuidString) else {
+            return false
+        }
+        guard let decoded = ExpensePayerContributionPolicy.decode(payerContributionsJSON),
+              decoded.contains(where: { $0.humanID == humanID }),
+              let anonymized = try? ExpensePayerContributionPolicy.anonymized(
+                  decoded,
+                  removing: humanID,
+                  total: amount
+              ) else {
+            // Fail closed if a locally corrupt snapshot still contains the
+            // deleted identifier. Keep the snapshot structured so reads do
+            // not reattribute the whole bill to the legacy primary payer.
+            if let totalUnits = ExpensePayerContributionPolicy.minorUnits(amount), totalUnits > 0 {
+                payerContributionsJSON = ExpensePayerContributionPolicy.encode([
+                    ExpensePayerContribution(humanID: nil, minorUnits: totalUnits)
+                ])
+            } else {
+                payerContributionsJSON = "{}"
+            }
+            executorId = nil
+            return true
+        }
+        payerContributionsJSON = ExpensePayerContributionPolicy.encode(anonymized)
+        executorId = anonymized.compactMap(\.humanID).first?.uuidString
+        return true
     }
 }

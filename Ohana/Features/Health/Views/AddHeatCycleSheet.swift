@@ -26,6 +26,12 @@ struct AddHeatCycleSheet: View {
     @State private var note: String = ""
     @State private var selectedRecorderHumanID: UUID?
     @State private var requiresRecorderSelection = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [String(startDate.timeIntervalSince1970), String(endDate.timeIntervalSince1970),
+         String(hasEndDate), status.rawValue, String(isMated),
+         String(expectedDeliveryDate.timeIntervalSince1970), note]
+    }
     @State private var isSaving = false
 
     private var themeColor: Color { Color(hex: pet.themeColorHex) }
@@ -50,7 +56,7 @@ struct AddHeatCycleSheet: View {
                     }
                 } header: {
                     Text(l.tr(zh: "生理期状态", en: "Heat Cycle Status", de: "Läufigkeitsstatus"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                 }
 
                 if status == .estrus || status == .pregnant {
@@ -62,7 +68,7 @@ struct AddHeatCycleSheet: View {
                         }
                     } header: {
                         Text(l.tr(zh: "繁育记录", en: "Breeding Record", de: "Zuchtprotokoll"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                     }
                 }
 
@@ -71,7 +77,7 @@ struct AddHeatCycleSheet: View {
                         .frame(minHeight: 80)
                 } header: {
                     Text(l.tr(zh: "备注说明（可选）", en: "Notes (optional)", de: "Notizen (optional)"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                 }
 
                 Section {
@@ -83,32 +89,19 @@ struct AddHeatCycleSheet: View {
                     )
                 }
 
-                Section {
-                    Button {
-                        save()
-                    } label: {
-                        Text(isSaving
-                            ? l.tr(zh: "保存中...", en: "Saving...", de: "Speichert...")
-                            : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern"))
-                            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                    }
-                    .listRowBackground(themeColor)
-                    .disabled(isSaving || !pet.canWriteHealthFacts || requiresRecorderSelection)
-                }
+
             }
             .navigationTitle(l.tr(zh: "记录生理期", en: "Log Heat Cycle", de: "Läufigkeit erfassen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) { dismiss() }
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, canSave: pet.canWriteHealthFacts && !requiresRecorderSelection,
+                onCancel: { dismiss() }, onSave: save
+            )
             .onAppear {
+                guard initialDraft == nil else { return }
                 if status == .pregnant { isMated = true }
+                initialDraft = editorDraft
             }
             .onDisappear {
                 commandQueue.cancelAll()

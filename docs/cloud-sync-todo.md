@@ -2,15 +2,21 @@
 
 This file tracks future CloudKit work that is intentionally deferred until the
 product gate, capability profile, provisioning, CloudKit Dashboard, and
-multi-device evidence all exist. The current Solo target keeps CloudDocuments
-for restricted iCloud Drive backup, but declares no APNs entitlement, no
-`remote-notification` background mode, and no CloudKit service entitlement;
-its SwiftData containers use `cloudKitDatabase: .none`.
+multi-device evidence all exist. The current target keeps CloudDocuments for
+restricted iCloud Drive backup and its SwiftData containers use
+`cloudKitDatabase: .none`; it declares no CloudKit service entitlement.
+
+The local Free / Personal release target no longer declares APNs,
+`remote-notification`, or Sign in with Apple. The separately approved,
+fail-closed Family guardian code does not authorize CloudKit, does not change
+this TODO, and may not restore those capabilities without its independent
+release gates. Guardian release gates live in
+`docs/specs/GuardianSafety-logic.md`.
 
 The 2026-06-24 signed-development build below is historical provisioning
 evidence from an earlier capability profile. It is not evidence about the
-current Solo target and must not be used to re-enable Push or CloudKit without
-an explicit release decision.
+current target and must not be used to re-enable CloudKit without an explicit
+release decision.
 
 ## Deferred Until Developer Account
 

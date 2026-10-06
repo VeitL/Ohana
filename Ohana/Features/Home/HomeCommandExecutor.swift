@@ -497,41 +497,22 @@ struct HomeCommandExecutor {
     }
 
     @discardableResult
-    func recordPlantCare(
-        _ type: PlantCareType,
-        plantIDs: [UUID],
-        executorId: String?,
-        careNote: String = "",
-        photoData: Data? = nil,
-        healthStatus: PlantHealthStatus? = nil
-    ) -> [UUID] {
-        var recordedIDs: [UUID] = []
-        for plantID in plantIDs {
-            guard let plant = fetchPlant(id: plantID) else {
-                publishNoop(.plantCare(plantID: plantID, action: type.rawValue), note: "home.plantCare.missingPlant")
-                continue
-            }
-            let result = recordPlantCare(type, plant: plant, executorId: executorId, careNote: careNote, photoData: photoData, healthStatus: healthStatus)
-            if result.didPersist {
-                recordedIDs.append(plantID)
-            }
-        }
-        return recordedIDs
-    }
-
-    @discardableResult
     func completePlantBatchCare(
         selections: [PlantBatchCareSelection],
         executorId: String?,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init
     ) -> PlantBatchCareCommandResult {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).completeBatchCare(
             selections: selections,
             executorId: resolvedExecutorId(executorId),
             note: "home.plantCare.batchCare",
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            operationID: operationID,
+            clock: clock
         )
     }
 
@@ -540,14 +521,18 @@ struct HomeCommandExecutor {
         selections: [PlantBatchCareSelection],
         executorId: String?,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        operationID: UUID = UUID(),
+        clock: () -> Date = Date.init
     ) -> PlantBatchCareCommandResult {
         PlantCareCommandExecutor(context: modelContext, revisions: revisions).recordBatchQuickCare(
             selections: selections,
             executorId: resolvedExecutorId(executorId),
             note: "home.plantCare.batchQuickRecord",
             now: now,
-            calendar: calendar
+            calendar: calendar,
+            operationID: operationID,
+            clock: clock
         )
     }
 
@@ -607,6 +592,51 @@ struct HomeCommandExecutor {
                 note: "home.plantCare.deferDueTasks"
             )
         )
+        return result
+    }
+
+    @discardableResult
+    func deferPlantCare(
+        plant: Plant,
+        careType: PlantCareType,
+        until date: Date,
+        wetSoil: Bool = false,
+        skip: Bool = false,
+        executorId: String?,
+        now: Date = Date()
+    ) -> PlantReminderToggleResult {
+        let result = PlantReminderControlService.deferTask(
+            plant: plant,
+            careType: careType,
+            until: date,
+            wetSoil: wetSoil,
+            skip: skip,
+            context: modelContext,
+            executorId: resolvedExecutorId(executorId),
+            now: now
+        )
+        revisions.publish(DomainMutationResult(
+            command: .command("plants", "deferCare", ["careType": careType.rawValue]),
+            affectedEntityIDs: [plant.id],
+            wroteBusinessFact: result.didPersist && result.didChange,
+            note: "home.plantCare.deferCare"
+        ))
+        return result
+    }
+
+    @discardableResult
+    func enablePlantWateringCheck(plant: Plant, intervalDays: Int) -> PlantReminderToggleResult {
+        let result = PlantReminderControlService.enableWateringCheck(
+            plant: plant,
+            intervalDays: intervalDays,
+            context: modelContext
+        )
+        revisions.publish(DomainMutationResult(
+            command: .command("plants", "enableWateringCheck", ["plantID": plant.id.uuidString]),
+            affectedEntityIDs: [plant.id],
+            wroteBusinessFact: result.didPersist && result.didChange,
+            note: "home.plantCare.enableWateringCheck"
+        ))
         return result
     }
 
@@ -670,7 +700,8 @@ struct HomeCommandExecutor {
             ExpandedQuickActionExecutor.Feedback(
                 cardId: pet.id,
                 coconutDelta: delta,
-                label: ExpandedQuickActionExecutor.rewardLabel(actionType: "feed", delta: delta)
+                label: ExpandedQuickActionExecutor.rewardLabel(actionType: "feed", delta: delta),
+                recordReference: result.recordReference
             )
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)

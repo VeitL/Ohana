@@ -39,7 +39,8 @@ nonisolated enum PlantReminderPreferenceStore {
     static let timeWindowStorageName = "plantReminder.timeWindow.v1"
     static let weekendQuietStorageName = "plantReminder.weekendQuiet.v1"
     static let travelModeStorageName = "plantReminder.travelMode.v1"
-    static let generatedPlanTitleMarker = "植物计划"
+    /// Compatibility-only marker for plans created before structured identity.
+    static let generatedPlanTitleMarker = PlantCarePlanIdentity.legacyTitleMarker
     private static let careTypeStoragePrefix = "plantReminder.careTypeEnabled.v1."
     private static let plantCarePlanCalendarPrefix = "plantReminder.plantCarePlanCalendarEnabled.v1."
     private static let plantCareSystemReminderPrefix = "plantReminder.plantCareSystemReminderEnabled.v1."
@@ -119,6 +120,16 @@ nonisolated enum PlantReminderPreferenceStore {
         defaults.set(value, forKey: key)
     }
 
+    static func restorePlanCalendarOverride(
+        _ value: Bool?,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCarePlanCalendarPrefix, plantID: plantID, careType: careType)
+        if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+    }
+
     static func planCalendarOverride(
         forPlantID plantID: UUID,
         careType: PlantCareType,
@@ -148,6 +159,16 @@ nonisolated enum PlantReminderPreferenceStore {
         guard controllableCareTypes.contains(careType) else { return }
         let key = plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType)
         defaults.set(value, forKey: key)
+    }
+
+    static func restoreSystemReminderOverride(
+        _ value: Bool?,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType)
+        if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
     }
 
     static func systemReminderOverride(
@@ -265,11 +286,7 @@ nonisolated enum PlantReminderPreferenceStore {
     }
 
     static func isGeneratedPlantCareEvent(_ event: Event) -> Bool {
-        DomainEntityLinkRegistry.plantId(for: event) != nil &&
-            careType(forEventType: event.eventType) != nil &&
-            event.isAllDay &&
-            event.recurrenceDays > 0 &&
-            event.title.contains(generatedPlanTitleMarker)
+        PlantCarePlanIdentity.isGeneratedPlan(event)
     }
 
     static func isPlantCareCompletionEvent(_ event: Event) -> Bool {

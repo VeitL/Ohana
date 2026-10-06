@@ -23,6 +23,7 @@ struct QuickFeedDetailSheet: View {
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
     let allEvents: [Event]
+    let eventRevision: QuickFeedRouteRevision
     let allHumans: [Human]
     let allPets: [Pet]
     let feedingLedgerEntries: [QuickFeedLedgerEntry]
@@ -43,6 +44,7 @@ struct QuickFeedDetailSheet: View {
         showsCloseButton: Bool = true,
         opensManualSheetOnAppear: Bool = false,
         allEvents: [Event] = [],
+        eventRevision: QuickFeedRouteRevision,
         allHumans: [Human] = [],
         allPets: [Pet] = [],
         feedingLedgerEntries: [QuickFeedLedgerEntry] = [],
@@ -50,13 +52,15 @@ struct QuickFeedDetailSheet: View {
         allFoodRecords: [PetFoodRecord] = [],
         allSharedCareSessions: [SharedCareSession] = []
     ) {
+        let safeRouteEvents = QuickFeedModelReadability.readableEvents(allEvents)
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
-        self.allEvents = allEvents
+        self.allEvents = safeRouteEvents
+        self.eventRevision = eventRevision
         self.allHumans = allHumans
         self.allPets = allPets
         self.feedingLedgerEntries = feedingLedgerEntries
@@ -74,6 +78,7 @@ struct QuickFeedDetailSheet: View {
             showsCloseButton: showsCloseButton,
             opensManualSheetOnAppear: opensManualSheetOnAppear,
             allEvents: allEvents,
+            eventRevision: eventRevision,
             allHumans: allHumans,
             allPets: allPets,
             feedingLedgerEntries: feedingLedgerEntries,
@@ -84,7 +89,8 @@ struct QuickFeedDetailSheet: View {
                 context: modelContext,
                 careEvents: appServices.careEvents,
                 revisions: appServices.domainRevisions,
-                reminderScheduling: appServices.reminderScheduling
+                reminderScheduling: appServices.reminderScheduling,
+                personalAccessLevel: appServices.commerce.hasPersonalEntitlement ? .personal : .free
             ),
             appLanguage: appLanguage,
             defaultFeedGrams: $defaultFeedGrams
@@ -100,6 +106,7 @@ struct QuickFeedDetailContent: View {
     var showsCloseButton: Bool = true
     var opensManualSheetOnAppear: Bool = false
     let allEvents: [Event]
+    let eventRevision: QuickFeedRouteRevision
     let allHumans: [Human]
     let allPets: [Pet]
     let feedingLedgerEntries: [QuickFeedLedgerEntry]
@@ -124,7 +131,11 @@ struct QuickFeedDetailContent: View {
     @StateObject var presentationState = QuickFeedPresentationState()
     @StateObject var runtimeState = QuickFeedRuntimeState()
     @StateObject var feedHomeController: FeedHomeController
+    @State var isRecordingFeed = false
+    @StateObject var recordCommandQueue = DeferredDomainCommandQueue()
+    @State var savedRecord: PetRecordReference?
     @State var selectedActionHumanID: UUID?
+    @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @FocusState var focusedField: FeedInputField?
 
     let stockReminderAdvanceOptions = [1, 3, 7, 14]
@@ -137,6 +148,7 @@ struct QuickFeedDetailContent: View {
         showsCloseButton: Bool = true,
         opensManualSheetOnAppear: Bool = false,
         allEvents: [Event],
+        eventRevision: QuickFeedRouteRevision,
         allHumans: [Human],
         allPets: [Pet],
         feedingLedgerEntries: [QuickFeedLedgerEntry],
@@ -147,13 +159,15 @@ struct QuickFeedDetailContent: View {
         appLanguage: String,
         defaultFeedGrams: Binding<Double>
     ) {
+        let safeRouteEvents = QuickFeedModelReadability.readableEvents(allEvents)
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
         self.showsRemoveQuickActionFooter = showsRemoveQuickActionFooter
         self.showsCloseButton = showsCloseButton
         self.opensManualSheetOnAppear = opensManualSheetOnAppear
-        self.allEvents = allEvents
+        self.allEvents = safeRouteEvents
+        self.eventRevision = eventRevision
         self.allHumans = allHumans
         self.allPets = allPets
         self.feedingLedgerEntries = feedingLedgerEntries
@@ -164,13 +178,13 @@ struct QuickFeedDetailContent: View {
         self.appLanguage = appLanguage
         _defaultFeedGrams = defaultFeedGrams
         let initialNow = Date()
-        let initialRules = FeedRuleState(pet: pet, allEvents: allEvents, now: initialNow)
-        let initialFeedMode = FeedOperatingMode.resolved(pet: pet, allEvents: allEvents, now: initialNow)
+        let initialRules = FeedRuleState(pet: pet, allEvents: safeRouteEvents, now: initialNow)
+        let initialFeedMode = FeedOperatingMode.resolved(pet: pet, allEvents: safeRouteEvents, now: initialNow)
         _feedHomeController = StateObject(wrappedValue: FeedHomeController(initialMode: initialFeedMode))
         _stockSnapshotStore = StateObject(wrappedValue: QuickFeedStockSnapshotStore(
             initial: QuickFeedStockSnapshot.build(
                 pet: pet,
-                allEvents: allEvents,
+                allEvents: safeRouteEvents,
                 careLogs: legacyCareLogs,
                 feedingLedgerEntries: feedingLedgerEntries,
                 foodRecords: allFoodRecords,
@@ -259,8 +273,8 @@ struct QuickFeedDetailContent: View {
         feedHomeController.viewState.metrics
     }
 
-    var feedScheduleEvents: [Event] { feedTaskState.manualPlanEvents }
-    var autoFeederEvents: [Event] { feedTaskState.autoFeederEvents }
+    var feedScheduleEvents: [QuickFeedPlanRenderEvent] { feedTaskState.manualPlanEvents }
+    var autoFeederEvents: [QuickFeedPlanRenderEvent] { feedTaskState.autoFeederEvents }
     var activeFeedingMode: FeedOperatingMode {
         feedHomeController.displayedMode
     }
@@ -279,7 +293,15 @@ struct QuickFeedDetailContent: View {
     }
 
     var currentAllEvents: [Event] {
-        runtimeState.latestAllEventsOverride ?? allEvents
+        QuickFeedModelReadability.readableEvents(allEvents)
+    }
+
+    var currentRuleSnapshots: [QuickFeedRouteEventSignature] {
+        runtimeState.ruleSnapshotsMergingPendingWrite(with: currentAllEvents)
+    }
+
+    func currentPlanRuleSnapshots(_ kind: FeedRuleKind) -> [QuickFeedRouteEventSignature] {
+        currentRuleSnapshots.filter { $0.matches(petID: pet.id, kind: kind) }
     }
 
     var currentUserId: String? {
@@ -477,10 +499,20 @@ struct QuickFeedDetailContent: View {
 
     var configuredRoot: some View {
         rootNavigation
+            .petRecordFeedback($savedRecord)
             .modifier(rootEventHost)
             .modifier(systemSheetHost)
             .modifier(feedAlertHost)
-            .interactiveDismissDisabled(inlineOverlayBlocksBackground)
+            .sheet(item: $personalUpgradePrompt) { prompt in
+                PersonalPlanView(prompt: prompt)
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, isEntitled in
+                if !isEntitled, draftStore.overviewRange == .days90 {
+                    draftStore.overviewRange = .days30
+                }
+            }
+            .onDisappear { recordCommandQueue.cancelAll(); isRecordingFeed = false }
+            .interactiveDismissDisabled(inlineOverlayBlocksBackground || isRecordingFeed)
             .animation(GoMotion.page, value: activeSheet?.id)
             .animation(GoMotion.page, value: activeEmbeddedPanel)
     }
@@ -494,7 +526,7 @@ struct QuickFeedDetailContent: View {
             selectedTreatKindRawValue: draftStore.selectedTreatOverviewKind?.rawValue,
             planCalendarMonth: draftStore.feedPlanCalendarMonth,
             planCalendarSelectedDate: draftStore.feedPlanCalendarSelectedDate,
-            eventCount: allEvents.count,
+            eventRevision: eventRevision,
             feedingLedgerEntryCount: feedingLedgerEntries.count,
             careLogCount: legacyCareLogs.count,
             foodRecordCount: allFoodRecords.count,
@@ -520,8 +552,11 @@ struct QuickFeedDetailContent: View {
             onPlanCalendarChange: {
                 scheduleDeferredFeedRefresh([.refreshPlanCalendarSnapshot])
             },
-            onEventCountChange: {
-                runtimeState.latestAllEventsOverride = nil
+            onEventsChange: {
+                runtimeState.resetPendingFeedRefresh()
+                runtimeState.acknowledgePendingRuleWriteIfRouteCaughtUp(
+                    with: QuickFeedModelReadability.readableEvents(allEvents)
+                )
                 scheduleDeferredFeedRefresh([.reloadSnapshots, .syncDisplayedMode, .ensurePlanReminders])
             },
             onFeedingLedgerEntryCountChange: {
@@ -552,15 +587,18 @@ struct QuickFeedDetailContent: View {
     var rootNavigation: some View {
         NavigationStack {
             rootScene
-                .navigationTitle("")
-                .toolbar(.hidden, for: .navigationBar)
+                .navigationTitle(l.tr(zh: "粮食记录", en: "Food log", de: "Futter", es: "Alimentación", pt: "Alimentação", fr: "Repas", ja: "食事の記録", ko: "급식 기록", it: "Pasti"))
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    if showsCloseButton {
+                        OhanaModalToolbar(onClose: closeDetail, closeIdentifier: "quick-feed-detail-close-action")
+                    }
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                             dismissFeedKeyboard()
                         }
-                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                     }
                 }
@@ -576,7 +614,6 @@ struct QuickFeedDetailContent: View {
 
             QuickFeedOverlayHost(route: activeOverlay)
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .petMemorialTone(isActive: pet.hasPassedAway)
     }
 
@@ -614,11 +651,13 @@ struct QuickFeedDetailContent: View {
     }
 
     func openRootFeedSheet(_ sheet: ActiveFeedSheet) {
+        draftStore.initialSheetEditorDraft = feedEditorDraft(sheet)
         sheetCoordinator.openRoot(sheet)
         scheduleDetailDataLoad(for: sheet)
     }
 
     func openFeedSheet(_ sheet: ActiveFeedSheet) {
+        draftStore.initialSheetEditorDraft = feedEditorDraft(sheet)
         sheetCoordinator.open(sheet)
         scheduleDetailDataLoad(for: sheet)
     }
@@ -766,11 +805,16 @@ struct QuickFeedDetailContent: View {
             fallback: feedingLedgerEntries,
             force: force,
             fetcher: { _, fallback in
-                commandExecutor.fullFeedingLedgerEntries(
+                let latestRules = FeedRuleState(
+                    pet: pet,
+                    allEvents: latestAllEvents(),
+                    now: clockTick
+                )
+                return commandExecutor.fullFeedingLedgerEntries(
                     pet: pet,
                     legacyCareLogs: observedCareLogs,
-                    manualPlanEvents: feedScheduleEvents,
-                    autoFeederEvents: autoFeederEvents,
+                    manualPlanEvents: latestRules.manualReminderEvents,
+                    autoFeederEvents: latestRules.autoFeederEvents,
                     fallback: fallback
                 )
             }
@@ -789,33 +833,17 @@ struct QuickFeedDetailContent: View {
     // MARK: - Main
 
     var petHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: OhanaSpacing.row) {
             avatarView(size: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "粮食记录", en: "Food log", de: "Futter"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            if showsCloseButton {
-                Button {
-                    closeDetail()
-                } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                .accessibilityIdentifier("quick-feed-detail-close-action")
-                .frame(width: 44, height: 44)
-                .buttonStyle(ScaleButtonStyle())
-            }
+                .accessibilityHidden(true)
+            Text(pet.name)
+                .font(OhanaFont.headline())
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
+        .accessibilityIdentifier("quick-feed-detail-screen")
     }
 
     private func closeDetail() {

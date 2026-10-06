@@ -166,7 +166,10 @@ final class VerticalSolidHomeController: ObservableObject {
             outgoingTab = previousTab
         }
 
-        selectedTab = tab
+        let motionBudget = AppWorkloadPolicy.shared.interactionMotionBudget(isVisible: true)
+        withAnimation(motionBudget == .full ? VerticalHomeTabTransitionPolicy.selectionAnimation : nil) {
+            selectedTab = tab
+        }
         AppPerformanceMonitor.shared.record(
             "tab_switch_first_frame",
             startedAt: startedAt,

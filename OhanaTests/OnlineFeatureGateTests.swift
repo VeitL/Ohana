@@ -6,9 +6,46 @@ struct OnlineFeatureGateTests {
     @Test func launchGateIsClosed() {
         #expect(AppCapabilityProfile.current == .solo)
         #expect(!AppCapabilityProfile.shipsCloudFamilyCapabilities)
+        #expect(!AppCapabilityProfile.shipsGuardianSafetyCapabilities)
         #expect(!AppCapabilityProfile.permitsCloudSyncRuntime)
         #expect(!AppCapabilityProfile.shippingPermitsCloudSyncDirtyWrites)
         #expect(!OnlineFeatureGate.allows(.onlineCollaboration))
+        #expect(!OnlineFeatureGate.allows(.guardianSafety))
+        #expect(GuardianSafetyConfiguration.current == nil)
+    }
+
+    @Test @MainActor func soloAppDelegateDoesNotExposeRemoteNotificationCallbacks() {
+        let delegate = OhanaCloudSharingAppDelegate()
+
+        #expect(!delegate.responds(to: NSSelectorFromString(
+            "application:didRegisterForRemoteNotificationsWithDeviceToken:"
+        )))
+        #expect(!delegate.responds(to: NSSelectorFromString(
+            "application:didFailToRegisterForRemoteNotificationsWithError:"
+        )))
+        #expect(!delegate.responds(to: NSSelectorFromString(
+            "application:didReceiveRemoteNotification:fetchCompletionHandler:"
+        )))
+    }
+
+    @Test func guardianConfigurationRequiresTheFlagSecureEndpointsAndRegisteredCallback() {
+        var values: [String: Any] = [
+            "OHANAGuardianSafetyEnabled": true,
+            "OHANAGuardianAPIBaseURL": "https://guardian.example/v1/",
+            "OHANAGuardianCognitoAuthorizationURL": "https://auth.example/oauth2/authorize",
+            "OHANAGuardianCognitoTokenURL": "https://auth.example/oauth2/token",
+            "OHANAGuardianCognitoClientID": "client-id",
+            "OHANAGuardianRedirectURL": "ohana://auth/family",
+            "OHANAGuardianInviteBaseURL": "https://guardian.example"
+        ]
+
+        #expect(GuardianSafetyConfiguration.configuration(from: values) != nil)
+        #expect(!OnlineFeatureGate.allows(.guardianSafety))
+        values["OHANAGuardianAPIBaseURL"] = "http://guardian.example/v1/"
+        #expect(GuardianSafetyConfiguration.configuration(from: values) == nil)
+        values["OHANAGuardianAPIBaseURL"] = "https://guardian.example/v1/"
+        values["OHANAGuardianRedirectURL"] = "other://auth/family"
+        #expect(GuardianSafetyConfiguration.configuration(from: values) == nil)
     }
 
     @Test func initialMergeCannotBypassTheSoloDirtyWriteBoundary() throws {
@@ -30,7 +67,63 @@ struct OnlineFeatureGateTests {
 
         #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.collaboration), currentLevel: launchLevel))
         #expect(AppFeatureRouteGuard.allowsSheetRoute(.crewRoster(.members), currentLevel: launchLevel))
+        #expect(!AppFeatureRouteGuard.allowsSheetRoute(
+            .guardianSafety(invitationCode: nil, incidentID: nil),
+            currentLevel: launchLevel
+        ))
         #expect(AppFeatureRouteGuard.isVisibleFunctionDestination(.familyWeeklyReport, currentLevel: launchLevel))
+    }
+
+    @Test @MainActor func guardianSheetPresentationIsSuppressedInSolo() {
+        let coordinator = AppRouteCoordinator()
+        let route = AppSheetRoute.guardianSafety(invitationCode: nil, incidentID: nil)
+
+        guard case let .suppressed(reason) = coordinator.sheetPresentationDecision(
+            for: route,
+            currentLevel: 10
+        ) else {
+            Issue.record("Expected the online Guardian sheet to be suppressed in Solo")
+            return
+        }
+        #expect(reason.hasPrefix("onlineGateSheet:"))
+        coordinator.presentSheet(route)
+        #expect(coordinator.sheet == nil)
+    }
+
+    @Test func soloPrivacyManifestDeclaresNoDeveloperCollectionAndAllRequiredReasons() throws {
+        let manifest = try propertyListDictionary(
+            repositoryRootURL().appendingPathComponent("Ohana/PrivacyInfo.xcprivacy")
+        )
+        let collected = try #require(manifest["NSPrivacyCollectedDataTypes"] as? [Any])
+        let accessed = try #require(manifest["NSPrivacyAccessedAPITypes"] as? [[String: Any]])
+        let reasonsByType: [String: [String]] = Dictionary(
+            uniqueKeysWithValues: accessed.compactMap { entry -> (String, [String])? in
+                guard let type = entry["NSPrivacyAccessedAPIType"] as? String,
+                      let reasons = entry["NSPrivacyAccessedAPITypeReasons"] as? [String]
+                else { return nil }
+                return (type, reasons)
+            }
+        )
+
+        #expect(collected.isEmpty)
+        #expect(reasonsByType["NSPrivacyAccessedAPICategoryUserDefaults"] == ["CA92.1"])
+        #expect(reasonsByType["NSPrivacyAccessedAPICategoryFileTimestamp"] == ["C617.1"])
+        #expect(reasonsByType["NSPrivacyAccessedAPICategorySystemBootTime"] == ["35F9.1"])
+    }
+
+    @Test func widgetPrivacyManifestDeclaresOnlyItsActualPrivacySurface() throws {
+        let manifest = try propertyListDictionary(
+            repositoryRootURL().appendingPathComponent("OhanaWidgets/PrivacyInfo.xcprivacy")
+        )
+        let tracking = try #require(manifest["NSPrivacyTracking"] as? Bool)
+        let trackingDomains = try #require(manifest["NSPrivacyTrackingDomains"] as? [Any])
+        let collected = try #require(manifest["NSPrivacyCollectedDataTypes"] as? [Any])
+        let accessed = try #require(manifest["NSPrivacyAccessedAPITypes"] as? [Any])
+
+        #expect(!tracking)
+        #expect(trackingDomains.isEmpty)
+        #expect(collected.isEmpty)
+        #expect(accessed.isEmpty)
     }
 
     @Test func blockedShareNoticeHasVisibleLaunchCopy() {
@@ -100,6 +193,12 @@ struct OnlineFeatureGateTests {
 
     private func source(_ url: URL) throws -> String {
         try String(contentsOf: url, encoding: .utf8)
+    }
+
+    private func propertyListDictionary(_ url: URL) throws -> [String: Any] {
+        let data = try Data(contentsOf: url)
+        let object = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        return try #require(object as? [String: Any])
     }
 
     private func swiftSources(under rootURL: URL) throws -> [URL] {

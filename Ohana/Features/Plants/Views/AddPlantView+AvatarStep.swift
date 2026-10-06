@@ -14,39 +14,16 @@ extension AddPlantView {
                 title: l.tr(zh: "植物头像", en: "Plant avatar", de: "Pflanzenavatar"),
                 icon: "camera.aperture"
             ) {
-                plantAvatarHero
+                Text(plantAvatarStatusText)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                 plantAvatarSourceActions
             }
         }
         .overlay(alignment: .topLeading) {
             PlantCreationAccessibilityMarker(identifier: "add-plant-step-avatar")
         }
-    }
-
-    var plantAvatarHero: some View {
-        VStack(alignment: .center, spacing: 12) {
-            PlantCreationAvatarPreview(
-                image: selectedAvatarSource == .customImage ? decodedAvatarImage : nil,
-                catalog: selectedCatalog,
-                size: 154
-            )
-            .accessibilityIdentifier("add-plant-avatar-preview")
-
-            VStack(spacing: 4) {
-                Text(resolvedPlantName)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.68)
-                Text(plantAvatarStatusText)
-                    .font(OhanaFont.caption(.black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
     }
 
     var plantAvatarStatusText: String {
@@ -100,7 +77,7 @@ extension AddPlantView {
                         l.tr(zh: "改回自带头像", en: "Use built-in avatar", de: "Integrierten Avatar nutzen"),
                         systemImage: "arrow.uturn.backward"
                     )
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
@@ -125,16 +102,16 @@ extension AddPlantView {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
-                    .foregroundStyle(isSelected ? Color.arkInk : Color.goTeal)
+                    .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goTeal)
                     .frame(width: 34, height: 34) // a11y: allow decorative source glyph; parent button provides the 44pt target and label.
                     .background(isSelected ? Color.goPrimary.opacity(0.96) : Color.goTeal.opacity(0.13), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -147,7 +124,7 @@ extension AddPlantView {
                 Spacer(minLength: 0)
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selected glyph; button selected trait carries state.
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                         .accessibilityHidden(true)
                 }

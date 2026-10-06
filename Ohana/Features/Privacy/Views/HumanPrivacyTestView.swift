@@ -49,13 +49,13 @@ struct HumanPrivacyTestView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
                     .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "人类隐私检查", en: "Human privacy check", de: "Menschen-Datenschutzcheck"))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
                         zh: "只显示可见/锁定结果，不展示任何私密内容",
@@ -86,12 +86,12 @@ struct HumanPrivacyTestView: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text(l.tr(zh: "字段矩阵", en: "Field matrix", de: "Feldmatrix"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text(viewer?.id == target.id ? l.tr(zh: "本人视角", en: "Own view", de: "Eigene Ansicht") : l.tr(zh: "他人视角", en: "Other viewer", de: "Andere Ansicht"))
-                        .font(OhanaFont.caption2(.black))
-                        .foregroundStyle(Color.arkInk)
+                        .font(OhanaFont.caption2(.semibold))
+                        .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
                         .background(Color.goPrimary, in: Capsule())
@@ -143,13 +143,13 @@ struct HumanPrivacyTestView: View {
     private func visibleRow(title: String, subtitle: String, isLocked: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: isLocked ? "lock.fill" : "eye.fill")
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(isLocked ? Color.goYellow : Color.goPrimary)
                 .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background((isLocked ? Color.goYellow : Color.goPrimary).opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
                     .font(OhanaFont.caption2(.bold))
@@ -157,8 +157,8 @@ struct HumanPrivacyTestView: View {
             }
             Spacer()
             Text(isLocked ? l.tr(zh: "锁定", en: "Locked", de: "Gesperrt") : l.tr(zh: "可见", en: "Visible", de: "Sichtbar"))
-                .font(OhanaFont.caption2(.black))
-                .foregroundStyle(isLocked ? Color.goYellow : Color.arkInk)
+                .font(OhanaFont.caption2(.semibold))
+                .foregroundStyle(isLocked ? Color.goYellow : Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(isLocked ? Color.goYellow.opacity(0.14) : Color.goPrimary, in: Capsule())
@@ -184,7 +184,7 @@ struct HumanPrivacyTestView: View {
     private func localizedPrivateFieldTitle(_ field: HumanPrivateField) -> String {
         switch field {
         case .weight:
-            l.tr(zh: "体重", en: "Weight", de: "Gewicht")
+            l.tr(zh: "身体与健康记录", en: "Body & health records", de: "Körper- und Gesundheitsdaten")
         case .workout:
             l.tr(zh: "运动", en: "Workouts", de: "Training")
         case .medication:

@@ -63,6 +63,22 @@ enum HumanRequirementCoordinator {
     }
 
     @MainActor
+    static func firstLivingHumanID(context: ModelContext) -> UUID? {
+        var descriptor = FetchDescriptor<Human>(
+            predicate: #Predicate<Human> { human in
+                human.passedAwayDate == nil
+            },
+            sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
+        )
+        descriptor.fetchLimit = 1
+        return fetchOrLog(
+            descriptor,
+            context: context,
+            operation: "fetch first living human"
+        ).first?.id
+    }
+
+    @MainActor
     private static func firstHuman(context: ModelContext) -> Human? {
         var descriptor = FetchDescriptor<Human>(
             sortBy: [SortDescriptor(\Human.createdAt, order: .forward)]
@@ -91,6 +107,8 @@ protocol HumanRequirementResolving {
         isAccountSwitchPresented: Bool,
         context: ModelContext
     ) -> HumanRequirementResolution
+
+    func firstLivingHumanID(context: ModelContext) -> UUID?
 }
 
 struct LiveHumanRequirementResolver: HumanRequirementResolving {
@@ -106,5 +124,9 @@ struct LiveHumanRequirementResolver: HumanRequirementResolving {
             isAccountSwitchPresented: isAccountSwitchPresented,
             context: context
         )
+    }
+
+    func firstLivingHumanID(context: ModelContext) -> UUID? {
+        HumanRequirementCoordinator.firstLivingHumanID(context: context)
     }
 }

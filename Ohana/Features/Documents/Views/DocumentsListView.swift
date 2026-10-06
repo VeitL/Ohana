@@ -11,6 +11,7 @@ import SwiftUI
 struct DocumentsListContentView: View {
     let pet: Pet
     var showsCloseButton: Bool = true
+    var onClose: (() -> Void)?
 
     let routeDocuments: [PetDocument]
     let routeInsurances: [PetInsurance]
@@ -35,10 +36,12 @@ struct DocumentsListContentView: View {
         pet: Pet,
         showsCloseButton: Bool = true,
         routeDocuments: [PetDocument],
-        routeInsurances: [PetInsurance]
+        routeInsurances: [PetInsurance],
+        onClose: (() -> Void)? = nil
     ) {
         self.pet = pet
         self.showsCloseButton = showsCloseButton
+        self.onClose = onClose
         self.routeDocuments = routeDocuments
         self.routeInsurances = routeInsurances
     }
@@ -69,7 +72,14 @@ struct DocumentsListContentView: View {
                 .padding(.top, 18)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .accessibilityIdentifier("pet-documents-screen")
+        .navigationTitle(l.tr(zh: "证件保障", en: "Documents and protection", de: "Dokumente und Schutz"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsCloseButton {
+                OhanaModalToolbar(onClose: { if let onClose { onClose() } else { dismiss() } }, closeIdentifier: "pet-documents-close-action")
+            }
+        }
         .sheet(item: $activePopup) { popup in
             switch popup {
             case .addDocument:
@@ -82,10 +92,10 @@ struct DocumentsListContentView: View {
                 ProtectionInsurancePopup(pet: pet, existing: insurance) { activePopup = nil }
             }
         }
-        .sheet(item: $detailDoc) { doc in
-            DocumentDetailSheet(doc: doc, pet: pet, onEdit: { activePopup = .editDocument(doc) })
+        .navigationDestination(item: $detailDoc) { doc in
+            DocumentDetailSheet(doc: doc, pet: pet)
         }
-        .sheet(item: $selectedInsurance) { insurance in
+        .navigationDestination(item: $selectedInsurance) { insurance in
             InsurancePolicyDetailSheet(insurance: insurance, pet: pet)
         }
         .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: Binding(
@@ -145,24 +155,14 @@ struct DocumentsListContentView: View {
             ProtectionPetAvatar(pet: pet, size: 48)
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "证件保障", en: "Documents and protection", de: "Dokumente und Schutz"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(pet.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            if showsCloseButton {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            }
+
         }
     }
 
@@ -185,7 +185,7 @@ struct DocumentsListContentView: View {
     private func statusMetric(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(value)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -224,7 +224,7 @@ struct DocumentsListContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label(selectedSection.title(l), systemImage: selectedSection.icon)
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
             }
@@ -236,6 +236,7 @@ struct DocumentsListContentView: View {
                         icon: "doc.badge.plus",
                         title: l.tr(zh: "还没有证件", en: "No documents yet", de: "Noch keine Dokumente"),
                         actionTitle: l.tr(zh: "添加证件", en: "Add document", de: "Dokument hinzufügen"),
+                        actionIdentifier: "pet-documents-add-document-action",
                         tint: selectedSection.tint
                     ) { openAdd(for: .documents) }
                 } else {
@@ -254,6 +255,7 @@ struct DocumentsListContentView: View {
                         icon: "shield",
                         title: l.tr(zh: "还没有保单", en: "No policies yet", de: "Noch keine Policen"),
                         actionTitle: l.tr(zh: "添加保单", en: "Add policy", de: "Police hinzufügen"),
+                        actionIdentifier: "pet-documents-add-insurance-action",
                         tint: selectedSection.tint
                     ) { openAdd(for: .insurance) }
                 } else {

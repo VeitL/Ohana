@@ -19,11 +19,14 @@ struct FeatureGroupDashboardView: View {
 
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedItemID: String?
+    @State private var showingPersonalPlan = false
 
     private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
     private var visibleHumans: [Human] { humans.filter { !$0.hasPassedAway } }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
+    private var currentPlan: OhanaPlanLevel { appServices.commerce.ohanaPlanLevel }
     private var l: L10n { L10n(appLanguage) }
 
     private var hasDogs: Bool {
@@ -31,11 +34,15 @@ struct FeatureGroupDashboardView: View {
     }
 
     private var items: [FeatureGroupItem] {
-        FeatureGroupItem.items(for: group, hasDogs: hasDogs, l: l)
-            .filter {
+        let allItems = FeatureGroupItem.items(for: group, hasDogs: hasDogs, l: l)
+        if group == .householdHub {
+            return allItems
+        }
+        return allItems.filter {
                 AppFeatureRouteGuard.isVisibleFunctionDestination(
                     $0.destination,
-                    currentLevel: currentTreeLevel
+                    currentLevel: currentTreeLevel,
+                    plan: currentPlan
                 )
             }
     }
@@ -57,7 +64,6 @@ struct FeatureGroupDashboardView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                pageHeader
                 if items.isEmpty {
                     unavailableGroupFallback
                 } else {
@@ -69,57 +75,52 @@ struct FeatureGroupDashboardView: View {
         }
         .onAppear(perform: ensureSelectedItem)
         .onChange(of: items.map(\.id)) { _, _ in ensureSelectedItem() }
-        .accessibilityIdentifier("function-menu-group-screen-\(group.rawValue)")
-    }
-
-    private var pageHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: group.icon)
-                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(group.color)
-                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-            Text(group.title(l: l))
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-            Spacer(minLength: 54)
+        .sheet(isPresented: $showingPersonalPlan) {
+            PersonalPlanView()
+                .ohanaSheetPagePresentation()
         }
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 6)
+        .accessibilityIdentifier("function-menu-group-screen-\(group.rawValue)")
     }
 
     private var segmentBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(items) { item in
+                    let access = householdAccess(for: item)
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(GoMotion.feedback) {
-                            selectedItemID = item.id
-                        }
+                        guard effectiveSelectedItemID != item.id else { return }
+                        OhanaFeedback.selection()
+                        selectedItemID = item.id
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: item.icon)
+                                .accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text(item.title)
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
+                            if case let .locked(requiredLevel) = access {
+                                Image(systemName: "lock.fill").accessibilityHidden(true)
+                                    .font(OhanaFont.adaptive(size: 8, weight: .semibold))
+                                Text("Lv.\(requiredLevel)")
+                                    .font(OhanaFont.caption2(.semibold))
+                            }
                         }
                         .foregroundStyle(effectiveSelectedItemID == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 8)
-                        .background(effectiveSelectedItemID == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                        .frame(minHeight: 44)
+                        .background(effectiveSelectedItemID == item.id ? Color.goPrimary : Color.clear, in: Capsule())
+                        .animation(reduceMotion ? GoMotion.reduced : GoMotion.selection, value: effectiveSelectedItemID == item.id)
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .buttonStyle(ScaleButtonStyle(triggersHaptic: false))
+                    .accessibilityAddTraits(effectiveSelectedItemID == item.id ? .isSelected : [])
                     .accessibilityIdentifier("function-menu-group-segment-\(item.id)")
-                    .accessibilityValue(effectiveSelectedItemID == item.id
-                        ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
-                        : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
+                    .accessibilityValue(segmentAccessibilityValue(for: item, access: access))
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 6)
         }
     }
 
@@ -129,20 +130,27 @@ struct FeatureGroupDashboardView: View {
             content(for: selectedItem)
                 .id(selectedItem.id)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity)
-                .animation(GoMotion.page, value: effectiveSelectedItemID)
+                .ohanaContextHandoff(effectiveSelectedItemID, initialScale: 1)
         }
     }
 
     @ViewBuilder
     private func content(for item: FeatureGroupItem) -> some View {
-        switch AppFeatureRouteGuard.functionDestinationDecision(item.destination, currentLevel: currentTreeLevel) {
+        switch AppFeatureRouteGuard.functionDestinationDecision(
+            item.destination,
+            currentLevel: currentTreeLevel,
+            plan: currentPlan
+        ) {
         case .allow:
             allowedContent(for: item)
         case .rootMenu:
             EmptyView()
         case let .redirectToRoadmap(note):
-            lockedRouteFallback(note: note)
+            if group == .householdHub, let tab = item.householdInsightTab {
+                householdInsightLockedContent(tab: tab, note: note)
+            } else {
+                lockedRouteFallback(note: note)
+            }
         case let .suppress(note):
             hiddenRouteFallback(note: note)
         }
@@ -171,6 +179,8 @@ struct FeatureGroupDashboardView: View {
             }
         case .familyWeeklyReport:
             FamilyWeeklyReportDashboardView()
+        case .familyLongTermReview:
+            FamilyLongTermReviewView()
         case .plantsDashboard:
             PlantDashboardView(
                 plants: plants,
@@ -250,6 +260,30 @@ struct FeatureGroupDashboardView: View {
         }
     }
 
+    private func householdInsightLockedContent(
+        tab: HouseholdInsightTab,
+        note: String
+    ) -> some View {
+        ScrollView(showsIndicators: false) {
+            VStack(spacing: 14) {
+                if HouseholdInsightAccessPolicy.includesUngatedSafetySummary(for: tab) {
+                    ReminderSafetySummaryView()
+                }
+                HouseholdInsightLockedCard(
+                    tab: tab,
+                    currentLevel: currentTreeLevel,
+                    appLanguage: appLanguage,
+                    onShowPersonal: { showingPersonalPlan = true }
+                )
+            }
+            .padding(16)
+            .padding(.bottom, 30)
+        }
+        .onAppear {
+            AppFeatureRouteGuard.recordIntercept(note)
+        }
+    }
+
     private func hiddenRouteFallback(note: String) -> some View {
         Color.clear
             .onAppear {
@@ -264,6 +298,32 @@ struct FeatureGroupDashboardView: View {
         }
         selectedItemID = items[0].id
     }
+
+    private func householdAccess(for item: FeatureGroupItem) -> HouseholdInsightAccess {
+        guard let tab = item.householdInsightTab else { return .available }
+        return HouseholdInsightAccessPolicy.access(
+            for: tab,
+            currentLevel: currentTreeLevel,
+            plan: currentPlan
+        )
+    }
+
+    private func segmentAccessibilityValue(
+        for item: FeatureGroupItem,
+        access: HouseholdInsightAccess
+    ) -> String {
+        let selection = effectiveSelectedItemID == item.id
+            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
+            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt")
+        switch access {
+        case .available:
+            return selection
+        case .availableThroughPersonal:
+            return "\(selection), \(l.tr(zh: "Personal 已解锁", en: "Unlocked by Personal", de: "Durch Personal freigeschaltet"))"
+        case let .locked(requiredLevel):
+            return "\(selection), \(l.tr(zh: "Lv.\(requiredLevel) 解锁", en: "Unlocks at Lv.\(requiredLevel)", de: "Ab Lv.\(requiredLevel)"))"
+        }
+    }
 }
 
 private struct FeatureGroupItem: Identifiable {
@@ -271,6 +331,10 @@ private struct FeatureGroupItem: Identifiable {
     let title: String
     let icon: String
     let destination: FMDest
+
+    var householdInsightTab: HouseholdInsightTab? {
+        HouseholdInsightTab.tab(for: destination)
+    }
 
     static func items(for group: FeatureGroup, hasDogs: Bool, l: L10n) -> [FeatureGroupItem] {
         switch group {
@@ -285,39 +349,44 @@ private struct FeatureGroupItem: Identifiable {
             items.append(feature(.potty, l: l))
             return items
         case .healthBody:
-            // 「提醒健康」迁出至「家」hub（属家庭层面审计）；本组聚焦个体健康指标
+            // Raw health and medication records are Lv.1 entity routes. This
+            // Lv.2 group contains only their household aggregate dashboards.
             return [
                 feature(.health, l: l),
-                feature(.medications, l: l),
-                feature(.weight, l: l)
+                feature(.medications, l: l)
             ]
         case .archiveMemory:
             // 单一聚合入口：用户进入 hub 后再选择 基本信息 / 证件 / 重要时刻 / 成就
             return [feature(.retention, l: l)]
         case .householdHub:
-            // 整合自旧 financeLedger + familyCollab + 提醒健康（跨模块协作类）
-            var items: [FeatureGroupItem] = [
+            return [
+                feature(.weight, l: l),
                 feature(.expense, l: l),
                 destination(
+                    id: "weekly-report",
+                    title: HouseholdInsightTab.weeklyReport.title(language: l.languageCode),
+                    icon: "chart.bar.doc.horizontal",
+                    .familyWeeklyReport
+                ),
+                destination(
                     id: "care-ledger",
-                    title: l.tr(zh: "照护分析", en: "Care Analysis", de: "Pflegeanalyse"),
+                    title: HouseholdInsightTab.careAnalysis.title(language: l.languageCode),
                     icon: "list.bullet.rectangle.portrait.fill",
                     .careLedgerAnalysis
                 ),
                 destination(
                     id: "reminder-observability",
-                    title: l.tr(zh: "提醒健康", en: "Reminder Health", de: "Erinnerungsstatus"),
+                    title: HouseholdInsightTab.reminderHealth.title(language: l.languageCode),
                     icon: "bell.badge.fill",
                     .reminderObservability
+                ),
+                destination(
+                    id: "long-term-review",
+                    title: HouseholdInsightTab.longTermReview.title(language: l.languageCode),
+                    icon: "book.closed.fill",
+                    .familyLongTermReview
                 )
             ]
-            items.append(destination(
-                id: "weekly-report",
-                title: l.tr(zh: "照护周报", en: "Care Weekly", de: "Pflegewoche"),
-                icon: "chart.bar.doc.horizontal",
-                .familyWeeklyReport
-            ))
-            return items
         case .plants:
             return [
                 destination(

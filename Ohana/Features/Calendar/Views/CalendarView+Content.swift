@@ -600,13 +600,70 @@ extension CalendarView {
 
     func applyPreparedSnapshotReference(_ reference: CalendarRoutePreparedSnapshotReference) {
         let eventByModelID = Dictionary(uniqueKeysWithValues: events.map { ($0.persistentModelID, $0) })
-        let prepared = reference.rehydrated(eventByModelID: eventByModelID)
+        let persistedPrepared = reference.rehydrated(eventByModelID: eventByModelID)
+        let projectionEvents = filteredFamilyTaskProjectionEvents(for: reference.key.filter)
+        let prepared = CalendarRoutePreparedSnapshot(
+            key: persistedPrepared.key,
+            snapshot: CalendarSnapshotBuilder.mergingFamilyTaskProjectionEvents(
+                projectionEvents,
+                into: persistedPrepared.snapshot,
+                allEvents: events,
+                pets: pets,
+                selectedDate: selectedDate
+            )
+        )
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
             preparedCalendarSnapshot = prepared.snapshot
             preparedCalendarSnapshotKey = prepared.key
         }
+    }
+
+    private func filteredFamilyTaskProjectionEvents(
+        for selection: CalendarFilterSelection
+    ) -> [Event] {
+        var result = familyTaskProjectionEvents.filter { event in
+            !MemberLifecycleActiveScheduleResolver.eventTargetsDeceasedActiveSchedule(
+                event,
+                pets: pets,
+                humans: humans,
+                petMedications: petMedications,
+                humanMedications: humanMedications,
+                insurances: insurances
+            )
+        }
+        if selection.humanId.isEmpty, selection.plantId.isEmpty,
+           let petID = selection.selectedPetId {
+            result = result.filter {
+                MemberLifecycleActiveScheduleResolver.eventBelongsToPet(
+                    $0,
+                    petId: petID,
+                    petMedications: petMedications,
+                    insurances: insurances
+                )
+            }
+        }
+        if selection.petId.isEmpty, selection.plantId.isEmpty,
+           let humanID = selection.selectedHumanId {
+            result = result.filter {
+                MemberLifecycleActiveScheduleResolver.eventBelongsToHuman(
+                    $0,
+                    humanId: humanID,
+                    humanMedications: humanMedications
+                )
+            }
+        }
+        if selection.petId.isEmpty, selection.humanId.isEmpty {
+            if selection.isAllPlantsSelected {
+                result = result.filter { eventIsRelatedToAnyPlant($0) }
+            } else if let plantID = selection.selectedPlantId {
+                result = result.filter {
+                    DomainEntityLinkRegistry.plantId(for: $0)?.uuidString == plantID
+                }
+            }
+        }
+        return result
     }
 
     func clearPreparedCalendarSnapshotTask(generation: Int) {

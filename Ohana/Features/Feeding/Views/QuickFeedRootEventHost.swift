@@ -17,7 +17,7 @@ struct QuickFeedRootEventHost: ViewModifier {
     let selectedTreatKindRawValue: String?
     let planCalendarMonth: Date
     let planCalendarSelectedDate: Date
-    let eventCount: Int
+    let eventRevision: QuickFeedRouteRevision
     let feedingLedgerEntryCount: Int
     let careLogCount: Int
     let foodRecordCount: Int
@@ -33,7 +33,7 @@ struct QuickFeedRootEventHost: ViewModifier {
     let onNestedInlineSheetChange: () -> Void
     let onTreatFilterChange: () -> Void
     let onPlanCalendarChange: () -> Void
-    let onEventCountChange: () -> Void
+    let onEventsChange: () -> Void
     let onFeedingLedgerEntryCountChange: () -> Void
     let onCareLogCountChange: () -> Void
     let onFoodRecordCountChange: () -> Void
@@ -63,7 +63,7 @@ struct QuickFeedRootEventHost: ViewModifier {
             .onChange(of: selectedTreatKindRawValue) { _, _ in onTreatFilterChange() }
             .onChange(of: planCalendarMonth) { _, _ in onPlanCalendarChange() }
             .onChange(of: planCalendarSelectedDate) { _, _ in onPlanCalendarChange() }
-            .onChange(of: eventCount) { _, _ in onEventCountChange() }
+            .onChange(of: eventRevision) { _, _ in onEventsChange() }
             .onChange(of: feedingLedgerEntryCount) { _, _ in onFeedingLedgerEntryCountChange() }
             .onChange(of: careLogCount) { _, _ in onCareLogCountChange() }
             .onChange(of: foodRecordCount) { _, _ in onFoodRecordCountChange() }

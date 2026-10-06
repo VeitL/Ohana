@@ -41,25 +41,7 @@ extension OasisRewardView {
 
     // MARK: - Header
 
-    var oasisFixedToolbar: some View {
-        HStack(spacing: 8) {
-            oasisToolbarButton(systemName: "xmark") {
-                dismiss()
-            }
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
 
-            Spacer()
-
-            oasisToolbarButton(systemName: "info.circle") {
-                openSheet(.coconutRules)
-            }
-            .accessibilityLabel(l.tr(zh: "椰子规则", en: "Coconut rules", de: "Kokosnuss-Regeln"))
-            oasisToolbarButton(systemName: "shippingbox.fill") {
-                openSheet(.inventory)
-            }
-            .accessibilityLabel(l.tr(zh: "库存", en: "Inventory", de: "Inventar"))
-        }
-    }
 
     var oasisHeader: some View {
         HStack(alignment: .center) {
@@ -69,7 +51,7 @@ extension OasisRewardView {
                     .kerning(1.2)
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(l.tr(zh: "生命之树", en: "Life Tree", de: "Lebensbaum"))
-                    .font(OhanaFont.title(.black))
+                    .font(OhanaFont.brandTitle(.title, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer()

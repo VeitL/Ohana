@@ -95,7 +95,7 @@ struct VerticalSolidHomeTodayFocusChrome: View {
                         .font(.headline)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .buttonStyle(.borderedProminent)
+                .ohanaPrimaryProminentButton()
                 .controlSize(.large)
                 .disabled(!isLive)
                 .accessibilityLabel(accessibilityTaskActionLabel(action, title: task.title))

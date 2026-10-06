@@ -196,6 +196,7 @@ struct PlantAllFeaturesSheet: View {
                     subtitle: headerSubtitle,
                     eyebrow: l.tr(zh: "植物全部功能", en: "Plant Hub", de: "Pflanzen-Hub"),
                     onClose: { dismiss() },
+                    showsCloseButton: false,
                     avatar: {
                         FeatureHubAvatar(
                             imageCacheID: "plant-all-features-\(plant.id.uuidString)",
@@ -209,7 +210,6 @@ struct PlantAllFeaturesSheet: View {
                 )
             } content: {
                 focusActionBanner
-                FeatureHubMetricStrip(metrics: metrics)
 
                 ForEach(sections) { section in
                     FeatureHubSectionActionView(section: section) { destination in
@@ -217,7 +217,9 @@ struct PlantAllFeaturesSheet: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "feature-hub-close-action") }
         }
         .accessibilityIdentifier("plant-detail-all-features-sheet")
     }
@@ -382,7 +384,7 @@ struct PlantAllFeaturesSheet: View {
 
     private func focusActionIcon(_ action: PlantHubFocusAction) -> some View {
         Image(systemName: action.icon) // a11y: allow decorative priority glyph; the banner label names the action.
-            .font(OhanaFont.adaptive(size: 18, weight: .black))
+            .font(OhanaFont.adaptive(size: 18, weight: .semibold))
             .foregroundStyle(action.tint)
             .frame(width: 44, height: 44)
             .background(action.tint.opacity(0.16), in: Circle())
@@ -392,18 +394,18 @@ struct PlantAllFeaturesSheet: View {
     private func focusActionCopy(_ action: PlantHubFocusAction) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(action.eyebrow)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .textCase(.uppercase)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Text(action.title)
-                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Text(action.detail)
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
@@ -412,36 +414,11 @@ struct PlantAllFeaturesSheet: View {
 
     private var focusActionArrow: some View {
         Image(systemName: "arrow.right") // a11y: allow decorative priority navigation glyph; button label is explicit.
-            .font(OhanaFont.adaptive(size: 16, weight: .black))
-            .foregroundStyle(Color.arkInk)
+            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(width: 44, height: 44)
             .background(Color.goPrimary, in: Circle())
             .accessibilityHidden(true)
-    }
-
-    private var metrics: [FeatureHubMetric] {
-        [
-            FeatureHubMetric(
-                id: "due",
-                title: l.tr(zh: "到期", en: "Due", de: "Fällig"),
-                value: "\(dueTaskCount)"
-            ),
-            FeatureHubMetric(
-                id: "logs",
-                title: l.tr(zh: "记录", en: "Logs", de: "Einträge"),
-                value: "\(logCount)"
-            ),
-            FeatureHubMetric(
-                id: "photos",
-                title: l.tr(zh: "照片", en: "Photos", de: "Fotos"),
-                value: "\(photoCount)"
-            ),
-            FeatureHubMetric(
-                id: "profile",
-                title: l.tr(zh: "档案", en: "Profile", de: "Profil"),
-                value: "\(profileCompletionPercent)%"
-            )
-        ]
     }
 
     private var sections: [FeatureHubSectionData<PlantFeatureDestination>] {

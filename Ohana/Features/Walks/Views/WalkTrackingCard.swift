@@ -35,6 +35,7 @@ struct WalkTrackingCard: View {
     @State var summaryRotation: Double = 0
     @State var showingGoalSetter = false
     @State var goalDraft: Double = 0
+    @State var savedRecord: PetRecordReference?
     @State var lastStopRewardSummary: WalkStopRewardSummary?
     @State var selectedSharedWalkPetIds: Set<UUID> = []
     @State var selectedSharedWalkExecutorIds: Set<String> = []
@@ -187,13 +188,9 @@ struct WalkTrackingCard: View {
                 lastStopRewardSummary = nil
             }
         }
+        .petRecordFeedback($savedRecord)
         .onAppear {
-            selectedSharedWalkPetIds = SharedPetSelectionMemory.restoredSelection(
-                sourcePet: pet,
-                scope: "walk.shared",
-                candidates: sameSpeciesWalkPets,
-                defaultToAll: false
-            )
+            selectedSharedWalkPetIds = Set([pet.id])
             refreshDefaultWalkExecutors()
             if case .finished = mgr.phase, mgr.currentPet?.id == pet.id {
                 presentSummaryBack(animated: false)

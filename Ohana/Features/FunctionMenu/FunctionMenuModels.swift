@@ -24,7 +24,11 @@ enum FeatureGroup: String, Hashable, CaseIterable {
         case .archiveMemory:
             l.tr(zh: "成长档案", en: "Growth Records", de: "Wachstumsakte")
         case .householdHub:
-            l.tr(zh: "家庭洞察", en: "Household Insights", de: "Haushaltseinblicke")
+            AppLocalizedText(
+                zh: "家庭洞察", en: "Household Insights", de: "Haushaltseinblicke",
+                es: "Información del hogar", pt: "Visão da família", fr: "Aperçu du foyer",
+                ja: "家族インサイト", ko: "가족 인사이트", it: "Analisi della famiglia"
+            ).resolve(l.languageCode)
         case .oasisRewards:
             l.tr(zh: "绿洲奖励", en: "Oasis Rewards", de: "Oasis-Belohnungen")
         case .plants:
@@ -96,6 +100,7 @@ enum FMDest: Hashable {
     case wealthDashboard
     case bountyBoard
     case familyWeeklyReport
+    case familyLongTermReview
     case careLedgerAnalysis
     case reminderObservability
     case coconutShop

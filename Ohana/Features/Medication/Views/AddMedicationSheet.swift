@@ -35,6 +35,12 @@ struct AddMedicationSheet: View {
     @State private var showMore = false
     @State private var showDeleteConfirmation = false
     @State private var isSaving = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [name, String(describing: doseForm), doseAmount, doseUnit, String(describing: frequency), customNote,
+         String(describing: doseMinutes), String(weeklyWeekday), String(startDate.timeIntervalSince1970),
+         String(hasEndDate), String(endDate.timeIntervalSince1970), colorHex, notes, String(isActive)]
+    }
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
     @FocusState private var focusedField: FocusField?
 
@@ -99,12 +105,26 @@ struct AddMedicationSheet: View {
     }
 
     var body: some View {
+        NavigationStack {
+            editorContent
+                .navigationTitle(isEditing ? l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten") : l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
+                .navigationBarTitleDisplayMode(.inline)
+                .accessibilityIdentifier("add-human-medication-sheet")
+                .ohanaEditorChrome(
+                    hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                    isSaving: isSaving, canSave: canSave,
+                    saveIdentifier: "add-human-medication-save-action",
+                    onCancel: { dismiss() }, onSave: save
+                )
+        }
+    }
+
+    private var editorContent: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
-                    header
                     basicInfoCard
                     frequencyCard
                     dateCard
@@ -122,14 +142,13 @@ struct AddMedicationSheet: View {
 
                     moreDisclosure
 
-                    Spacer(minLength: 110)
+                    Spacer(minLength: 20)
                 }
                 .padding(.top, 20)
                 .padding(.horizontal, 16)
             }
             .scrollDismissesKeyboard(.interactively)
         }
-        .safeAreaInset(edge: .bottom) { footerBar }
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
                 Spacer()
@@ -157,7 +176,9 @@ struct AddMedicationSheet: View {
             Text(l.tr(zh: "只会删除这个药物计划，历史服药记录会保留。", en: "Only this medication plan will be deleted. Past dose logs stay saved.", de: "Nur dieser Plan wird gelöscht. Frühere Einnahmen bleiben gespeichert."))
         }
         .onAppear {
+            guard initialDraft == nil else { return }
             loadEditing()
+            initialDraft = editorDraft
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                 focusedField = .name
             }
@@ -178,33 +199,7 @@ struct AddMedicationSheet: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(isEditing ? l.tr(zh: "编辑药物", en: "Edit medication", de: "Medikament bearbeiten") : l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
-                    .font(OhanaFont.title2(.bold))
-                    .foregroundStyle(primaryText)
-                    .accessibilityIdentifier("add-human-medication-sheet")
-                Text(l.tr(zh: "先设好药名、频率和时间。", en: "Set the name, frequency, and time first.", de: "Lege zuerst Name, Häufigkeit und Zeit fest."))
-                    .font(OhanaFont.caption())
-                    .foregroundStyle(secondaryText)
-            }
-            Spacer()
-            Button {
-                guard !isSaving else { return }
-                dismiss()
-            } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(primaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(isSaving)
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-        }
-    }
+
 
     private var basicInfoCard: some View {
         sheetCard {
@@ -384,7 +379,7 @@ struct AddMedicationSheet: View {
                                     } label: {
                                         Text(label)
                                             .font(OhanaFont.caption(.bold))
-                                            .foregroundStyle(weeklyWeekday == weekday ? Color.arkInk : primaryText)
+                                            .foregroundStyle(weeklyWeekday == weekday ? Color.ohanaPrimaryActionText : primaryText)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
                                             .background(weeklyWeekday == weekday ? Color.goPrimary : controlFill, in: Capsule())
@@ -429,10 +424,10 @@ struct AddMedicationSheet: View {
                 Text(l.tr(zh: "手动记录", en: "Manual logging", de: "Manuell eintragen"))
                     .font(OhanaFont.caption(.bold))
                     .foregroundStyle(primaryText)
-                Text(l.tr(zh: "按需和自定义药物不会自动生成固定提醒，可在管理页记录一次。", en: "As-needed and custom medications do not create fixed reminders. Log them from the management page.", de: "Bedarfs- und eigene Medikamente erzeugen keine festen Erinnerungen. Trage sie auf der Verwaltungsseite ein."))
+                Text(l.tr(zh: "无固定提醒 · 在管理页记录", en: "No fixed reminders · log from Medication", de: "Keine festen Erinnerungen · unter Medikamente eintragen"))
                     .font(OhanaFont.caption())
                     .foregroundStyle(secondaryText)
-                    .lineLimit(3)
+                    .lineLimit(2)
             }
             Spacer()
         }
@@ -533,36 +528,7 @@ struct AddMedicationSheet: View {
         }
     }
 
-    private var footerBar: some View {
-        VStack(spacing: 0) {
-            Button {
-                GoKeyboard.dismiss()
-                DispatchQueue.main.async {
-                    save()
-                }
-            } label: {
-                HStack(spacing: 8) {
-                    if isSaving {
-                        Image(systemName: "hourglass") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.callout(.bold))
-                    }
-                    Text(isSaving ? l.tr(zh: "保存中", en: "Saving", de: "Speichert") : (isEditing ? l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen sichern") : l.tr(zh: "保存药物", en: "Save medication", de: "Medikament sichern")))
-                        .font(OhanaFont.headline(.bold))
-                }
-                .foregroundStyle(Color.arkInk)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(canSave ? Color.goPrimary : Color.goPrimary.opacity(0.35), in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .disabled(!canSave)
-            .accessibilityIdentifier("add-human-medication-save-action")
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 12)
-        }
-        .background(Color.ohanaCardSurface)
-    }
+
 
     private func sheetCard(@ViewBuilder content: () -> some View) -> some View {
         content()

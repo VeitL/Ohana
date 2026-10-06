@@ -33,8 +33,29 @@ nonisolated protocol ReminderNotificationScheduling: Sendable {
     func scheduleRollingWindow(reminders: [Reminder])
     func refillWindowIfNeeded(allReminders: [Reminder])
     func cancel(notificationId: String)
+    func cancelPendingNotifications(withPrefixes prefixes: [String])
     func cancelAll(for pet: Pet, reminders: [Reminder])
     func compensate(reminders: [Reminder])
+}
+
+nonisolated extension ReminderNotificationScheduling {
+    func cancelPendingNotifications(withPrefixes prefixes: [String]) {
+        let normalizedPrefixes = prefixes
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard !normalizedPrefixes.isEmpty else { return }
+
+        Task {
+            let identifiers = await pendingNotificationIds()
+                .filter { identifier in
+                    normalizedPrefixes.contains { identifier.hasPrefix($0) }
+                }
+                .sorted()
+            for identifier in identifiers {
+                cancel(notificationId: identifier)
+            }
+        }
+    }
 }
 
 /// Injectable accessor for the notification scheduler. Defaults to a no-op until

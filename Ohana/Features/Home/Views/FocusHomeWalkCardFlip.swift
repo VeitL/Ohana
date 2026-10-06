@@ -42,6 +42,7 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
             front()
                 .opacity(rotation < 90 ? 1 : 0)
                 .allowsHitTesting(currentWalkPet == nil && rotation < 90)
+                .accessibilityHidden(currentWalkPet != nil || rotation >= 90)
 
             if let pet = currentWalkPet {
                 ZStack(alignment: .topTrailing) {
@@ -61,6 +62,7 @@ struct FocusHomeWalkCardFlip<Front: View>: View {
                 .rotation3DEffect(.degrees(180), axis: (x: 0, y: 1, z: 0))
                 .opacity(rotation >= 90 ? 1 : 0)
                 .allowsHitTesting(rotation >= 90)
+                .accessibilityHidden(rotation < 90)
             }
         }
         .rotation3DEffect(.degrees(rotation), axis: (x: 0, y: 1, z: 0), perspective: 0.75)

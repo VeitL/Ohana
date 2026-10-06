@@ -43,9 +43,9 @@ iPhone 11 through the current iPhone generation:
 
 | Lane | Required evidence |
 | --- | --- |
-| Automated tests | Unit, Integration, and UI tests use only the disposable `iPhone 17 Tests` device and `.build/DerivedData/tests`. |
-| Persistent Dogfood | Non-destructive long-lived journeys use the pinned `iPhone 17` through `scripts/run-dogfood-simulator.sh` and preserve its app/data container. |
-| Release compiler lane | Optimized compiler validation uses a generic iOS Simulator destination and `.build/DerivedData/release`; signed-device proof still requires an Archive. |
+| Automated tests | Unit, Integration, and UI tests use only the disposable `iPhone 17 Tests` device and the worktree-shared external `tests` cache lane. |
+| Persistent Dogfood | Non-destructive long-lived journeys use the pinned `iPhone 17 Dogfood` Release synthetic user through `scripts/run-dogfood-simulator.sh` and preserve its durable app data across container remounts. |
+| Release compiler lane | Optimized compiler validation uses a generic iOS Simulator destination and the shared external `release` cache lane; signed-device proof still requires an Archive. |
 | Hardware floor | Signed Release smoke on iPhone SE (2nd generation), or the smallest supported iPhone actually used for launch, running iOS 26.2 or later. |
 | Current hardware | Signed Release smoke on a current iPhone and current supported iOS. |
 | Archive / App Store Connect | The shipped app reports iPhone-only device family, requires no iPad screenshots, exposes no watchOS app, and records the selected storefronts. |
@@ -54,6 +54,33 @@ iPhone 11 through the current iPhone generation:
 Simulator evidence cannot close the hardware-floor, signed Archive, App Store
 Connect, notification-delivery, energy, or physical accessibility rows. Those
 remain in `TFU-20260709-001` and the true-device release plan.
+
+## Automated OS and Toolchain Validation
+
+Passing on one OS runtime or Xcode release does not establish compatibility
+with another. Keep the OS runtime and Xcode toolchain explicit in every test
+receipt, and vary one of them at a time when diagnosing a failure.
+
+| Trigger | Required automated coverage |
+| --- | --- |
+| Pull request | Full Unit/Integration suite on the minimum supported iOS runtime and the latest supported stable iOS runtime; critical UI smoke paths on both runtimes. |
+| Nightly | Complete UI shard manifest on the latest supported stable iOS runtime. Keep the governed per-simulator shard execution serial. |
+| Release candidate | Full Unit/Integration and complete UI shard manifest on both the minimum supported runtime (iOS 26.2) and latest supported stable runtime. Run each matrix leg on an isolated disposable `iPhone 17 Tests` Simulator. |
+| Next-major iOS beta | Use the matching Xcode beta and OS runtime. Run critical UI smoke paths on each beta; run the complete suite before adopting the OS as a supported release target. |
+| Xcode upgrade | Before changing the stable CI toolchain, run the same commit and runtime with both the old and new Xcode versions so toolchain changes are not confused with OS changes. |
+
+Every matrix leg must use the same source commit, device profile, seed, locale,
+and permission fixture unless the test explicitly varies that input. Receipts
+must record the exact Xcode build, simulator runtime, device, selectors, and
+result counts. Preserve the first failing result; a later retry is diagnostic
+evidence and never replaces a failed matrix leg. If a runner cannot provide
+the required runtime or Xcode version, mark that leg **Blocked** rather than
+substituting a different environment or claiming compatibility. Keep UI shards
+serial on each Simulator; separate OS matrix legs may use separate CI runners
+only when each runner owns its own disposable test Simulator and managed cache.
+The matrix policy itself is not test evidence: a leg remains **Blocked** until
+CI or an approved device run publishes a receipt for that exact OS/toolchain
+combination.
 
 ## Deferred Platform Migrations
 

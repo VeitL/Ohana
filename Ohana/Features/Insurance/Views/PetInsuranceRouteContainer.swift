@@ -11,10 +11,12 @@ struct PetInsuranceView: View {
     @Environment(AppServices.self) private var appServices
 
     let pet: Pet
+    let showsCloseButton: Bool
     var embedded: Bool = false
 
-    init(pet: Pet, embedded: Bool = false) {
+    init(pet: Pet, embedded: Bool = false, showsCloseButton: Bool = true) {
         self.pet = pet
+        self.showsCloseButton = showsCloseButton
         self.embedded = embedded
     }
 
@@ -30,7 +32,8 @@ struct PetInsuranceView: View {
             PetInsuranceContentView(
                 pet: pet,
                 embedded: embedded,
-                routeInsurances: data.insurances
+                routeInsurances: data.insurances,
+                showsCloseButton: showsCloseButton
             )
         }
     }

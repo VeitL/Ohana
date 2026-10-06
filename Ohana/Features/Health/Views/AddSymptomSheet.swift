@@ -36,14 +36,24 @@ struct AddSymptomSheet: View {
     }
 
     var body: some View {
+        NavigationStack {
+            editorContent
+                .navigationTitle(l.tr(zh: "记录异常", en: "Log symptom", de: "Symptom erfassen"))
+                .navigationBarTitleDisplayMode(.inline)
+                .ohanaEditorChrome(
+                    hasChanges: !symptomName.isEmpty || !note.isEmpty || category != .digestive || severity != .mild,
+                    isSaving: isSaving, canSave: canSave,
+                    onCancel: { dismiss() }, onSave: save
+                )
+        }
+    }
+
+    private var editorContent: some View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
 
             VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
-                    .padding(.bottom, 8)
+
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
@@ -56,49 +66,18 @@ struct AddSymptomSheet: View {
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 8)
-                    .padding(.bottom, 94)
+                    .padding(.bottom, 24)
                 }
                 .scrollDismissesKeyboard(.interactively)
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            saveBar
-        }
-        .interactiveDismissDisabled(isSaving)
+
         .onDisappear {
             commandQueue.cancelAll()
         }
-        .toolbar(.hidden, for: .navigationBar)
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            PetAvatarPortraitView(
-                pet: pet,
-                fallbackText: pet.avatarEmoji,
-                themeColor: themeColor,
-                size: 46,
-                backgroundOpacity: 0.16
-            )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(l.tr(zh: "记录异常", en: "Log symptom", de: "Symptom erfassen"))
-                    .font(OhanaFont.title3(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(pet.name)
-                    .font(OhanaFont.caption(.semibold))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-    }
+
 
     private var categorySection: some View {
         formBlock {
@@ -111,9 +90,9 @@ struct AddSymptomSheet: View {
                         } label: {
                             HStack(spacing: 7) {
                                 Image(systemName: categoryIcon(item))
-                                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                                 Text(categoryTitle(item))
-                                    .font(OhanaFont.caption(.black))
+                                    .font(OhanaFont.caption(.semibold))
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.72)
                             }
@@ -150,8 +129,8 @@ struct AddSymptomSheet: View {
                             withAnimation(GoMotion.selection) { severity = level }
                         } label: {
                             Text(severityTitle(level))
-                                .font(OhanaFont.caption(.black))
-                                .foregroundStyle(severity == level ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
+                                .font(OhanaFont.caption(.semibold))
+                                .foregroundStyle(severity == level ? severityForeground(level) : Color.ohanaPrimaryText)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 36)
                                 .background(severity == level ? severityColor(level) : Color.ohanaControlFill, in: Capsule())
@@ -198,29 +177,15 @@ struct AddSymptomSheet: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var saveBar: some View {
-        Button(action: save) {
-            Text(l.tr(zh: "保存记录", en: "Save record", de: "Eintrag speichern"))
-                .font(OhanaFont.subheadline(.black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(maxWidth: .infinity)
-                .frame(height: 52)
-                .background(canSave ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .disabled(!canSave)
-        .padding(.horizontal, 18)
-        .padding(.top, 10)
-        .padding(.bottom, 12)
-    }
+
 
     private func sectionLabel(_ title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             Text(title)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
     }
@@ -273,6 +238,15 @@ struct AddSymptomSheet: View {
         case .moderate: Color.goYellow
         case .severe: Color.goOrange
         case .critical: Color.goRed
+        }
+    }
+
+    private func severityForeground(_ severity: SymptomSeverity) -> Color {
+        switch severity {
+        case .mild, .moderate, .severe:
+            Color.arkInk
+        case .critical:
+            Color.goCardWhite
         }
     }
 

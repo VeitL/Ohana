@@ -29,11 +29,10 @@ extension Human {
         // 规则 B："💸 榜一大哥"（累计 Expense 金额全家最高）
         let allExpenseLogs: [PetExpenseLog] = allPets.flatMap(\.expenseLogs)
         let myExpense = allExpenseLogs
-            .filter { $0.executorId == myId }
-            .reduce(0.0) { acc, log in acc + log.amount }
+            .reduce(0.0) { acc, log in acc + log.amountPaid(by: myId) }
         let otherExpenses: [Double] = allHumans.filter { $0.id != id }.map { otherHuman in
             let oid = otherHuman.id.uuidString
-            return allExpenseLogs.filter { $0.executorId == oid }.reduce(0.0) { acc, log in acc + log.amount }
+            return allExpenseLogs.reduce(0.0) { acc, log in acc + log.amountPaid(by: oid) }
         }
         let maxOtherExpense = otherExpenses.max() ?? 0
         if myExpense > 0, myExpense >= maxOtherExpense {

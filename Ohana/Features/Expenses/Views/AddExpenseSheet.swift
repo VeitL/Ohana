@@ -107,6 +107,7 @@ struct AddExpenseSheetContent: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.dismiss) var dismiss
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(AppServices.self) var appServices
     @Environment(\.ohanaAppLanguageCode) var appLanguage
     @AppStorage(AppCountry.storageKey) var appCountry = AppCountry.detectedCode
@@ -117,11 +118,16 @@ struct AddExpenseSheetContent: View {
     @State var noteInput = ""
     @State var date = Date()
     @State var selectedPayerId: String? = nil
+    @State var selectedPayerIDs: [String] = []
+    @State var payerAmountInputs: [String: String] = [:]
+    @State var activePayerAmountID: String?
     @State var selectedRecorderID: UUID?
-    @State var requiresRecorderSelection = false
+    @State var requiresRecorderSelection = true
     @State var selectedSharedExpensePetIds: Set<UUID> = []
     @State var showMore = false
     @State var isSaving = false
+    @State var savedRecord: PetRecordReference?
+    @State var didSaveExpense = false
     @State var receiptAttachments: [ExpenseReceiptAttachment] = []
     @State var photoPickerItems: [PhotosPickerItem] = []
     @State var showingCamera = false
@@ -197,13 +203,15 @@ struct AddExpenseSheetContent: View {
     }
 
     var isAmountValid: Bool {
-        guard let v = parsedAmount, v > 0 else { return false }
-        return true
+        guard let amount = parsedAmount,
+              ExpenseAmountPolicy.isValidUserExpense(amount) else { return false }
+        guard selectedExpenseTargets.count > 1 else { return true }
+        return (ExpensePayerContributionPolicy.minorUnits(amount) ?? 0) > 0
     }
 
     var canSave: Bool {
         isAmountValid && !isSaving && !hasSavedMedicalExpense && !sharedExpenseReceiptBlocked &&
-            !requiresRecorderSelection
+            !requiresRecorderSelection && payerContributionsForSave != nil
     }
 
     var hasSavedMedicalExpense: Bool {
@@ -217,6 +225,34 @@ struct AddExpenseSheetContent: View {
 
     var activeExpenseHumans: [Human] {
         humans.filter { !$0.hasPassedAway }
+    }
+
+    var selectedExpensePayerHumans: [Human] {
+        selectedPayerIDs.compactMap { id in
+            activeExpenseHumans.first { $0.id.uuidString == id }
+        }
+    }
+
+    var draftedPayerContributions: [ExpensePayerContribution]? {
+        guard selectedPayerIDs.count > 1 else { return [] }
+        let contributions = selectedPayerIDs.compactMap { id -> ExpensePayerContribution? in
+            guard let humanID = UUID(uuidString: id),
+                  let input = payerAmountInputs[id],
+                  let amount = CountryDecimalInput.parse(input, countryCode: appCountry)
+            else {
+                return nil
+            }
+            return try? ExpensePayerContributionPolicy.contribution(humanID: humanID, amount: amount)
+        }
+        guard contributions.count == selectedPayerIDs.count else { return nil }
+        return contributions
+    }
+
+    var payerContributionsForSave: [ExpensePayerContribution]? {
+        guard selectedPayerIDs.count > 1 else { return [] }
+        guard let total = parsedAmount,
+              let contributions = draftedPayerContributions else { return nil }
+        return try? ExpensePayerContributionPolicy.validated(contributions, total: total)
     }
 
     var sameSpeciesExpensePets: [Pet] {
@@ -276,16 +312,6 @@ struct AddExpenseSheetContent: View {
                     amountEntry
                     quickAmountStrip
                     categoryStrip
-                    sharedExpenseTargetSection
-                    payerSection
-                    QuickCareActionHumanPickerContainer(
-                        selectedHumanID: $selectedRecorderID,
-                        requiresSelection: $requiresRecorderSelection,
-                        role: .recorder,
-                        tint: sheetTint
-                    )
-                    .padding(.horizontal, 20)
-                    receiptSection
                     if selectedCategory == .insurancePremium {
                         insurancePolicyNotice
                     }
@@ -300,24 +326,28 @@ struct AddExpenseSheetContent: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(l.tr(zh: "添加花费", en: "Add Expense", de: "Ausgabe hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
+            .ohanaEditorChrome(
+                hasChanges: !amountInput.isEmpty || !noteInput.isEmpty || !receiptAttachments.isEmpty,
+                isSaving: isSaving,
+                isComplete: didSaveExpense,
+                canSave: canSave,
+                onCancel: closeSheet,
+                onSave: saveExpense
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { closeSheet() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if hasSavedMedicalExpense {
+                if hasSavedMedicalExpense {
+                    ToolbarItem(placement: .primaryAction) {
                         Button(l.quickExpenseApplyClaim) {
                             inputFocused = false
                             GoKeyboard.dismiss()
                             showClaimSheet = true
                         }
-                    } else {
-                        Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveExpense() }
-                            .disabled(!canSave || isSaving)
                     }
                 }
             }
         }
+        .petRecordFeedback($savedRecord)
+        .petRecordAttribution(selectedHumanID: $selectedRecorderID, requiresSelection: $requiresRecorderSelection)
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .sheet(isPresented: $showClaimSheet) {
@@ -374,18 +404,18 @@ struct AddExpenseSheetContent: View {
         }
         .onAppear {
             configureInitialPayer()
-            selectedSharedExpensePetIds = SharedPetSelectionMemory.restoredSelection(
-                sourcePet: pet,
-                scope: "expense.shared",
-                candidates: sameSpeciesExpensePets,
-                defaultToAll: false
-            )
+            selectedSharedExpensePetIds = Set([pet.id])
         }
         .onChange(of: amountInput) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(newValue, countryCode: appCountry, maxFractionDigits: 2)
             if sanitized != newValue {
                 amountInput = sanitized
+                return
             }
+            if payerInputsMatchCurrentAmount {
+                return
+            }
+            resetPayerAmountsToEqual()
         }
         .animation(GoMotion.feedback, value: selectedCategory)
         .animation(GoMotion.feedback, value: showMore)

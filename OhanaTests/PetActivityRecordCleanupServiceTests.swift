@@ -79,12 +79,12 @@ struct PetActivityRecordCleanupServiceTests {
         #expect(insurances.map { $0.pet?.id } == [pet.id])
         #expect(Set(events.map(\.relatedEntityId)) == Set([otherPet.id.uuidString]))
         #expect(reminders.isEmpty)
-        #expect(deletionTombstone(PetCareLog.self, id: careLog.id, context: context) != nil)
-        #expect(deletionTombstone(PetPottyLog.self, id: pottyLog.id, context: context) != nil)
-        #expect(deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
-        #expect(deletionTombstone(PetWeightLog.self, id: weightLog.id, context: context) != nil)
-        #expect(deletionTombstone(Event.self, id: event.id, context: context) != nil)
-        #expect(deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
+        #expect(try deletionTombstone(PetCareLog.self, id: careLog.id, context: context) != nil)
+        #expect(try deletionTombstone(PetPottyLog.self, id: pottyLog.id, context: context) != nil)
+        #expect(try deletionTombstone(PetWalkLog.self, id: walkLog.id, context: context) != nil)
+        #expect(try deletionTombstone(PetWeightLog.self, id: weightLog.id, context: context) != nil)
+        #expect(try deletionTombstone(Event.self, id: event.id, context: context) != nil)
+        #expect(try deletionTombstone(Reminder.self, id: reminder.id, context: context) != nil)
     }
 
     @Test func cleanupNoOpsForPassedAwayPet() throws {
@@ -119,8 +119,8 @@ struct PetActivityRecordCleanupServiceTests {
         #expect(pet.currentStreak == 5)
         #expect(careLogs.map(\.id) == [careLog.id])
         #expect(events.map(\.id) == [event.id])
-        #expect(deletionTombstone(PetCareLog.self, id: careLog.id, context: context) == nil)
-        #expect(deletionTombstone(Event.self, id: event.id, context: context) == nil)
+        #expect(try deletionTombstone(PetCareLog.self, id: careLog.id, context: context) == nil)
+        #expect(try deletionTombstone(Event.self, id: event.id, context: context) == nil)
     }
 
     private func makeContainer() throws -> ModelContainer {
@@ -133,9 +133,9 @@ struct PetActivityRecordCleanupServiceTests {
         _: T.Type,
         id: UUID,
         context: ModelContext
-    ) -> CloudSyncRecordState? {
+    ) throws -> CloudSyncRecordState? {
         let key = CloudSyncRecordState.recordKey(entityName: String(describing: T.self), localRecordId: id)
-        return (try? context.fetch(FetchDescriptor<CloudSyncRecordState>()))?
+        return try context.fetch(FetchDescriptor<CloudSyncRecordState>())
             .first { $0.recordKey == key && $0.isDeletionTombstone }
     }
 }

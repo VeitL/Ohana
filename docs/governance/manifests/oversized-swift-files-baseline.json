@@ -62,11 +62,11 @@
     },
     {
       "path": "Ohana/Features/Economy/RewardEconomyCommands.swift",
-      "lines": 955
+      "lines": 1500
     },
     {
       "path": "Ohana/Features/FamilyTasks/FamilyTaskService.swift",
-      "lines": 827
+      "lines": 1738
     },
     {
       "path": "Ohana/Features/Feeding/Views/QuickFeedDetailSheet.swift",
@@ -74,11 +74,11 @@
     },
     {
       "path": "Ohana/Features/Gacha/GachaModels.swift",
-      "lines": 915
+      "lines": 1561
     },
     {
       "path": "Ohana/Features/Gacha/Views/GachaView.swift",
-      "lines": 1074
+      "lines": 1551
     },
     {
       "path": "Ohana/Features/Home/ExpandedQuickActionLogic.swift",
@@ -159,6 +159,10 @@
     {
       "path": "Ohana/Features/TodayFocus/IslandQuestEngine.swift",
       "lines": 1019
+    },
+    {
+      "path": "Ohana/Features/Zen/ZenHomeView.swift",
+      "lines": 1911
     },
     {
       "path": "Ohana/Models/SharedModelContainer.swift",

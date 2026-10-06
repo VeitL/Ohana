@@ -11,7 +11,13 @@ import UniformTypeIdentifiers
 
 extension AddExpenseSheetContent {
     func saveExpense() {
-        guard canSave, let amount = parsedAmount, amount > 0 else { return }
+        guard !didSaveExpense, !isSaving, canSave,
+              let amount = parsedAmount,
+              amount > 0,
+              let payerContributions = payerContributionsForSave
+        else {
+            return
+        }
         isSaving = true
         inputFocused = false
         GoKeyboard.dismiss()
@@ -34,6 +40,7 @@ extension AddExpenseSheetContent {
             let executor = DashboardRecordCommandExecutor(context: modelContext, services: appServices)
             let coconutDelta: Int
             let savedLogID: UUID?
+            let reference: PetRecordReference?
             do {
                 if savedTargets.count > 1 {
                     let result = try executor.recordSharedPetExpense(
@@ -45,6 +52,7 @@ extension AddExpenseSheetContent {
                         note: cleanNote,
                         executorId: payerId,
                         recordedByHumanId: recorderId,
+                        payerContributions: payerContributions,
                         source: .detail,
                         command: command,
                         revisionNote: "dashboard.expense.sharedEntry"
@@ -55,7 +63,8 @@ extension AddExpenseSheetContent {
                         return
                     }
                     coconutDelta = result.coconutDelta
-                    savedLogID = result.expenseLogIDs.first
+                    reference = result.recordReference(for: pet.id, ids: result.expenseLogIDs, filter: .expense)
+                    savedLogID = reference?.recordID
                 } else {
                     let result = try executor.recordPetExpense(
                         pet: pet,
@@ -65,6 +74,7 @@ extension AddExpenseSheetContent {
                         note: cleanNote,
                         executorId: payerId,
                         recordedByHumanId: recorderId,
+                        payerContributions: payerContributions,
                         source: .detail,
                         receiptTitle: savedReceiptTitle,
                         receiptCategory: savedReceiptCategory,
@@ -74,6 +84,7 @@ extension AddExpenseSheetContent {
                     )
                     coconutDelta = result.coconutDelta
                     savedLogID = result.logID
+                    reference = PetRecordReference(petID: pet.id, recordID: result.logID, filter: .expense)
                 }
             } catch {
                 saveErrorMessage = (error as? LocalizedError)?.errorDescription
@@ -92,6 +103,10 @@ extension AddExpenseSheetContent {
                 scope: "expense.shared",
                 candidates: sameSpeciesExpensePets
             )
+            savedRecord = reference
+            didSaveExpense = true
+            selectedSharedExpensePetIds = [pet.id]
+            isSaving = false
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved?()
             onRewarded?(coconutDelta)
@@ -99,8 +114,6 @@ extension AddExpenseSheetContent {
             if savedTargets.count == 1, savedCategory == .medical, hasActiveInsurance, let savedLogID {
                 savedExpenseId = savedLogID.uuidString
                 isSaving = false
-            } else {
-                closeSheet()
             }
         }
     }

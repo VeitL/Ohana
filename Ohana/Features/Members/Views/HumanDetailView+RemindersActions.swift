@@ -87,11 +87,15 @@ extension HumanDetailView {
     }
 
     // MARK: - Notes Section
+    private var visibleNotes: String {
+        HumanProfileOptions.visibleNoteEntries(from: human.notes).joined(separator: "\n\n")
+    }
+
     var notesSection: some View {
         Group {
             if human.isPrivate(.note, viewedBy: activeHumanId) {
                 privacyPlaceholderCard(label: l.tr(zh: "备注", en: "Notes", de: "Notizen"))
-            } else if !human.notes.isEmpty {
+            } else if !visibleNotes.isEmpty {
                 VStack(spacing: 10) {
                     HumanPrivateDataNotice(human: human, field: .note)
 
@@ -104,7 +108,7 @@ extension HumanDetailView {
                                 .font(OhanaFont.headline(.bold))
                                 .foregroundStyle(Color(hex: "1E3A8A"))
                         }
-                        Text(human.notes)
+                        Text(visibleNotes)
                             .font(OhanaFont.body())
                             .foregroundStyle(Color(hex: "475569"))
                             .fixedSize(horizontal: false, vertical: true)
@@ -145,7 +149,7 @@ extension HumanDetailView {
                 .fill(Color.goPrimary)
                 .frame(width: 3, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(text)
-                .font(OhanaFont.footnote(.black))
+                .font(OhanaFont.footnote(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(1.2)
@@ -157,19 +161,27 @@ extension HumanDetailView {
     }
 
     // MARK: - Actions
-    func deleteHumanAndReturnHome() {
+    func deleteHumanAndReturnHome(
+        completion: @escaping (HumanDeletionPresentationOutcome) -> Void
+    ) {
+        guard !isDeleting else {
+            completion(.failed(message: HumanDeletionPresentationCopy.failureMessage(l: l)))
+            return
+        }
+        isDeleting = true
         let activeHumanID = activeHumanIdStr
         let command = DomainCommand.memberDeletion(entityID: human.id, kind: EntityKind.human.rawValue)
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        dismiss()
-        commandQueue.enqueue(command, delayMilliseconds: DeferredDomainCommandQueue.destructiveRouteDismissDelayMilliseconds) {
+        OhanaFeedback.medium()
+        commandQueue.enqueue(command) {
             let result = MemberCommandExecutor(context: modelContext, services: appServices).deleteHuman(
                 human,
                 activeHumanID: activeHumanID,
                 note: "human.detail.delete"
             )
             guard result.didPersist else {
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
+                isDeleting = false
+                OhanaFeedback.error()
+                completion(.failed(message: HumanDeletionPresentationCopy.failureMessage(for: result, l: l)))
                 return
             }
             if case .pending = result.attachmentCleanup {
@@ -188,6 +200,12 @@ extension HumanDetailView {
                     requiresAccountSwitch: result.requiresAccountSwitch
                 )
             )
+            isDeleting = false
+            OhanaFeedback.success()
+            completion(.deleted)
+            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 180) {
+                dismiss()
+            }
         }
     }
 
@@ -220,6 +238,11 @@ extension HumanDetailView {
                 human,
                 note: "human.detail.passed.undo"
             )
+            if let denial = result.personalDenial {
+                personalUpgradePrompt = PersonalUpgradePrompt(denial: denial)
+                UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                return
+            }
             UINotificationFeedbackGenerator().notificationOccurred(result.didPersist ? .success : .error)
         }
     }

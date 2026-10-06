@@ -30,12 +30,12 @@ extension PlantDetailContentView {
 
             VStack(alignment: .leading, spacing: 10) {
                 Text(l.tr(zh: "植物档案", en: "Plant profile", de: "Pflanzenprofil"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .heavy, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .textCase(.uppercase)
 
                 Text(plant.name)
-                    .font(OhanaFont.adaptive(size: 28, weight: .heavy, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.78)
@@ -69,7 +69,7 @@ extension PlantDetailContentView {
 
                 if let task = nextTask {
                     Text(l.tr(zh: "下一项：\(task.title) · \(dueText(for: task))", en: "Next: \(task.title) · \(dueText(for: task))", de: "Nächstes: \(task.title) · \(dueText(for: task))"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(task.isOverdue ? Color.goRed : Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
@@ -89,7 +89,7 @@ extension PlantDetailContentView {
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -103,10 +103,10 @@ extension PlantDetailContentView {
     func statusPill(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .heavy))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .accessibilityHidden(true)
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .heavy, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -126,12 +126,12 @@ extension PlantDetailContentView {
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 13, weight: .heavy, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -158,16 +158,16 @@ extension PlantDetailContentView {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 13, weight: .heavy, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(detail)
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 10)
                 Text(status)
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(tint)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)
@@ -202,7 +202,7 @@ extension PlantDetailContentView {
                 Image(systemName: "drop.fill").accessibilityHidden(true)
                     .foregroundStyle(Color.goTeal)
                 Text(l.tr(zh: "浇水状态", en: "Watering status", de: "Gießstatus"))
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                 Spacer()
             }
 
@@ -250,7 +250,7 @@ extension PlantDetailContentView {
                 Image(systemName: "leaf.fill").accessibilityHidden(true)
                     .foregroundStyle(Color.goPrimary)
                 Text(l.tr(zh: "施肥状态", en: "Fertilizing status", de: "Düngestatus"))
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                 Spacer()
             }
 
@@ -300,7 +300,7 @@ extension PlantDetailContentView {
                         Image(systemName: "note.text").accessibilityHidden(true)
                             .foregroundStyle(Color.goTeal)
                         Text(l.tr(zh: "备注", en: "Notes", de: "Notizen"))
-                            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                         Spacer()
                     }
                     Text(plant.notes)
@@ -320,20 +320,20 @@ extension PlantDetailContentView {
                 HStack(alignment: .top, spacing: 10) {
                     Image(systemName: "leaf.arrow.circlepath") // a11y: allow decorative empty timeline glyph; adjacent text explains the state.
                         .accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(Color.goTeal)
                         .frame(width: 36, height: 36) // a11y: allow non-interactive timeline glyph; row text carries the content.
                         .background(Color.goTeal.opacity(0.15), in: Circle())
                     VStack(alignment: .leading, spacing: 4) {
                         Text(l.tr(zh: "还没有护理日志", en: "No care logs yet", de: "Noch keine Pflegeprotokolle"))
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(
                             zh: "完成一次浇水、施肥或观察后，这里会生成植物的活动时间线。",
                             en: "Water, fertilize, or observe once to start this plant's activity timeline.",
                             de: "Gießen, düngen oder beobachten startet hier die Aktivitäts-Zeitachse."
                         ))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                     }
@@ -377,15 +377,15 @@ extension PlantDetailContentView {
         HStack(spacing: 6) {
             Image(systemName: icon) // a11y: allow decorative summary glyph; pill text carries the value.
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -404,7 +404,7 @@ extension PlantDetailContentView {
             VStack(spacing: 0) {
                 Image(systemName: careSymbol(for: log.careType)) // a11y: allow decorative timeline glyph; row text names the care action.
                     .accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 34, height: 34) // a11y: allow non-interactive care log glyph; row text carries the content.
                     .background(careTint(for: log.careType), in: Circle())
@@ -418,22 +418,54 @@ extension PlantDetailContentView {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.careType.displayName(l: l))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(timelineDateText(for: log))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 if let note = timelineNoteText(for: log) {
                     Text(note)
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
             }
+            .accessibilityElement(children: .combine)
             Spacer(minLength: 0)
+
+            Menu {
+                Button {
+                    careHistoryRoute = PlantCareHistoryRoute(
+                        recordID: log.historyRecordID(plantID: plant.id),
+                        action: .edit
+                    )
+                } label: {
+                    Label(l.tr(zh: "编辑记录", en: "Edit log", de: "Eintrag bearbeiten"), systemImage: "pencil")
+                }
+                Button(role: .destructive) {
+                    careHistoryRoute = PlantCareHistoryRoute(
+                        recordID: log.historyRecordID(plantID: plant.id),
+                        action: .delete
+                    )
+                } label: {
+                    Label(l.tr(zh: "删除记录", en: "Delete log", de: "Eintrag löschen"), systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis").accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(l.tr(
+                zh: "编辑或删除\(log.careType.displayName(l: l))记录",
+                en: "Edit or delete \(log.careType.displayName(l: l)) log",
+                de: "Eintrag \(log.careType.displayName(l: l)) bearbeiten oder löschen"
+            ))
+            .accessibilityIdentifier("plant-detail-history-menu-\(log.id.uuidString)")
         }
         .padding(.vertical, 8)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
     }
 
     func timelineDateText(for log: PlantDetailLogSnapshot) -> String {
@@ -502,11 +534,11 @@ extension PlantDetailContentView {
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(l.tr(zh: "已归档", en: "Archived", de: "Archiviert"))
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if let archivedAt = plant.archivedAt {
                             Text(archivedAt.formatted(.dateTime.year().month().day()))
-                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                     }
@@ -551,28 +583,28 @@ extension PlantDetailContentView {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "即将删除 \(plant.name)", en: "Deleting \(plant.name) soon", de: "\(plant.name) wird gleich gelöscht"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
                         zh: "6 秒内可撤销；到时会清理相关日历和提醒。",
                         en: "Undo within 6 seconds; related calendar items and reminders will be cleaned up.",
                         de: "Innerhalb von 6 Sekunden widerrufbar; zugehörige Kalenderpunkte und Erinnerungen werden bereinigt."
                     ))
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer(minLength: 8)
                 Button(l.tr(zh: "撤销", en: "Undo", de: "Widerrufen")) {
                     cancelPendingDelete()
                 }
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityIdentifier("plant-detail-delete-undo")
 
                 Button(l.tr(zh: "立即删除", en: "Delete now", de: "Jetzt löschen"), role: .destructive) {
                     commitPendingDelete()
                 }
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .accessibilityIdentifier("plant-detail-delete-now")
             }
             .padding(.horizontal, 14)

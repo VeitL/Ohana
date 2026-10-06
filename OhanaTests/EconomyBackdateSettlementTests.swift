@@ -61,7 +61,7 @@ struct EconomyBackdateSettlementTests {
             date: historicalDate,
             context: context
         )
-        let historicalUsageCountBefore = usageEvents(
+        let historicalUsageCountBefore = try usageEvents(
             context: context,
             dayKey: historicalDayKey,
             actionKey: "feed"
@@ -84,8 +84,8 @@ struct EconomyBackdateSettlementTests {
         #expect(record.log.date == historicalDate)
         #expect(record.reward.humanGot + record.reward.petGot > 0)
         #expect(questManager.lastEconomyRewardResult?.budgetStage != .recordOnly)
-        #expect(usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
-        #expect(usageEvents(context: context, dayKeys: operationDayKeys, actionKey: "feed").isEmpty == false)
+        #expect(try usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
+        #expect(try usageEvents(context: context, dayKeys: operationDayKeys, actionKey: "feed").isEmpty == false)
 
         let careLedgerEvents = try context.fetch(FetchDescriptor<CareLedgerEvent>())
             .filter { $0.legacyModelId == record.log.id.uuidString }
@@ -217,7 +217,7 @@ struct EconomyBackdateSettlementTests {
 
         let historicalDayKey = EconomyDailyBudgetStore.dayKey(for: historicalDate)
         let operationDayKey = EconomyDailyBudgetStore.dayKey(for: operationDate)
-        let historicalUsageCountBefore = usageEvents(
+        let historicalUsageCountBefore = try usageEvents(
             context: context,
             dayKey: historicalDayKey,
             actionKey: "feed"
@@ -235,14 +235,14 @@ struct EconomyBackdateSettlementTests {
 
         let careLog = try #require(try context.fetch(FetchDescriptor<PetCareLog>()).first)
         let ledger = try #require(try context.fetch(FetchDescriptor<CareLedgerEvent>()).first)
-        let operationUsageEvents = usageEvents(context: context, dayKey: operationDayKey, actionKey: "feed")
+        let operationUsageEvents = try usageEvents(context: context, dayKey: operationDayKey, actionKey: "feed")
         let rewardLedgerEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
             .filter { $0.source == .careEvent && $0.delta > 0 }
 
         #expect(completed.isCompleted)
         #expect(Calendar.current.isDate(careLog.date, inSameDayAs: historicalDate))
         #expect(Calendar.current.isDate(ledger.occurredAt, inSameDayAs: historicalDate))
-        #expect(usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
+        #expect(try usageEvents(context: context, dayKey: historicalDayKey, actionKey: "feed").count == historicalUsageCountBefore)
         #expect(operationUsageEvents.isEmpty == false)
         #expect(rewardLedgerEntries.isEmpty == false)
         #expect(rewardLedgerEntries.allSatisfy { EconomyDailyBudgetStore.dayKey(for: $0.occurredAt) != historicalDayKey })
@@ -309,16 +309,16 @@ struct EconomyBackdateSettlementTests {
         context: ModelContext,
         dayKey: String,
         actionKey: String
-    ) -> [EconomyBudgetUsageEvent] {
-        usageEvents(context: context, dayKeys: [dayKey], actionKey: actionKey)
+    ) throws -> [EconomyBudgetUsageEvent] {
+        try usageEvents(context: context, dayKeys: [dayKey], actionKey: actionKey)
     }
 
     private func usageEvents(
         context: ModelContext,
         dayKeys: Set<String>,
         actionKey: String
-    ) -> [EconomyBudgetUsageEvent] {
-        let events = (try? context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())) ?? []
+    ) throws -> [EconomyBudgetUsageEvent] {
+        let events = try context.fetch(FetchDescriptor<EconomyBudgetUsageEvent>())
         return events.filter { dayKeys.contains($0.dayKey) && $0.actionKey == actionKey }
     }
 

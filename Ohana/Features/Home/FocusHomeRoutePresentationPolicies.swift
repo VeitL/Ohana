@@ -20,6 +20,8 @@ extension AppPresentationPolicyProvider {
             )
         case .functionMenu:
             homeSheetPagePolicy("home.functionMenu")
+        case .critterCodex:
+            homeSheetPagePolicy("home.critterCodex")
         case .streakDetail:
             AppPresentationPolicy(
                 surface: .sheetPage,
@@ -131,6 +133,8 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanObservationQuick,
+             .humanConditions,
              .humanReport,
              .humanExpense,
              .humanWishlist,
@@ -203,6 +207,10 @@ private extension HomeSheetRoute {
             "humanWorkoutDashboard"
         case .humanMetrics:
             "humanMetrics"
+        case .humanObservationQuick:
+            "humanObservationQuick"
+        case .humanConditions:
+            "humanConditions"
         case .humanReport:
             "humanReport"
         case .humanExpenseQuick:

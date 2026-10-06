@@ -8,6 +8,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 // MARK: - Time Range
 
@@ -17,6 +18,10 @@ enum ExploreTimeRange: String, CaseIterable, Identifiable {
     case year = "年"
     case all = "全部"
     var id: String { rawValue }
+
+    var requiresPersonal: Bool {
+        self == .year || self == .all
+    }
 
     func title(_ l: L10n) -> String {
         switch self {
@@ -59,8 +64,10 @@ struct IslandExplorationDashboardContentView: View {
     let allWalkLogs: [PetWalkLog]
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppServices.self) private var appServices
 
     @State private var timeRange: ExploreTimeRange = .month
+    @State private var showingPersonalPlan = false
     @State private var animationProgress: Double = 0.0
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -189,6 +196,15 @@ struct IslandExplorationDashboardContentView: View {
 
     var body: some View {
         dashboardBody
+            .sheet(isPresented: $showingPersonalPlan) {
+                PersonalPlanView()
+                    .ohanaSheetPagePresentation()
+            }
+            .onChange(of: appServices.commerce.hasPersonalEntitlement) { _, _ in
+                if timeRange.requiresPersonal, !appServices.commerce.allows(.extendedTrends) {
+                    timeRange = .month
+                }
+            }
             .onAppear { triggerAnimation() }
             .onChange(of: timeRange) { _, _ in
                 animationProgress = 0
@@ -245,7 +261,7 @@ struct IslandExplorationDashboardContentView: View {
             .buttonStyle(ScaleButtonStyle())
             Spacer()
             Text(l.tr(zh: "全岛探索", en: "Island exploration", de: "Inselerkundung"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
@@ -258,9 +274,14 @@ struct IslandExplorationDashboardContentView: View {
     private var heroDisplay: some View {
         VStack(alignment: .leading, spacing: 12) {
             // 时间 filter
-            Picker("", selection: $timeRange) {
+            Picker("", selection: personalRangeSelection) {
                 ForEach(ExploreTimeRange.allCases) { r in
-                    Text(r.title(l)).tag(r)
+                    Text(
+                        r.requiresPersonal && !appServices.commerce.allows(.extendedTrends)
+                            ? "\(r.title(l)) · Personal"
+                            : r.title(l)
+                    )
+                    .tag(r)
                 }
             }
             .pickerStyle(.segmented)
@@ -272,20 +293,20 @@ struct IslandExplorationDashboardContentView: View {
                     (totalMeters / 1000)
                         .formatted(.number.precision(.fractionLength(totalMeters >= 1000 ? 1 : 0)))
                 )
-                .font(OhanaFont.adaptive(size: 46, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 46, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
                 .animation(GoMotion.feedback, value: totalMeters)
 
                 Text("km")
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goPrimary)
                     .padding(.bottom, 3)
 
                 Spacer()
 
                 Text(funSubtitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                     .multilineTextAlignment(.trailing)
                     .frame(maxWidth: 140)
@@ -308,6 +329,20 @@ struct IslandExplorationDashboardContentView: View {
         .padding(.horizontal, 4)
     }
 
+    private var personalRangeSelection: Binding<ExploreTimeRange> {
+        Binding(
+            get: { timeRange },
+            set: { range in
+                guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    UINotificationFeedbackGenerator().notificationOccurred(.warning)
+                    return
+                }
+                timeRange = range
+            }
+        )
+    }
+
     // MARK: - 模块B：荣誉看板 Fun Bento
 
     private var funBentoRow: some View {
@@ -322,14 +357,14 @@ struct IslandExplorationDashboardContentView: View {
                     VStack(spacing: 6) {
                         Text(p.emoji).font(OhanaFont.adaptive(size: 38))
                         Text(p.name)
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(
                             (p.totalMeters / 1000)
                                 .formatted(.number.precision(.fractionLength(1))) + " km"
                         )
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.goPrimary)
                     }
                 } else {
@@ -360,14 +395,14 @@ struct IslandExplorationDashboardContentView: View {
                             }
                         }
                         Text(h.human.name)
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(
                             (h.totalMeters / 1000)
                                 .formatted(.number.precision(.fractionLength(1))) + " km"
                         )
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.goTeal)
                     }
                 } else {
@@ -386,7 +421,7 @@ struct IslandExplorationDashboardContentView: View {
     ) -> some View {
         VStack(spacing: 10) {
             Label(title, systemImage: symbol)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 .tracking(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -415,7 +450,7 @@ struct IslandExplorationDashboardContentView: View {
     private var stackedBarChartCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "探索趋势", en: "Exploration trend", de: "Erkundungstrend"))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
@@ -441,7 +476,7 @@ struct IslandExplorationDashboardContentView: View {
                             HStack(spacing: 4) {
                                 Circle().fill(s.color).frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                 Text(s.name)
-                                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                                     .lineLimit(1)
                             }
@@ -461,7 +496,7 @@ struct IslandExplorationDashboardContentView: View {
     private var leaderboardCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "里程贡献榜", en: "Distance leaderboard", de: "Distanz-Rangliste"))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 .tracking(1)
 
@@ -486,7 +521,7 @@ struct IslandExplorationDashboardContentView: View {
                             // 名字 + 进度条
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(s.name)
-                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
 
@@ -512,7 +547,7 @@ struct IslandExplorationDashboardContentView: View {
                                 (s.totalMeters / 1000)
                                     .formatted(.number.precision(.fractionLength(1))) + " km"
                             )
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(s.color)
                             .frame(width: 52, alignment: .trailing)
                         }

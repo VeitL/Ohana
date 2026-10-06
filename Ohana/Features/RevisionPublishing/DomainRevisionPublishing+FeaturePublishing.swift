@@ -92,7 +92,7 @@ extension DomainRevisionPublishing {
             DomainMutationResult(
                 command: .plantCare(plantID: result.plantID, action: result.careType.rawValue),
                 affectedEntityIDs: result.affectedEntityIDs,
-                wroteBusinessFact: result.didPersist,
+                wroteBusinessFact: result.didWrite,
                 note: note
             )
         )
@@ -335,6 +335,21 @@ extension DomainRevisionPublishing {
                 command: command,
                 affectedEntityIDs: affected,
                 wroteBusinessFact: true,
+                note: note
+            )
+        )
+    }
+
+    func publishExpenseUpdate(_ result: PetExpenseUpdateCommandResult, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .expenseUpdate(
+                    entityID: result.petID,
+                    entityKind: EntityKind.pet.rawValue,
+                    recordID: result.logID
+                ),
+                affectedEntityIDs: result.affectedEntityIDs,
+                wroteBusinessFact: result.didChange,
                 note: note
             )
         )

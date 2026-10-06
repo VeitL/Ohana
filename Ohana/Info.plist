@@ -23,14 +23,27 @@
 		<string>ko</string>
 		<string>it</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.guanchen.li.Ohana.system-surfaces</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>ohana</string>
+			</array>
+		</dict>
+	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>用于在你主动拍照时创建成员或宠物头像、时刻照片或收据附件。</string>
+	<string>用于在你主动拍照时创建头像、记录时刻、添加收据，或识别健康检查报告。健康报告文字仅在本机处理。</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>用于在切换受保护成员或访问成员门禁时，通过系统 Face ID 代替输入本地 PIN。</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>用于在你主动设置 Apple Health 时读取步数、距离、活动能量、锻炼与站立时间、活动目标和运动记录，并在本机显示此成员的健康摘要。</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>用于导入你选择的头像、时刻图片或收据附件；Ohana 只处理你选中的项目。</string>
+	<string>用于导入你选择的头像、时刻图片、收据或健康检查报告；Ohana 只处理你选中的项目，健康报告文字仅在本机识别。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>用于在「记录时刻」中附加当前地点，以及在你主动开始遛狗时记录路线。</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

@@ -281,7 +281,7 @@ struct OasisEmbeddedLayoutMetrics: Equatable {
 }
 
 enum OasisEmbeddedLayoutPolicy {
-    static let compactTreeStageChromeHeight: CGFloat = 210
+    static let compactTreeStageChromeHeight: CGFloat = 218
 
     static func metrics(availableHeight: CGFloat) -> OasisEmbeddedLayoutMetrics {
         let height = max(0, availableHeight)
@@ -298,13 +298,13 @@ enum OasisEmbeddedLayoutPolicy {
 
         let topPadding: CGFloat = height >= 620 ? 4 : 2
         let sectionSpacing: CGFloat = height >= 620 ? 8 : 6
-        let bottomPadding: CGFloat = height >= 620 ? 8 : 6
+        let bottomPadding: CGFloat = height >= 620 ? 24 : 20
         let chromeHeight = topPadding + sectionSpacing + bottomPadding
         let contentHeight = max(0, height - chromeHeight)
-        let idealBentoHeight = min(124, max(92, contentHeight * 0.19))
+        let idealBentoHeight = min(148, max(112, contentHeight * 0.23))
         let bentoGridHeight = min(idealBentoHeight, contentHeight * 0.34)
         let treeCardHeight = max(0, contentHeight - bentoGridHeight)
-        let idealTreeVisualHeight = min(260, max(170, treeCardHeight * 0.58))
+        let idealTreeVisualHeight = min(232, max(148, treeCardHeight * 0.50))
         let treeVisualHeight = min(
             idealTreeVisualHeight,
             max(0, treeCardHeight - compactTreeStageChromeHeight)
@@ -349,7 +349,6 @@ struct OasisRewardView: View {
     @State var activeBentoFeatureInfo: OasisBentoFeatureInfo?
     @State var confirmationRoute: OasisConfirmationRoute?
     @State var showCritterNest = false
-    @State var critterNestPopupProgress: CGFloat = 0
     @State var energyParticles: [EnergyParticle] = []
     // 模块六：打卡日历
     @State var checkedInDates: Set<String> = [] // "yyyy-MM-dd" 格式
@@ -368,8 +367,6 @@ struct OasisRewardView: View {
     @State var lastLevel: TreeLevel = .lv0
     @State var isInjecting: Bool = false
     @State var treeInjectionLocked = false
-    @State var treeInjectionProgress: CGFloat = 0
-    @State var treeInjectionBoost: CGFloat = 0.026
     @State var injectionPulseToken = 0
     @State var levelUpPulse = false
     @State var levelUpBadgeVisible = false
@@ -396,9 +393,6 @@ struct OasisRewardView: View {
     @State var upgradeRewardTask: Task<Void, Never>?
     @State var critterCommandTask: Task<Void, Never>?
     @State var checkInCommandTask: Task<Void, Never>?
-    @State var critterNestOpenTask: Task<Void, Never>?
-    @State var critterNestCloseTask: Task<Void, Never>?
-    @State var injectionResetTask: Task<Void, Never>?
     @State var levelUpFeedbackTask: Task<Void, Never>?
     @State var particleCleanupTask: Task<Void, Never>?
     @State var critterPulseCleanupTask: Task<Void, Never>?
@@ -551,7 +545,7 @@ struct OasisRewardView: View {
     }
 
     var contentTopInset: CGFloat {
-        hideToolbar ? 32 : 64
+        hideToolbar ? 32 : 0
     }
 
     var treeSceneTopPadding: CGFloat {
@@ -569,16 +563,18 @@ struct OasisRewardView: View {
         )
     }
 
+    var usesFullTreeVisualEffects: Bool {
+        workloadPolicy.visualEffectsBudget(
+            isVisible: (isVisible || shouldTreatEmbeddedAsVisible) && isOasisPrepared
+        ).usesFullEffects
+    }
+
     var isOasisPrepared: Bool {
         isEmbeddedPrepared || isEmbeddedVisible || isEmbeddedActive
     }
 
     var shouldTreatEmbeddedAsVisible: Bool {
         isEmbeddedVisible || isEmbeddedActive
-    }
-
-    var treeInjectionVisualScale: CGFloat {
-        1 + treeInjectionProgress * treeInjectionBoost
     }
 
     var makeupConfirmationTitle: String {

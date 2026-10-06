@@ -44,7 +44,12 @@ struct OasisRewardCommandExecutor {
             canInjectCoconuts: injectionBalance >= OasisTreeEnergyInjectionPolicy.starterPackageCost,
             injectionCoconutBalance: injectionBalance,
             activeCoconutBalance: activeBalance,
-            critterFragmentTotal: critterFragments.reduce(0) { $0 + $1.amount }
+            critterFragmentTotal: critterFragments
+                .filter { $0.catalogId != OasisCompanionCurrency.stardustCatalogID }
+                .reduce(0) { $0 + $1.amount },
+            stardustBalance: critterFragments
+                .first(where: { $0.catalogId == OasisCompanionCurrency.stardustCatalogID })?
+                .amount ?? 0
         )
     }
 
@@ -84,12 +89,17 @@ struct OasisRewardCommandExecutor {
             let lifecycle = rewards.lifecycleSnapshot(for: critter, context: context)
             let wish = rewards.displayDailyWish(for: critter, snapshot: lifecycle)
             let starCost = rewards.starUpgradeCost(for: critter)
+            let starAvailability = rewards.starUpgradeAvailability(
+                for: critter,
+                context: context,
+                isProcessing: false
+            )
             let feedCost = rewards.interactionCost(for: critter, action: .feed, context: context)
             let playCost = rewards.interactionCost(for: critter, action: .play, context: context)
             let restCost = rewards.interactionCost(for: critter, action: .rest, context: context)
             let fragmentCount = fragments.first(where: { $0.catalogId == critter.catalogId })?.amount ?? 0
             let xpProgress = rewards.xpProgress(for: critter)
-            let canUseActions = lifecycle.state != .dead
+            let canUseActions = lifecycle.state != .dead && lifecycle.state != .critical && lifecycle.state != .sleeping
             snapshots[critter.id] = OasisCritterRenderSnapshot(
                 lifecycle: lifecycle,
                 dailyWish: wish,
@@ -118,7 +128,10 @@ struct OasisRewardCommandExecutor {
                 restCost: restCost,
                 starFragmentsCost: starCost.fragments,
                 starCoconutsCost: starCost.coconuts,
-                canUpgradeStar: canUseActions && fragmentCount >= starCost.fragments && activeCoconutBalance >= starCost.coconuts
+                canUpgradeStar: canUseActions && starAvailability.isAvailable,
+                specificFragmentBalance: fragmentCount,
+                stardustBalance: starAvailability.fundingPlan.stardustBalance,
+                starAvailability: starAvailability
             )
         }
         return snapshots
@@ -205,12 +218,55 @@ struct OasisRewardCommandExecutor {
         try rewards.upgradeStar(for: critter, context: context)
     }
 
+    func starUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        isProcessing: Bool = false
+    ) -> CompanionActionAvailability {
+        rewards.starUpgradeAvailability(
+            for: critter,
+            context: context,
+            isProcessing: isProcessing
+        )
+    }
+
     func upgradeLevel(_ critter: OasisElectronicPet) throws -> Bool {
         try rewards.upgradeLevel(for: critter, context: context)
     }
 
+    func levelUpgradeAvailability(
+        for critter: OasisElectronicPet,
+        isProcessing: Bool = false
+    ) -> CompanionActionAvailability {
+        rewards.levelUpgradeAvailability(
+            for: critter,
+            isProcessing: isProcessing
+        )
+    }
+
     func awakenWithFragments(catalogId: String) throws -> OasisElectronicPet? {
         try rewards.awakenWithFragments(catalogId: catalogId, context: context)
+    }
+
+    func awakenAvailability(
+        catalogId: String,
+        isProcessing: Bool = false
+    ) -> CompanionActionAvailability {
+        rewards.awakenAvailability(
+            catalogId: catalogId,
+            context: context,
+            isProcessing: isProcessing
+        )
+    }
+
+    func companionSnapshot(
+        for critter: OasisElectronicPet,
+        isProcessing: Bool = false
+    ) -> OasisCompanionSnapshot {
+        rewards.companionSnapshot(
+            for: critter,
+            context: context,
+            isProcessing: isProcessing
+        )
     }
 
     func setFeatured(_ critter: OasisElectronicPet, desired: Bool) throws {
@@ -228,11 +284,14 @@ struct OasisRewardCommandExecutor {
     }
 
     func loadCheckInData(currentActiveHumanId: String) -> OasisCheckInSnapshot {
+        // The UserDefaults streak store is retired. Keep this compatibility
+        // shape empty until the unmounted legacy Oasis calendar is removed;
+        // Zen Streak reads V93 Presence facts through its dedicated read model.
         OasisCheckInSnapshot(
-            checkedInDates: CheckInStreakStore.checkedInDates(for: currentActiveHumanId),
-            makeupDates: CheckInStreakStore.makeupDates(for: currentActiveHumanId),
+            checkedInDates: [],
+            makeupDates: [],
             makeupPackCount: shopInventory.consumableSnapshot().backdatePassCount,
-            lastClaimedMilestone: CheckInStreakStore.lastClaimedMilestone(for: currentActiveHumanId)
+            lastClaimedMilestone: 0
         )
     }
 
@@ -241,24 +300,9 @@ struct OasisRewardCommandExecutor {
         checkedInDates: Set<String>,
         postsRewardFeedback: Bool = true
     ) -> Set<String>? {
-        let today = CheckInStreakStore.dateString()
-        guard !checkedInDates.contains(today) else { return nil }
-        var updatedDates = checkedInDates
-        updatedDates.insert(today)
-        guard rewards.awardBudgetedCurrentHumanCoconuts(
-            1,
-            emoji: "📅",
-            title: DomainCareRewardGeneralTitle.oasisDailyCheckIn,
-            context: context,
-            postsRewardFeedback: postsRewardFeedback,
-            date: Date()
-        ) != nil else {
-            context.rollback()
-            rewards.refreshCoconutProjection(context: context)
-            return nil
-        }
-        CheckInStreakStore.setCheckedInDates(updatedDates, for: currentActiveHumanId)
-        return updatedDates
+        // Retired with the V93 Presence command boundary. Ordinary Oasis must
+        // not mint a second daily reward or write the legacy defaults store.
+        nil
     }
 
     func applyMakeup(
@@ -266,35 +310,13 @@ struct OasisRewardCommandExecutor {
         currentActiveHumanId: String,
         snapshot: OasisCheckInSnapshot
     ) -> OasisCheckInSnapshot? {
-        guard snapshot.makeupPackCount > 0, !snapshot.checkedInDates.contains(date) else { return nil }
-        var updated = snapshot
-        guard let updatedPackCount = shopInventory.consumeBackdatePass() else { return nil }
-        updated.makeupPackCount = updatedPackCount
-        updated.checkedInDates.insert(date)
-        updated.makeupDates.insert(date)
-        CheckInStreakStore.setCheckedInDates(updated.checkedInDates, for: currentActiveHumanId)
-        CheckInStreakStore.setMakeupDates(updated.makeupDates, for: currentActiveHumanId)
-        return updated
+        // Backdate packs are historical inventory only; V93 does not support
+        // makeup writes and this path must not consume one.
+        nil
     }
 
     func claimMilestone(days: Int, reward: Int, emoji: String, currentActiveHumanId: String) {
-        guard CheckInStreakStore.lastClaimedMilestone(for: currentActiveHumanId) < days else { return }
-        guard rewards.awardSpecialCurrentHumanCoconuts(
-            reward,
-            emoji: emoji,
-            title: DomainCareRewardGeneralTitle.counted(DomainCareRewardGeneralTitle.oasisCheckInStreak, count: days),
-            sourceModelName: "OasisCheckInMilestone",
-            sourceModelId: "\(currentActiveHumanId):\(days)",
-            transactionKey: "oasis:checkInMilestone:\(currentActiveHumanId):\(days)",
-            metadataJSON: "{\"kind\":\"oasisCheckInMilestone\",\"days\":\(days)}",
-            context: context,
-            postsRewardFeedback: true,
-            occurredAt: Date()
-        ) != nil else {
-            context.rollback()
-            rewards.refreshCoconutProjection(context: context)
-            return
-        }
-        CheckInStreakStore.setLastClaimedMilestone(days, for: currentActiveHumanId)
+        // V93 milestones are automatic and receipt-backed. The retired manual
+        // claim callback remains source-compatible but intentionally does no work.
     }
 }

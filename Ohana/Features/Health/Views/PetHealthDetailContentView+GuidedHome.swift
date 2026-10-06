@@ -20,64 +20,36 @@ extension PetHealthDetailContentView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "健康", en: "Health", de: "Gesundheit"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
-            Button {
-                OhanaFeedback.light()
-                dismiss()
-                onFullDismiss?()
-            } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel(l.tr(zh: "关闭健康详情", en: "Close health details", de: "Gesundheitsdetails schließen"))
-            .accessibilityIdentifier("pet-health-detail-close-action")
-            .buttonStyle(ScaleButtonStyle())
+
         }
         .padding(.top, 4)
     }
 
     var healthAddMenu: some View {
-        VStack(alignment: .trailing, spacing: 14) {
-            if isHealthFabExpanded {
-                ForEach(Array(healthFabActionKinds.enumerated()), id: \.element.id) { index, action in
-                    HomeFabActionRow(
-                        item: HomeFabFunctionShortcut(
-                            label: action.label(l, isRenderingPDF: isRenderingPDF),
-                            icon: action.icon,
-                            isAvailable: action != .pdf || !isRenderingPDF
-                        ),
-                        rowHeight: 48
-                    )
-                    .ohanaStaggeredMenuItem(isVisible: healthFabItemsVisible, index: index, total: healthFabActionKinds.count)
-                    .onTapGesture {
-                        performHealthFabAction(action)
-                    }
-                    .allowsHitTesting(healthFabItemsVisible && (action != .pdf || !isRenderingPDF))
-                    .accessibilityHidden(!healthFabItemsVisible)
-                    .accessibilityIdentifier("pet-health-fab-action-\(action.id)")
+        Menu {
+            ForEach(healthFabActionKinds) { action in
+                Button { performHealthFabAction(action) } label: {
+                    Label(action == .pdf && !appServices.commerce.allows(.vetSummaryPDF)
+                        ? l.tr(zh: "导出 PDF · Personal", en: "Export PDF · Personal", de: "PDF exportieren · Personal")
+                        : action.label(l, isRenderingPDF: isRenderingPDF),
+                        systemImage: action == .pdf && !appServices.commerce.allows(.vetSummaryPDF) ? "lock.fill" : action.icon)
                 }
+                .disabled(action == .pdf && isRenderingPDF)
+                .accessibilityIdentifier("pet-health-fab-action-\(action.id)")
             }
-
-            HomeFabMainButton(
-                isExpanded: isHealthFabExpanded,
-                accessibilityLabel: isHealthFabExpanded
-                    ? l.tr(zh: "收起健康菜单", en: "Collapse health menu", de: "Gesundheitsmenü schließen")
-                    : l.tr(zh: "展开健康菜单", en: "Open health menu", de: "Gesundheitsmenü öffnen"),
-                action: toggleHealthFabMenu
-            )
-            .accessibilityIdentifier("pet-health-fab-toggle")
+        } label: {
+            Label(l.tr(zh: "健康操作", en: "Health actions", de: "Gesundheitsaktionen"), systemImage: "plus")
         }
+        .accessibilityIdentifier("pet-health-fab-toggle")
     }
 
     var healthFabActionKinds: [HealthFabActionKind] {
@@ -99,106 +71,57 @@ extension PetHealthDetailContentView {
         return actions
     }
 
-    func openHealthFabMenu() {
-        guard !isHealthFabExpanded else { return }
-        healthFabItemsVisible = false
-        withAnimation(GoMotion.fab) {
-            isHealthFabExpanded = true
-        }
-        DispatchQueue.main.async {
-            withAnimation(GoMotion.fab) {
-                healthFabItemsVisible = true
-            }
-        }
-    }
 
-    func closeHealthFabMenu() {
-        guard isHealthFabExpanded else { return }
-        withAnimation(GoMotion.fab) {
-            healthFabItemsVisible = false
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-            if isHealthFabExpanded, !healthFabItemsVisible {
-                withAnimation(GoMotion.fab) {
-                    isHealthFabExpanded = false
-                }
-            }
-        }
-    }
 
-    func toggleHealthFabMenu() {
-        OhanaFeedback.medium()
-        isHealthFabExpanded ? closeHealthFabMenu() : openHealthFabMenu()
-    }
+
+
+
 
     func performHealthFabAction(_ action: HealthFabActionKind) {
         guard action != .pdf || !isRenderingPDF else { return }
         OhanaFeedback.light()
-        healthFabItemsVisible = false
-        withAnimation(GoMotion.fab) {
-            isHealthFabExpanded = false
-        }
-        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 90) {
-            switch action {
-            case .preventive:
-                openHealthRecord(.guided(.preventive), feedback: false)
-            case .visit:
-                openHealthRecord(.guided(.visit), feedback: false)
-            case .medication:
-                openMedicationPopup(feedback: false)
-            case .vaccinePassport:
-                showingPassport = true
-            case .archive:
-                showingHistory = true
-            case .pdf:
-                renderHealthPDF()
-            case .symptom:
-                openHealthRecord(.symptom, feedback: false)
-            case .heatCycle:
-                openHealthRecord(.heatCycle, feedback: false)
-            }
+        switch action {
+        case .preventive:
+            openHealthRecord(.guided(.preventive), feedback: false)
+        case .visit:
+            openHealthRecord(.guided(.visit), feedback: false)
+        case .medication:
+            openMedicationPopup(feedback: false)
+        case .vaccinePassport:
+            showingPassport = true
+        case .archive:
+            showingHistory = true
+        case .pdf:
+            renderHealthPDF()
+        case .symptom:
+            openHealthRecord(.symptom, feedback: false)
+        case .heatCycle:
+            openHealthRecord(.heatCycle, feedback: false)
         }
     }
 
-    var healthInlinePopupTransition: AnyTransition {
-        .asymmetric(
-            insertion: .move(edge: .bottom)
-                .combined(with: .opacity)
-                .combined(with: .scale(scale: 0.965, anchor: .bottom)),
-            removal: .move(edge: .bottom)
-                .combined(with: .opacity)
-                .combined(with: .scale(scale: 0.985, anchor: .bottom))
-        )
-    }
+
 
     func openHealthRecord(_ destination: HealthPlusDestination, feedback: Bool = true) {
         guard pet.canWriteHealthFacts else { return }
         if feedback { OhanaFeedback.light() }
         activeHealthSheet = nil
-        withAnimation(GoMotion.sheet) {
-            healthPlusDestination = destination
-        }
+        healthPlusDestination = destination
     }
 
     func closeHealthRecordPopup(feedback: Bool = true) {
         if feedback { OhanaFeedback.light() }
-        withAnimation(GoMotion.sheet) {
-            healthPlusDestination = nil
-        }
+        healthPlusDestination = nil
     }
 
     func openHealthOverview(_ sheet: ActiveHealthSheet, feedback: Bool = true) {
         if feedback { OhanaFeedback.light() }
-        withAnimation(GoMotion.page) {
-            activeHealthSheet = sheet
-        }
+        activeHealthSheet = sheet
     }
 
     func closeHealthOverview() {
         OhanaFeedback.light()
-        withAnimation(GoMotion.page) {
-            activeHealthSheet = nil
-        }
+        activeHealthSheet = nil
     }
 
     func openMedicationPopup(feedback: Bool = true) {
@@ -206,20 +129,21 @@ extension PetHealthDetailContentView {
         if feedback { OhanaFeedback.light() }
         activeHealthSheet = nil
         healthPlusDestination = nil
-        withAnimation(GoMotion.sheet) {
-            showingMedicationPopup = true
-        }
+        showingMedicationPopup = true
     }
 
     func closeMedicationPopup(feedback: Bool = true) {
         if feedback { OhanaFeedback.light() }
-        withAnimation(GoMotion.sheet) {
-            showingMedicationPopup = false
-        }
+        showingMedicationPopup = false
     }
 
     func renderHealthPDF() {
         guard !isRenderingPDF else { return }
+        guard appServices.commerce.allows(.vetSummaryPDF) else {
+            showingPersonalPlan = true
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            return
+        }
         isRenderingPDF = true
         Task {
             pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
@@ -232,10 +156,10 @@ extension PetHealthDetailContentView {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(healthStatusTitle)
-                    .font(OhanaFont.adaptive(size: 27, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 27, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(healthStatusSubtitle)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(healthStatusColor)
                     .lineLimit(1)
                 HStack(spacing: 6) {
@@ -245,7 +169,7 @@ extension PetHealthDetailContentView {
             }
             Spacer()
             Image(systemName: (healthAlerts.isEmpty && duePreventiveCount == 0) ? "checkmark.seal.fill" : "heart.text.square.fill")
-                .font(OhanaFont.adaptive(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(healthStatusColor)
         }
@@ -256,9 +180,9 @@ extension PetHealthDetailContentView {
     func statusPill(icon: String, value: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
             Text(value)
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
         }
         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.78))
         .padding(.horizontal, 8)
@@ -271,17 +195,17 @@ extension PetHealthDetailContentView {
             ForEach(healthAlerts.prefix(2)) { alert in
                 HStack(spacing: 10) {
                     Image(systemName: alertIcon(for: alert.type))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                         .foregroundStyle(alertColor(alert))
                         .frame(width: 30, height: 30) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(alertColor(alert).opacity(0.16), in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text(alert.title)
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(alert.detail)
-                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
                     }
@@ -301,9 +225,10 @@ extension PetHealthDetailContentView {
                 value: nextPreventiveStatusText,
                 detail: preventiveDashboardDetail,
                 icon: "shield.checkered",
-                tint: preventionTint,
+                accent: (preventionTint, preventionActionForeground),
                 primaryTitle: l.tr(zh: "记录", en: "Log", de: "Eintragen"),
                 secondaryTitle: l.tr(zh: "疫苗本", en: "Passport", de: "Impfpass"),
+                primaryIdentifier: "pet-health-tool-preventive-action",
                 primaryAction: { openHealthRecord(.guided(.preventive)) },
                 secondaryAction: {
                     OhanaFeedback.light()
@@ -316,7 +241,7 @@ extension PetHealthDetailContentView {
                 value: medicationStatusText,
                 detail: nextMedicationDoseText,
                 icon: "pill.fill",
-                tint: medicationTint,
+                accent: (medicationTint, medicationActionForeground),
                 primaryTitle: medicationPrimaryButtonTitle,
                 secondaryTitle: l.tr(zh: "管理", en: "Manage", de: "Verwalten"),
                 primaryAction: handleMedicationPrimaryAction,
@@ -331,9 +256,10 @@ extension PetHealthDetailContentView {
                 value: symptomStatusText,
                 detail: symptomVisitDashboardDetail,
                 icon: "waveform.path.ecg",
-                tint: symptomVisitTint,
+                accent: (symptomVisitTint, symptomVisitActionForeground),
                 primaryTitle: l.tr(zh: "症状", en: "Symptom", de: "Symptom"),
                 secondaryTitle: l.tr(zh: "就诊", en: "Visit", de: "Besuch"),
+                secondaryIdentifier: "pet-health-tool-visit-action",
                 primaryAction: { openHealthRecord(.symptom) },
                 secondaryAction: { openHealthRecord(.guided(.visit)) },
                 cardAction: { openHealthOverview(.symptomVisitOverview) }
@@ -346,9 +272,11 @@ extension PetHealthDetailContentView {
         value: String,
         detail: String,
         icon: String,
-        tint: Color,
+        accent: (tint: Color, foreground: Color),
         primaryTitle: String,
         secondaryTitle: String,
+        primaryIdentifier: String? = nil,
+        secondaryIdentifier: String? = nil,
         primaryAction: @escaping () -> Void,
         secondaryAction: @escaping () -> Void,
         cardAction: @escaping () -> Void
@@ -356,24 +284,24 @@ extension PetHealthDetailContentView {
         HStack(spacing: 14) {
             ZStack {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
-                    .fill(tint.opacity(isDark ? 0.20 : 0.13))
+                    .fill(accent.tint.opacity(isDark ? 0.20 : 0.13))
                     .frame(width: 58, height: 58)
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black))
-                    .foregroundStyle(tint)
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold))
+                    .foregroundStyle(accent.tint)
             }
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(detail)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -385,23 +313,25 @@ extension PetHealthDetailContentView {
                     primaryAction()
                 } label: {
                     Text(primaryTitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
+                        .foregroundStyle(accent.foreground)
                         .frame(width: 64, height: 34)
-                        .background(tint, in: Capsule())
+                        .background(accent.tint, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(primaryIdentifier ?? "")
 
                 Button {
                     secondaryAction()
                 } label: {
                     Text(secondaryTitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 64, height: 34)
                         .background(Color.primary.opacity(isDark ? 0.10 : 0.07), in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier(secondaryIdentifier ?? "")
             }
         }
         .padding(14)

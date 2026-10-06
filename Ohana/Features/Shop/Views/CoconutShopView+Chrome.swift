@@ -8,59 +8,172 @@ import SwiftUI
 
 extension CoconutShopView {
     var header: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokosnuss-Shop"))
-                        .font(OhanaFont.title(.black))
-                        .foregroundStyle(primaryText)
-                        .accessibilityIdentifier("coconut-shop-screen")
-                    Text(l.tr(zh: "买断外观、植物装饰、称号和 App Icon。", en: "Unlock looks, plant decor, titles, and App Icons.", de: "Schalte Looks, Pflanzendeko, Titel und App Icons frei."))
-                        .font(OhanaFont.caption(.semibold))
-                        .foregroundStyle(secondaryText)
-                }
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(primaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 18) {
+                spendableMetric
+                inventoryMetric
             }
 
-            HStack(spacing: 18) {
-                metric(
-                    label: l.tr(zh: "本人余额", en: "My balance", de: "Mein Guthaben"),
-                    value: "\(currentHumanBalance)",
-                    suffix: "🥥",
-                    tint: Color.goYellow,
-                    accessibilityIdentifier: "coconut-shop-current-human-balance"
-                )
-                metric(
-                    label: l.tr(zh: "已拥有", en: "Owned", de: "Besitzt"),
-                    value: "\(ownedCount)",
-                    suffix: "",
-                    tint: Color.goPrimary,
-                    accessibilityIdentifier: "coconut-shop-owned-count"
-                )
-                if CoconutExchangeFeatureGate.isEnabled {
-                    metric(
-                        label: l.tr(zh: "待确认", en: "Pending", de: "Offen"),
-                        value: "\(incomingPendingExchanges.count)",
-                        suffix: "",
-                        tint: Color.goTeal,
-                        accessibilityIdentifier: nil
-                    )
+            buyerSummaryControl
+                .accessibilityIdentifier("coconut-shop-screen")
+        }
+    }
+
+    @ViewBuilder
+    var buyerSummaryControl: some View {
+        if activeHumans.count > 1 {
+            Menu {
+                ForEach(activeHumans) { human in
+                    Button {
+                        shopBuyerID = human.id
+                        OhanaFeedback.selection()
+                    } label: {
+                        if currentHuman?.id == human.id {
+                            Label(human.name, systemImage: "checkmark")
+                        } else {
+                            Text(human.name)
+                        }
+                    }
                 }
+            } label: {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    buyerSummaryLabel
+                    Image(systemName: "chevron.up.chevron.down") // a11y: allow decorative menu affordance; the menu label names the selected buyer.
+                        .font(OhanaFont.caption2(.bold))
+                        .accessibilityHidden(true)
+                }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(l.tr(zh: "为本次商店会话选择付款成员", en: "Chooses the paying member for this shop session", de: "Wählt das zahlende Mitglied für diese Shop-Sitzung"))
+        } else {
+            buyerSummaryLabel
+        }
+    }
+
+    var buyerSummaryLabel: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 7) {
+            Image(systemName: currentHuman == nil ? "person.crop.circle.badge.questionmark" : "person.crop.circle")
+                .foregroundStyle(currentHuman == nil ? Color.goOrange : Color.goTeal)
+                .accessibilityHidden(true)
+            Text(currentHumanSummary)
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    var spendableMetric: some View {
+        metric(
+            label: l.text(ShopShelfCopy.availableBalance),
+            value: "\(islandSpendableHumanBalance)",
+            suffix: "🥥",
+            tint: Color.goYellow,
+            accessibilityIdentifier: "coconut-shop-island-spendable-balance"
+        )
+    }
+
+    var personalBalanceMetric: some View {
+        metric(
+            label: l.tr(
+                zh: "当前成员",
+                en: "Current member",
+                de: "Aktuelles Mitglied",
+                es: "Miembro actual",
+                pt: "Membro atual",
+                fr: "Membre actuel",
+                ja: "現在のメンバー",
+                ko: "현재 구성원",
+                it: "Membro attuale"
+            ),
+            value: "\(currentHumanBalance)",
+            suffix: "🥥",
+            tint: Color.goTeal,
+            accessibilityIdentifier: "coconut-shop-current-human-balance"
+        )
+    }
+
+    var inventoryMetric: some View {
+        Button {
+            showInventory = true
+        } label: {
+            Label(l.tr(zh: "百宝箱", en: "Treasure box", de: "Schatzkiste"), systemImage: "shippingbox")
+                .font(OhanaFont.caption(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier("coconut-shop-owned-count")
+        .accessibilityHint(l.tr(zh: "打开百宝箱管理已拥有内容", en: "Opens your owned items for management", de: "Öffnet deine gekauften Inhalte zur Verwaltung"))
+    }
+
+    @ViewBuilder
+    var purchaseSettlementNotice: some View {
+        let needsAttention = purchaseSettlements.values.contains(.needsAttention)
+            || !blockedPurchaseItemIDs.isEmpty
+        let recoveryItemID = allItems.first {
+            purchaseSettlements[$0.id] == .needsAttention
+        }?.id ?? purchaseSettlements.first { $0.value == .needsAttention }?.key
+        VStack(alignment: .leading, spacing: 10) {
+            Label {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        needsAttention
+                            ? l.text(ShopShelfCopy.settlementAttention)
+                            : l.text(ShopShelfCopy.settlementPending)
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                    if let recoveryItemID,
+                       let reason = purchaseSettlementReasons[recoveryItemID] {
+                        Text(purchaseRecoveryReasonMessage(reason))
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(secondaryText)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            } icon: {
+                Image(systemName: needsAttention ? "exclamationmark.triangle.fill" : "clock.arrow.trianglehead.counterclockwise.rotate.90")
+                    .accessibilityHidden(true)
+            }
+
+            if let recoveryItemID,
+               ShopManualRecoveryActionPolicy.canRetry(
+                   reasonCode: purchaseSettlementReasons[recoveryItemID]
+               ) {
+                Button {
+                    retryRecovery(for: recoveryItemID)
+                } label: {
+                    if recoveryInFlightItemID == recoveryItemID {
+                        Label(
+                            l.tr(zh: "正在检查…", en: "Checking…", de: "Wird geprüft…"),
+                            systemImage: "clock"
+                        )
+                    } else {
+                        Label(
+                            l.tr(zh: "重新尝试恢复", en: "Retry recovery", de: "Wiederherstellung erneut versuchen"),
+                            systemImage: "arrow.clockwise"
+                        )
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(recoveryInFlightItemID != nil)
+                .accessibilityIdentifier("coconut-shop-retry-recovery")
+                .accessibilityHint(purchaseRecoverySafetyHint)
             }
         }
+        .font(OhanaFont.caption(.bold))
+        .foregroundStyle(needsAttention ? Color.goOrange : Color.goTeal)
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            (needsAttention ? Color.goOrange : Color.goTeal).opacity(0.12),
+            in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
+        )
+        .accessibilityIdentifier("coconut-shop-settlement-notice")
+    }
+
+    var currentHumanSummary: String {
+        guard let currentHuman else { return l.text(ShopShelfCopy.chooseBuyer) }
+        return "\(l.text(ShopShelfCopy.payingMember)): \(currentHuman.name)"
     }
 
     func metric(label: String, value: String, suffix: String, tint: Color, accessibilityIdentifier: String?) -> some View {
@@ -90,71 +203,26 @@ extension CoconutShopView {
         .accessibilityIdentifier(accessibilityIdentifier ?? "coconut-shop-metric-\(label)")
     }
 
-    var selectedAppIconShortName: String {
-        guard let item = ShopCatalog.item(id: selectedAppIcon, purchasedSet: purchasedSet) else {
-            return "Ohana"
-        }
-        return item.name(l)
-    }
+    func shopShelfSection(_ section: ShopShelfSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(section.title(l))
+                .font(OhanaFont.title3(.bold))
+                .foregroundStyle(primaryText)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("coconut-shop-section-\(section.id)")
 
-    var categoryRail: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(ShopItem.ShopCategory.visibleCases) { category in
-                    Button {
-                        withAnimation(GoMotion.feedback) {
-                            selectedCategory = category
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: category.icon)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            Text(category.title(l))
-                                .font(OhanaFont.caption(.black))
-                        }
-                        .foregroundStyle(selectedCategory == category ? Color.ohanaPrimaryActionText : primaryText)
-                        .padding(.horizontal, 13)
-                        .padding(.vertical, 9)
-                        .background(selectedCategory == category ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityIdentifier("coconut-shop-category-\(category.rawValue)")
-                }
-            }
-            .padding(.horizontal, 20)
-        }
-    }
-
-    @ViewBuilder
-    var categoryIntro: some View {
-        if effectiveSelectedCategory == .plantDecor {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "leaf.circle.fill") // a11y: allow decorative category marker; nearby copy names the shelf
-                    .font(OhanaFont.adaptive(size: 22, weight: .black))
-                    .foregroundStyle(Color.goTeal)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "植物装饰只影响绿洲外观", en: "Plant decor is cosmetic", de: "Pflanzendeko ist kosmetisch"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(primaryText)
-                    Text(l.tr(
-                        zh: "添加植物、护理计划、资料库和提醒仍然免费；这里兑换的是场景、盆器和岛屿氛围。",
-                        en: "Adding plants, care plans, catalog, and reminders stay free. This shelf unlocks scenes, pot skins, and island ambience.",
-                        de: "Pflanzen, Pflegepläne, Katalog und Erinnerungen bleiben kostenlos. Dieses Regal schaltet Szenen, Topf-Skins und Inselstimmung frei."
-                    ))
-                    .font(OhanaFont.caption2(.semibold))
+            if section == .oasis {
+                Text(l.text(ShopShelfCopy.plantCosmetic))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            LazyVGrid(columns: shopGridColumns, spacing: 12) {
+                ForEach(allItems.filter(section.contains)) { item in
+                    shopItemCard(item)
                 }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
-                    .strokeBorder(Color.goTeal.opacity(0.22), lineWidth: 1)
-            }
-            .accessibilityElement(children: .combine)
         }
     }
 }

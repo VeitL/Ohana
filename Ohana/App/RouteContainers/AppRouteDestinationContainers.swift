@@ -88,14 +88,15 @@ struct AppRoutePresentationHost: ViewModifier {
             .sheet(item: $coordinator.sheet, onDismiss: handleSheetDismissed) { route in
                 AppDeferredRouteContent(
                     routeID: route.id,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: route == .requiredAccountSwitch ? nil : { coordinator.dismissSheet(route) }
                 ) {
                     AppSheetRouteDestination(
                         route: route,
                         coordinator: coordinator,
                         onDismiss: { coordinator.dismissSheet(route) },
-                        onPetSavedFromAddEntity: onPetSavedFromAddEntity,
-                        onHumanSavedFromAddEntity: onHumanSavedFromAddEntity,
+                        onPetSavedFromAddEntity: handlePetSavedFromAddEntity,
+                        onHumanSavedFromAddEntity: handleHumanSavedFromAddEntity,
                         onRequestStarterGiftClaim: onRequestStarterGiftClaim,
                         onCalendarEventDestination: handleCalendarEventDestination,
                         onFirstSuccessMomentCompleted: onFirstSuccessMomentCompleted,
@@ -112,7 +113,8 @@ struct AppRoutePresentationHost: ViewModifier {
             .sheet(item: $coordinator.overlay) { route in
                 AppDeferredRouteContent(
                     routeID: route.id,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { coordinator.dismissOverlay(route) }
                 ) {
                     AppOverlayRouteDestination(
                         route: route,
@@ -130,6 +132,16 @@ struct AppRoutePresentationHost: ViewModifier {
                 .appPresentationSheet(AppPresentationPolicyProvider.policy(for: route))
                 .globalCoconutRewardFeedbackOverlay()
             }
+    }
+
+    private func handlePetSavedFromAddEntity(_ pet: Pet) {
+        coordinator.completeMemberCreation()
+        onPetSavedFromAddEntity(pet)
+    }
+
+    private func handleHumanSavedFromAddEntity(_ human: Human) {
+        coordinator.completeMemberCreation()
+        onHumanSavedFromAddEntity(human)
     }
 
     private func handleSheetDismissed() {
@@ -402,46 +414,34 @@ private struct AppSheetRouteDestination: View {
                 .onAppear(perform: onDismiss)
             }
         case let .crewRoster(mode):
-            NavigationStack {
-                CrewRosterOverlayRouteContainer(
-                    initialMode: mode,
-                    onSelectPet: { pet in
-                        onDismiss()
-                        coordinator.openPet(pet.id, initialTab: .overview)
-                    },
-                    onSelectHuman: { human in
-                        onDismiss()
-                        coordinator.openHuman(human.id)
-                    },
-                    onInlinePetSaved: { pet in
-                        onDismiss()
-                        onPetSavedFromAddEntity(pet)
-                    },
-                    onInlineHumanSaved: { human in
-                        onDismiss()
-                        onHumanSavedFromAddEntity(human)
-                    },
-                    onClose: onDismiss,
-                    onPresentCoconutLog: { subject in
-                        coordinator.presentCoconutLog(subject)
-                    },
-                    onOpenTaskCenter: {
-                        onDismiss()
-                        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
-                            coordinator.presentTaskCenter()
-                        }
-                    }
-                )
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(action: onDismiss) {
-                            Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark.circle.fill")
-                                .labelStyle(.iconOnly)
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
+            CrewRosterOverlayRouteContainer(
+                initialMode: mode,
+                onSelectPet: { pet in
+                    onDismiss()
+                    coordinator.openPet(pet.id, initialTab: .overview)
+                },
+                onSelectHuman: { human in
+                    onDismiss()
+                    coordinator.openHuman(human.id)
+                },
+                onInlinePetSaved: { pet in
+                    onPetSavedFromAddEntity(pet)
+                },
+                onInlineHumanSaved: { human in
+                    onHumanSavedFromAddEntity(human)
+                },
+                onClose: onDismiss,
+                onPresentCoconutLog: { subject in
+                    coordinator.presentCoconutLog(subject)
+                },
+                onOpenTaskCenter: {
+                    onDismiss()
+                    OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+                        coordinator.presentTaskCenter()
                     }
                 }
-            }
+            )
+
             .ohanaSheetPagePresentation()
         case let .functionMenu(destination):
             FunctionMenuSheet(initialDestination: destination)
@@ -458,7 +458,8 @@ private struct AppSheetRouteDestination: View {
             AppPetDetailSheetRouteContainer(
                 id: id,
                 destination: .basicInfo,
-                onMissing: onDismiss
+                onMissing: onDismiss,
+                onDismiss: onDismiss
             )
             .ohanaSheetPagePresentation()
         case let .petFood(id):
@@ -553,7 +554,8 @@ private struct AppSheetRouteDestination: View {
             AppPetDetailSheetRouteContainer(
                 id: id,
                 destination: .health(initialSection),
-                onMissing: onDismiss
+                onMissing: onDismiss,
+                onDismiss: onDismiss
             )
             .ohanaSheetPagePresentation()
         case let .petMedication(id):
@@ -569,10 +571,10 @@ private struct AppSheetRouteDestination: View {
                 onSaved: onFirstSuccessMomentCompleted,
                 onDismiss: onDismiss
             )
-        case let .petMomentHistory(id):
+        case let .petMomentHistory(id, route):
             AppPetDetailSheetRouteContainer(
                 id: id,
-                destination: .momentHistory,
+                destination: .momentHistory(route),
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
@@ -679,6 +681,17 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .humanObservationQuick(id):
+            AppHumanDetailSheetRouteContainer(id: id, destination: .observationQuick, onMissing: onDismiss, onDismiss: onDismiss)
+                .ohanaSheetPagePresentation()
+        case let .humanConditions(id):
+            AppHumanDetailSheetRouteContainer(
+                id: id,
+                destination: .conditions,
+                onMissing: onDismiss,
+                onDismiss: onDismiss
+            )
+            .ohanaSheetPagePresentation()
         case let .humanReport(id):
             AppHumanDetailSheetRouteContainer(
                 id: id,
@@ -721,8 +734,26 @@ private struct AppSheetRouteDestination: View {
                 onMissing: onDismiss
             )
             .ohanaSheetPagePresentation()
+        case let .guardianSafety(invitationCode, incidentID):
+            if AppFeatureRouteGuard.allowsSheetRoute(route, currentLevel: currentFeatureLevel) {
+                NavigationStack {
+                    GuardianSafetyDashboardView(
+                        initialInviteCode: invitationCode,
+                        initialIncidentID: incidentID
+                    )
+                    .toolbar {
+                        OhanaModalToolbar(onClose: onDismiss)
+                    }
+                }
+                .ohanaSheetPagePresentation()
+            } else {
+                HiddenRouteInterceptView(
+                    note: AppFeatureRouteGuard.lockedRouteNote(for: route, currentLevel: currentFeatureLevel)
+                )
+                .onAppear(perform: onDismiss)
+            }
         case .requiredAccountSwitch:
-            AppAccountSwitcherRouteContainer(onSwitched: onDismiss)
+            AppAccountSwitcherRouteContainer(allowsDismiss: false, onSwitched: onDismiss)
                 .interactiveDismissDisabled(true)
         case .settings:
             AppSettingsSheetRouteContainer(onClose: onDismiss)
@@ -769,8 +800,14 @@ private struct AppSheetRouteDestination: View {
             .petBasicInfo(petID)
         case .documents:
             .petDocuments(petID)
-        case .moments, .timeline:
+        case .moments:
             .petMomentHistory(petID)
+        case .timeline:
+            .petMomentHistory(petID, initialRoute: .timeline)
+        case .photos:
+            .petMomentHistory(petID, initialRoute: .photos)
+        case let .memory(reference):
+            .petMomentHistory(petID, initialRoute: reference.route)
         case .achievements:
             .petAchievements(petID)
         case .retention:
@@ -789,12 +826,18 @@ private struct AppSheetRouteDestination: View {
         let route: AppSheetRoute = switch destination {
         case .basicInfo:
             .humanBasicInfo(humanID)
+        case .weightQuick:
+            .humanWeightQuick(humanID)
         case .weight:
             .humanWeight(humanID)
+        case .workoutQuick:
+            .humanWorkoutQuick(humanID)
         case .workout:
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .medication:
             .humanMedication(humanID)
         case .report:
@@ -803,8 +846,12 @@ private struct AppSheetRouteDestination: View {
             .humanExpense(humanID)
         case .wishlist:
             .humanWishlist(humanID)
+        case .noteQuick:
+            .humanNoteQuick(humanID)
         case .notes:
             .humanNote(humanID)
+        case .achievements:
+            .functionMenu(destination: .featureAggregate(.achievements))
         }
         presentFeatureRouteAfterTap(route)
     }
@@ -829,6 +876,10 @@ private struct AppSheetRouteDestination: View {
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .observationQuick:
+            .humanObservationQuick(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .report:
             .humanReport(humanID)
         case .expenseQuick:
@@ -948,6 +999,10 @@ private struct AppOverlayRouteDestination: View {
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .observationQuick:
+            .humanObservationQuick(humanID)
+        case .conditions:
+            .humanConditions(humanID)
         case .report:
             .humanReport(humanID)
         case .expenseQuick:

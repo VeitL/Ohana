@@ -25,7 +25,7 @@ struct PetImmunityCard: View {
                     .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goCardCyan)
                 Text(l.tr(zh: "免疫健康", en: "Immunity health", de: "Immunschutz"))
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 let urgentCount = upcomingCount
@@ -108,7 +108,7 @@ struct PetImmunityCard: View {
             Text(row.icon).font(OhanaFont.adaptive(size: 22))
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if let last = row.lastDate {
                     Text(l.tr(zh: "上次: \(last.formatted(.dateTime.year().month().day()))", en: "Last: \(last.formatted(.dateTime.year().month().day()))", de: "Zuletzt: \(last.formatted(.dateTime.year().month().day()))"))
@@ -124,13 +124,13 @@ struct PetImmunityCard: View {
             if let days = daysUntilDue {
                 if isOverdue {
                     Text(l.tr(zh: "已逾期", en: "Overdue", de: "Überfällig"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(Color.goRed)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goRed.opacity(0.15), in: Capsule())
                 } else if isUrgent {
                     Text(l.tr(zh: "\(days)天后", en: "In \(days)d", de: "In \(days) T."))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(Color.goYellow)
                         .padding(.horizontal, 8).padding(.vertical, 3)
                         .background(Color.goYellow.opacity(0.15), in: Capsule())

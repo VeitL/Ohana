@@ -60,22 +60,22 @@ extension PetHealthDetailContentView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 19, weight: .black))
+                        .font(OhanaFont.adaptive(size: 19, weight: .semibold))
                         .foregroundStyle(tint)
                         .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     Spacer()
                     Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(.tertiary)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(value)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -90,7 +90,7 @@ extension PetHealthDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "防护", en: "Protection", de: "Schutz"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
@@ -98,7 +98,7 @@ extension PetHealthDetailContentView {
                     showingPassport = true
                 } label: {
                     Image(systemName: "syringe.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(chromeAccent)
                         .frame(width: 30, height: 30) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 }
@@ -123,14 +123,13 @@ extension PetHealthDetailContentView {
                     healthPlusDestination = .heatCycle
                 }
             }
-            healthToolButton(title: "PDF", icon: "doc.richtext", tint: chromeAccent, identifier: "pet-health-tool-pdf-action") {
-                guard !isRenderingPDF else { return }
-                isRenderingPDF = true
-                Task {
-                    pdfURL = await PetVetSummaryPDFRenderer.render(pet: pet, context: modelContext)
-                    isRenderingPDF = false
-                    if pdfURL != nil { showingPDFPreview = true }
-                }
+            healthToolButton(
+                title: appServices.commerce.allows(.vetSummaryPDF) ? "PDF" : "PDF · Personal",
+                icon: appServices.commerce.allows(.vetSummaryPDF) ? "doc.richtext" : "lock.fill",
+                tint: chromeAccent,
+                identifier: "pet-health-tool-pdf-action"
+            ) {
+                renderHealthPDF()
             }
         }
     }
@@ -148,11 +147,11 @@ extension PetHealthDetailContentView {
         } label: {
             VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(tint)
                     .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.74))
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -170,7 +169,7 @@ extension PetHealthDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Button {
@@ -178,7 +177,7 @@ extension PetHealthDetailContentView {
                     showingHistory = true
                 } label: {
                     Text(l.tr(zh: "全部", en: "All", de: "Alle"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(chromeAccent)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -190,7 +189,7 @@ extension PetHealthDetailContentView {
                         .font(OhanaFont.adaptive(size: 22, weight: .bold))
                         .foregroundStyle(chromeAccent)
                     Text(l.tr(zh: "还没有健康记录", en: "No health records yet", de: "Noch keine Gesundheitseinträge"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                 }
@@ -199,23 +198,23 @@ extension PetHealthDetailContentView {
                 ForEach(recentHealthActivities) { item in
                     HStack(spacing: 12) {
                         Image(systemName: item.icon)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                             .foregroundStyle(item.tint)
                             .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .background(item.tint.opacity(isDark ? 0.20 : 0.12), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text(item.title)
-                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(1)
                             Text(item.detail)
-                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
                         }
                         Spacer()
                         Text(item.date.formatted(.dateTime.month().day()))
-                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                             .foregroundStyle(.tertiary)
                     }
                     .padding(.vertical, 3)
@@ -259,11 +258,11 @@ extension PetHealthDetailContentView {
                                 .rotationEffect(.degrees(-90))
                         }
                         Image(systemName: icon)
-                            .font(OhanaFont.adaptive(size: 16, weight: .black))
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                             .foregroundStyle(color)
                     }
                     Text(label)
-                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                     if let d = days {
                         Text(d < 0 ? l.tr(zh: "逾期", en: "Overdue", de: "Überfällig") : l.tr(zh: "\(d)天", en: "\(d)d", de: "\(d) T"))
@@ -332,7 +331,7 @@ extension PetHealthDetailContentView {
                             .fill(colorForType(type))
                             .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Text(localizedHealthLogType(type))
-                            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
                     }
                 }
@@ -345,7 +344,7 @@ extension PetHealthDetailContentView {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 8) {
                 Label(l.tr(zh: "健康记录趋势", en: "Health trend", de: "Gesundheitstrend"), systemImage: "waveform.path.ecg")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(chromeAccent)
                 Spacer()
                 Text(l.tr(zh: "最近 12 个月", en: "Last 12 months", de: "Letzte 12 Monate"))
@@ -362,7 +361,7 @@ extension PetHealthDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label(l.tr(zh: "健康时间轴", en: "Health timeline", de: "Gesundheitsverlauf"), systemImage: "list.bullet.clipboard.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(chromeAccent)
                 Spacer()
                 Text(l.tr(zh: "\(sortedLogs.count) 条", en: "\(sortedLogs.count)", de: "\(sortedLogs.count)"))
@@ -375,7 +374,7 @@ extension PetHealthDetailContentView {
             if sortedLogs.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "heart.text.square").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 34, weight: .black))
+                        .font(OhanaFont.adaptive(size: 34, weight: .semibold))
                         .foregroundStyle(chromeAccent)
                     Text(l.tr(zh: "暂无健康记录", en: "No health records yet", de: "Noch keine Gesundheitseinträge"))
                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
@@ -390,12 +389,12 @@ extension PetHealthDetailContentView {
                         ZStack {
                             Circle().fill(colorForType(log.healthLogType).opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                             Image(systemName: healthIcon(for: log.healthLogType))
-                                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                                 .foregroundStyle(colorForType(log.healthLogType))
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             Text(localizedHealthLogType(log.healthLogType))
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             HStack(spacing: 6) {
                                 Text(log.date, format: .dateTime.year().month().day())
@@ -413,7 +412,7 @@ extension PetHealthDetailContentView {
                         VStack(alignment: .trailing, spacing: 3) {
                             if log.cost > 0 {
                                 Text(AppCurrency.format(log.cost, fractionDigits: 0))
-                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                             }
                             Button {
@@ -440,7 +439,7 @@ extension PetHealthDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label(l.tr(zh: "异常症状记录", en: "Symptom records", de: "Symptome"), systemImage: "exclamationmark.triangle.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.red)
                 Spacer()
                 Text(l.tr(zh: "\(symptomLogs.count) 条", en: "\(symptomLogs.count)", de: "\(symptomLogs.count)"))
@@ -455,12 +454,12 @@ extension PetHealthDetailContentView {
                     ZStack {
                         Circle().fill(Color.red.opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Image(systemName: symptomCategoryIcon(log.category))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                             .foregroundStyle(Color.goRed)
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(log.symptomName)
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         HStack(spacing: 6) {
                             Text(log.date, format: .dateTime.year().month().day())
@@ -502,7 +501,7 @@ extension PetHealthDetailContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Label(l.tr(zh: "生理期与繁育", en: "Cycle and breeding", de: "Zyklus und Zucht"), systemImage: "heart.text.square.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.pink)
                 Spacer()
                 Text(l.tr(zh: "\(heatCycleLogs.count) 条", en: "\(heatCycleLogs.count)", de: "\(heatCycleLogs.count)"))
@@ -517,12 +516,12 @@ extension PetHealthDetailContentView {
                     ZStack {
                         Circle().fill(Color(hex: log.status.colorHex).opacity(0.15)).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Image(systemName: "heart.text.square.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                             .foregroundStyle(Color(hex: log.status.colorHex))
                     }
                     VStack(alignment: .leading, spacing: 3) {
                         Text(localizedHeatCycleStatus(log.status))
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         HStack(spacing: 6) {
                             Text(log.startDate, format: .dateTime.year().month().day())
@@ -563,7 +562,7 @@ extension PetHealthDetailContentView {
                     .font(OhanaFont.adaptive(size: 12, weight: .bold))
                     .foregroundStyle(isDark ? Color.goPrimary : Color.goOrange)
                 Text(l.tr(zh: "健康预警", en: "Health alerts", de: "Gesundheitswarnungen"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.8))
                 Spacer()
                 Text(l.tr(zh: "\(healthAlerts.count) 条", en: "\(healthAlerts.count)", de: "\(healthAlerts.count)"))
@@ -578,12 +577,12 @@ extension PetHealthDetailContentView {
                             .fill(alertColor(alert).opacity(0.15))
                             .frame(width: 32, height: 32) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         Image(systemName: alertIcon(for: alert.type))
-                            .font(OhanaFont.adaptive(size: 13, weight: .black))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                             .foregroundStyle(alertColor(alert))
                     }
                     VStack(alignment: .leading, spacing: 2) {
                         Text(alert.title)
-                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(alert.detail)
                             .font(OhanaFont.adaptive(size: 11, weight: .medium))
@@ -617,7 +616,7 @@ extension PetHealthDetailContentView {
         case .info: (l.tr(zh: "提示", en: "Info", de: "Info"), isDark ? Color.goPrimary.opacity(0.75) : Color.goTeal)
         }
         Text(label)
-            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
             .foregroundStyle(color)
             .padding(.horizontal, 7).padding(.vertical, 3)
             .background(color.opacity(0.15), in: Capsule())

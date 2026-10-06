@@ -19,12 +19,14 @@ private struct HygieneChartPoint: Identifiable {
 
 struct PetHygieneDetailContentView: View {
     let pet: Pet
+    var showsCloseButton = true
     let allReminders: [Reminder]
     let hygieneEntries: [PetHygieneLedgerEntry]
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var groomingPlanTarget: HygieneType? = nil
@@ -36,6 +38,10 @@ struct PetHygieneDetailContentView: View {
 
     private var themeColor: Color {
         Color(hex: pet.safeThemeColorHex)
+    }
+
+    private var themeActionForeground: Color {
+        OhanaResolvedPrimaryAccent(customHex: pet.safeThemeColorHex)?.actionTextColor ?? Color.ohanaPrimaryText
     }
 
     private var isDark: Bool { colorScheme == .dark }
@@ -128,7 +134,7 @@ struct PetHygieneDetailContentView: View {
         let maxH: CGFloat = 22
         VStack(alignment: .leading, spacing: 6) {
             Text(l.tr(zh: "近 28 天", en: "Last 28 days", de: "Letzte 28 Tage"))
-                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 2) {
                 ForEach(pts) { pt in
@@ -196,23 +202,25 @@ struct PetHygieneDetailContentView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 16) {
                     hygieneHeader
-                    // ── 本月概览（无卡片背景）
-                    monthlySummaryCard
                     // ── 5 项护理卡片（打卡 + 计划；顶部状态条已移除，与首页快捷护理重复）
                     ForEach(HygieneType.allCases, id: \.rawValue) { type in
                         hygieneTypeCard(type)
                     }
-                    Spacer(minLength: 40)
+                    monthlySummaryCard
+                    Spacer(minLength: 24)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
             }
         }
-        .navigationTitle("")
+        .navigationTitle(l.tr(zh: "护理", en: "Care", de: "Pflege", es: "Cuidados", pt: "Cuidados", fr: "Soins", ja: "お手入れ", ko: "돌봄", it: "Cura"))
         .navigationBarTitleDisplayMode(.inline)
         .tint(themeColor)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "pet-hygiene-detail-close-action") }
+        }
         .accessibilityIdentifier("pet-hygiene-detail-screen")
         // 护理卡片「计划」按钮 → 待办 sheet
         .sheet(item: $groomingPlanTarget) { hygieneType in
@@ -225,7 +233,8 @@ struct PetHygieneDetailContentView: View {
             PetHygieneActionHumanConfirmationSheet(
                 draft: draft,
                 humans: actionHumanOptions,
-                tint: themeColor
+                tint: themeColor,
+                tintForeground: themeActionForeground
             ) { executorID in
                 commitHygiene(draft.type, executorID: executorID)
             }
@@ -239,35 +248,23 @@ struct PetHygieneDetailContentView: View {
     }
 
     private var hygieneHeader: some View {
-        HStack(spacing: 12) {
-            PetAvatarPortraitView(
-                pet: pet,
-                fallbackText: pet.avatarEmoji,
-                themeColor: chromeAccent,
-                size: 46,
-                backgroundOpacity: isDark ? 0.18 : 0.12
-            )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "护理", en: "Care", de: "Pflege"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+        FeatureHubHeader(
+            title: pet.name,
+            subtitle: "",
+            eyebrow: "",
+            onClose: { dismiss() },
+            closeAccessibilityIdentifier: "pet-hygiene-detail-close-action",
+            showsCloseButton: false,
+            avatar: {
+                PetAvatarPortraitView(
+                    pet: pet,
+                    fallbackText: pet.avatarEmoji,
+                    themeColor: chromeAccent,
+                    size: 46,
+                    backgroundOpacity: isDark ? 0.18 : 0.12
+                )
             }
-
-            Spacer()
-
-            Button { dismiss() } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 40, height: 40) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
+        )
         .padding(.top, 4)
     }
 
@@ -276,9 +273,15 @@ struct PetHygieneDetailContentView: View {
         let totalTypes = max(HygieneType.allCases.count, 1)
         let progress = CGFloat(completedTodayCount) / CGFloat(totalTypes)
         let attentionTint = hasOverdueType ? Color.goRed : Color.goOrange
-        let headline = attentionTypes.isEmpty
-            ? l.tr(zh: "今天的护理节奏很好", en: "Care rhythm looks good today", de: "Der Pflegerhythmus passt heute")
-            : l.tr(zh: "\(attentionTypes.count) 项护理需要关注", en: "\(attentionTypes.count) care items need attention", de: "\(attentionTypes.count) Pflegepunkte brauchen Aufmerksamkeit")
+        let headline = hygieneEntries.isEmpty
+            ? l.tr(
+                zh: "还没有护理记录", en: "No care records yet", de: "Noch keine Pflegeeinträge",
+                es: "Aún no hay registros de cuidados", pt: "Ainda não há registros de cuidados", fr: "Aucun soin enregistré",
+                ja: "お世話の記録はまだありません", ko: "아직 돌봄 기록이 없어요", it: "Nessun registro di cura"
+            )
+            : (attentionTypes.isEmpty
+                ? l.tr(zh: "今天的护理节奏很好", en: "Care rhythm looks good today", de: "Der Pflegerhythmus passt heute")
+                : l.tr(zh: "\(attentionTypes.count) 项护理需要关注", en: "\(attentionTypes.count) care items need attention", de: "\(attentionTypes.count) Pflegepunkte brauchen Aufmerksamkeit"))
 
         return VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
@@ -291,28 +294,44 @@ struct PetHygieneDetailContentView: View {
                         .rotationEffect(.degrees(-90))
                     VStack(spacing: 1) {
                         Text("\(completedTodayCount)/\(totalTypes)")
-                            .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "今日", en: "Today", de: "Heute"))
-                            .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
-                .frame(width: 66, height: 66)
+                .frame(width: dynamicTypeSize.isAccessibilitySize ? 100 : 66, height: dynamicTypeSize.isAccessibilitySize ? 100 : 66)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(l.tr(zh: "今日", en: "Today", de: "Heute"))
+                .accessibilityValue("\(completedTodayCount)/\(totalTypes)")
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(headline)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                    Text(attentionTypes.isEmpty ? l.tr(zh: "继续保持，下一次护理会自动提醒。", en: "Keep going. The next care item will remind you.", de: "Weiter so. Die nächste Pflege erinnert dich.") : attentionTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(attentionTypes.isEmpty ? .secondary : attentionTint.opacity(0.9))
-                        .lineLimit(2)
+                    if hygieneEntries.isEmpty {
+                        if !pet.hasPassedAway {
+                            Text(l.tr(
+                                zh: "选择下方项目记录护理，也可设置提醒。", en: "Choose a care item below to log it or set a reminder.", de: "Unten Pflege erfassen oder eine Erinnerung einrichten.",
+                                es: "Elige un cuidado abajo para registrarlo o crear un recordatorio.", pt: "Escolha um cuidado abaixo para registrar ou criar um lembrete.", fr: "Choisissez un soin ci-dessous pour le noter ou créer un rappel.",
+                                ja: "下の項目でお世話を記録したり、リマインダーを設定できます。", ko: "아래 항목에서 돌봄을 기록하거나 알림을 설정하세요.", it: "Scegli una cura qui sotto per registrarla o impostare un promemoria."
+                            ))
+                            .font(OhanaFont.caption(.semibold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                        }
+                    } else if !attentionTypes.isEmpty {
+                        Text(attentionTypes.map { $0.localizedLabel(l) }.joined(separator: l.tr(zh: "、", en: ", ", de: ", ")))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
+                            .foregroundStyle(attentionTint.opacity(0.9))
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    }
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 8) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: dynamicTypeSize.isAccessibilitySize ? 1 : 3), spacing: 8) {
                 overviewMetric(icon: "sparkle", value: "\(monthlyTotalCount)", label: l.tr(zh: "本月护理", en: "This month", de: "Dieser Monat"), tint: themeColor)
                 overviewMetric(icon: "bolt.fill", value: "\(currentStrike)", label: l.tr(zh: "连续打卡", en: "Streak", de: "Serie"), tint: Color.goOrange)
                 overviewMetric(icon: "clock", value: "\(attentionTypes.count)", label: l.tr(zh: "待护理", en: "Due", de: "Fällig"), tint: attentionTypes.isEmpty ? themeColor : attentionTint)
@@ -324,17 +343,18 @@ struct PetHygieneDetailContentView: View {
     private func overviewMetric(icon: String, value: String, label: String, tint: Color) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 18, height: 18) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(label)
-                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }
@@ -342,6 +362,7 @@ struct PetHygieneDetailContentView: View {
         .padding(.vertical, 9)
         .frame(maxWidth: .infinity)
         .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
+        .accessibilityElement(children: .combine)
     }
 
     // MARK: - 是否今天已完成
@@ -363,65 +384,7 @@ struct PetHygieneDetailContentView: View {
         let accessibilityPrefix = "pet-hygiene-\(type.accessibilityIdentifierFragment)"
 
         return VStack(alignment: .leading, spacing: 10) {
-            // 标题行：名称 + 状态 + 计划 + 打卡（主题色仅用于图标/按钮）
-            HStack(spacing: 6) {
-                Image(systemName: type.systemIconName)
-                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
-                    .foregroundStyle(themeColor)
-                Text(type.localizedLabel(l))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer(minLength: 4)
-                if let status {
-                    Text(status.requiresAttention ? status.compactDueText(l: l) : status.compactLastRecordedText(l: l))
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(status.elapsedDays == 0 ? themeColor : color)
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background((status.elapsedDays == 0 ? themeColor : color).opacity(0.14), in: Capsule())
-                } else {
-                    Text(l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag"))
-                        .font(OhanaFont.adaptive(size: 10, weight: .medium))
-                        .foregroundStyle(themeColor.opacity(0.55))
-                        .padding(.horizontal, 7).padding(.vertical, 3)
-                        .background(themeColor.opacity(0.1), in: Capsule())
-                }
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    groomingPlanTarget = type
-                } label: {
-                    HStack(spacing: 3) {
-                        Image(systemName: "bell.badge.plus").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 10, weight: .bold))
-                        Text(l.tr(zh: "计划", en: "Plan", de: "Plan"))
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(themeColor)
-                    .padding(.horizontal, 9).padding(.vertical, 5)
-                    .background(themeColor.opacity(0.12), in: Capsule())
-                    .overlay(Capsule().strokeBorder(themeColor.opacity(0.35), lineWidth: 0.5))
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityIdentifier("\(accessibilityPrefix)-plan-action")
-                Button {
-                    requestHygieneRecord(type, doneToday: doneToday)
-                } label: {
-                    if doneToday {
-                        Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold))
-                            .foregroundStyle(themeColor.opacity(0.55))
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(themeColor.opacity(0.1), in: Capsule())
-                    } else {
-                        Text(l.tr(zh: "打卡", en: "Log", de: "Erfassen"))
-                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goCardWhite)
-                            .padding(.horizontal, 10).padding(.vertical, 5)
-                            .background(themeColor, in: Capsule())
-                    }
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityIdentifier("\(accessibilityPrefix)-record-action")
-            }
+            hygieneCardHeader(type, status: status, color: color, doneToday: doneToday, accessibilityPrefix: accessibilityPrefix)
 
             hygienePlansSection(plans)
 
@@ -437,7 +400,7 @@ struct PetHygieneDetailContentView: View {
                     .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .foregroundStyle(themeColor.opacity(0.6))
                 Text(cycleSummary(days: effectiveDays, isCustom: isCustom))
-                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                 Spacer()
             }
@@ -452,6 +415,115 @@ struct PetHygieneDetailContentView: View {
         )
     }
 
+    private func hygieneCardHeader(
+        _ type: HygieneType,
+        status: CareCycleStatus?,
+        color: Color,
+        doneToday: Bool,
+        accessibilityPrefix: String
+    ) -> some View {
+        let layout = dynamicTypeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+            : AnyLayout(HStackLayout(spacing: 6))
+        return layout {
+            HStack(spacing: 6) {
+                Image(systemName: type.systemIconName)
+                    .accessibilityHidden(true)
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
+                    .foregroundStyle(themeColor)
+                Text(type.localizedLabel(l))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                Spacer(minLength: 4)
+                if let status {
+                    Text(status.requiresAttention ? status.compactDueText(l: l) : status.compactLastRecordedText(l: l))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
+                        .foregroundStyle(status.elapsedDays == 0 ? themeColor : color)
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background((status.elapsedDays == 0 ? themeColor : color).opacity(0.14), in: Capsule())
+                } else {
+                    Text(l.tr(zh: "未记录", en: "No record", de: "Kein Eintrag"))
+                        .font(OhanaFont.adaptive(size: 10, weight: .medium))
+                        .foregroundStyle(themeColor.opacity(0.55))
+                        .padding(.horizontal, 7).padding(.vertical, 3)
+                        .background(themeColor.opacity(0.1), in: Capsule())
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            hygieneCardActions(type, doneToday: doneToday, accessibilityPrefix: accessibilityPrefix)
+        }
+    }
+
+    private func hygieneCardActions(_ type: HygieneType, doneToday: Bool, accessibilityPrefix: String) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                groomingPlanTarget = type
+            } label: {
+                HStack(spacing: 3) {
+                    Image(systemName: "bell.badge.plus").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold))
+                    Text(l.tr(
+                        zh: "提醒", en: "Remind", de: "Erinnern",
+                        es: "Avisar", pt: "Lembrar", fr: "Rappel",
+                        ja: "リマインダー", ko: "알림", it: "Promemoria"
+                    ))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
+                }
+                .foregroundStyle(themeColor)
+                .padding(.horizontal, 9).padding(.vertical, 5)
+                .frame(minWidth: 44, minHeight: 44)
+                .background(themeColor.opacity(0.12), in: Capsule())
+                .overlay(Capsule().strokeBorder(themeColor.opacity(0.35), lineWidth: 0.5))
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(l.tr(
+                zh: "设置\(type.localizedLabel(l))提醒", en: "Set a reminder for \(type.localizedLabel(l))", de: "Erinnerung für \(type.localizedLabel(l)) einrichten",
+                es: "Crear recordatorio para \(type.localizedLabel(l))", pt: "Criar lembrete para \(type.localizedLabel(l))", fr: "Créer un rappel pour \(type.localizedLabel(l))",
+                ja: "\(type.localizedLabel(l))のリマインダーを設定", ko: "\(type.localizedLabel(l)) 알림 설정", it: "Imposta un promemoria per \(type.localizedLabel(l))"
+            ))
+            .accessibilityIdentifier("\(accessibilityPrefix)-plan-action")
+            Button {
+                requestHygieneRecord(type, doneToday: doneToday)
+            } label: {
+                if doneToday {
+                    Image(systemName: "checkmark").accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold))
+                        .foregroundStyle(themeColor.opacity(0.55))
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .background(themeColor.opacity(0.1), in: Capsule())
+                } else {
+                    Text(l.tr(zh: "打卡", en: "Log", de: "Erfassen"))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
+                        .foregroundStyle(themeActionForeground)
+                        .padding(.horizontal, 10).padding(.vertical, 5)
+                        .frame(minWidth: 44, minHeight: 44)
+                        .background(themeColor, in: Capsule())
+                }
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityLabel(hygieneRecordActionLabel(type, doneToday: doneToday))
+            .accessibilityIdentifier("\(accessibilityPrefix)-record-action")
+        }
+    }
+
+    private func hygieneRecordActionLabel(_ type: HygieneType, doneToday: Bool) -> String {
+        let name = type.localizedLabel(l)
+        if doneToday {
+            return l.tr(
+                zh: "今天已记录\(name)", en: "\(name) logged today", de: "\(name) heute erfasst",
+                es: "\(name) registrado hoy", pt: "\(name) registrado hoje", fr: "\(name) enregistré aujourd’hui",
+                ja: "今日の\(name)は記録済み", ko: "오늘 \(name) 기록 완료", it: "\(name) registrato oggi"
+            )
+        }
+        return l.tr(
+            zh: "记录\(name)", en: "Log \(name)", de: "\(name) erfassen",
+            es: "Registrar \(name)", pt: "Registrar \(name)", fr: "Enregistrer \(name)",
+            ja: "\(name)を記録", ko: "\(name) 기록", it: "Registra \(name)"
+        )
+    }
+
     @ViewBuilder
     private func hygienePlansSection(_ plans: [Reminder]) -> some View {
         if !plans.isEmpty {
@@ -460,7 +532,7 @@ struct PetHygieneDetailContentView: View {
                     Image(systemName: "bell.fill").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 10, weight: .bold))
                     Text(l.tr(zh: "已设计划", en: "Plans set", de: "Geplante Pflege"))
-                        .font(OhanaFont.adaptive(size: 10, weight: .heavy, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 }
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
 
@@ -472,7 +544,7 @@ struct PetHygieneDetailContentView: View {
                             .frame(width: 16, alignment: .center)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(reminder.scheduledAt, format: .dateTime.month().day())
-                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             if let event = reminder.event, event.recurrenceDays > 0 {
                                 Text(l.tr(
@@ -480,7 +552,7 @@ struct PetHygieneDetailContentView: View {
                                     en: "Repeats · \(recurrenceLabel(event.recurrenceDays))",
                                     de: "Wiederholt · \(recurrenceLabel(event.recurrenceDays))"
                                 ))
-                                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                             }
                         }
@@ -509,13 +581,24 @@ struct PetHygieneDetailContentView: View {
                 ForEach(logs.prefix(3)) { log in
                     HStack {
                         Text(log.date, format: .dateTime.month().day().hour().minute())
-                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText.opacity(0.7))
                         Spacer()
-                        Button { deleteHygieneEntry(log) } label: {
+                        Button(role: .destructive) { deleteHygieneEntry(log) } label: {
                             Image(systemName: "trash").accessibilityHidden(true).font(OhanaFont.adaptive(size: 10))
-                                .foregroundStyle(Color.ohanaSecondaryText.opacity(0.4))
+                                .foregroundStyle(Color.goRed)
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
                         }
+                        .accessibilityLabel(l.tr(
+                            zh: "删除\(log.type.localizedLabel(l))记录", en: "Delete \(log.type.localizedLabel(l)) record", de: "\(log.type.localizedLabel(l))-Eintrag löschen",
+                            es: "Eliminar registro de \(log.type.localizedLabel(l))", pt: "Excluir registro de \(log.type.localizedLabel(l))", fr: "Supprimer le soin \(log.type.localizedLabel(l))",
+                            ja: "\(log.type.localizedLabel(l))の記録を削除", ko: "\(log.type.localizedLabel(l)) 기록 삭제", it: "Elimina il registro di \(log.type.localizedLabel(l))"
+                        ))
+                        .accessibilityValue(log.date.formatted(
+                            Date.FormatStyle(date: .abbreviated, time: .shortened)
+                                .locale(AppLanguage.swiftUIPreferredLocale(for: appLanguage))
+                        ))
                         .accessibilityIdentifier("\(accessibilityPrefix)-delete-\(log.id.uuidString)")
                     }
                     .padding(.vertical, 4)
@@ -529,9 +612,9 @@ struct PetHygieneDetailContentView: View {
     private func requestHygieneRecord(_ type: HygieneType, doneToday: Bool) {
         guard !doneToday else {
             singleUseNoticeMessage = l.tr(
-                zh: "\(pet.name) 今天已经记录过\(type.localizedLabel(l))了，这类护理一天记录一次就够了。",
-                en: "\(pet.name) already has \(type.localizedLabel(l)) logged today. Once per day is enough for this care type.",
-                de: "\(type.localizedLabel(l)) wurde für \(pet.name) heute schon erfasst. Einmal pro Tag reicht."
+                zh: "\(pet.name) 今天已记录\(type.localizedLabel(l))。",
+                en: "\(type.localizedLabel(l)) is already logged for \(pet.name) today.",
+                de: "\(type.localizedLabel(l)) ist heute bereits für \(pet.name) erfasst."
             )
             showSingleUseNotice = true
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
@@ -548,7 +631,7 @@ struct PetHygieneDetailContentView: View {
             currentLocalHumanID: currentLocalHumanID,
             humans: options
         )
-        guard eligibleHumanCount > 1 else {
+        guard eligibleHumanCount > 1, defaultHumanID == nil else {
             commitHygiene(type, executorID: defaultHumanID)
             return
         }

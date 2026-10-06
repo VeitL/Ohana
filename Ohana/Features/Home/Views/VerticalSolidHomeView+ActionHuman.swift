@@ -26,7 +26,7 @@ extension VerticalSolidHomeView {
             currentLocalHumanID: activeHumanID,
             humans: humans
         )
-        guard eligible.count > 1 else {
+        guard eligible.count > 1, preferredID == nil else {
             perform(preferredID?.uuidString)
             return
         }

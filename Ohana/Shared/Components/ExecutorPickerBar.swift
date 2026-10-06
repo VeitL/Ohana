@@ -71,7 +71,7 @@ struct ExecutorPickerBar: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(l.tr(zh: "执行人", en: "Executor", de: "Ausführend"))
-                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .tracking(0.6)
                 Text(currentHuman.map(displayName) ?? l.tr(zh: "选择账户", en: "Choose Account", de: "Konto wählen"))

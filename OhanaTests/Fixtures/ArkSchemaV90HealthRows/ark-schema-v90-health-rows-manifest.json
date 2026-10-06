@@ -1,0 +1,140 @@
+{
+  "schema": "ohana.swiftdata.migration-fixture.v1",
+  "sourceSchemaTarget": "ArkSchemaV90",
+  "sourceCommit": "dbe34426f77c8b19c80f0c6082f7be4803f12c63",
+  "purpose": "Prove that populated V90 Human health report and metric rows survive migration to V98.",
+  "sourceApp": {
+    "bundleIdentifier": "com.guanchen.li.Ohana",
+    "debugDylibSHA256": "ecebe778bb509577aab47a6043d477ccd085383f87c1ed86ef450d3e0ee5044a"
+  },
+  "generator": {
+    "xcodeVersion": "26.6",
+    "xcodeBuild": "17F113",
+    "sdk": "iphonesimulator26.5",
+    "simulatorRuntime": "iOS 26.5",
+    "simulatorName": "iPhone 17 Tests",
+    "baseFixtureGeneratedOn": "2026-07-15",
+    "healthRowsInjectedOn": "2026-08-02",
+    "mutation": "Copied only the checkpointed V90 main store, inserted rows through its legacy SQLite tables, updated Z_PRIMARYKEY, and checkpointed before removing generated sidecars."
+  },
+  "derivedFrom": {
+    "file": "../ArkSchemaV90/default.store",
+    "sourceStoreSHA256": "7be79564b3e61ab2b12c5ceddb332670ea46d4fd059358d467d0ca1fc526a880"
+  },
+  "legacyShape": {
+    "primaryKeys": {
+      "Human": {
+        "entityNumber": 13,
+        "maximumPrimaryKey": 1
+      },
+      "HumanHealthMetricLog": {
+        "entityNumber": 14,
+        "maximumPrimaryKey": 1
+      },
+      "HumanHealthReport": {
+        "entityNumber": 15,
+        "maximumPrimaryKey": 1
+      }
+    },
+    "humanHealthReportColumns": [
+      "Z_PK",
+      "Z_ENT",
+      "Z_OPT",
+      "ZCREATEDAT",
+      "ZNEXTCHECKDATE",
+      "ZREPORTDATE",
+      "ZCOLORHEX",
+      "ZCONCLUSIONRAW",
+      "ZDOCTORNAME",
+      "ZHOSPITALNAME",
+      "ZHUMANID",
+      "ZNOTES",
+      "ZREPORTTYPERAW",
+      "ZSUMMARY",
+      "ZID"
+    ],
+    "humanHealthMetricLogColumns": [
+      "Z_PK",
+      "Z_ENT",
+      "Z_OPT",
+      "ZHUMAN",
+      "ZCREATEDAT",
+      "ZDATE",
+      "ZVALUE",
+      "ZMETRICKEY",
+      "ZNOTES",
+      "ZUNITCODE",
+      "ZID"
+    ],
+    "missingV98ReportColumns": [
+      "ZRECORDEDBYHUMANID",
+      "ZCAPTURESOURCERAW"
+    ],
+    "missingV98MetricColumns": [
+      "ZRECORDEDBYHUMANID",
+      "ZSOURCEREPORTID",
+      "ZSOURCELABEL",
+      "ZREFERENCELOW",
+      "ZREFERENCEHIGH",
+      "ZREFERENCERANGETEXT",
+      "ZREPORTEDFLAGRAW"
+    ]
+  },
+  "seed": {
+    "human": {
+      "sqlitePrimaryKey": 1,
+      "id": "58B6F77F-1913-4951-BBBF-C08B56858D97",
+      "name": "FixtureHuman"
+    },
+    "humanHealthReport": {
+      "sqlitePrimaryKey": 1,
+      "id": "977E9A6B-90B4-4B84-AEF3-000000000090",
+      "humanId": "58B6F77F-1913-4951-BBBF-C08B56858D97",
+      "reportTypeRaw": "血液检测",
+      "conclusionRaw": "注意",
+      "hospitalName": "Legacy General Hospital",
+      "doctorName": "Dr. Ada Legacy",
+      "reportDate": "2026-07-15T11:30:00Z",
+      "nextCheckDate": "2026-07-22T11:30:00Z",
+      "summary": "Legacy thyroid follow-up",
+      "notes": "V90 report row must survive migration.",
+      "colorHex": "123ABC",
+      "createdAt": "2026-07-15T11:30:20Z"
+    },
+    "humanHealthMetricLog": {
+      "sqlitePrimaryKey": 1,
+      "id": "987E9A6B-90B4-4B84-AEF3-000000000090",
+      "humanSQLiteForeignKey": 1,
+      "humanId": "58B6F77F-1913-4951-BBBF-C08B56858D97",
+      "metricKey": "tsh",
+      "unitCode": "mIU_L",
+      "value": 3.75,
+      "date": "2026-07-15T11:30:00Z",
+      "notes": "V90 metric row must survive migration.",
+      "createdAt": "2026-07-15T11:30:30Z"
+    }
+  },
+  "expectedV98Defaults": {
+    "humanHealthReport": {
+      "recordedByHumanId": null,
+      "captureSourceRaw": "manual"
+    },
+    "humanHealthMetricLog": {
+      "recordedByHumanId": null,
+      "sourceReportID": null,
+      "sourceLabel": "",
+      "referenceLow": null,
+      "referenceHigh": null,
+      "referenceRangeText": "",
+      "reportedFlagRaw": "unknown"
+    }
+  },
+  "store": {
+    "file": "ark-schema-v90-health-rows.store",
+    "bytes": 712704,
+    "sha256": "d19499bbad8bceb0ec6f1bc96d4741e6d0337c820b8a8b164e6d5474cad812e0",
+    "sqliteIntegrityCheck": "ok",
+    "walCheckpointed": true,
+    "sidecarsIncluded": false
+  }
+}

@@ -27,8 +27,10 @@ enum MomentCommandService {
         executorId: String? = nil,
         date: Date = Date(),
         questManager providedQuestManager: QuestManager? = nil,
-        careLedger providedCareLedger: CareLedgerRecording? = nil
+        careLedger providedCareLedger: CareLedgerRecording? = nil,
+        persist providedPersist: ((ModelContext) throws -> Void)? = nil
     ) -> MomentCommandResult {
+        let persist = providedPersist ?? saveMomentChanges
         let questManager = providedQuestManager ?? QuestManager()
         let careLedger: CareLedgerRecording = providedCareLedger ?? CareLedgerService()
         let cleanNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -128,7 +130,7 @@ enum MomentCommandService {
                         save: false
                     )
                 }
-                try saveMomentChanges(context: context)
+                try persist(context)
             } catch {
                 context.rollback()
                 questManager.wallet.refreshQuestProjection(context: context, manager: questManager)
@@ -138,8 +140,9 @@ enum MomentCommandService {
                 return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
             }
         } else {
-            let saveResult = context.safeSaveResult(publishFailureEvent: true)
-            guard saveResult.didSave else {
+            do {
+                try persist(context)
+            } catch {
                 context.rollback()
                 return MomentCommandResult(savedLogIDs: [], coconutDelta: 0)
             }

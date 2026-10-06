@@ -48,20 +48,7 @@ struct OhanaUISpecShowcaseView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by explicit close label
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
-                        .foregroundStyle(primaryText)
-                        .frame(width: 44, height: 44)
-                        .background(Color.ohanaControlFill, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close"))
-                .accessibilityIdentifier("ui-spec-showcase-close-action")
-            }
+            OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "ui-spec-showcase-close-action")
         }
         .accessibilityIdentifier("ui-spec-showcase")
     }
@@ -79,7 +66,7 @@ struct OhanaUISpecShowcaseView: View {
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(l.tr(zh: "Ohana UI 规范", en: "Ohana UI Specification"))
-                            .font(OhanaFont.title(.black))
+                            .font(OhanaFont.title())
                             .foregroundStyle(primaryText)
                         Text(l.tr(
                             zh: "展示 token、组件、页面契约和验收门槛。规范正文见 docs/design/ohana-ui-spec.md。",
@@ -253,14 +240,20 @@ struct OhanaUISpecShowcaseView: View {
             VStack(alignment: .leading, spacing: 10) {
                 sectionMiniTitle(l.tr(zh: "字体层级", en: "Type Scale"), icon: "textformat.size")
                 Text(l.tr(zh: "页面标题使用 OhanaFont.title", en: "Page title uses OhanaFont.title"))
-                    .font(OhanaFont.title(.black))
+                    .font(OhanaFont.title())
                     .foregroundStyle(primaryText)
                     .lineLimit(2)
+                Text("Ohana")
+                    .font(OhanaFont.brandTitle())
+                    .foregroundStyle(primaryText)
+                Text("1,280")
+                    .font(OhanaFont.brandMetric(size: 28))
+                    .foregroundStyle(primaryText)
                 Text(l.tr(zh: "卡片标题使用 headline/body，保持短句和可扫描。", en: "Card headings use headline/body, staying short and scannable."))
-                    .font(OhanaFont.body(.semibold))
+                    .font(OhanaFont.body())
                     .foregroundStyle(primaryText)
                 Text(l.tr(zh: "辅助说明使用 footnote/caption，不承担主要操作说明。", en: "Hints use footnote/caption and do not carry the main workflow."))
-                    .font(OhanaFont.footnote(.semibold))
+                    .font(OhanaFont.footnote())
                     .foregroundStyle(secondaryText)
             }
         }
@@ -545,7 +538,8 @@ struct OhanaUISpecShowcaseView: View {
                     ? l.tr(zh: "完成", en: "Done")
                     : l.tr(zh: "重试", en: "Try again"),
                 accessibilityIdentifier: "ui-spec-showcase-feedback-state",
-                action: sampleToggle ? nil : { sampleToggle = true }
+                action: sampleToggle ? nil : { sampleToggle = true },
+                layout: .compact
             )
         }
     }

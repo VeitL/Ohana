@@ -4,7 +4,7 @@ import UIKit
 extension QuickFeedDetailContent {
     func planEditorSheet(_ kind: FeedRuleKind) -> some View {
         let tint = kind == .manualReminder ? Color.goPurple : Color.goTeal
-        let hasExistingPlan = !FeedingPlanWriter.planEvents(pet: pet, kind: kind, allEvents: allEvents).isEmpty
+        let hasExistingPlan = !currentPlanRuleSnapshots(kind).isEmpty
 
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
@@ -16,8 +16,8 @@ extension QuickFeedDetailContent {
                 compactNotice(
                     icon: kind.iconName,
                     text: kind == .manualReminder
-                        ? l.tr(zh: "到点提醒你确认打卡；每餐可单独设置干粮/湿粮和克数。", en: "Reminds you to confirm meals. Each meal can set food type and grams.", de: "Erinnert dich. Jede Mahlzeit hat Sorte und Gramm.")
-                        : l.tr(zh: "不提醒、不等待确认；App 打开或进入本页时会自动补记并扣余粮。", en: "No reminder or confirmation. The app backfills due meals and deducts stock.", de: "Keine Erinnerung. Fällige Mahlzeiten werden automatisch eingetragen."),
+                        ? l.tr(zh: "到点提醒，手动确认", en: "Reminder, then manual confirmation", de: "Erinnerung, dann manuell bestätigen")
+                        : l.tr(zh: "自动补记并扣余粮", en: "Auto-log and deduct stock", de: "Automatisch erfassen und Vorrat abziehen"),
                     tint: tint
                 )
                 if sameSpeciesFeedPets.count > 1 {
@@ -47,12 +47,12 @@ extension QuickFeedDetailContent {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(l.tr(zh: "每餐", en: "Meals", de: "Mahlzeiten"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     ForEach(Array(draftStore.planMeals.indices), id: \.self) { index in
                         VStack(alignment: .leading, spacing: 10) {
                             Label(FeedRuleMetadata.localizedMealName(for: draftStore.planMeals[index].time, l: l), systemImage: "clock.fill")
-                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                                 .foregroundStyle(tint)
                             DatePicker(
                                 "",
@@ -83,13 +83,7 @@ extension QuickFeedDetailContent {
                 }
             }
             .padding(18)
-            .padding(.bottom, hasExistingPlan ? 126 : 78)
-            .ohanaAdaptiveSheetContentHeight(
-                adaptiveSheetHeightBinding,
-                minHeight: sameSpeciesFeedPets.count > 1 ? 690 : 620,
-                maxHeight: 860,
-                chromePadding: 70
-            )
+            .padding(.bottom, 12)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             planEditorFooter(kind: kind, tint: tint, hasExistingPlan: hasExistingPlan)
@@ -97,35 +91,20 @@ extension QuickFeedDetailContent {
         .scrollDismissesKeyboard(.interactively)
         .background(FeedScrollBounceConfigurator(isBouncingEnabled: false))
         .navigationTitle(kind == .manualReminder ? l.tr(zh: "计划", en: "Plan", de: "Plan") : l.tr(zh: "自动", en: "Auto", de: "Auto"))
+        .ohanaEditorChrome(
+            hasChanges: draftStore.planEditorDraft != draftStore.initialPlanEditorDraft,
+            isSaving: draftStore.isSavingFeedPlan,
+            closeIdentifier: "quick-feed-sheet-cancel-action",
+            saveIdentifier: kind == .manualReminder ? "quick-feed-plan-save" : "quick-feed-auto-save",
+            onCancel: closeActiveFeedSheet,
+            onSave: { savePlan(kind) }
+        )
     }
 
     func planEditorFooter(kind: FeedRuleKind, tint: Color, hasExistingPlan: Bool) -> some View {
         VStack(spacing: 10) {
-            FoodPrimaryButton(
-                title: draftStore.isSavingFeedPlan
-                    ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
-                    : (kind == .manualReminder ? l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern") : l.tr(zh: "保存自动记录", en: "Save auto feeder", de: "Automat speichern")),
-                icon: draftStore.isSavingFeedPlan ? "hourglass" : "checkmark",
-                tint: tint
-            ) {
-                savePlan(kind)
-            }
-            .accessibilityIdentifier(kind == .manualReminder ? "quick-feed-plan-save" : "quick-feed-auto-save")
-            .disabled(draftStore.isSavingFeedPlan)
-            .opacity(draftStore.isSavingFeedPlan ? 0.72 : 1)
-
             if hasExistingPlan {
-                Button(role: .destructive) {
-                    deletePlan(kind)
-                } label: {
-                    Label(l.tr(zh: "删除当前计划", en: "Delete current plan", de: "Aktuellen Plan löschen"), systemImage: "trash")
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goRed)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
-                }
-                .buttonStyle(ScaleButtonStyle())
+                OhanaDeletePlanButton(title: l.tr(zh: "删除当前计划", en: "Delete current plan", de: "Aktuellen Plan löschen")) { deletePlan(kind) }
                 .accessibilityIdentifier(kind == .manualReminder ? "quick-feed-plan-delete" : "quick-feed-auto-delete")
                 .disabled(draftStore.isSavingFeedPlan)
                 .opacity(draftStore.isSavingFeedPlan ? 0.72 : 1)

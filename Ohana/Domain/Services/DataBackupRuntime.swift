@@ -29,6 +29,7 @@ enum BackupError: LocalizedError {
     case invalidEncryptedBackup
     case encryptionUnavailable
     case invalidBackupPackage
+    case pendingShopPurchase
     case invalidRestoreData(BackupRestoreValidationCategory)
 
     var errorDescription: String? {
@@ -84,6 +85,12 @@ enum BackupError: LocalizedError {
                 zh: "备份包格式无效或媒体文件缺失，请重新选择备份。",
                 en: "The backup package is invalid or missing media files. Choose the backup again.",
                 de: "Das Backup-Paket ist ungültig oder Mediendateien fehlen. Wähle das Backup erneut aus."
+            )
+        case .pendingShopPurchase:
+            l.tr(
+                zh: "商店最终成交仍在应用中。请稍后重试，避免备份丢失椰子或权益。",
+                en: "A final-sale shop purchase is still being applied. Try again shortly so the backup cannot lose coconuts or an entitlement.",
+                de: "Ein endgültiger Shop-Kauf wird noch angewendet. Versuche es gleich erneut, damit im Backup keine Kokosnüsse oder Berechtigungen verloren gehen."
             )
         case let .invalidRestoreData(category):
             switch category {
@@ -166,8 +173,12 @@ actor DataBackupActor {
             mediaPackageEncrypted: encryptMedia,
             scope: scope
         )
+        let manifestData = try manager.encode(backup)
+        guard manifestData.count <= DataBackupRestoreLimits.maximumManifestBytes else {
+            throw BackupError.invalidRestoreData(.sizeLimit)
+        }
         return DataBackupPackageBuildResult(
-            manifestData: try manager.encode(backup),
+            manifestData: manifestData,
             mediaCount: mediaWriter.mediaCount,
             mediaBytes: mediaWriter.mediaBytes
         )

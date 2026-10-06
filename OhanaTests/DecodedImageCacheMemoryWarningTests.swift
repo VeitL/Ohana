@@ -20,8 +20,9 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(FocusWalletAvatarCache.cachedEntry(for: id, signature: signature)?.image != nil)
 
         NotificationCenter.default.post(name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait {
+            FocusWalletAvatarCache.cachedEntry(for: id, signature: signature) == nil
+        })
 
         #expect(FocusWalletAvatarCache.cachedEntry(for: id, signature: signature) == nil)
         #expect(await FocusWalletAvatarCache.preload(payloads: [payload]))
@@ -42,8 +43,9 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(FocusPopoutImageCache.cachedImage(for: id, signature: signature) != nil)
 
         NotificationCenter.default.post(name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait {
+            FocusPopoutImageCache.cachedImage(for: id, signature: signature) == nil
+        })
 
         #expect(FocusPopoutImageCache.cachedImage(for: id, signature: signature) == nil)
         #expect(await FocusPopoutImageCache.preload(payloads: [payload]))
@@ -65,8 +67,9 @@ struct DecodedImageCacheMemoryWarningTests {
         #expect(MediaThumbnailProvider.cachedImage(for: key) != nil)
 
         NotificationCenter.default.post(name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
-        await Task.yield()
-        await Task.yield()
+        try #require(await TestObservation.wait {
+            MediaThumbnailProvider.cachedImage(for: key) == nil
+        })
 
         #expect(MediaThumbnailProvider.cachedImage(for: key) == nil)
         let rebuilt = try #require(await MediaThumbnailProvider.imageWithTransparency(for: key, dataProvider: { data }))
@@ -88,6 +91,15 @@ struct DecodedImageCacheMemoryWarningTests {
         FocusWalletAvatarCache.resetForTesting()
         FocusPopoutImageCache.resetForTesting()
         MediaThumbnailProvider.resetForTesting()
+        defer { MediaThumbnailProvider.setWorkloadPolicyForTesting(nil) }
+        MediaThumbnailProvider.setWorkloadPolicyForTesting(
+            AppWorkloadPolicy(
+                lowPowerModeProvider: { false },
+                reduceMotionProvider: { false },
+                userPowerSavingProvider: { false },
+                thermalStateProvider: { .nominal }
+            )
+        )
 
         let probe = DecodeCancellationProbe()
         let key = MediaThumbnailKey(id: "cancel-test", sourceSignature: "pending", maxPixel: 48)
@@ -97,17 +109,11 @@ struct DecodedImageCacheMemoryWarningTests {
             })
         }
 
-        for _ in 0 ..< 100 {
-            if await probe.didStart() {
-                break
-            }
-            await Task.yield()
-        }
-        #expect(await probe.didStart())
+        let workerStarted = await probe.waitUntilStarted(timeout: .seconds(10))
+        #expect(workerStarted)
 
         request.cancel()
-        try? await Task.sleep(nanoseconds: 100_000_000)
-        let cancelledWorker = await probe.wasCancelled()
+        let cancelledWorker = await probe.waitUntilCancelled(timeout: .seconds(3))
         await probe.finish()
         _ = await request.value
 
@@ -157,19 +163,26 @@ private actor DecodeCancellationProbe {
     private var cancelled = false
     private var continuation: CheckedContinuation<Data?, Never>?
 
-    func didStart() -> Bool {
-        started
+    func waitUntilStarted(timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while !started, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return started
     }
 
-    func wasCancelled() -> Bool {
-        cancelled
+    func waitUntilCancelled(timeout: Duration) async -> Bool {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while !cancelled, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return cancelled
     }
 
     func value() async -> Data? {
-        started = true
-
-        return await withTaskCancellationHandler(operation: {
+        await withTaskCancellationHandler(operation: {
             await withCheckedContinuation { continuation in
+                started = true
                 if self.cancelled {
                     continuation.resume(returning: nil)
                 } else {

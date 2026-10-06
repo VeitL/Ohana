@@ -19,7 +19,7 @@
 
 ### MBR-004 新宠物创建会写 Pet、相关日历事实和首宠完成标记
 
-任何情况下，新宠物会从草稿写入核心资料、头像数据和性格标签；名称、物种与品种为必填，物种和品种的 Other 自定义文本按用户输入保存。未在极简创建流填写的性别与毛色保持空值或 `unknown`，不得伪造。主题色可由用户明确选择；未选择时由名称、物种、品种和可用毛色稳定推导，重启或重试不会随机跳色。Pet 插入后会标记 CloudSync modified。保存成功后，若草稿包含生日则创建生日 Event + Reminder，若包含到家日则创建周年 Event 和若干 PetMilestone，并确保默认 CarePlan 日历计划；生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只有效宠物使 D17 的 50 椰子启动赠礼进入待领取状态；Pet 保存不会直接弹领取层，Task Center 的奖励事项才是弹层入口。实际领取由 `StarterGiftService` 通过确定性交易键独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human，不再要求第一笔照护。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
+任何情况下，新宠物会从草稿写入核心资料、头像数据和性格标签；名称、物种、品种与性别为必填，物种和品种的 Other 自定义文本按用户输入保存。毛色可跳过并保持空值，不得伪造。主题色可由用户明确选择；未选择毛色时由名称、物种与品种稳定自动分配，选择毛色时优先使用该毛色对应色值，用户手动主题色始终覆盖自动结果。Pet 插入后会标记 CloudSync modified。保存成功后，只有草稿中用户明确填写的日期可以派生日历事实：生日创建生日 Event + Reminder，到家日创建周年 Event 和若干 PetMilestone；不得因新建宠物自动写入喂食、饮水、散步、清洁等 CarePlan Event，照护计划必须由用户设置或确认。生日 Event、生日 Reminder、到家周年 Event 都必须写入 CloudSync 本地 dirty state。首只有效宠物使 D17 的 50 椰子启动赠礼进入待领取状态；Pet 保存不会直接弹领取层，Task Center 的奖励事项才是弹层入口。实际领取由 `StarterGiftService` 通过确定性交易键独立写入 `system:island`，不属于 Pet 创建事务，也不绑定 Pet/Human，不再要求第一笔照护。来源：`Ohana/Features/Members/MemberCreationService.swift`、`Ohana/Features/Economy/StarterGiftService.swift`、`docs/specs/Onboarding-logic.md`。
 
 ### MBR-005 新人类创建会写 Human、可选初始体重、生日 Event 和隐私字段
 
@@ -31,7 +31,7 @@
 
 ### MBR-007 成员资料更新走 Members command service
 
-任何情况下，Pet/Human/Plant 资料更新由 `MemberProfileCommandService` 写 SwiftData 并返回 changedFields；Pet/Human 更新会标记 CloudSync modified，Plant 更新当前只保存本地，不标记 CloudSync。Pet 更新会重新 ensure 默认 CarePlan；Human 更新会标准化角色、性别、主题色，并在传入 `privateFieldsRaw` 时覆盖所有已知隐私字段。来源：`Ohana/Features/Members/MemberProfileCommands.swift:199`、`Ohana/Features/Members/MemberProfileCommands.swift:207`、`Ohana/Features/Members/MemberProfileCommands.swift:273`、`Ohana/Features/Members/MemberProfileCommands.swift:274`、`Ohana/Features/Members/MemberProfileCommands.swift:308`、`Ohana/Features/Members/MemberProfileCommands.swift:319`、`Ohana/Features/Members/MemberProfileCommands.swift:326`、`Ohana/Features/Members/MemberProfileCommands.swift:342`、`Ohana/Features/Members/MemberProfileCommands.swift:347`、`Ohana/Features/Members/MemberProfileCommands.swift:367`、`Ohana/Features/Members/MemberProfileCommands.swift:384`。
+任何情况下，Pet/Human/Plant 资料更新由 `MemberProfileCommandService` 写 SwiftData 并返回 changedFields；Pet/Human 更新会标记 CloudSync modified，Plant 更新当前只保存本地，不标记 CloudSync。Pet 资料更新不得隐式创建或重建 CarePlan；Human 更新会标准化角色、性别、主题色，并在传入 `privateFieldsRaw` 时覆盖所有已知隐私字段。来源：`Ohana/Features/Members/MemberProfileCommands.swift`。
 
 ### MBR-008 隐私字段只对非本人锁定
 
@@ -71,7 +71,7 @@
 
 ### MBR-017 创建向导步骤由成员类型决定
 
-完整人类创建向导仍为 basicInfo -> avatar -> theme；首次引导另用只输入名字的极简 Human 页面。宠物创建步骤统一为名字 -> 物种与品种 -> 性格与可选主题色 -> 头像。名字、物种和品种必填；两个分类都支持 Other 自定义文本。性格最多三项，未手动选择主题色时自动稳定搭配，头像有默认值。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift`。
+完整人类创建向导仍为 basicInfo -> avatar -> theme；首次引导另用只输入名字的极简 Human 页面。宠物创建步骤统一为名字 -> 物种与品种 -> 外观 -> 性格与可选主题色 -> 头像。名字、物种、品种和外观页的性别必填；毛色可跳过，两个分类都支持 Other 自定义文本。性格最多三项；未选毛色时稳定自动分配主题色，选毛色时按毛色搭配，手动自定义始终覆盖自动结果；头像有默认值。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/Views/MemberCardCreationContentView+Steps.swift`。
 
 ### MBR-018 成员页只管理名册，家庭分工进入统一 Task Center
 
@@ -91,10 +91,11 @@ stateDiagram-v2
     theme --> Saved: Human save succeeds
     [*] --> petName: Pet wizard
     petName --> petSpecies
-    petSpecies --> petPersonality
+    petSpecies --> petAppearance
+    petAppearance --> petPersonality: sex selected; coat optional
     petPersonality --> petAvatar
     petAvatar --> Saved: Pet save succeeds
-    petAvatar --> Error: empty or duplicate name / missing species or breed / avatar pass / save failure
+    petAvatar --> Error: empty or duplicate name / missing species, breed or sex / avatar pass / save failure
 ```
 
 代码实际约束：步骤列表由 `MemberCreationStep.steps(for:)` 静态决定；保存时才执行名称、2.5D 权限、SwiftData 写入和派生事件/里程碑。来源：`Ohana/Features/Members/MemberCardCreationSupport.swift`、`Ohana/Features/Members/MemberCreationService.swift`。
@@ -195,3 +196,26 @@ GAP-9 已改为：UI 文案不再承诺删除；Members command 委托 `RainbowB
 - S-MEM-001 / S-MEM-002 已有定向测试覆盖并通过。
 - RequiredHumanProfileView 的 decorative icon 已隐藏给 VoiceOver，44pt 容器通过 `scripts/audit-accessibility.sh Ohana/Features/Members`。
 - S-MEM-006 与 Economy 侧删除后钱包/账本可见性审计作为跨范围余留，写入 `docs/task-follow-ups.md`。
+
+
+## Human 健康主页与轻量记录（2026-10-05）
+
+正常 Human 成员入口与原 Human 功能总览统一进入 `HumanHealthSummaryView`；纪念资料仍进入原只读入口，资料与佛系签到保持各自语义。新增 Human 在称呼页即可保存，生日、性别、头像、主题均可后续完善。首屏不要求 HealthKit 绑定、通知或健康问卷。
+
+健康主页依次呈现成员归属与资料/更多、最多三项今天与接下来事项、体重/指标/状态快捷记录、原有置顶顺序与最新记录、最多两项有两次同单位记录支持的近期变化。事项合并今日未处理用药、未来七天用药和未来三十天内或逾期复查；逾期优先，其后按时间排列。未来用药只进入详情，不能在摘要提前标记今日已服。查询失败或截断显示不完整信息，不声称没有待办。更多中保留完整健康历史、运动/报告/随记记录、资产、愿望和成就。
+
+今日已服/跳过/撤回复用 `HumanCareCommandExecutor`，待保存期间防重复点击，成功反馈等待持久化。人类用药快捷入口进入今日用药，添加和编辑计划复用 `AddMedicationSheet`。指标先显示最近记录，再提供名称/缩写搜索和分类；按当前成员最近有效单位读取，空历史使用地区默认，不自动推荐 TSH。状态只有一个状况时直接进入记录，没有状况时需要用户明确创建；可选状态信息与报告的医院/医生/复查资料逐步展开。保存返回来源页，可查看对应历史，失败保留输入。
+
+本轮不变更 SwiftData schema、套餐、权限、提醒默认值、HealthKit 绑定或线上能力；摘要只读取当前成员的有界记录，并通过领域更新、前台恢复和日期变化刷新。界面变化不能直接证明留存改善。
+
+### 用药与延迟出现的状态变化（2026-10-05）
+
+- 创建状况可选择“脱发情况”或“过敏症状”模板，选择只填写草稿，仍须明确保存。自定义名称与其他类别继续可用；补充资料默认折叠。每天沿用时间、0–10 自评和保存的轻量记录。
+- 状况详情新增“用药与变化”。选择本人的一个药物，再查看当天、1、7、14、30、60 或 90 天后的记录。毛发/头皮类别初始显示 60 天，其他类别显示当天；这是可调整的观察假设，不是医学上的作用时间。所有状况类别使用同一分析能力。
+- 显示近 90 个自然日的状态记录；每个点为该日自评均值，未记录日留空。按所选间隔回溯用药记录对应的计划日期，补录点击时间不改变归属日期，跨夏令时按 Calendar 自然日对齐。逐日明细同时显示状态日期、用药日期和记录状态。
+- “标记已服”“标记跳过”“已服和跳过”“用药未知”分开显示。没有日志、待处理或无法识别的状态不会被当作未服；同计划分钟的历史重复记录使用现有 `HumanMedicationLogStore.actionPrecedes` 更正优先级。跳过日志不等于该自然日完全没有用药。
+- 两类各至少 5 个配对记录日且查询完整时，展示各组每日均值及样本天数。天数门槛只控制描述性展示，不表示统计显著性或因果性；不搜索“最相关”的间隔，不推断药物疗效，不生成停药或调整剂量建议。连续用药而缺少对照记录时保留时间图，不生成差异结论。
+- 独立读模型校验 Human、状况与药物归属，并复用隐私规则。药物候选上限 128、观察上限 1,024、选定药物日志上限 2,048，均加一条探针识别截断。读取失败提供重试，截断隐藏均值对照。仅进入该详情时读取，不扩大健康首页查询。前台恢复、日期与领域更新会刷新。
+- 本轮不增加持久化模型；新增记录继续走现有状况/观察/用药命令。最短验收：选择脱发模板 → 保存今日程度 → 打开用药与变化并切换间隔 → 冷启动读回。日历间隔、缺失值、样本不足、更正与成员隔离由 `HumanHealthMedicationPatternTests` 验证；运行结果以实际测试记录为准。
+
+设计依据：[AAD 关于延迟出现的掉发说明](https://www.aad.org/public/diseases/hair-loss/insider/shedding)提供医学措辞边界；[Bearable 用药记录说明](https://bearable.app/support/howto/how-to-use-bearable-to-manage-your-medication/)用于参考症状与用药并列观察、关联不等于因果的呈现方式。

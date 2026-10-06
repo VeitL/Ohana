@@ -64,14 +64,14 @@ struct TreatCelebrationOverlay: View {
                             .accessibilityHidden(true)
                     } else {
                         Image(systemName: "birthday.cake.fill") // a11y: allow decorative fallback celebration art hidden from VoiceOver.
-                            .font(OhanaFont.adaptive(size: 72, weight: .black)) // a11y: allow fixed-size decorative celebration art.
+                            .font(OhanaFont.adaptive(size: 72, weight: .semibold)) // a11y: allow fixed-size decorative celebration art.
                             .foregroundStyle(tint)
                             .scaleEffect(1 + sin(t * 4.0) * 0.035)
                             .accessibilityHidden(true)
                     }
                 }
                 Text(l.tr(zh: "零食已记录", en: "Treat logged", de: "Snack erfasst"))
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .padding(24)

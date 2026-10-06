@@ -6,10 +6,16 @@ typealias CareRecordResult = CareEventService.CareRecordResult
 nonisolated struct ExpenseActorAttribution: Hashable, Sendable {
     let executorId: String?
     let recordedByHumanId: String?
+    let payerContributions: [ExpensePayerContribution]
 
-    init(executorId: String? = nil, recordedByHumanId: String? = nil) {
+    init(
+        executorId: String? = nil,
+        recordedByHumanId: String? = nil,
+        payerContributions: [ExpensePayerContribution] = []
+    ) {
         self.executorId = executorId
         self.recordedByHumanId = recordedByHumanId
+        self.payerContributions = payerContributions
     }
 }
 
@@ -49,7 +55,8 @@ protocol CareEventRecording {
         quality: DomainCareRewardQuality,
         date: Date,
         foodKind: FeedFoodKind,
-        source: CareLedgerSource
+        source: CareLedgerSource,
+        note: String
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog)
 
     @discardableResult
@@ -73,7 +80,8 @@ protocol CareEventRecording {
         context: ModelContext,
         executorId: String?,
         quality: DomainCareRewardQuality,
-        date: Date
+        date: Date,
+        note: String
     ) -> SharedPetActionResult
 
     @discardableResult
@@ -161,7 +169,8 @@ protocol CareEventRecording {
         quality: DomainCareRewardQuality,
         date: Date,
         source: CareLedgerSource,
-        createsLinkedPottyLog: Bool
+        createsLinkedPottyLog: Bool,
+        note: String
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?)
 
     @discardableResult
@@ -181,7 +190,8 @@ protocol CareEventRecording {
         totalMl: Double,
         context: ModelContext,
         executorId: String?,
-        date: Date
+        date: Date,
+        note: String
     ) -> SharedPetActionResult
 
     @discardableResult
@@ -307,4 +317,103 @@ protocol CareEventRecording {
         currencyCode: String,
         source: CareLedgerSource
     ) -> SharedPetActionResult
+}
+
+// Existing entry points keep their default empty note.
+extension CareEventRecording {
+    @discardableResult
+    func recordManualFeedFact(
+        pet: Pet,
+        amountGrams: Double,
+        context: ModelContext,
+        executorId: String?,
+        quality: DomainCareRewardQuality,
+        date: Date,
+        foodKind: FeedFoodKind,
+        source: CareLedgerSource
+    ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
+        recordManualFeedFact(
+            pet: pet,
+            amountGrams: amountGrams,
+            context: context,
+            executorId: executorId,
+            quality: quality,
+            date: date,
+            foodKind: foodKind,
+            source: source,
+            note: ""
+        )
+    }
+
+    @discardableResult
+    func recordSharedManualFeedFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        totalGrams: Double,
+        foodKind: FeedFoodKind,
+        context: ModelContext,
+        executorId: String?,
+        quality: DomainCareRewardQuality,
+        date: Date
+    ) -> SharedPetActionResult {
+        recordSharedManualFeedFact(
+            sourcePet: sourcePet,
+            targets: targets,
+            totalGrams: totalGrams,
+            foodKind: foodKind,
+            context: context,
+            executorId: executorId,
+            quality: quality,
+            date: date,
+            note: ""
+        )
+    }
+
+    @discardableResult
+    func recordSharedWateringFact(
+        sourcePet: Pet,
+        targets: [Pet],
+        totalMl: Double,
+        context: ModelContext,
+        executorId: String?,
+        date: Date
+    ) -> SharedPetActionResult {
+        recordSharedWateringFact(
+            sourcePet: sourcePet,
+            targets: targets,
+            totalMl: totalMl,
+            context: context,
+            executorId: executorId,
+            date: date,
+            note: ""
+        )
+    }
+
+    @discardableResult
+    func recordCareFact(
+        pet: Pet,
+        type: CareType,
+        amountMl: Double,
+        context: ModelContext,
+        executorId: String?,
+        reward: DomainCareRewardAction,
+        quality: DomainCareRewardQuality,
+        date: Date,
+        source: CareLedgerSource,
+        createsLinkedPottyLog: Bool
+    ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog, pottyLog: PetPottyLog?) {
+        recordCareFact(
+            pet: pet,
+            type: type,
+            amountMl: amountMl,
+            context: context,
+            executorId: executorId,
+            reward: reward,
+            quality: quality,
+            date: date,
+            source: source,
+            createsLinkedPottyLog: createsLinkedPottyLog,
+            note: ""
+        )
+    }
 }

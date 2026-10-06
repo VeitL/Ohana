@@ -37,12 +37,14 @@ struct CoHealthDashboardFullContentView: View {
         let petName = associatedPets.first?.name ?? l.tr(zh: "毛孩子", en: "your pets", de: "deine Tiere")
         let km = String(format: "%.1f", thisMonthWalkKm)
         if let delta = petWeightDelta {
-            let amount = String(format: "%.1f", abs(delta))
-            return delta < 0
-                ? l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n\(petName)瘦了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month\n\(petName) is down \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\n\(petName) hat \(amount) kg abgenommen 🎉")
-                : l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n\(petName)胖了 \(amount)kg 🎉", en: "You walked \(km) km with \(petName) this month\n\(petName) is up \(amount) kg 🎉", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\n\(petName) hat \(amount) kg zugenommen 🎉")
+            let change = String(format: "%+.1f", delta)
+            return l.tr(
+                zh: "本月同行 \(km) km · \(petName) 体重 \(change) kg",
+                en: "\(km) km together this month · \(petName) weight \(change) kg",
+                de: "Diesen Monat \(km) km zusammen · \(petName) Gewicht \(change) kg"
+            )
         }
-        return l.tr(zh: "本月你带 \(petName) 走了 \(km)km\n继续加油！💪", en: "You walked \(km) km with \(petName) this month\nKeep going! 💪", de: "Du bist diesen Monat \(km) km mit \(petName) gegangen\nWeiter so! 💪")
+        return l.tr(zh: "本月同行 \(km) km", en: "\(km) km together this month", de: "Diesen Monat \(km) km zusammen")
     }
 
     var body: some View {
@@ -112,7 +114,7 @@ struct CoHealthDashboardFullContentView: View {
                 HumanAvatarPipelineView(human: human, size: 52)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(human.name + " × " + l.tr(zh: "毛孩子", en: "Pets", de: "Tiere"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "人宠共健报告", en: "Co-health Report", de: "Gemeinsamer Gesundheitsbericht"))
                         .font(OhanaFont.adaptive(size: 11, weight: .medium)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
@@ -123,7 +125,7 @@ struct CoHealthDashboardFullContentView: View {
             }
 
             Text(summaryText)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .lineSpacing(4)
         }
@@ -192,7 +194,7 @@ struct CoHealthDashboardFullContentView: View {
                     )
                     VStack(alignment: .leading, spacing: 4) {
                         Text(pet.name)
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         if let w = pet.latestWeightKg {
                             Text(l.tr(zh: "最新体重 \(String(format: "%.1f", w)) kg", en: "Latest weight \(String(format: "%.1f", w)) kg", de: "Letztes Gewicht \(String(format: "%.1f", w)) kg"))
@@ -204,7 +206,7 @@ struct CoHealthDashboardFullContentView: View {
                     let monthWalk = snapshot.thisMonthWalkKm(for: human.id, pets: [pet])
                     VStack(alignment: .trailing, spacing: 2) {
                         Text(String(format: "%.1f km", monthWalk))
-                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                         Text(l.tr(zh: "本月同行", en: "Together this month", de: "Diesen Monat zusammen")).font(OhanaFont.adaptive(size: 9)).foregroundStyle(Color.ohanaPrimaryText.opacity(0.3)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
@@ -218,7 +220,7 @@ struct CoHealthDashboardFullContentView: View {
     // MARK: - Helpers
     private func sectionTitle(_ t: String) -> some View {
         Text(t)
-            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
     }
 

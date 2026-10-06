@@ -130,6 +130,21 @@ extension DomainRevisionPublishing {
         )
     }
 
+    func publishHumanHealthMetricUpdate(_ result: HumanHealthMetricUpdateCommandResult, note: String) {
+        publish(
+            DomainMutationResult(
+                command: .humanHealthMetricUpdate(
+                    humanID: result.humanID,
+                    metricKey: result.metricKey,
+                    logID: result.logID
+                ),
+                affectedEntityIDs: [result.humanID, result.logID],
+                wroteBusinessFact: result.didPersist && result.didChange,
+                note: note
+            )
+        )
+    }
+
     func publishHumanHealthMetricDelete(_ result: HumanHealthMetricDeleteCommandResult, note: String) {
         publish(
             DomainMutationResult(
@@ -178,6 +193,9 @@ extension DomainRevisionPublishing {
     }
 
     func publishHumanHealthReport(_ result: HumanHealthReportCommandResult, action: String, note: String) {
+        var affectedEntityIDs = result.affectedMetricLogIDs
+        affectedEntityIDs.insert(result.humanID)
+        affectedEntityIDs.insert(result.reportID)
         publish(
             DomainMutationResult(
                 command: .humanHealthReport(
@@ -185,7 +203,64 @@ extension DomainRevisionPublishing {
                     reportID: result.reportID,
                     action: action
                 ),
-                affectedEntityIDs: [result.humanID, result.reportID],
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: result.didChange,
+                note: note
+            )
+        )
+    }
+
+    func publishHumanLabReportImport(_ result: HumanLabReportImportCommandResult, note: String) {
+        var affectedEntityIDs = result.logIDs
+        affectedEntityIDs.insert(result.humanID)
+        affectedEntityIDs.insert(result.reportID)
+        publish(
+            DomainMutationResult(
+                command: .humanLabReportImport(
+                    humanID: result.humanID,
+                    reportID: result.reportID,
+                    metricCount: result.logIDs.count
+                ),
+                affectedEntityIDs: affectedEntityIDs,
+                wroteBusinessFact: result.didPersist && result.didChange,
+                note: note
+            )
+        )
+    }
+
+    func publishHumanHealthCondition(
+        _ result: HumanHealthConditionCommandResult,
+        action: String,
+        note: String
+    ) {
+        publish(
+            DomainMutationResult(
+                command: .humanHealthCondition(
+                    humanID: result.humanID,
+                    conditionID: result.conditionID,
+                    action: action
+                ),
+                affectedEntityIDs: [result.humanID, result.conditionID],
+                wroteBusinessFact: result.didChange,
+                note: note
+            )
+        )
+    }
+
+    func publishHumanHealthObservation(
+        _ result: HumanHealthObservationCommandResult,
+        action: String,
+        note: String
+    ) {
+        publish(
+            DomainMutationResult(
+                command: .humanHealthObservation(
+                    humanID: result.humanID,
+                    conditionID: result.conditionID,
+                    observationID: result.observationID,
+                    action: action
+                ),
+                affectedEntityIDs: [result.humanID, result.conditionID, result.observationID],
                 wroteBusinessFact: result.didChange,
                 note: note
             )

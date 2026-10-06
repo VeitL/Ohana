@@ -8,6 +8,11 @@
 import SwiftData
 import SwiftUI
 
+private struct PlantRoomCareGroup: Identifiable {
+    let id: UUID
+    let tasks: [PlantBatchCareSheetTask]
+}
+
 struct PlantBatchCareSheet: View {
     let snapshot: PlantBatchCareSheetSnapshot
     let initialCareType: PlantCareType?
@@ -20,6 +25,8 @@ struct PlantBatchCareSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @State private var selectedCareType: PlantCareType?
+    @State private var selectedRoomName: String?
+    @State private var expandedPlantIDs: Set<UUID> = []
     @State private var selectedTaskIDs: Set<String>
     @State private var resolvedTaskIDs: Set<String> = []
     @State private var selectedExecutorID: UUID?
@@ -43,7 +50,7 @@ struct PlantBatchCareSheet: View {
         self.onDeferTask = onDeferTask
         self.onSkipTask = onSkipTask
         _selectedCareType = State(initialValue: initialCareType)
-        _selectedTaskIDs = State(initialValue: Set(snapshot.filterSnapshot(for: initialCareType).taskIDs))
+        _selectedTaskIDs = State(initialValue: [])
         _selectedExecutorID = State(initialValue: initialExecutorID)
     }
 
@@ -66,7 +73,7 @@ struct PlantBatchCareSheet: View {
     }
 
     private var visibleTaskIDs: Set<String> {
-        Set(visibleSnapshot.taskIDs).intersection(activeTaskIDs)
+        Set(visibleRoomSections.flatMap { $0.tasks.map(\.id) })
     }
 
     private var visibleTaskCount: Int {
@@ -75,6 +82,7 @@ struct PlantBatchCareSheet: View {
 
     private var visibleRoomSections: [PlantBatchCareSheetRoomSection] {
         visibleSnapshot.roomSections.compactMap { section in
+            guard selectedRoomName == nil || section.room == selectedRoomName else { return nil }
             let tasks = section.tasks.filter { activeTaskIDs.contains($0.id) }
             guard !tasks.isEmpty else { return nil }
             return PlantBatchCareSheetRoomSection(id: section.id, room: section.room, tasks: tasks)
@@ -91,7 +99,7 @@ struct PlantBatchCareSheet: View {
 
     var body: some View {
         OhanaSheetWrapper(
-            title: l.tr(zh: "批量照护", en: "Batch care", de: "Sammelpflege"),
+            title: l.tr(zh: "今日护理", en: "Today care", de: "Pflege heute"),
             onDismiss: { dismiss() }
         ) {
             VStack(alignment: .leading, spacing: 16) {
@@ -102,6 +110,7 @@ struct PlantBatchCareSheet: View {
                     role: .executor,
                     tint: .goPrimary
                 )
+                roomChips
                 typeChips
                 checklist
                 bottomAction
@@ -112,15 +121,14 @@ struct PlantBatchCareSheet: View {
         .onChange(of: snapshot.signature) { _, _ in
             let currentTaskIDs = Set(snapshot.tasks.map(\.id))
             resolvedTaskIDs = resolvedTaskIDs.intersection(currentTaskIDs)
-            selectedTaskIDs = Set(snapshot.filterSnapshot(for: selectedCareType).taskIDs)
-                .subtracting(resolvedTaskIDs)
+            selectedTaskIDs = selectedTaskIDs.intersection(currentTaskIDs)
         }
     }
 
     private var headerCard: some View {
         HStack(spacing: 12) {
             Image(systemName: "checklist.checked") // a11y: allow decorative glyph; title and count name this sheet.
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 44, height: 44)
                 .background(Color.goPrimary.opacity(0.16), in: Circle())
@@ -128,11 +136,11 @@ struct PlantBatchCareSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "今天到期", en: "Due today", de: "Heute fällig"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
                 Text(headerSummary)
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .minimumScaleFactor(0.82)
@@ -184,11 +192,47 @@ struct PlantBatchCareSheet: View {
         .accessibilityIdentifier("plant-batch-care-type-chips")
     }
 
+    private var roomChips: some View {
+        let rooms = Array(Set(snapshot.tasks.map(\.roomName))).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                chip(title: l.tr(zh: "全部房间", en: "All rooms", de: "Alle Räume"), icon: "house", isSelected: selectedRoomName == nil, tint: .goPrimary) {
+                    selectedRoomName = nil
+                    selectedTaskIDs.removeAll()
+                }
+                ForEach(rooms, id: \.self) { room in
+                    chip(title: room, icon: "mappin", isSelected: selectedRoomName == room, tint: .goPrimary) {
+                        selectedRoomName = room
+                        selectedTaskIDs.removeAll()
+                    }
+                }
+            }
+        }
+        .accessibilityIdentifier("plant-batch-care-room-chips")
+    }
+
     private var checklist: some View {
         VStack(alignment: .leading, spacing: 12) {
             if visibleTaskCount == 0 {
                 emptyState
             } else {
+                Button {
+                    let visible = visibleTaskIDs
+                    if visible.isSubset(of: selectedTaskIDs) {
+                        selectedTaskIDs.subtract(visible)
+                    } else {
+                        selectedTaskIDs.formUnion(visible)
+                    }
+                    UISelectionFeedbackGenerator().selectionChanged()
+                } label: {
+                    Text(visibleTaskIDs.isSubset(of: selectedTaskIDs)
+                        ? l.tr(zh: "取消当前筛选", en: "Clear current selection", de: "Aktuelle Auswahl löschen")
+                        : l.tr(zh: "选择当前筛选的 \(visibleTaskCount) 项", en: "Select \(visibleTaskCount) shown tasks", de: "\(visibleTaskCount) angezeigte Aufgaben wählen"))
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.goPrimary)
+                .accessibilityIdentifier("plant-batch-care-select-visible")
                 ForEach(visibleRoomSections) { section in
                     roomSection(section.room, tasks: section.tasks)
                 }
@@ -206,14 +250,14 @@ struct PlantBatchCareSheet: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "checkmark.circle.fill") // a11y: allow decorative glyph; button label names action.
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(primaryButtonTitle)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
-            .foregroundStyle(selectedTasks.isEmpty ? Color.ohanaSecondaryText : Color.arkInk)
+            .foregroundStyle(selectedTasks.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 50)
             .background(selectedTasks.isEmpty ? Color.ohanaControlFill.opacity(0.72) : Color.goPrimary, in: Capsule())
@@ -237,18 +281,20 @@ struct PlantBatchCareSheet: View {
     private var emptyState: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "checkmark.seal.fill") // a11y: allow decorative glyph; text explains state.
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 44, height: 44)
                 .background(Color.goTeal.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(emptyStateTitle)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
-                Text(emptyStateDetail)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.ohanaSecondaryText)
+                if let emptyStateDetail {
+                    Text(emptyStateDetail)
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.ohanaSecondaryText)
+                }
             }
         }
         .padding(14)
@@ -261,9 +307,9 @@ struct PlantBatchCareSheet: View {
             : l.tr(zh: "没有匹配的照护", en: "No matching care", de: "Keine passenden Aufgaben")
     }
 
-    private var emptyStateDetail: String {
+    private var emptyStateDetail: String? {
         activeTaskCount == 0
-            ? l.tr(zh: "可以直接关闭，或稍后再回来查看。", en: "You can close this sheet or check back later.", de: "Du kannst schließen oder später erneut prüfen.")
+            ? nil
             : l.tr(zh: "换一个类型，或回到全部查看。", en: "Choose another type or return to all.", de: "Anderen Typ wählen oder alle anzeigen.")
     }
 
@@ -271,23 +317,54 @@ struct PlantBatchCareSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(room)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(l.tr(zh: "\(tasks.count) 项", en: "\(tasks.count) tasks", de: "\(tasks.count) Aufgaben"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             VStack(spacing: 8) {
-                ForEach(tasks) { task in
-                    taskRow(task)
+                ForEach(roomCareGroups(tasks)) { group in
+                    if let first = group.tasks.first {
+                        taskRow(first)
+                    }
+                    if group.tasks.count > 1 {
+                        DisclosureGroup(
+                            isExpanded: Binding(
+                                get: { expandedPlantIDs.contains(group.id) },
+                                set: { expanded in
+                                    if expanded { expandedPlantIDs.insert(group.id) }
+                                    else { expandedPlantIDs.remove(group.id) }
+                                }
+                            )
+                        ) {
+                            ForEach(group.tasks.dropFirst()) { task in
+                                taskRow(task)
+                            }
+                        } label: {
+                            Text(l.tr(zh: "\(group.tasks.count - 1) 项其他护理", en: "\(group.tasks.count - 1) more care tasks", de: "\(group.tasks.count - 1) weitere Pflegeaufgaben"))
+                                .font(OhanaFont.adaptive(size: 12))
+                        }
+                        .accessibilityIdentifier("plant-batch-care-more-\(group.id.uuidString)")
+                    }
                 }
             }
         }
         .padding(14)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
         .accessibilityElement(children: .contain)
+    }
+
+    private func roomCareGroups(_ tasks: [PlantBatchCareSheetTask]) -> [PlantRoomCareGroup] {
+        var order: [UUID] = []
+        var byPlant: [UUID: [PlantBatchCareSheetTask]] = [:]
+        for task in tasks {
+            if byPlant[task.plantID] == nil { order.append(task.plantID) }
+            byPlant[task.plantID, default: []].append(task)
+        }
+        return order.map { PlantRoomCareGroup(id: $0, tasks: byPlant[$0] ?? []) }
     }
 
     private func taskRow(_ task: PlantBatchCareSheetTask) -> some View {
@@ -306,12 +383,13 @@ struct PlantBatchCareSheet: View {
                 resolveTask(task, using: onSkipTask)
             }
         ) {
-            HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
                 Button {
                     toggle(task)
                 } label: {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(OhanaFont.adaptive(size: 22, weight: .black))
+                        .font(OhanaFont.adaptive(size: 22, weight: .semibold))
                         .foregroundStyle(isSelected ? Color.goPrimary : Color.ohanaSecondaryText)
                         .frame(width: 44, height: 44)
                         .accessibilityHidden(true)
@@ -323,24 +401,58 @@ struct PlantBatchCareSheet: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(task.plantName) · \(task.careType.displayName(l: l))")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.78)
                     Text("\(task.subtitle) · \(task.dueText)")
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(1)
+                        .lineLimit(2)
                         .minimumScaleFactor(0.76)
+                    if let lastCareDate = task.lastCareDate {
+                        Text(l.tr(zh: "上次 \(lastCareDate.formatted(date: .abbreviated, time: .omitted))", en: "Last \(lastCareDate.formatted(date: .abbreviated, time: .omitted))", de: "Zuletzt \(lastCareDate.formatted(date: .abbreviated, time: .omitted))"))
+                            .font(OhanaFont.adaptive(size: 11))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
-                Spacer(minLength: 6)
+                HStack(spacing: 8) {
+                Spacer(minLength: 0)
 
-                Image(systemName: "ellipsis") // a11y: allow decorative menu hint; context menu and actions are exposed separately.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
-                    .foregroundStyle(Color.ohanaTertiaryText)
-                    .frame(width: 24, height: 44)
-                    .accessibilityHidden(true)
+                Button {
+                    guard !requiresExecutorSelection else { return }
+                    onComplete([task.selection], selectedExecutorID)
+                    dismiss()
+                } label: {
+                    Text(l.tr(zh: "已\(task.careType.displayName(l: l))", en: "\(task.careType.displayName(l: l)) done", de: "\(task.careType.displayName(l: l)) erledigt"))
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(Color.arkInk)
+                        .frame(minHeight: 44)
+                        .padding(.horizontal, 10)
+                        .background(Color.goPrimary, in: Capsule())
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(requiresExecutorSelection)
+                .accessibilityIdentifier("plant-batch-care-quick-\(task.id)")
+
+                Menu {
+                    Button(l.tr(zh: "稍后再看", en: "Check later", de: "Später prüfen")) {
+                        resolveTask(task, using: onDeferTask)
+                    }
+                    Button(l.tr(zh: "详细记录", en: "Detailed log", de: "Detailliert erfassen")) {
+                        onOpenCareLog(task.plantID, task.careType)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                        .frame(width: 44, height: 44)
+                        .accessibilityHidden(true)
+                }
+                .accessibilityLabel(l.tr(zh: "更多护理操作", en: "More care actions", de: "Weitere Pflegeaktionen"))
+                }
             }
         }
         .contextMenu {
@@ -396,7 +508,7 @@ struct PlantBatchCareSheet: View {
             .clipShape(Circle())
 
             Image(systemName: careSymbol(for: task.careType))
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 18, height: 18) // a11y: allow decorative badge inside non-interactive avatar.
                 .background(careTint(for: task.careType), in: Circle())
@@ -413,7 +525,7 @@ struct PlantBatchCareSheet: View {
         return ZStack {
             tint.opacity(0.16)
             Image(systemName: "leaf.fill") // a11y: allow decorative avatar placeholder.
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
         }
@@ -429,10 +541,10 @@ struct PlantBatchCareSheet: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
             }
@@ -446,7 +558,7 @@ struct PlantBatchCareSheet: View {
 
     private func selectCareType(_ type: PlantCareType?) {
         selectedCareType = type
-        selectedTaskIDs = Set(snapshot.filterSnapshot(for: type).taskIDs).intersection(activeTaskIDs)
+        selectedTaskIDs.removeAll()
         UISelectionFeedbackGenerator().selectionChanged()
     }
 
@@ -583,10 +695,10 @@ private struct PlantBatchCareActionRevealRow<Content: View>: View {
         } label: {
             VStack(spacing: 4) {
                 Image(systemName: symbol)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.78)

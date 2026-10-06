@@ -37,11 +37,17 @@ enum OhanaMotionSceneRole {
 }
 
 struct OhanaMotionScene<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
+    @ObservedObject private var workloadPolicy = AppWorkloadPolicy.shared
     var role: OhanaMotionSceneRole
     var alignment: Alignment
     var isActive: Bool
     var reduceMotion: Bool
     @ViewBuilder var content: () -> Content
+
+    private var usesReducedMotion: Bool {
+        reduceMotion || accessibilityReduceMotion || !workloadPolicy.shouldRunInteractionAnimation()
+    }
 
     init(
         role: OhanaMotionSceneRole,
@@ -61,9 +67,9 @@ struct OhanaMotionScene<Content: View>: View {
         ZStack(alignment: alignment) {
             content()
         }
-        .animation(reduceMotion ? role.reducedAnimation : role.animation, value: isActive)
+        .animation(usesReducedMotion ? role.reducedAnimation : role.animation, value: isActive)
         .transaction { transaction in
-            if reduceMotion {
+            if usesReducedMotion {
                 transaction.animation = role.reducedAnimation
             }
         }

@@ -2,55 +2,333 @@
 //  VerticalSolidHomeBottomBar.swift
 //  Ohana
 //
-//  Quick-action menu that sits above the system-owned root tab bar.
+//  Native same-row content tabs and contextual actions.
 //
 
 import Foundation
 import SwiftUI
 
-struct HomeBottomNavigationLayoutMetrics: Equatable {
-    let barHeight: CGFloat
-    let horizontalPadding: CGFloat
-    let leadingPadding: CGFloat
-    let trailingPadding: CGFloat
-    let tabSpacing: CGFloat
-    let actionDiameter: CGFloat
-    let actionHitSize: CGFloat
-    let showsSelectedLabel: Bool
-}
+enum HomeBottomContextAction: Equatable {
+    case quickRecord
+    case addEvent
+    case injectEnergy
 
-enum HomeBottomNavigationLayoutPolicy {
-    static func metrics(tabCount: Int, isAccessibilitySize: Bool = false) -> HomeBottomNavigationLayoutMetrics {
-        let normalizedCount = max(tabCount, 1)
-        let showsSelectedLabel = false
-        let barHeight: CGFloat = isAccessibilitySize ? 72 : 64
-        let tabSpacing: CGFloat = normalizedCount >= 5 ? 0 : 2
-
-        return HomeBottomNavigationLayoutMetrics(
-            barHeight: barHeight,
-            horizontalPadding: 10,
-            leadingPadding: 8,
-            trailingPadding: 8,
-            tabSpacing: tabSpacing,
-            actionDiameter: 48,
-            actionHitSize: 52,
-            showsSelectedLabel: showsSelectedLabel
-        )
+    static func action(for tab: VerticalSolidHomeTab) -> HomeBottomContextAction {
+        switch tab {
+        case .home, .plants:
+            .quickRecord
+        case .calendar:
+            .addEvent
+        case .oasis:
+            .injectEnergy
+        }
     }
 
-    static func estimatedTabSlotWidth(
-        containerWidth: CGFloat,
-        tabCount: Int,
-        isAccessibilitySize: Bool = false
-    ) -> CGFloat {
-        let metrics = metrics(tabCount: tabCount, isAccessibilitySize: isAccessibilitySize)
-        let normalizedCount = max(tabCount, 1)
-        let fixedWidth = metrics.horizontalPadding * 2
-            + metrics.leadingPadding
-            + metrics.trailingPadding
-            + CGFloat(max(normalizedCount - 1, 0)) * metrics.tabSpacing
-        let availableWidth = max(44 * CGFloat(normalizedCount), containerWidth - fixedWidth)
-        return availableWidth / CGFloat(normalizedCount)
+    var icon: String {
+        switch self {
+        case .quickRecord:
+            "plus"
+        case .addEvent:
+            "calendar.badge.plus"
+        case .injectEnergy:
+            "bolt.fill"
+        }
+    }
+
+    func accessibilityLabel(_ localization: L10n) -> String {
+        switch self {
+        case .quickRecord:
+            localization.tr(
+                zh: "快速记录",
+                en: "Quick log",
+                de: "Schnell erfassen",
+                es: "Registro rápido",
+                pt: "Registro rápido",
+                fr: "Saisie rapide",
+                ja: "すばやく記録",
+                ko: "빠르게 기록",
+                it: "Registrazione rapida"
+            )
+        case .addEvent:
+            localization.tr(
+                zh: "添加事件",
+                en: "Add event",
+                de: "Ereignis hinzufügen",
+                es: "Añadir evento",
+                pt: "Adicionar evento",
+                fr: "Ajouter un événement",
+                ja: "イベントを追加",
+                ko: "이벤트 추가",
+                it: "Aggiungi evento"
+            )
+        case .injectEnergy:
+            localization.tr(
+                zh: "注入能量",
+                en: "Inject energy",
+                de: "Energie einspeisen",
+                es: "Inyectar energía",
+                pt: "Injetar energia",
+                fr: "Injecter de l’énergie",
+                ja: "エネルギーを注入",
+                ko: "에너지 주입",
+                it: "Immetti energia"
+            )
+        }
+    }
+
+    func accessibilityHint(_ localization: L10n) -> String {
+        switch self {
+        case .quickRecord:
+            return ""
+        case .addEvent:
+            return localization.tr(
+                zh: "打开新事件表单",
+                en: "Opens the new event form.",
+                de: "Öffnet das Formular für ein neues Ereignis.",
+                es: "Abre el formulario de un nuevo evento.",
+                pt: "Abre o formulário de um novo evento.",
+                fr: "Ouvre le formulaire d’un nouvel événement.",
+                ja: "新しいイベントのフォームを開きます。",
+                ko: "새 이벤트 양식을 엽니다.",
+                it: "Apre il modulo per un nuovo evento."
+            )
+        case .injectEnergy:
+            let cost = OasisTreeEnergyInjectionPolicy.starterPackageCost
+            let energy = OasisTreeEnergyInjectionPolicy.starterPackageXP
+            return localization.tr(
+                zh: "消耗 \(cost) 个椰子，增加 \(energy) 点能量",
+                en: "Uses \(cost) coconuts to add \(energy) energy.",
+                de: "Verbraucht \(cost) Kokosnüsse für \(energy) Energie.",
+                es: "Usa \(cost) cocos para añadir \(energy) de energía.",
+                pt: "Usa \(cost) cocos para adicionar \(energy) de energia.",
+                fr: "Utilise \(cost) noix de coco pour ajouter \(energy) d’énergie.",
+                ja: "ココナッツを \(cost) 個使い、エネルギーを \(energy) 増やします。",
+                ko: "코코넛 \(cost)개를 사용해 에너지 \(energy)을 추가합니다.",
+                it: "Usa \(cost) noci di cocco per aggiungere \(energy) energia."
+            )
+        }
+    }
+}
+
+enum HomeBottomContextActionDisabledReason: Equatable {
+    case loading
+    case insufficientCoconuts(required: Int)
+    case inProgress
+    case unavailable
+
+    func accessibilityDescription(_ localization: L10n) -> String {
+        switch self {
+        case .loading:
+            localization.tr(
+                zh: "正在读取数据",
+                en: "Loading data.",
+                de: "Daten werden geladen.",
+                es: "Cargando datos.",
+                pt: "Carregando dados.",
+                fr: "Chargement des données.",
+                ja: "データを読み込んでいます。",
+                ko: "데이터를 불러오는 중입니다.",
+                it: "Caricamento dei dati."
+            )
+        case let .insufficientCoconuts(required):
+            localization.tr(
+                zh: "椰子不足，需要 \(required) 个",
+                en: "Not enough coconuts. \(required) required.",
+                de: "Nicht genug Kokosnüsse. \(required) benötigt.",
+                es: "No hay suficientes cocos. Se necesitan \(required).",
+                pt: "Cocos insuficientes. São necessários \(required).",
+                fr: "Pas assez de noix de coco. \(required) nécessaires.",
+                ja: "ココナッツが不足しています。\(required)個必要です。",
+                ko: "코코넛이 부족합니다. \(required)개가 필요합니다.",
+                it: "Noci di cocco insufficienti. Ne servono \(required)."
+            )
+        case .inProgress:
+            localization.tr(
+                zh: "正在注入能量",
+                en: "Injecting energy.",
+                de: "Energie wird eingespeist.",
+                es: "Inyectando energía.",
+                pt: "Injetando energia.",
+                fr: "Injection d’énergie en cours.",
+                ja: "エネルギーを注入しています。",
+                ko: "에너지를 주입하는 중입니다.",
+                it: "Immissione di energia in corso."
+            )
+        case .unavailable:
+            localization.tr(
+                zh: "当前无法注入能量",
+                en: "Energy injection is currently unavailable.",
+                de: "Energie kann derzeit nicht eingespeist werden.",
+                es: "La inyección de energía no está disponible ahora.",
+                pt: "A injeção de energia não está disponível agora.",
+                fr: "L’injection d’énergie est actuellement indisponible.",
+                ja: "現在エネルギーを注入できません。",
+                ko: "현재 에너지를 주입할 수 없습니다.",
+                it: "L’immissione di energia non è disponibile al momento."
+            )
+        }
+    }
+}
+
+/// Only the placement is app-owned; selection, menu tracking and press feedback are native.
+struct VerticalSolidHomeBottomBar: View {
+    let selectedTab: VerticalSolidHomeTab
+    let visibleTabs: [VerticalSolidHomeTab]
+    let taskCenterBadge: TaskCenterBadgeSnapshot
+    let quickRecordTargets: [HomeToolbarQuickRecordTarget]
+    let contextActionDisabledReason: HomeBottomContextActionDisabledReason?
+    let localization: L10n
+    let onSelect: (VerticalSolidHomeTab) -> Void
+    let onQuickRecord: (HomeToolbarQuickRecordTarget, QuickActionItem?, String?) -> Void
+    let onContextAction: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var contextAction: HomeBottomContextAction {
+        HomeBottomContextAction.action(for: selectedTab)
+    }
+
+    private var selection: Binding<VerticalSolidHomeTab> {
+        Binding(get: { selectedTab }, set: { tab in
+            guard tab != selectedTab, visibleTabs.contains(tab) else { return }
+            onSelect(tab)
+        })
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    tabPicker(symbolsOnly: false)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                tabPicker(symbolsOnly: true)
+            }
+            .frame(maxWidth: .infinity)
+
+            contextControl
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+                .tint(Color.goPrimary)
+                .controlSize(.large)
+                .frame(minWidth: 48, minHeight: 48)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("home-bottom-navigation")
+    }
+
+    private func tabPicker(symbolsOnly: Bool) -> some View {
+        Picker(localization.tr(zh: "页面", en: "Pages", de: "Seiten", es: "Páginas", pt: "Páginas", fr: "Pages", ja: "ページ", ko: "페이지", it: "Pagine"), selection: selection) {
+            ForEach(visibleTabs) { tab in
+                Group {
+                    if symbolsOnly {
+                        Image(systemName: tab.icon)
+                    } else {
+                        Text(tabTitle(tab))
+                    }
+                }
+                .tag(tab)
+                .accessibilityLabel(tabTitle(tab))
+                .accessibilityIdentifier("home-tab-\(tab.rawValue)")
+            }
+        }
+        .labelsHidden()
+        .ohanaContentTabsPickerStyle()
+        .controlSize(.large)
+        .frame(minWidth: CGFloat(visibleTabs.count) * 44, minHeight: 44)
+        .accessibilityIdentifier("home-tab-picker")
+    }
+
+    private func tabTitle(_ tab: VerticalSolidHomeTab) -> String {
+        let title = tab.title(localization)
+        guard tab == .calendar, taskCenterBadge.attentionCount > 0 else { return title }
+        return "\(title) · \(taskCenterBadge.attentionCount)"
+    }
+
+    @ViewBuilder
+    private var contextControl: some View {
+        if contextAction == .quickRecord {
+            if let onlyTarget = HomeNativeQuickRecordPolicy.singleDirectTarget(quickRecordTargets) {
+                Button { onQuickRecord(onlyTarget, nil, nil) } label: { contextLabel }
+                    .accessibilityIdentifier("home-quick-record-action")
+                    .accessibilityLabel(contextAction.accessibilityLabel(localization))
+                    .disabled(contextActionDisabledReason != nil)
+            } else {
+                Menu {
+                    if quickRecordTargets.count == 1, let target = quickRecordTargets.first {
+                        targetActions(target)
+                    } else {
+                        ForEach(quickRecordTargets) { target in
+                            if target.kind == .plant {
+                                Button { onQuickRecord(target, nil, nil) } label: {
+                                    Label(target.name, systemImage: target.kind.systemImage)
+                                }
+                                .accessibilityIdentifier(target.accessibilityIdentifier)
+                            } else {
+                                Menu { targetActions(target) } label: {
+                                    Label(target.name, systemImage: target.kind.systemImage)
+                                }
+                                .accessibilityIdentifier(target.accessibilityIdentifier)
+                            }
+                        }
+                    }
+                } label: { contextLabel }
+                .menuOrder(.fixed)
+                .disabled(contextActionDisabledReason != nil || quickRecordTargets.isEmpty)
+                .accessibilityLabel(contextAction.accessibilityLabel(localization))
+                .accessibilityHint(contextActionDisabledReason?.accessibilityDescription(localization) ?? "")
+                .accessibilityIdentifier("home-quick-record-action")
+            }
+        } else {
+            Button(action: onContextAction) { contextLabel }
+                .disabled(contextActionDisabledReason != nil)
+                .accessibilityLabel(contextAction.accessibilityLabel(localization))
+                .accessibilityHint(contextActionDisabledReason?.accessibilityDescription(localization) ?? contextAction.accessibilityHint(localization))
+                .accessibilityIdentifier("home-primary-action")
+        }
+    }
+
+    private var contextLabel: some View {
+        Image(systemName: contextAction.icon)
+            .font(OhanaFont.title3())
+            .dynamicTypeSize(.large)
+            .frame(width: 18, height: 18) // a11y: allow decorative glyph; enclosing large native control reserves a minimum 48pt hit target.
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func targetActions(_ target: HomeToolbarQuickRecordTarget) -> some View {
+        ForEach(target.quickActions) { action in
+            let options = HomeQuickActionOptionCatalog.options(for: action.actionType, localization: localization)
+            if options.isEmpty {
+                Button { onQuickRecord(target, action, nil) } label: {
+                    Label(action.displayLabel(localization: localization), systemImage: action.icon)
+                }
+                .accessibilityIdentifier("\(target.accessibilityIdentifier)-\(action.actionType)")
+            } else {
+                Menu {
+                    ForEach(options) { option in
+                        Button { onQuickRecord(target, action, option.id) } label: {
+                            Label(option.title, systemImage: option.icon)
+                        }
+                        .accessibilityIdentifier("\(target.accessibilityIdentifier)-\(action.actionType)-\(option.id)")
+                    }
+                } label: {
+                    Label(action.displayLabel(localization: localization), systemImage: action.icon)
+                }
+                .accessibilityIdentifier("\(target.accessibilityIdentifier)-\(action.actionType)")
+            }
+        }
+    }
+}
+
+enum HomeNativeQuickRecordPolicy {
+    /// Plant logging has one intent; member logging still needs an action choice.
+    static func singleDirectTarget(_ targets: [HomeToolbarQuickRecordTarget]) -> HomeToolbarQuickRecordTarget? {
+        guard targets.count == 1, let target = targets.first, target.kind == .plant else { return nil }
+        return target
     }
 }
 
@@ -122,6 +400,7 @@ struct VerticalSolidHomeQuickActionMenu: View {
             .buttonBorderShape(.circle)
             .controlSize(.large)
             .tint(Color.goPrimary)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .accessibilityLabel(primaryActionAccessibilityLabel)
             .accessibilityIdentifier("home-primary-action")
             .padding(.trailing, 14)
@@ -475,69 +754,5 @@ private struct VerticalSolidHomeHomeFabShortcutButton: View {
             return feature.rawValue
         }
         return shortcut.id
-    }
-}
-
-private extension HomeFabFunctionShortcut {
-    var accessibilityIdentifierFragment: String {
-        switch action {
-        case let .addEntity(type):
-            return "add-\(type.rawValue)"
-        case let .submenu(submenu):
-            return "submenu-\(submenu.rawValue.dashSeparatedIdentifier)"
-        case let .destination(destination):
-            switch destination {
-            case .petFeatureCollection:
-                return "pet-feature-collection"
-            case .petSharedCheckIn:
-                return "pet-shared-check-in"
-            case .plantFeatureCollection:
-                return "plant-feature-collection"
-            case let .featureAggregate(feature):
-                return "feature-\(feature.rawValue)"
-            case let .featureGroup(group):
-                return "feature-group-\(group.rawValue)"
-            case .plantsBatchCare:
-                return "plants-batch-care"
-            case let .plantsBatchCareFiltered(careType):
-                return "plants-batch-care-\(careType.rawValue)"
-            case .plantsBatchQuickRecord:
-                return "plants-batch-quick-record"
-            case let .plantCareAggregate(feature):
-                return "plant-care-\(feature.rawValue)"
-            case .coconutShop:
-                return "coconutShop"
-            case .gacha:
-                return "gacha"
-            case .wealthDashboard:
-                return "wealth"
-            case .familyWeeklyReport:
-                return "weeklyReport"
-            case .careLedgerAnalysis:
-                return "careLedgerAnalysis"
-            case .reminderObservability:
-                return "reminderObservability"
-            default:
-                break
-            }
-        case .unavailable:
-            break
-        }
-        return "more"
-    }
-}
-
-private extension String {
-    var dashSeparatedIdentifier: String {
-        reduce(into: "") { result, character in
-            if character.isUppercase {
-                if !result.isEmpty {
-                    result.append("-")
-                }
-                result.append(character.lowercased())
-            } else {
-                result.append(character)
-            }
-        }
     }
 }

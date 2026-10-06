@@ -23,6 +23,9 @@ struct PetPhotoAlbumView: View {
     @State private var selectedPhoto: PetPhotoAlbumPhotoItem? = nil
     @State private var showingPhotoDetail = false
     @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
+    @State private var isSavingPhotos = false
+    @State private var photoSaveFailed = false
+    @State private var savedRecord: PetRecordReference?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     init(
@@ -77,12 +80,13 @@ struct PetPhotoAlbumView: View {
                                         .foregroundStyle(Color.goPrimary)
                                         .font(OhanaFont.title2(.bold))
                                 }
+                                .accessibilityLabel(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
+                                .disabled(isSavingPhotos)
                             }
                         }
                 }
                 .onChange(of: internalPickerItems) { _, newItems in
-                    Self.consumePickerItems(newItems, pet: pet, modelContext: modelContext, services: appServices)
-                    internalPickerItems = []
+                    saveSelectedPhotos()
                 }
             }
         }
@@ -92,6 +96,32 @@ struct PetPhotoAlbumView: View {
             }
         }
         .onDisappear { commandQueue.cancelAll() }
+        .petRecordFeedback($savedRecord)
+        .overlay {
+            if isSavingPhotos { ProgressView(PetCareExperienceCopy(l: l).saving) }
+        }
+        .alert(PetCareExperienceCopy(l: l).saveFailed, isPresented: $photoSaveFailed) {
+            Button(PetCareExperienceCopy(l: l).retry) { saveSelectedPhotos() }
+            Button(l.cancel, role: .cancel) {}
+        }
+    }
+
+    private func saveSelectedPhotos() {
+        guard !internalPickerItems.isEmpty, !isSavingPhotos else { return }
+        isSavingPhotos = true
+        savedRecord = nil
+        Self.consumePickerItems(internalPickerItems, pet: pet, modelContext: modelContext, services: appServices) { result in
+            isSavingPhotos = false
+            switch result {
+            case let .success(receipt):
+                internalPickerItems = []
+                if let id = receipt.photoIDs.first {
+                    savedRecord = PetRecordReference(petID: pet.id, recordID: id, filter: .memories)
+                }
+            case .failure:
+                photoSaveFailed = true
+            }
+        }
     }
 
     /// 供 `PetMomentsHubView` 等外层调用：从 PhotosPicker 项写入相册
@@ -100,7 +130,10 @@ struct PetPhotoAlbumView: View {
         consumePickerItems([newItem], pet: pet, modelContext: modelContext, services: services)
     }
 
-    static func consumePickerItems(_ newItems: [PhotosPickerItem], pet: Pet, modelContext: ModelContext, services: AppServices) {
+    static func consumePickerItems(
+        _ newItems: [PhotosPickerItem], pet: Pet, modelContext: ModelContext, services: AppServices,
+        onComplete: @escaping @MainActor (Result<PetPhotoAlbumCreateResult, Error>) -> Void = { _ in }
+    ) {
         guard !newItems.isEmpty else { return }
         Task { @MainActor in
             var payloads: [Data] = []
@@ -111,6 +144,9 @@ struct PetPhotoAlbumView: View {
             }
             let command = DomainCommand.petPhotoCreate(petID: pet.id)
             do {
+                guard payloads.count == newItems.count else {
+                    throw PetPhotoAlbumCommandError.persistenceFailed(nil)
+                }
                 let result = try PetPhotoAlbumCommandExecutor(context: modelContext, services: services).createPhotos(
                     data: payloads,
                     pet: pet,
@@ -118,60 +154,71 @@ struct PetPhotoAlbumView: View {
                 )
                 if !result.photoIDs.isEmpty {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    onComplete(.success(result))
+                } else {
+                    onComplete(.failure(PetPhotoAlbumCommandError.persistenceFailed(nil)))
                 }
             } catch {
                 services.domainRevisions.publishFailure(command: command, error: error)
+                onComplete(.failure(error))
             }
         }
     }
 
     private var albumCore: some View {
-        ZStack {
-            if !isHubEmbedded {
-                OhanaAppBackground()
-            }
+        GeometryReader { viewport in
+            ZStack {
+                if !isHubEmbedded {
+                    OhanaAppBackground()
+                }
 
-            if renderData.isEmpty {
-                emptyState
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        ForEach(renderData.groups) { group in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(group.title)
-                                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                    .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
-                                    .padding(.horizontal, 16)
+                if renderData.isEmpty {
+                    emptyState
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 20) {
+                            ForEach(renderData.groups) { group in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(group.title)
+                                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
+                                        .padding(.horizontal, 16)
 
-                                LazyVGrid(columns: columns, spacing: 3) {
-                                    ForEach(group.photos) { photo in
-                                        Button {
-                                            selectedPhoto = photo
-                                            showingPhotoDetail = true
-                                        } label: {
-                                            photoThumbnail(photo)
-                                        }
-                                        .buttonStyle(ScaleButtonStyle())
-                                        .contextMenu {
+                                    LazyVGrid(columns: columns, spacing: 3) {
+                                        ForEach(group.photos) { photo in
                                             Button {
-                                                sharePhoto(photo)
+                                                selectedPhoto = photo
+                                                showingPhotoDetail = true
                                             } label: {
-                                                Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
+                                                photoThumbnail(
+                                                    photo,
+                                                    side: max(1, (viewport.size.width - 6) / 3)
+                                                )
                                             }
-                                            Divider()
-                                            Button(role: .destructive) {
-                                                deletePhoto(photo)
-                                            } label: {
-                                                Label(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), systemImage: "trash")
+                                            .buttonStyle(ScaleButtonStyle())
+                                            .accessibilityLabel(photo.note.isEmpty ? l.tr(zh: "照片", en: "Photo", de: "Foto") : photo.note)
+                                            .accessibilityIdentifier("pet-album-photo-\(photo.id.uuidString)")
+                                            .contextMenu {
+                                                Button {
+                                                    sharePhoto(photo)
+                                                } label: {
+                                                    Label(l.tr(zh: "分享", en: "Share", de: "Teilen"), systemImage: "square.and.arrow.up")
+                                                }
+                                                Divider()
+                                                Button(role: .destructive) {
+                                                    deletePhoto(photo)
+                                                } label: {
+                                                    Label(l.tr(zh: "删除", en: "Delete", de: "Loeschen"), systemImage: "trash")
+                                                }
                                             }
                                         }
                                     }
                                 }
                             }
+                            Spacer(minLength: 40)
                         }
-                        Spacer(minLength: 40)
+                        .padding(.top, 8)
                     }
-                    .padding(.top, 8)
                 }
             }
         }
@@ -183,20 +230,7 @@ struct PetPhotoAlbumView: View {
                 .font(OhanaFont.metric(size: 56, .medium))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(l.tr(zh: "暂无照片", en: "No photos yet", de: "Noch keine Fotos"))
-                .font(OhanaFont.title3(.black))
-            Text(l.tr(
-                zh: "记录\(pet.name)的每一个精彩瞬间",
-                en: "Capture every lovely moment with \(pet.name)",
-                de: "Halte jeden schoenen Moment mit \(pet.name) fest"
-            ))
-            .font(OhanaFont.subheadline(.medium))
-            .foregroundStyle(Color.ohanaSecondaryText)
-            PhotosPicker(selection: pickerBinding, maxSelectionCount: 12, matching: .images) {
-                Text(l.tr(zh: "添加第一张照片", en: "Add the first photo", de: "Erstes Foto hinzufuegen"))
-                    .font(OhanaFont.body(.black)).foregroundStyle(Color.arkInk)
-                    .padding(.horizontal, 28).padding(.vertical, 12)
-                    .background(Color.goPrimary, in: Capsule())
-            }
+                .font(OhanaFont.title3(.semibold))
         }
         .padding(.top, 60)
     }
@@ -247,8 +281,7 @@ struct PetPhotoAlbumView: View {
     }
 
     @ViewBuilder
-    private func photoThumbnail(_ photo: PetPhotoAlbumPhotoItem) -> some View {
-        let side = (ScreenCompat.width - 6) / 3
+    private func photoThumbnail(_ photo: PetPhotoAlbumPhotoItem, side: CGFloat) -> some View {
         AsyncDecodedImageView(
             cacheID: "pet-photo-thumbnail-\(photo.id.uuidString)",
             sourceSignature: photo.imageSignature,
@@ -392,6 +425,8 @@ private struct PhotoDetailSheet: View {
                             .resizable()
                             .scaledToFit()
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .accessibilityLabel(l.tr(zh: "照片", en: "Photo", de: "Foto"))
+                            .accessibilityIdentifier("pet-album-full-image")
                     } placeholder: {
                         ProgressView()
                             .tint(.white)
@@ -400,12 +435,12 @@ private struct PhotoDetailSheet: View {
 
                     VStack(spacing: 10) {
                         Text(photo.date.formatted(.dateTime.year().month().day().weekday()))
-                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(.white.opacity(0.6)) // ui-v4: allow fullScreenPhotoViewer
 
                         if isEditingNote {
                             TextField(l.tr(zh: "添加备注...", en: "Add a note...", de: "Notiz hinzufuegen..."), text: $noteText, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(.white) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .lineLimit(3)
@@ -414,7 +449,7 @@ private struct PhotoDetailSheet: View {
                                 }
                         } else {
                             Text(displayedNote.isEmpty ? l.tr(zh: "轻触添加备注", en: "Tap to add a note", de: "Tippen, um eine Notiz hinzuzufuegen") : displayedNote)
-                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 14, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(displayedNote.isEmpty ? .white.opacity(0.3) : .white.opacity(0.8)) // ui-v4: allow fullScreenPhotoViewer
                                 .multilineTextAlignment(.center)
                                 .onTapGesture {

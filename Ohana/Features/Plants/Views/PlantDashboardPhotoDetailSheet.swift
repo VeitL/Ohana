@@ -55,7 +55,7 @@ struct PlantDashboardPhotoDetailSheet: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 8) {
                 Image(systemName: item.hasRealPhoto ? "photo.fill" : "camera.badge.ellipsis") // a11y: allow decorative photo context glyph; text names the state.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(item.hasRealPhoto ? Color.goTeal : Color.goYellow)
                     .frame(width: 28, height: 28) // a11y: allow non-interactive context glyph; adjacent text names the photo state.
                     .background((item.hasRealPhoto ? Color.goTeal : Color.goYellow).opacity(0.16), in: Circle())
@@ -63,19 +63,19 @@ struct PlantDashboardPhotoDetailSheet: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(item.plant.name)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                     Text(item.subtitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
             }
 
             Text(detailText)
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -92,14 +92,14 @@ struct PlantDashboardPhotoDetailSheet: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.right.circle.fill") // a11y: allow decorative navigation glyph; button text names destination.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "打开植物详情", en: "Open plant detail", de: "Pflanzendetails öffnen"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
             }
-            .foregroundStyle(Color.arkInk)
+            .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity)
             .frame(minHeight: 48)
             .background(Color.goPrimary, in: Capsule())
