@@ -62,6 +62,12 @@ struct PlantCareHistoryEditSheet: View {
         PlantCareCommandExecutor(context: modelContext, services: appServices)
     }
 
+    private var hasChanges: Bool {
+        guard let snapshot else { return false }
+        return date != snapshot.date || careType != snapshot.careType || note != snapshot.note
+            || healthStatus != snapshot.healthStatus || photoMutation != .keep || selectedPhotoItem != nil
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -76,23 +82,13 @@ struct PlantCareHistoryEditSheet: View {
             }
             .navigationTitle(l.tr(zh: "编辑护理记录", en: "Edit care log", de: "Pflegeeintrag bearbeiten"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen")) {
-                        dismiss()
-                    }
-                    .disabled(isSaving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) {
-                        save()
-                    }
-                    .disabled(snapshot == nil || isSaving || isLoadingPhoto)
-                    .accessibilityIdentifier("plant-care-history-save")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: hasChanges, isSaving: isSaving || isLoadingPhoto,
+                canSave: snapshot != nil,
+                saveIdentifier: "plant-care-history-save",
+                onCancel: { dismiss() }, onSave: save
+            )
         }
-        .interactiveDismissDisabled(isSaving)
         .task(id: route.recordID) {
             loadSnapshot()
         }
@@ -285,7 +281,7 @@ struct PlantCareHistoryEditSheet: View {
                 .font(.title)
                 .foregroundStyle(Color.goRed)
             Text(l.tr(zh: "无法读取这条记录", en: "This log could not be loaded", de: "Dieser Eintrag konnte nicht geladen werden"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
             Text(l.tr(
                 zh: "它可能已在别处删除，或暂时无法访问。你可以重试。",
                 en: "It may have been deleted elsewhere or is temporarily unavailable. You can retry.",

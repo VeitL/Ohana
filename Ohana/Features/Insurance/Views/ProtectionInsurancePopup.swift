@@ -32,6 +32,13 @@ struct ProtectionInsurancePopup: View {
     @State private var showInCalendar = false
     @State private var notes = ""
     @State private var isSaving = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [productName, companyName, policyNumber, String(hasPolicyNumber), premiumInput,
+         String(describing: premiumMode), coverageInput, String(hasCoverage),
+         String(startDate.timeIntervalSince1970), String(renewalDate.timeIntervalSince1970),
+         String(describing: paymentFrequency), String(paymentDay), String(autoGenExpenses), String(showInCalendar), notes]
+    }
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var isEdit: Bool { existing != nil }
@@ -126,17 +133,17 @@ struct ProtectionInsurancePopup: View {
                 ? l.tr(zh: "编辑保险", en: "Edit insurance", de: "Versicherung bearbeiten")
                 : l.tr(zh: "添加保险", en: "Add insurance", de: "Versicherung hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel, action: close)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(primaryButtonTitle, action: save)
-                        .disabled(!canSave || isSaving)
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, canSave: canSave,
+                onCancel: close, onSave: save
+            )
         }
-        .onAppear(perform: prefill)
+        .onAppear {
+            guard initialDraft == nil else { return }
+            prefill()
+            initialDraft = editorDraft
+        }
     }
 
     private var basicBlock: some View {
@@ -203,7 +210,7 @@ struct ProtectionInsurancePopup: View {
     private var frequencyBlock: some View {
         popupBlock {
             Text(l.tr(zh: "缴费", en: "Payment", de: "Zahlung"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                 ForEach(InsurancePaymentFrequency.allCases, id: \.rawValue) { frequency in
@@ -211,7 +218,7 @@ struct ProtectionInsurancePopup: View {
                         withAnimation(GoMotion.feedback) { paymentFrequency = frequency }
                     } label: {
                         Text(frequency.localizedLabel(l))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(paymentFrequency == frequency ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 42)
@@ -231,7 +238,7 @@ struct ProtectionInsurancePopup: View {
                         Image(systemName: "minus.circle.fill").accessibilityHidden(true)
                     }
                     Text("\(paymentDay)")
-                        .font(OhanaFont.headline(.black))
+                        .font(OhanaFont.headline(.semibold))
                         .frame(minWidth: 28)
                     Button { if paymentDay < 28 { paymentDay += 1 } } label: {
                         Image(systemName: "plus.circle.fill").accessibilityHidden(true)
@@ -271,7 +278,7 @@ struct ProtectionInsurancePopup: View {
             withAnimation(GoMotion.feedback) { premiumMode = mode }
         } label: {
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(premiumMode == mode ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 36)

@@ -160,6 +160,15 @@ nonisolated enum HumanProfileOptions {
             .filter { !$0.hasPrefix("性别:") && !$0.hasPrefix("关系:") }
     }
 
+    static func visibleNoteEntries(from notes: String) -> [String] {
+        notes.components(separatedBy: "\n\n").compactMap { entry in
+            let visible = visibleNoteParts(from: entry)
+                .joined(separator: "｜")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return visible.isEmpty ? nil : visible
+        }
+    }
+
     static func genderMetadata(from notes: String) -> String {
         metadataValue(prefix: "性别:", from: notes).map(normalizedGender) ?? ""
     }

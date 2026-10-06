@@ -99,7 +99,7 @@ struct HumanLabImportIdleView: View {
         HumanLabImportCard {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "iphone.and.arrow.forward.inward").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 44, height: 44)
                     .background(Color.goTeal.opacity(0.14), in: Circle())
@@ -229,7 +229,7 @@ struct HumanLabImportSourceActionLabel: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                 .foregroundStyle(tint)
             Text(title)
                 .font(OhanaFont.callout(.bold))

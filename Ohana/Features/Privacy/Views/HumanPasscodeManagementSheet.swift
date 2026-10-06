@@ -67,13 +67,13 @@ struct HumanPasscodeManagementSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: appServices.passcodes.hasPasscode(human) ? "lock.shield.fill" : "lock.open.fill")
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goYellow.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "账户 4 位密码", en: "Account 4-digit PIN", de: "4-stellige Konto-PIN"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "用于在同一设备上切换到 \(displayName(human)) 时验证", en: "Used to verify switches to \(displayName(human)) on this device", de: "Wird beim Wechsel zu \(displayName(human)) auf diesem Gerät geprüft"))
                     .font(OhanaFont.caption(.semibold))
@@ -82,7 +82,7 @@ struct HumanPasscodeManagementSheet: View {
             Spacer()
             Button { dismiss() } label: {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.primary.opacity(0.08), in: Circle())
@@ -152,7 +152,7 @@ struct HumanPasscodeManagementSheet: View {
     private func formContent(title: String, needsCurrent: Bool, primaryTitle: String, primaryAction: @escaping () -> Void) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if needsCurrent {
                 pinField(l.tr(zh: "当前密码", en: "Current PIN", de: "Aktuelle PIN"), text: $currentPin, target: .current)
@@ -174,13 +174,13 @@ struct HumanPasscodeManagementSheet: View {
     private func statusCard(title: String, subtitle: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
                     .font(OhanaFont.caption(.semibold))
@@ -196,16 +196,16 @@ struct HumanPasscodeManagementSheet: View {
     private func actionRow(title: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText.opacity(0.5))
         }
         .padding(14)
@@ -222,7 +222,7 @@ struct HumanPasscodeManagementSheet: View {
             } label: {
                 HStack {
                     Text(title)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     HStack(spacing: 7) {
@@ -267,7 +267,7 @@ struct HumanPasscodeManagementSheet: View {
     private func primaryButton(_ title: String, tint: Color, foreground: Color = Color.arkInk, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)
@@ -279,7 +279,7 @@ struct HumanPasscodeManagementSheet: View {
     private func secondaryButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 13)

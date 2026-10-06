@@ -41,11 +41,11 @@ extension PlantDashboardView {
 
             Image(systemName: "leaf.circle.fill") // a11y: allow decorative empty-state glyph; following title describes the state.
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 72, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 72, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goTeal)
 
             Text(l.tr(zh: "还没有植物", en: "No plants yet", de: "Noch keine Pflanzen"))
-                .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Button {
@@ -55,7 +55,7 @@ extension PlantDashboardView {
                     Image(systemName: "plus.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 28)
@@ -71,25 +71,35 @@ extension PlantDashboardView {
 
     var urgentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Image(systemName: "drop.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.goTeal)
-                Text(l.tr(zh: "需要浇水", en: "Needs watering", de: "Braucht Wasser"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
+            let headerLayout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 6))
+            headerLayout {
+                Label {
+                    Text(l.tr(zh: "需要浇水", en: "Needs watering", de: "Braucht Wasser"))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                } icon: {
+                    Image(systemName: "drop.fill")
+                        .foregroundStyle(Color.ohanaFunctionalIcon)
+                        .accessibilityHidden(true)
+                }
+                    .font(OhanaFont.callout(.bold))
+                    .fixedSize(horizontal: false, vertical: true)
+                if !dynamicTypeSize.isAccessibilitySize { Spacer() }
                 Button {
                     waterAll()
                 } label: {
                     Text(l.tr(zh: "全部浇水", en: "Water all", de: "Alle gießen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryActionText)
+                        .fixedSize(horizontal: false, vertical: true)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 6)
+                        .frame(minHeight: 44)
                         .background(Color.goPrimary, in: Capsule())
                 }
                 .buttonStyle(ScaleButtonStyle())
+                .accessibilityIdentifier("plant-dashboard-water-all-action")
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -110,16 +120,22 @@ extension PlantDashboardView {
                 .font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             VStack(alignment: .leading, spacing: 2) {
                 Text(plant.name)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 if let days = plant.daysSinceWatered {
                     Text(l.tr(
                         zh: "\(days)天未浇水",
-                        en: "\(days)d overdue",
-                        de: "\(days) T. überfällig"
+                        en: "\(days)d since watering",
+                        de: "Seit \(days) T. nicht gegossen",
+                        es: "\(days) días sin regar",
+                        pt: "\(days) dias sem regar",
+                        fr: "\(days) j depuis l’arrosage",
+                        ja: "水やりから\(days)日",
+                        ko: "물을 준 지 \(days)일",
+                        it: "\(days) giorni dall’ultima annaffiatura"
                     ))
-                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
                 }
             }
@@ -145,14 +161,14 @@ extension PlantDashboardView {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Image(systemName: isSearchingPlants ? "magnifyingglass.circle.fill" : "line.3.horizontal.decrease.circle.fill") // a11y: allow decorative empty-search glyph; adjacent text states the result.
-                    .font(OhanaFont.adaptive(size: 22, weight: .black))
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
                 Text(isSearchingPlants
                     ? l.tr(zh: "没有匹配的植物", en: "No matching plants", de: "Keine passenden Pflanzen")
                     : l.tr(zh: "当前筛选没有植物", en: "No plants in this filter", de: "Keine Pflanzen in diesem Filter"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
 
@@ -160,7 +176,7 @@ extension PlantDashboardView {
                 clearPlantSearchAndFilters()
             } label: {
                 Text(l.tr(zh: "显示全部植物", en: "Show all plants", de: "Alle Pflanzen anzeigen"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 44)

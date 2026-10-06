@@ -213,19 +213,19 @@ struct HumanDetailView: View {
                 .ohanaSheetPagePresentation()
         }
         .sheet(isPresented: $showWeightHistory) {
-            NavigationStack { HumanWeightHistoryView(human: human) }
+            HumanWeightHistoryView(human: human)
                 .ohanaSheetPagePresentation() // ui-v4: allow long weight history uses large sheet
         }
         .navigationDestination(isPresented: $showingWishlist) { HumanWishlistView(human: human) }
         .navigationDestination(isPresented: $showingCoHealth) { CoHealthDashboardFullView(human: human) }
-        .navigationDestination(isPresented: $showingExpenses) { HumanExpenseDetailView(human: human) }
+        .navigationDestination(isPresented: $showingExpenses) { HumanExpenseDetailView(human: human, showsCloseButton: false) }
         .sheet(isPresented: $showingMedication) {
             NavigationStack { HumanMedicationView(human: human) }
                 .ohanaSheetPagePresentation() // ui-v4: allow long medication management uses large sheet
         }
         .navigationDestination(isPresented: $showingHealthReport) { HumanHealthReportView(human: human) }
         .navigationDestination(isPresented: $showingHealthMetrics) { HumanHealthCheckupView(human: human) }
-        .navigationDestination(isPresented: $showingHealthConditions) { HumanHealthConditionsView(human: human) }
+        .navigationDestination(isPresented: $showingHealthConditions) { HumanHealthConditionsView(human: human, showsCloseButton: false) }
         .navigationDestination(isPresented: $showingHealthSummary) { HumanHealthSummaryView(human: human) }
         .task(id: avatarSourceKey) {
             await prepareAvatar()

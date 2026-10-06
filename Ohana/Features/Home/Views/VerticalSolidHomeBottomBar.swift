@@ -2,61 +2,11 @@
 //  VerticalSolidHomeBottomBar.swift
 //  Ohana
 //
-//  App-owned split-island root navigation and contextual actions.
+//  Native same-row content tabs and contextual actions.
 //
 
 import Foundation
 import SwiftUI
-
-struct HomeBottomNavigationLayoutMetrics: Equatable {
-    let barHeight: CGFloat
-    let horizontalPadding: CGFloat
-    let leadingPadding: CGFloat
-    let trailingPadding: CGFloat
-    let tabSpacing: CGFloat
-    let actionGap: CGFloat
-    let actionDiameter: CGFloat
-    let actionHitSize: CGFloat
-    let showsSelectedLabel: Bool
-}
-
-enum HomeBottomNavigationLayoutPolicy {
-    static func metrics(tabCount: Int, isAccessibilitySize: Bool = false) -> HomeBottomNavigationLayoutMetrics {
-        let normalizedCount = max(tabCount, 1)
-        let showsSelectedLabel = false
-        let barHeight: CGFloat = isAccessibilitySize ? 64 : 58
-        let tabSpacing: CGFloat = normalizedCount >= 5 ? 0 : 2
-
-        return HomeBottomNavigationLayoutMetrics(
-            barHeight: barHeight,
-            horizontalPadding: 14,
-            leadingPadding: 8,
-            trailingPadding: 8,
-            tabSpacing: tabSpacing,
-            actionGap: 12,
-            actionDiameter: 54,
-            actionHitSize: 58,
-            showsSelectedLabel: showsSelectedLabel
-        )
-    }
-
-    static func estimatedTabSlotWidth(
-        containerWidth: CGFloat,
-        tabCount: Int,
-        isAccessibilitySize: Bool = false
-    ) -> CGFloat {
-        let metrics = metrics(tabCount: tabCount, isAccessibilitySize: isAccessibilitySize)
-        let normalizedCount = max(tabCount, 1)
-        let fixedWidth = metrics.horizontalPadding * 2
-            + metrics.leadingPadding
-            + metrics.trailingPadding
-            + metrics.actionGap
-            + metrics.actionHitSize
-            + CGFloat(max(normalizedCount - 1, 0)) * metrics.tabSpacing
-        let availableWidth = max(44 * CGFloat(normalizedCount), containerWidth - fixedWidth)
-        return availableWidth / CGFloat(normalizedCount)
-    }
-}
 
 enum HomeBottomContextAction: Equatable {
     case quickRecord
@@ -220,745 +170,165 @@ enum HomeBottomContextActionDisabledReason: Equatable {
     }
 }
 
+/// Only the placement is app-owned; selection, menu tracking and press feedback are native.
 struct VerticalSolidHomeBottomBar: View {
     let selectedTab: VerticalSolidHomeTab
     let visibleTabs: [VerticalSolidHomeTab]
     let taskCenterBadge: TaskCenterBadgeSnapshot
     let quickRecordTargets: [HomeToolbarQuickRecordTarget]
-    let safeBottom: CGFloat
-    let allowsSelectionMotion: Bool
     let contextActionDisabledReason: HomeBottomContextActionDisabledReason?
     let localization: L10n
     let onSelect: (VerticalSolidHomeTab) -> Void
     let onQuickRecord: (HomeToolbarQuickRecordTarget, QuickActionItem?, String?) -> Void
     let onContextAction: () -> Void
 
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @Namespace private var tabSelectionNamespace
-
-    private var metrics: HomeBottomNavigationLayoutMetrics {
-        HomeBottomNavigationLayoutPolicy.metrics(
-            tabCount: visibleTabs.count,
-            isAccessibilitySize: dynamicTypeSize.isAccessibilitySize
-        )
-    }
 
     private var contextAction: HomeBottomContextAction {
         HomeBottomContextAction.action(for: selectedTab)
     }
 
-    private var isContextActionEnabled: Bool {
-        contextActionDisabledReason == nil
+    private var selection: Binding<VerticalSolidHomeTab> {
+        Binding(get: { selectedTab }, set: { tab in
+            guard tab != selectedTab, visibleTabs.contains(tab) else { return }
+            onSelect(tab)
+        })
     }
 
     var body: some View {
-        Group {
-            if #available(iOS 26.0, *), !reduceTransparency {
-                islands(usesLiquidGlass: true)
-            } else {
-                islands(usesLiquidGlass: false)
+        HStack(alignment: .center, spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                if !dynamicTypeSize.isAccessibilitySize {
+                    tabPicker(symbolsOnly: false)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                tabPicker(symbolsOnly: true)
             }
+            .frame(maxWidth: .infinity)
+
+            contextControl
+                .buttonStyle(.glassProminent)
+                .buttonBorderShape(.circle)
+                .tint(Color.goPrimary)
+                .controlSize(.large)
+                .frame(minWidth: 48, minHeight: 48)
         }
-        .padding(.horizontal, metrics.horizontalPadding)
-        .padding(.bottom, max(safeBottom - 2, 4))
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("home-bottom-navigation")
     }
 
-    private func islands(usesLiquidGlass: Bool) -> some View {
-        HStack(spacing: metrics.actionGap) {
-            tabIsland(usesLiquidGlass: usesLiquidGlass)
-                .frame(maxWidth: .infinity)
-
-            contextActionControl(usesLiquidGlass: usesLiquidGlass)
-                .id(contextAction.icon)
-                .transition(.opacity)
-        }
-        .frame(height: metrics.barHeight)
-        .animation(
-            allowsSelectionMotion ? VerticalHomeTabTransitionPolicy.selectionAnimation : GoMotion.reduced,
-            value: selectedTab
-        )
-    }
-
-    @ViewBuilder
-    private func tabIsland(usesLiquidGlass: Bool) -> some View {
-        let content = HStack(spacing: metrics.tabSpacing) {
+    private func tabPicker(symbolsOnly: Bool) -> some View {
+        Picker(localization.tr(zh: "页面", en: "Pages", de: "Seiten", es: "Páginas", pt: "Páginas", fr: "Pages", ja: "ページ", ko: "페이지", it: "Pagine"), selection: selection) {
             ForEach(visibleTabs) { tab in
-                HomeBottomNavigationTabButton(
-                    tab: tab,
-                    isSelected: selectedTab == tab,
-                    attentionCount: tab == .calendar ? taskCenterBadge.attentionCount : 0,
-                    position: (visibleTabs.firstIndex(of: tab) ?? 0) + 1,
-                    totalCount: visibleTabs.count,
-                    localization: localization,
-                    selectionNamespace: tabSelectionNamespace,
-                    allowsSelectionMotion: allowsSelectionMotion,
-                    action: onSelect
-                )
-                .frame(maxWidth: .infinity)
+                Group {
+                    if symbolsOnly {
+                        Image(systemName: tab.icon)
+                    } else {
+                        Text(tabTitle(tab))
+                    }
+                }
+                .tag(tab)
+                .accessibilityLabel(tabTitle(tab))
+                .accessibilityIdentifier("home-tab-\(tab.rawValue)")
             }
         }
-        .padding(.leading, metrics.leadingPadding)
-        .padding(.trailing, metrics.trailingPadding)
-        .frame(height: metrics.barHeight)
+        .labelsHidden()
+        .ohanaContentTabsPickerStyle()
+        .controlSize(.large)
+        .frame(minWidth: CGFloat(visibleTabs.count) * 44, minHeight: 44)
+        .accessibilityIdentifier("home-tab-picker")
+    }
 
-        if usesLiquidGlass {
-            content
-                .glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            content
-                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-                }
-        }
+    private func tabTitle(_ tab: VerticalSolidHomeTab) -> String {
+        let title = tab.title(localization)
+        guard tab == .calendar, taskCenterBadge.attentionCount > 0 else { return title }
+        return "\(title) · \(taskCenterBadge.attentionCount)"
     }
 
     @ViewBuilder
-    private func contextActionControl(usesLiquidGlass: Bool) -> some View {
+    private var contextControl: some View {
         if contextAction == .quickRecord {
-            HomeQuickRecordPopoutControl(
-                selectedTab: selectedTab,
-                quickRecordTargets: quickRecordTargets,
-                localization: localization,
-                unavailableAccessibilityHint: contextActionDisabledReason?
-                    .accessibilityDescription(localization),
-                isEnabled: isContextActionEnabled,
-                diameter: metrics.actionDiameter,
-                hitSize: metrics.actionHitSize,
-                usesLiquidGlass: usesLiquidGlass,
-                allowsMotion: allowsSelectionMotion,
-                onQuickRecord: onQuickRecord
-            )
-            .opacity(isContextActionEnabled ? 1 : 0.52)
-        } else {
-            Button {
-                OhanaFeedback.medium()
-                onContextAction()
-            } label: {
-                contextActionLabel
-                    .accessibilityHidden(true)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .modifier(HomeBottomContextActionChrome(
-                diameter: metrics.actionDiameter,
-                hitSize: metrics.actionHitSize,
-                usesLiquidGlass: usesLiquidGlass
-            ))
-            .disabled(!isContextActionEnabled)
-            .opacity(isContextActionEnabled ? 1 : 0.52)
-            .accessibilityLabel(contextAction.accessibilityLabel(localization))
-            .accessibilityHint(
-                contextActionDisabledReason?.accessibilityDescription(localization)
-                    ?? contextAction.accessibilityHint(localization)
-            )
-            .accessibilityIdentifier("home-primary-action")
-        }
-    }
-
-    @ViewBuilder
-    private var contextActionLabel: some View {
-        Group {
-            if contextAction == .injectEnergy {
-                VStack(spacing: 1) {
-                    Image(systemName: contextAction.icon)
-                        .font(.system(size: 17, weight: .black)) // a11y: allow fixed glyph inside fixed dock circle; Button owns the scalable label.
-                    Text("\(OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥")
-                        .font(.system(size: 9, weight: .black, design: .rounded)) // a11y: allow compact visual cost; Button exposes the full localized value.
-                        .monospacedDigit()
-                }
+            if let onlyTarget = HomeNativeQuickRecordPolicy.singleDirectTarget(quickRecordTargets) {
+                Button { onQuickRecord(onlyTarget, nil, nil) } label: { contextLabel }
+                    .accessibilityIdentifier("home-quick-record-action")
+                    .accessibilityLabel(contextAction.accessibilityLabel(localization))
+                    .disabled(contextActionDisabledReason != nil)
             } else {
-                Image(systemName: contextAction.icon)
-                    .font(.system(size: 20, weight: .black)) // a11y: allow fixed glyph inside fixed dock circle; Button owns the scalable label.
-            }
-        }
-    }
-}
-
-private struct HomeBottomNavigationTabButton: View {
-    let tab: VerticalSolidHomeTab
-    let isSelected: Bool
-    let attentionCount: Int
-    let position: Int
-    let totalCount: Int
-    let localization: L10n
-    let selectionNamespace: Namespace.ID
-    let allowsSelectionMotion: Bool
-    let action: (VerticalSolidHomeTab) -> Void
-
-    var body: some View {
-        Button {
-            action(tab)
-        } label: {
-            Image(systemName: tab.icon)
-                .font(.system(size: 18, weight: .black)) // a11y: allow fixed glyph inside fixed tab slot; Button exposes label and position.
-                .symbolRenderingMode(.monochrome)
-                .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
-                .frame(width: 44, height: 44)
-                .background {
-                    if isSelected {
-                        selectionBackground
-                            .transition(.opacity)
+                Menu {
+                    if quickRecordTargets.count == 1, let target = quickRecordTargets.first {
+                        targetActions(target)
+                    } else {
+                        ForEach(quickRecordTargets) { target in
+                            if target.kind == .plant {
+                                Button { onQuickRecord(target, nil, nil) } label: {
+                                    Label(target.name, systemImage: target.kind.systemImage)
+                                }
+                                .accessibilityIdentifier(target.accessibilityIdentifier)
+                            } else {
+                                Menu { targetActions(target) } label: {
+                                    Label(target.name, systemImage: target.kind.systemImage)
+                                }
+                                .accessibilityIdentifier(target.accessibilityIdentifier)
+                            }
+                        }
                     }
+                } label: { contextLabel }
+                .menuOrder(.fixed)
+                .disabled(contextActionDisabledReason != nil || quickRecordTargets.isEmpty)
+                .accessibilityLabel(contextAction.accessibilityLabel(localization))
+                .accessibilityHint(contextActionDisabledReason?.accessibilityDescription(localization) ?? "")
+                .accessibilityIdentifier("home-quick-record-action")
+            }
+        } else {
+            Button(action: onContextAction) { contextLabel }
+                .disabled(contextActionDisabledReason != nil)
+                .accessibilityLabel(contextAction.accessibilityLabel(localization))
+                .accessibilityHint(contextActionDisabledReason?.accessibilityDescription(localization) ?? contextAction.accessibilityHint(localization))
+                .accessibilityIdentifier("home-primary-action")
+        }
+    }
+
+    private var contextLabel: some View {
+        Image(systemName: contextAction.icon)
+            .font(OhanaFont.title3())
+            .dynamicTypeSize(.large)
+            .frame(width: 18, height: 18) // a11y: allow decorative glyph; enclosing large native control reserves a minimum 48pt hit target.
+            .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private func targetActions(_ target: HomeToolbarQuickRecordTarget) -> some View {
+        ForEach(target.quickActions) { action in
+            let options = HomeQuickActionOptionCatalog.options(for: action.actionType, localization: localization)
+            if options.isEmpty {
+                Button { onQuickRecord(target, action, nil) } label: {
+                    Label(action.displayLabel(localization: localization), systemImage: action.icon)
                 }
-                .overlay(alignment: .topTrailing) {
-                    if attentionCount > 0 {
-                        Text(attentionCount > 99 ? "99+" : "\(attentionCount)")
-                            .font(.system(size: 9, weight: .black, design: .rounded)) // a11y: allow compact visual badge; Button label announces the count.
-                            .foregroundStyle(Color.ohanaPrimaryActionText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .padding(.horizontal, 4)
-                            .frame(minWidth: 16, minHeight: 16)
-                            .background(Color.goRed, in: Capsule())
-                            .offset(x: 3, y: -2)
-                            .accessibilityHidden(true)
+                .accessibilityIdentifier("\(target.accessibilityIdentifier)-\(action.actionType)")
+            } else {
+                Menu {
+                    ForEach(options) { option in
+                        Button { onQuickRecord(target, action, option.id) } label: {
+                            Label(option.title, systemImage: option.icon)
+                        }
+                        .accessibilityIdentifier("\(target.accessibilityIdentifier)-\(action.actionType)-\(option.id)")
                     }
+                } label: {
+                    Label(action.displayLabel(localization: localization), systemImage: action.icon)
                 }
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle(triggersHaptic: false))
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue(accessibilityPosition)
-        .accessibilityIdentifier("home-tab-\(tab.rawValue)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var selectionBackground: some View {
-        if allowsSelectionMotion {
-            Circle()
-                .fill(Color.goPrimary)
-                .matchedGeometryEffect(
-                    id: "home-bottom-tab-selection",
-                    in: selectionNamespace,
-                    properties: .position
-                )
-        } else {
-            Circle()
-                .fill(Color.goPrimary)
-        }
-    }
-
-    private var accessibilityLabel: String {
-        guard tab == .calendar, attentionCount > 0 else {
-            return tab.title(localization)
-        }
-        return localization.tr(
-            zh: "\(tab.title(localization))，待处理：\(attentionCount)",
-            en: "\(tab.title(localization)), needs attention: \(attentionCount)",
-            de: "\(tab.title(localization)), offen: \(attentionCount)",
-            es: "\(tab.title(localization)), pendientes: \(attentionCount)",
-            pt: "\(tab.title(localization)), pendentes: \(attentionCount)",
-            fr: "\(tab.title(localization)), à traiter : \(attentionCount)",
-            ja: "\(tab.title(localization))、未対応：\(attentionCount)件",
-            ko: "\(tab.title(localization)), 처리할 항목: \(attentionCount)개",
-            it: "\(tab.title(localization)), da gestire: \(attentionCount)"
-        )
-    }
-
-    private var accessibilityPosition: String {
-        localization.tr(
-            zh: "第 \(position) 个，共 \(totalCount) 个",
-            en: "\(position) of \(totalCount)",
-            de: "\(position) von \(totalCount)",
-            es: "\(position) de \(totalCount)",
-            pt: "\(position) de \(totalCount)",
-            fr: "\(position) sur \(totalCount)",
-            ja: "\(totalCount)個中\(position)番目",
-            ko: "\(totalCount)개 중 \(position)번째",
-            it: "\(position) di \(totalCount)"
-        )
-    }
-}
-
-private struct HomeBottomContextActionChrome: ViewModifier {
-    let diameter: CGFloat
-    let hitSize: CGFloat
-    let usesLiquidGlass: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        let control = content
-            .foregroundStyle(Color.ohanaPrimaryActionText)
-            .frame(width: diameter, height: diameter)
-            .contentShape(Circle())
-
-        if usesLiquidGlass {
-            control
-                .glassEffect(.regular.tint(Color.goPrimary).interactive(), in: Circle())
-                .frame(width: hitSize, height: hitSize)
-        } else {
-            control
-                .background(Color.goPrimary, in: Circle())
-                .overlay {
-                    Circle().strokeBorder(Color.ohanaPrimaryActionText.opacity(0.22), lineWidth: 1)
-                }
-                .frame(width: hitSize, height: hitSize)
+                .accessibilityIdentifier("\(target.accessibilityIdentifier)-\(action.actionType)")
+            }
         }
     }
 }
 
-private struct HomeQuickRecordPopoutControl: View {
-    let selectedTab: VerticalSolidHomeTab
-    let quickRecordTargets: [HomeToolbarQuickRecordTarget]
-    let localization: L10n
-    let unavailableAccessibilityHint: String?
-    let isEnabled: Bool
-    let diameter: CGFloat
-    let hitSize: CGFloat
-    let usesLiquidGlass: Bool
-    let allowsMotion: Bool
-    let onQuickRecord: (HomeToolbarQuickRecordTarget, QuickActionItem?, String?) -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isExpanded = false
-    @State private var itemsVisible = false
-    @State private var selectedTargetID: String?
-    @State private var selectedActionID: String?
-    @State private var transitionTask: Task<Void, Never>?
-
-    private var canOpen: Bool {
-        isEnabled && !quickRecordTargets.isEmpty
-    }
-
-    var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            Button(action: toggleMenu) {
-                Image(systemName: isExpanded ? "xmark" : "plus")
-                    .accessibilityHidden(true)
-                    .font(.system(size: 20, weight: .black)) // a11y: allow fixed glyph inside fixed dock circle; Button exposes a scalable label.
-                    .contentTransition(canAnimate ? .symbolEffect(.replace) : .identity)
-            }
-            .buttonStyle(ScaleButtonStyle(triggersHaptic: false))
-            .modifier(HomeBottomContextActionChrome(
-                diameter: diameter,
-                hitSize: hitSize,
-                usesLiquidGlass: usesLiquidGlass
-            ))
-            .disabled(!canOpen)
-            .accessibilityLabel(HomeBottomContextAction.quickRecord.accessibilityLabel(localization))
-            .accessibilityValue(isExpanded ? expandedAccessibilityValue : collapsedAccessibilityValue)
-            .accessibilityHint(accessibilityHint)
-            .accessibilityIdentifier("home-quick-record-action")
-
-            if isExpanded {
-                floatingMenu
-                    .fixedSize(horizontal: true, vertical: true)
-                    .offset(y: -(hitSize + 10))
-                    .allowsHitTesting(itemsVisible)
-                    .accessibilityHidden(!itemsVisible)
-                    .zIndex(30)
-            }
-        }
-        .frame(width: hitSize, height: hitSize, alignment: .bottomTrailing)
-        .zIndex(isExpanded ? 30 : 0)
-        .onChange(of: selectedTab) { _, _ in
-            dismissImmediately()
-        }
-        .onChange(of: quickRecordTargets) { _, _ in
-            dismissImmediately()
-        }
-        .onChange(of: isEnabled) { _, enabled in
-            if !enabled { dismissImmediately() }
-        }
-        .onDisappear {
-            transitionTask?.cancel()
-            transitionTask = nil
-        }
-    }
-
-    @ViewBuilder
-    private var floatingMenu: some View {
-        if #available(iOS 26.0, *), usesLiquidGlass {
-            GlassEffectContainer(spacing: 10) {
-                floatingMenuItems(usesLiquidGlass: true)
-            }
-        } else {
-            floatingMenuItems(usesLiquidGlass: false)
-        }
-    }
-
-    private func floatingMenuItems(usesLiquidGlass: Bool) -> some View {
-        let items = menuItems
-        return VStack(alignment: .trailing, spacing: 10) {
-            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
-                HomeQuickRecordPopoutItemButton(
-                    item: item,
-                    usesLiquidGlass: usesLiquidGlass,
-                    action: { handle(item.intent) }
-                )
-                .ohanaStaggeredMenuItem(
-                    isVisible: itemsVisible,
-                    index: index,
-                    total: items.count,
-                    anchor: .bottomTrailing
-                )
-            }
-        }
-        .fixedSize(horizontal: true, vertical: true)
-    }
-
-    private var menuItems: [HomeQuickRecordPopoutItem] {
-        guard let selectedTarget else {
-            return quickRecordTargets.map { target in
-                HomeQuickRecordPopoutItem(
-                    id: target.accessibilityIdentifier,
-                    title: target.name,
-                    icon: target.kind.systemImage,
-                    tint: targetTint(target.kind),
-                    accessibilityLabel: targetAccessibilityLabel(target),
-                    accessibilityIdentifier: target.accessibilityIdentifier,
-                    intent: .target(target.id)
-                )
-            }
-        }
-
-        guard let selectedAction else {
-            return [backItem] + selectedTarget.quickActions.map { action in
-                let title = action.displayLabel(localization: localization)
-                return HomeQuickRecordPopoutItem(
-                    id: "\(selectedTarget.accessibilityIdentifier)-\(action.id)",
-                    title: title,
-                    icon: action.icon,
-                    tint: Color(hex: action.colorHex),
-                    accessibilityLabel: "\(selectedTarget.name): \(title)",
-                    accessibilityIdentifier: "\(selectedTarget.accessibilityIdentifier)-\(action.actionType)",
-                    intent: .action(action.id)
-                )
-            }
-        }
-
-        let options = HomeQuickActionOptionCatalog.options(
-            for: selectedAction.actionType,
-            localization: localization
-        )
-        return [backItem] + options.map { option in
-            HomeQuickRecordPopoutItem(
-                id: "\(selectedTarget.accessibilityIdentifier)-\(selectedAction.actionType)-\(option.id)",
-                title: option.title,
-                icon: option.icon,
-                tint: option.colorToken.color,
-                accessibilityLabel: "\(selectedTarget.name): \(selectedAction.displayLabel(localization: localization)): \(option.title)",
-                accessibilityIdentifier: "\(selectedTarget.accessibilityIdentifier)-\(selectedAction.actionType)-\(option.id)",
-                intent: .option(option.id)
-            )
-        }
-    }
-
-    private var selectedTarget: HomeToolbarQuickRecordTarget? {
-        guard let selectedTargetID else { return nil }
-        return quickRecordTargets.first(where: { $0.id == selectedTargetID })
-    }
-
-    private var selectedAction: QuickActionItem? {
-        guard let selectedActionID else { return nil }
-        return selectedTarget?.quickActions.first(where: { $0.id == selectedActionID })
-    }
-
-    private var backItem: HomeQuickRecordPopoutItem {
-        HomeQuickRecordPopoutItem(
-            id: "quick-record-back-\(selectedTargetID ?? "root")-\(selectedActionID ?? "actions")",
-            title: localization.tr(
-                zh: "返回", en: "Back", de: "Zurück", es: "Atrás", pt: "Voltar",
-                fr: "Retour", ja: "戻る", ko: "뒤로", it: "Indietro"
-            ),
-            icon: "chevron.backward",
-            tint: Color.ohanaSecondaryText,
-            accessibilityLabel: localization.tr(
-                zh: "返回上一级", en: "Back", de: "Zurück", es: "Atrás", pt: "Voltar",
-                fr: "Retour", ja: "戻る", ko: "뒤로", it: "Indietro"
-            ),
-            accessibilityIdentifier: "home-quick-record-back",
-            intent: .back
-        )
-    }
-
-    private func toggleMenu() {
-        guard canOpen else { return }
-        OhanaFeedback.medium()
-        if isExpanded {
-            dismissMenu()
-        } else {
-            transitionTask?.cancel()
-            selectedTargetID = nil
-            selectedActionID = nil
-            withAnimation(menuAnimation) {
-                isExpanded = true
-            }
-            transitionTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: canAnimate ? 16 : 0) {
-                withAnimation(menuAnimation) {
-                    itemsVisible = true
-                }
-                transitionTask = nil
-            }
-        }
-    }
-
-    private func handle(_ intent: HomeQuickRecordPopoutIntent) {
-        switch intent {
-        case .back:
-            if selectedActionID != nil {
-                transition(toTargetID: selectedTargetID, actionID: nil)
-            } else {
-                transition(toTargetID: nil, actionID: nil)
-            }
-        case let .target(targetID):
-            guard let target = quickRecordTargets.first(where: { $0.id == targetID }) else { return }
-            if target.kind == .plant {
-                perform(target: target, action: nil, optionID: nil)
-            } else {
-                transition(toTargetID: targetID, actionID: nil)
-            }
-        case let .action(actionID):
-            guard let target = selectedTarget,
-                  let action = target.quickActions.first(where: { $0.id == actionID }) else { return }
-            if HomeQuickActionOptionCatalog.hasOptions(for: action.actionType) {
-                transition(toTargetID: target.id, actionID: actionID)
-            } else {
-                perform(target: target, action: action, optionID: nil)
-            }
-        case let .option(optionID):
-            guard let target = selectedTarget,
-                  let action = selectedAction,
-                  HomeQuickActionOptionCatalog.options(
-                    for: action.actionType,
-                    localization: localization
-                  ).contains(where: { $0.id == optionID }) else { return }
-            perform(target: target, action: action, optionID: optionID)
-        }
-    }
-
-    private func transition(toTargetID targetID: String?, actionID: String?) {
-        transitionTask?.cancel()
-        OhanaFeedback.light()
-        withAnimation(menuAnimation) {
-            itemsVisible = false
-        }
-        transitionTask = OhanaFrameScheduler.runAfterNextFrame(
-            milliseconds: canAnimate ? 390 : 0
-        ) {
-            selectedTargetID = targetID
-            selectedActionID = actionID
-            withAnimation(menuAnimation) {
-                itemsVisible = true
-            }
-            transitionTask = nil
-        }
-    }
-
-    private func perform(
-        target: HomeToolbarQuickRecordTarget,
-        action: QuickActionItem?,
-        optionID: String?
-    ) {
-        OhanaFeedback.light()
-        dismissMenu()
-        OhanaFrameScheduler.runAfterNextFrame {
-            onQuickRecord(target, action, optionID)
-        }
-    }
-
-    private func dismissMenu() {
-        transitionTask?.cancel()
-        withAnimation(menuAnimation) {
-            itemsVisible = false
-        }
-        transitionTask = OhanaFrameScheduler.runAfterNextFrame(
-            milliseconds: canAnimate ? 390 : 0
-        ) {
-            withAnimation(menuAnimation) {
-                isExpanded = false
-            }
-            selectedTargetID = nil
-            selectedActionID = nil
-            transitionTask = nil
-        }
-    }
-
-    private func dismissImmediately() {
-        transitionTask?.cancel()
-        transitionTask = nil
-        guard isExpanded || itemsVisible || selectedTargetID != nil || selectedActionID != nil else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            isExpanded = false
-            itemsVisible = false
-            selectedTargetID = nil
-            selectedActionID = nil
-        }
-    }
-
-    private var menuAnimation: Animation {
-        canAnimate ? GoMotion.fab : GoMotion.reduced
-    }
-
-    private var canAnimate: Bool {
-        allowsMotion && !reduceMotion
-    }
-
-    private var accessibilityHint: String {
-        unavailableAccessibilityHint
-            ?? (quickRecordTargets.isEmpty ? emptyTitle : quickRecordHint)
-    }
-
-    private var emptyTitle: String {
-        if selectedTab == .plants {
-            return localization.tr(
-                zh: "暂无可记录的植物", en: "No plants to log", de: "Keine Pflanzen zum Erfassen",
-                es: "No hay plantas para registrar", pt: "Nenhuma planta para registrar",
-                fr: "Aucune plante à enregistrer", ja: "記録できる植物がありません",
-                ko: "기록할 식물이 없습니다", it: "Nessuna pianta da registrare"
-            )
-        }
-        return localization.tr(
-            zh: "暂无可记录的成员", en: "No members to log", de: "Keine Mitglieder zum Erfassen",
-            es: "No hay miembros para registrar", pt: "Nenhum membro para registrar",
-            fr: "Aucun membre à enregistrer", ja: "記録できるメンバーがいません",
-            ko: "기록할 구성원이 없습니다", it: "Nessun membro da registrare"
-        )
-    }
-
-    private var quickRecordHint: String {
-        localization.tr(
-            zh: "展开后选择成员与记录类别", en: "Expand, then choose a member and record category.",
-            de: "Öffnen und Mitglied sowie Kategorie wählen.",
-            es: "Despliega y elige un miembro y una categoría.",
-            pt: "Expanda e escolha um membro e uma categoria.",
-            fr: "Déployez puis choisissez un membre et une catégorie.",
-            ja: "展開してメンバーと記録カテゴリを選びます。",
-            ko: "펼친 후 구성원과 기록 카테고리를 선택하세요.",
-            it: "Espandi, poi scegli un membro e una categoria."
-        )
-    }
-
-    private var expandedAccessibilityValue: String {
-        localization.tr(
-            zh: "已展开", en: "Expanded", de: "Geöffnet", es: "Desplegado", pt: "Expandido",
-            fr: "Déployé", ja: "展開中", ko: "펼쳐짐", it: "Espanso"
-        )
-    }
-
-    private var collapsedAccessibilityValue: String {
-        localization.tr(
-            zh: "已收起", en: "Collapsed", de: "Geschlossen", es: "Contraído", pt: "Recolhido",
-            fr: "Replié", ja: "折りたたみ", ko: "접힘", it: "Chiuso"
-        )
-    }
-
-    private func targetAccessibilityLabel(_ target: HomeToolbarQuickRecordTarget) -> String {
-        let kind = switch target.kind {
-        case .human:
-            localization.tr(
-                zh: "人类", en: "Person", de: "Person", es: "Persona", pt: "Pessoa",
-                fr: "Personne", ja: "人", ko: "사람", it: "Persona"
-            )
-        case .pet:
-            localization.tr(
-                zh: "宠物", en: "Pet", de: "Haustier", es: "Mascota", pt: "Pet",
-                fr: "Animal", ja: "ペット", ko: "반려동물", it: "Animale"
-            )
-        case .plant:
-            localization.tr(
-                zh: "植物", en: "Plant", de: "Pflanze", es: "Planta", pt: "Planta",
-                fr: "Plante", ja: "植物", ko: "식물", it: "Pianta"
-            )
-        }
-        return "\(kind): \(target.name)"
-    }
-
-    private func targetTint(_ kind: HomeToolbarQuickRecordTarget.Kind) -> Color {
-        switch kind {
-        case .human: Color.goPurple
-        case .pet: Color.goOrange
-        case .plant: Color.goTeal
-        }
-    }
-}
-
-private struct HomeQuickRecordPopoutItem: Identifiable {
-    let id: String
-    let title: String
-    let icon: String
-    let tint: Color
-    let accessibilityLabel: String
-    let accessibilityIdentifier: String
-    let intent: HomeQuickRecordPopoutIntent
-}
-
-private enum HomeQuickRecordPopoutIntent {
-    case back
-    case target(String)
-    case action(String)
-    case option(String)
-}
-
-private struct HomeQuickRecordPopoutItemButton: View {
-    let item: HomeQuickRecordPopoutItem
-    let usesLiquidGlass: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                titleSurface
-                iconSurface
-            }
-            .frame(minHeight: HomeFabShortcutHitAreaPolicy.minimumHitSize)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle(triggersHaptic: false))
-        .accessibilityLabel(item.accessibilityLabel)
-        .accessibilityIdentifier(item.accessibilityIdentifier)
-    }
-
-    @ViewBuilder
-    private var titleSurface: some View {
-        let title = Text(item.title)
-            .font(OhanaFont.callout(.black))
-            .foregroundStyle(Color.ohanaPrimaryText)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .frame(maxWidth: 190)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 8)
-
-        if #available(iOS 26.0, *), usesLiquidGlass {
-            title
-                .glassEffect(.regular.interactive(), in: Capsule())
-        } else {
-            title
-                .background(Color.ohanaCardSurfaceElevated, in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(Color.ohanaCardStroke, lineWidth: 1)
-                }
-        }
-    }
-
-    @ViewBuilder
-    private var iconSurface: some View {
-        let icon = Image(systemName: item.icon)
-            .font(.system(size: 17, weight: .black)) // a11y: allow fixed glyph inside 44pt floating Button; the Button exposes its text label.
-            .symbolRenderingMode(.monochrome)
-            .foregroundStyle(item.tint)
-            .frame(
-                width: HomeFabShortcutHitAreaPolicy.minimumHitSize,
-                height: HomeFabShortcutHitAreaPolicy.minimumHitSize
-            )
-
-        if #available(iOS 26.0, *), usesLiquidGlass {
-            icon
-                .glassEffect(.regular.tint(item.tint.opacity(0.16)).interactive(), in: Circle())
-        } else {
-            icon
-                .background(Color.ohanaCardSurfaceElevated, in: Circle())
-                .overlay {
-                    Circle().strokeBorder(item.tint.opacity(0.34), lineWidth: 1)
-                }
-        }
+enum HomeNativeQuickRecordPolicy {
+    /// Plant logging has one intent; member logging still needs an action choice.
+    static func singleDirectTarget(_ targets: [HomeToolbarQuickRecordTarget]) -> HomeToolbarQuickRecordTarget? {
+        guard targets.count == 1, let target = targets.first, target.kind == .plant else { return nil }
+        return target
     }
 }
 

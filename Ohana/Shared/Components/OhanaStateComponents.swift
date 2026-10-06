@@ -170,6 +170,11 @@ enum OhanaFeedbackStateKind: Equatable, Sendable {
 
 /// Shared empty/loading/error/offline/success surface. Copy remains owned by
 /// the caller so localization and feature meaning stay explicit.
+enum OhanaFeedbackLayout: Equatable, Sendable {
+    case page
+    case compact
+}
+
 struct OhanaFeedbackState: View {
     let state: OhanaFeedbackStateKind
     let title: String
@@ -177,37 +182,36 @@ struct OhanaFeedbackState: View {
     var actionLabel: String?
     var accessibilityIdentifier: String?
     var action: (() -> Void)?
+    var layout: OhanaFeedbackLayout = .page
 
     private var palette: OhanaStatusPalette { state.palette }
 
     var body: some View {
-        VStack(spacing: 16) {
-            stateIcon
-
-            VStack(spacing: 8) {
-                Text(title)
-                    .font(OhanaFont.title3(.bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                Text(message)
-                    .font(OhanaFont.callout())
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
+        Group {
+            if layout == .compact {
+                HStack(alignment: .top, spacing: OhanaSpacing.row) {
+                    stateIcon
+                    VStack(alignment: .leading, spacing: OhanaSpacing.related) {
+                        copy
+                        if let actionLabel { feedbackAction(label: actionLabel) }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.vertical, OhanaSpacing.row)
+            } else {
+                VStack(spacing: 16) {
+                    stateIcon
+                    copy
+                    if let actionLabel { feedbackAction(label: actionLabel) }
+                }
+                .padding(24)
+                .frame(maxWidth: .infinity, minHeight: 240)
+                .background(palette.background, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
+                        .strokeBorder(palette.border, lineWidth: 1)
+                }
             }
-
-            if let actionLabel {
-                feedbackAction(label: actionLabel)
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, minHeight: 240)
-        .background(palette.background, in: RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: OhanaRadius.cardLarge, style: .continuous)
-                .strokeBorder(palette.border, lineWidth: 1)
         }
         .accessibilityElement(children: .contain)
         .if(accessibilityIdentifier != nil) { view in
@@ -215,12 +219,33 @@ struct OhanaFeedbackState: View {
         }
     }
 
+    private var copy: some View {
+        VStack(alignment: layout == .compact ? .leading : .center, spacing: 4) {
+            Text(title)
+                .font(OhanaFont.headline())
+                .foregroundStyle(Color.ohanaPrimaryText)
+            if !message.isEmpty {
+                Text(message)
+                    .font(OhanaFont.subheadline())
+                    .foregroundStyle(Color.ohanaSecondaryText)
+            }
+        }
+        .multilineTextAlignment(layout == .compact ? .leading : .center)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
     @ViewBuilder private var stateIcon: some View {
         if state == .loading {
             ProgressView()
-                .controlSize(.large)
+                .controlSize(layout == .compact ? .regular : .large)
                 .tint(palette.icon)
-                .frame(width: 56, height: 56)
+                .frame(width: layout == .compact ? 24 : 56, height: layout == .compact ? 24 : 56)
+                .accessibilityHidden(true)
+        } else if layout == .compact {
+            Image(systemName: state.systemImage)
+                .font(OhanaFont.headline())
+                .foregroundStyle(palette.text)
+                .frame(width: 24, height: 24) // a11y: allow decorative state icon; adjacent text provides meaning.
                 .accessibilityHidden(true)
         } else {
             Image(systemName: state.systemImage)

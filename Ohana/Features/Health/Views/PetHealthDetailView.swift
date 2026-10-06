@@ -680,7 +680,7 @@ struct PetHealthDetailContentView: View {
                     }
                     healthDashboardCards
                     recentActivityCard
-                    Spacer(minLength: 108)
+                    Spacer(minLength: 24)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -694,23 +694,16 @@ struct PetHealthDetailContentView: View {
                 refreshHealthAlerts()
             }
 
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    if healthPlusDestination == nil, !showingMedicationPopup {
-                        healthAddMenu
-                            .padding(.trailing, 18)
-                            .padding(.bottom, 24)
-                    }
-                }
-            }
-            .zIndex(12)
         }
-        .navigationTitle("")
+        .navigationTitle(l.tr(zh: "健康护理", en: "Health care", de: "Gesundheitspflege"))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) { healthAddMenu }
+            if isModal {
+                OhanaModalToolbar(onClose: { if let onFullDismiss { onFullDismiss() } else { dismiss() } }, closeIdentifier: "pet-health-detail-close-action")
+            }
+        }
         .sheet(item: sheetHealthPlusDestination) { dest in
             switch dest {
             case .guided, .direct:

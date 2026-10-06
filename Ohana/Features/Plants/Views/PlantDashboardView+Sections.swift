@@ -34,12 +34,12 @@ extension PlantDashboardView {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "我的植物", en: "My Plants", de: "Meine Pflanzen"))
-                        .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
                     Text(plantCollectionSummaryLine)
-                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -75,7 +75,7 @@ extension PlantDashboardView {
                 .padding(4)
             } else {
                 Image(systemName: "person.crop.circle.fill") // a11y: allow decorative empty library avatar; surrounding header labels the plant library.
-                    .font(OhanaFont.adaptive(size: 36, weight: .black))
+                    .font(OhanaFont.adaptive(size: 36, weight: .semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .accessibilityHidden(true)
             }
@@ -138,7 +138,7 @@ extension PlantDashboardView {
         Button(action: action) {
             Image(systemName: icon) // a11y: allow decorative header glyph; button label names the command.
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 44, height: 44)
                 .background(fill ?? Color.clear, in: Circle())
@@ -166,7 +166,7 @@ extension PlantDashboardView {
                     }
                 } label: {
                     Text(mode.title(l))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(selectedDashboardMode == mode ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .frame(minWidth: 86)
                         .frame(height: 44)
@@ -207,22 +207,22 @@ extension PlantDashboardView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 24, height: 24) // a11y: allow non-interactive metric glyph; metric text provides the accessible value.
                 .accessibilityHidden(true)
             Text(value)
-                .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 21, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.75)
             Text(detail)
-                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default))
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -288,11 +288,11 @@ extension PlantDashboardView {
         Button(action: action) {
             VStack(alignment: .leading, spacing: 5) {
                 Image(systemName: icon) // a11y: allow decorative quick-action glyph; button text names the action.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(tint)
                     .accessibilityHidden(true)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
@@ -319,18 +319,18 @@ extension PlantDashboardView {
     func nextCareStrip(_ task: PlantCareTaskSnapshot) -> some View {
         HStack(spacing: 10) {
             Image(systemName: careSymbol(for: task.careType))
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(careTint(for: task.careType))
                 .frame(width: 30, height: 30) // a11y: allow non-interactive next-care glyph; adjacent text names the task.
                 .background(careTint(for: task.careType).opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "下一项照护", en: "Next care", de: "Nächste Pflege"))
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
                 Text("\(task.title) · \(dueText(for: task))")
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -395,7 +395,7 @@ extension PlantDashboardView {
 
     var sitesModeHeader: some View {
         Text(l.tr(zh: "位置", en: "Sites", de: "Orte"))
-            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryText)
             .lineLimit(1)
         .accessibilityIdentifier("plant-dashboard-sites-header")
@@ -407,7 +407,7 @@ extension PlantDashboardView {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: dueTasks.isEmpty ? "checkmark.seal.fill" : "calendar.badge.clock")
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                     .foregroundStyle(plantsModeBannerForeground)
                     .frame(width: 44, height: 44)
                     .background(Color.arkInk.opacity(0.08), in: Circle())
@@ -415,12 +415,12 @@ extension PlantDashboardView {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(plantsModeBannerTitle)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(plantsModeBannerForeground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
                     Text(plantsModeBannerSubtitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(plantsModeBannerForeground)
                         .lineLimit(2)
                 }
@@ -428,7 +428,7 @@ extension PlantDashboardView {
                 Spacer(minLength: 8)
 
                 Image(systemName: "arrow.right") // a11y: allow decorative banner navigation glyph; the button has a full label.
-                    .font(OhanaFont.adaptive(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                     .foregroundStyle(plantsModeBannerForeground)
                     .frame(width: 44, height: 44)
                     .accessibilityHidden(true)
@@ -504,7 +504,7 @@ extension PlantDashboardView {
                 Spacer()
                 HStack(spacing: 12) {
                     Image(systemName: "checkmark.seal.fill") // a11y: allow decorative glyph; adjacent text names the completed batch.
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                         .frame(width: 44, height: 44)
                         .background(Color.goPrimary.opacity(0.16), in: Circle())
@@ -516,7 +516,7 @@ extension PlantDashboardView {
                             en: "Completed \(token.items.count) care tasks",
                             de: "\(token.items.count) Pflegeaufgaben erledigt"
                         ))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
 
                         Text(l.tr(
@@ -524,7 +524,7 @@ extension PlantDashboardView {
                             en: "Undo within 6 seconds; rewards settle after the window.",
                             de: "6 Sekunden widerrufbar; Belohnungen folgen danach."
                         ))
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                     }
@@ -534,7 +534,7 @@ extension PlantDashboardView {
                     Button(l.tr(zh: "撤销", en: "Undo", de: "Widerrufen")) {
                         undoPendingBatchCare()
                     }
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goPrimary)
                     .frame(minWidth: 44, minHeight: 44)
                     .accessibilityIdentifier("plant-batch-care-undo")
@@ -543,7 +543,7 @@ extension PlantDashboardView {
                         let feature = token.items.first.map { careAggregateFeature(for: $0.careType) }
                         openCareAggregate(feature)
                     }
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(minWidth: 50, minHeight: 44)
                     .background(Color.goPrimary, in: Capsule())
@@ -576,14 +576,14 @@ extension PlantDashboardView {
                     .foregroundStyle(Color.goPrimary)
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "今日与未来 7 天", en: "Today and next 7 days", de: "Heute und die nächsten 7 Tage"))
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
 
                 Button(l.tr(zh: "统计", en: "Stats", de: "Statistik")) {
                     openCareAggregate()
                 }
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 11)
                 .frame(minHeight: 34)
@@ -597,7 +597,7 @@ extension PlantDashboardView {
                         showingCarePlanSheet = true
                     } label: {
                         Text(l.tr(zh: "全部", en: "All", de: "Alle"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 11)
                             .frame(minHeight: 34)
@@ -615,7 +615,7 @@ extension PlantDashboardView {
                     en: "No plant tasks in the next 7 days",
                     de: "Keine Pflanzenaufgaben in den nächsten 7 Tagen"
                 ))
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             } else {
                 VStack(spacing: 8) {
@@ -629,7 +629,7 @@ extension PlantDashboardView {
                         Button(l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen")) {
                             completeDueTasks()
                         }
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -639,7 +639,7 @@ extension PlantDashboardView {
                         Button(l.tr(zh: "全部延后一天", en: "Defer all one day", de: "Alle um einen Tag verschieben")) {
                             deferDueTasksOneDay()
                         }
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
@@ -662,7 +662,7 @@ extension PlantDashboardView {
                         selectedFilter = filter
                     } label: {
                         Text(filter.title(l))
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                             .foregroundStyle(selectedFilter == filter ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 8)
@@ -683,18 +683,18 @@ extension PlantDashboardView {
 
         return HStack(spacing: 10) {
             Image(systemName: careSymbol(for: task.careType))
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(careTint(for: task.careType))
                 .frame(width: 34, height: 34) // a11y: allow non-interactive care glyph; completion button is the hit target.
                 .background(careTint(for: task.careType).opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(task.subtitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }

@@ -89,7 +89,7 @@ extension MemberCardCreationContentView {
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(l.tr(zh: "物种", en: "Species", de: "Art"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(cardSecondaryForeground)
 
                 LazyVGrid(columns: petSpeciesGridColumns, spacing: 7) {
@@ -156,7 +156,7 @@ extension MemberCardCreationContentView {
         ) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(l.tr(zh: "性别（必填）", en: "Sex (required)", de: "Geschlecht (Pflicht)"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(cardSecondaryForeground)
                 compactGenderIconRow(
                     options: petGenderOptions,
@@ -207,7 +207,7 @@ extension MemberCardCreationContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Label(l.tr(zh: "头像", en: "Avatar", de: "Avatar"), systemImage: "sparkles")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(cardForeground)
                 Spacer()
                 avatar2DToggleButton
@@ -243,7 +243,7 @@ extension MemberCardCreationContentView {
             )
         ) {
             Label("2.5D", systemImage: "wand.and.stars")
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
             }
         .toggleStyle(.button)
         .buttonStyle(.bordered)
@@ -269,7 +269,7 @@ extension MemberCardCreationContentView {
             ) {
                 VStack(alignment: .leading, spacing: 7) {
                 Text("\(draft.personalityTagIds.count)/3")
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(cardForeground)
                     .frame(maxWidth: .infinity, alignment: .trailing)
                     .contentTransition(.numericText())
@@ -295,14 +295,14 @@ extension MemberCardCreationContentView {
                         } label: {
                             HStack(spacing: 3) {
                                 Text(personalityLabel(id))
-                                    .font(OhanaFont.caption2(.black))
+                                    .font(OhanaFont.caption2(.semibold))
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.64)
                                     .multilineTextAlignment(.center)
                                     .frame(maxWidth: .infinity, alignment: .center)
                                 if isSelected {
                                     Image(systemName: "checkmark") // a11y: allow decorative selected-state mark; the button exposes a selected value.
-                                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                                         .accessibilityHidden(true)
                                 }
                             }
@@ -358,7 +358,7 @@ extension MemberCardCreationContentView {
                                 }
                             } label: {
                                 Text(l.tr(zh: "恢复自动", en: "Use automatic", de: "Automatisch"))
-                                    .font(OhanaFont.caption2(.black))
+                                    .font(OhanaFont.caption2(.semibold))
                                     .foregroundStyle(cardForeground)
                             }
                             .buttonStyle(.plain)
@@ -620,7 +620,7 @@ extension MemberCardCreationContentView {
                     }
                 if isSelected {
                     Image(systemName: "checkmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: dotSize < 28 ? 10 : 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: dotSize < 28 ? 10 : 12, weight: .semibold))
                         .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: option.hex) ? Color.arkInk : Color.goCardWhite)
                 }
             }

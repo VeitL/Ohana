@@ -9,6 +9,8 @@ import SwiftData
 import SwiftUI
 
 struct AchievementWallView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
     @Environment(\.modelContext) private var modelContext
     @Environment(AppServices.self) private var appServices
     @State private var routeData = AchievementWallRouteData()
@@ -17,6 +19,7 @@ struct AchievementWallView: View {
     @State private var dataLoadTask: Task<Void, Never>?
 
     let pet: Pet
+    var showsCloseButton = true
     var allPets: [Pet] = []
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
@@ -25,6 +28,7 @@ struct AchievementWallView: View {
             if routeData.hasLoaded {
                 AchievementWallContentView(
                     pet: pet,
+                    showsCloseButton: false,
                     allPets: allPets,
                     onPresentCoconutLog: onPresentCoconutLog,
                     electronicPets: routeData.electronicPets,
@@ -53,6 +57,11 @@ struct AchievementWallView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(OhanaAppBackground())
             }
+        }
+        .navigationTitle(L10n(appLanguage).tr(zh: "成就解锁", en: "Badges", de: "Abzeichen"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }) }
         }
         .onAppear {
             scheduleRouteDataLoad()

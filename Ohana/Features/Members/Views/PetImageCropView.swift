@@ -59,7 +59,7 @@ struct PetImageCropView: View {
                 VStack {
                     Spacer()
                     Label(l.tr(zh: "头像取景", en: "Avatar crop", de: "Avatar zuschneiden"), systemImage: "crop")
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.goCardWhite.opacity(0.5))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -195,7 +195,7 @@ struct PetImageCropView: View {
         HStack(spacing: 12) {
             Button { onCrop(nil) } label: {
                 Text(l.cancel)
-                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goCardWhite.opacity(0.75))
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 50)
@@ -205,7 +205,7 @@ struct PetImageCropView: View {
 
             Button { performCrop() } label: {
                 Text(l.tr(zh: "确认裁剪", en: "Crop", de: "Zuschneiden"))
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(minHeight: 50)

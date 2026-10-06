@@ -11,7 +11,7 @@ extension FamilyCollaborationDashboardView {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "person.2.badge.gearshape.fill") // a11y: allow decorative section icon hidden below
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -19,7 +19,7 @@ extension FamilyCollaborationDashboardView {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "本机家庭分工", en: "On-device household tasks", de: "Familienaufgaben auf diesem Gerät"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
                         zh: "本机归属，不发送远程通知",
@@ -40,7 +40,7 @@ extension FamilyCollaborationDashboardView {
                         .font(OhanaFont.caption2(.bold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(currentHuman?.name ?? l.tr(zh: "未选择", en: "Not selected", de: "Nicht ausgewählt"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                 }
@@ -48,7 +48,7 @@ extension FamilyCollaborationDashboardView {
                 Spacer(minLength: 8)
 
                 Label("\(max(0, currentHuman?.coconutBalance ?? 0))", systemImage: "wallet.bifold.fill")
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -67,7 +67,7 @@ extension FamilyCollaborationDashboardView {
                     l.tr(zh: "发布任务", en: "Post task", de: "Aufgabe erstellen"),
                     systemImage: "plus.circle.fill"
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 44)
             }
             .ohanaPrimaryProminentButton()
@@ -121,7 +121,7 @@ extension FamilyCollaborationDashboardView {
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text("\(value)")
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .monospacedDigit()
             Text(title)
@@ -162,7 +162,7 @@ extension FamilyCollaborationDashboardView {
                     Button(l.tr(zh: "全部", en: "All", de: "Alle")) {
                         openMoreCollaboration()
                     }
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                 }
             }
         ) {
@@ -207,7 +207,7 @@ extension FamilyCollaborationDashboardView {
                     .frame(width: 28)
                     .accessibilityHidden(true)
                 Text(title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 8)
@@ -254,7 +254,7 @@ extension FamilyCollaborationDashboardView {
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "今日协作", en: "Today care", de: "Pflege heute"))
-                        .font(OhanaFont.title2(.black))
+                        .font(OhanaFont.title2(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     if openFocusCount > 0 {
                         Text(l.tr(zh: "\(openFocusCount) 个待处理", en: "\(openFocusCount) remaining", de: "\(openFocusCount) offen"))
@@ -264,7 +264,7 @@ extension FamilyCollaborationDashboardView {
                 }
                 Spacer()
                 Text("\(Int(boardProgress * 100))%")
-                    .font(OhanaFont.metric(size: 28, .black))
+                    .font(OhanaFont.metric(size: 28, .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .contentTransition(.numericText())
             }
@@ -398,7 +398,7 @@ extension FamilyCollaborationDashboardView {
                     RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                         .fill(tint.opacity(0.16))
                     Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tint)
                 }
                 .frame(width: 48, height: 48)
@@ -406,10 +406,10 @@ extension FamilyCollaborationDashboardView {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
                         Text(title)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("\(count)")
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(tintForeground)
                             .monospacedDigit()
                             .padding(.horizontal, 7)
@@ -427,7 +427,7 @@ extension FamilyCollaborationDashboardView {
                 Spacer(minLength: 6)
 
                 Text(actionTitle)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -517,7 +517,7 @@ extension FamilyCollaborationDashboardView {
                     presentEditor(.create)
                 } label: {
                     Label(l.tr(zh: "发布", en: "Post", de: "Erstellen"), systemImage: "plus")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
@@ -547,16 +547,16 @@ extension FamilyCollaborationDashboardView {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "ellipsis.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "更多协作", en: "More collaboration", de: "Mehr Zusammenarbeit"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
                 Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
@@ -572,13 +572,13 @@ extension FamilyCollaborationDashboardView {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "chart.bar.doc.horizontal") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goPrimary, in: Circle())
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "家庭周报", en: "Family weekly report", de: "Familien-Wochenbericht"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "看本周分工和贡献", en: "Review this week's contribution", de: "Diese Woche ansehen"))
                             .font(OhanaFont.caption2(.bold))
@@ -616,7 +616,7 @@ extension FamilyCollaborationDashboardView {
                         dismissMoreCollaboration(then: .presentEditor(.create))
                     } label: {
                         Label(l.tr(zh: "发布", en: "Post", de: "Erstellen"), systemImage: "plus")
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)

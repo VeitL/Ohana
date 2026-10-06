@@ -7,30 +7,15 @@ extension QuickFeedDetailContent {
     var manualFeedSheet: some View {
         let isSettingsOnly = draftStore.manualFeedSheetMode == .settingsOnly
         let nextReminder = overviewSnapshot.nextPendingManualReminder
-        let isPlannedCompletion = !isSettingsOnly && nextReminder != nil
         let latestManualLogDate = Date()
         return ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                sheetHero(icon: "fork.knife.circle.fill", title: manualFeedSheetTitle, tint: mainFoodTint)
                 if !isSettingsOnly, let reminder = nextReminder {
                     plannedReminderBanner(reminder)
                 }
-                if !isSettingsOnly {
-                    actionHumanPicker
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+                Text(pet.name).font(.headline)
                 if isSettingsOnly || nextReminder == nil {
                     manualFoodKindSelector
-                }
-                if !isSettingsOnly, nextReminder == nil, sameSpeciesFeedPets.count > 1 {
-                    SharedCareTargetPicker(
-                        title: l.tr(zh: "共同照护", en: "Shared care", de: "Gemeinsam"),
-                        subtitle: "\(selectedFeedTargets.count)只\(pet.species)",
-                        pets: sameSpeciesFeedPets,
-                        selectedPetIds: $draftStore.selectedSharedFeedPetIds,
-                        tint: mainFoodTint,
-                        fixedPetId: pet.id
-                    )
                 }
                 manualGramInput(
                     title: l.tr(zh: "克数", en: "Grams", de: "Gramm"),
@@ -40,47 +25,42 @@ extension QuickFeedDetailContent {
                     quickValues: quickMainGramOptions
                 )
                 if !isSettingsOnly, nextReminder == nil {
-                    manualFeedDatePicker(latestDate: latestManualLogDate)
+                    manualDefaultToggle
                 }
                 if !isSettingsOnly {
-                    manualDefaultToggle
+                    DisclosureGroup(PetCareExperienceCopy(l: l).moreOptions, isExpanded: $draftStore.manualMoreOptionsExpanded) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            actionHumanPicker
+                            if nextReminder == nil {
+                                manualFeedDatePicker(latestDate: latestManualLogDate)
+                                TextField(PetCareExperienceCopy(l: l).note, text: $draftStore.manualNote, axis: .vertical)
+                                    .textFieldStyle(.roundedBorder)
+                                if sameSpeciesFeedPets.count > 1 {
+                                    SharedCareTargetPicker(
+                                        title: PetCareExperienceCopy(l: l).sharedCare,
+                                        subtitle: "\(selectedFeedTargets.count) · \(pet.name)",
+                                        pets: sameSpeciesFeedPets,
+                                        selectedPetIds: $draftStore.selectedSharedFeedPetIds,
+                                        tint: mainFoodTint,
+                                        fixedPetId: pet.id
+                                    )
+                                }
+                            }
+                        }.padding(.top, 12)
+                    }
                 }
 
                 if let inputError = draftStore.inputError {
                     errorText(inputError)
                 }
 
-                FoodPrimaryButton(
-                    title: isSettingsOnly
-                        ? l.tr(zh: "确认", en: "Confirm", de: "Bestätigen")
-                        : (isPlannedCompletion ? l.tr(zh: "完成计划餐", en: "Complete planned meal", de: "Planmahlzeit erledigen") : l.tr(zh: "完成打卡", en: "Log feeding", de: "Eintragen")),
-                    icon: isSettingsOnly ? "checkmark" : "checkmark.circle.fill",
-                    tint: mainFoodTint
-                ) {
-                    if isSettingsOnly {
-                        saveManualFeedSettings()
-                    } else if nextReminder == nil {
-                        commitManualFeed()
-                    } else {
-                        completeNextPlannedFeed()
-                    }
-                }
-                .accessibilityIdentifier(isSettingsOnly
-                    ? "quick-feed-manual-settings-save"
-                    : (isPlannedCompletion ? "quick-feed-planned-complete" : "quick-feed-manual-log-save"))
+
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
             .padding(.bottom, 24)
-            .ohanaAdaptiveSheetContentHeight(
-                adaptiveSheetHeightBinding,
-                minHeight: 310,
-                maxHeight: 560,
-                chromePadding: 66
-            )
         }
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle("")
     }
 
     var manualFeedSheetTitle: String {
@@ -97,7 +77,7 @@ extension QuickFeedDetailContent {
                 in: ...latestDate,
                 displayedComponents: [.date, .hourAndMinute]
             )
-            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryText)
             .tint(mainFoodTint)
             .accessibilityIdentifier("quick-feed-manual-log-date")
@@ -137,7 +117,7 @@ extension QuickFeedDetailContent {
                 draftStore.manualFeedDate = min(targetDate, latestDate)
             } label: {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity, minHeight: 32)
                     .background(mainFoodTint, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -150,7 +130,6 @@ extension QuickFeedDetailContent {
     var treatFeedSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                sheetHero(icon: "birthday.cake.fill", title: l.tr(zh: "记录零食", en: "Log treats", de: "Snack eintragen"), tint: treatTint)
                 actionHumanPicker
                     .frame(maxWidth: .infinity, alignment: .leading)
                 treatKindPicker(selection: $draftStore.selectedTreatKind)
@@ -164,19 +143,10 @@ extension QuickFeedDetailContent {
                 if let inputError = draftStore.inputError {
                     errorText(inputError)
                 }
-                FoodPrimaryButton(title: l.tr(zh: "保存零食", en: "Save treat", de: "Snack speichern"), icon: "checkmark", tint: treatTint) {
-                    commitTreatFeed()
-                }
+
             }
             .padding(20)
-            .ohanaAdaptiveSheetContentHeight(
-                adaptiveSheetHeightBinding,
-                minHeight: 330,
-                maxHeight: 560,
-                chromePadding: 66
-            )
         }
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle(l.tr(zh: "零食", en: "Treats", de: "Snacks"))
     }
 }

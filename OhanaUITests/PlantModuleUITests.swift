@@ -48,6 +48,7 @@ final class PlantModuleUITests: XCTestCase {
         openCalendarAndAssertPlantVisible(named: plantName, in: app)
 
         openPlantDetail(named: plantName, in: app)
+        XCTAssertTrue(app.buttons["plant-detail-enable-watering-reminder"].waitForExistence(timeout: 8), "A new plant should offer an optional watering reminder after saving.")
         exercisePlantDetailCareAndDeleteUndo(named: plantName, in: app)
         returnFromPlantDetailToHome(in: app)
 
@@ -79,6 +80,8 @@ final class PlantModuleUITests: XCTestCase {
         relaunchWithoutResetToHome(in: app)
         openHomePlantsTabAfterUnlock(in: app)
         assertHomePlantCard(named: plantName, in: app)
+        openPlantDetail(named: plantName, in: app)
+        XCTAssertTrue(app.buttons["plant-detail-enable-watering-reminder"].waitForExistence(timeout: 8), "Skipping reminders at creation should persist after relaunch.")
     }
 
     @MainActor
@@ -758,13 +761,17 @@ final class PlantModuleUITests: XCTestCase {
             "Plant catalog choice \(catalogID) did not become tappable."
         )
 
+        let nextAction = app.buttons["add-plant-next-action"]
+        XCTAssertTrue(tapWhenSemanticallyHittable(nextAction, timeout: 8), "Add Plant did not advance after selecting a species.")
+        XCTAssertTrue(app.descendants(matching: .any)["add-plant-step-confirm"].waitForExistence(timeout: 8), "Add Plant did not advance to the details step.")
+
         let defaultName = app.staticTexts["add-plant-name-summary-secondary-value"]
         XCTAssertTrue(defaultName.waitForExistence(timeout: 8), "Catalog choice did not expose the default plant name summary.")
         XCTAssertTrue(
             defaultName.label.localizedCaseInsensitiveContains(expectedPlantName),
             "Catalog choice should default the plant name without typing. Current value: \(defaultName.label)"
         )
-        assertAddPlantPrimaryPathKeepsCustomTextFieldsHidden(in: app, context: "after catalog selection")
+        assertAddPlantPrimaryPathKeepsCustomTextFieldsHidden(in: app, context: "on the details step")
 
         let roomChoice = app.buttons["add-plant-room-choice-0"]
         scrollToElement(roomChoice, in: app, maxSwipes: 3)
@@ -775,25 +782,6 @@ final class PlantModuleUITests: XCTestCase {
         scrollToElement(locationChoice, in: app, maxSwipes: 3)
         tapWhenSemanticallyHittable(locationChoice, timeout: 8)
         assertAddPlantPrimaryPathKeepsCustomTextFieldsHidden(in: app, context: "after location chip selection")
-
-        let nextAction = app.buttons["add-plant-next-action"]
-        XCTAssertTrue(
-            tapWhenSemanticallyHittable(nextAction, timeout: 8),
-            "Add Plant next action did not become semantically tappable after choosing plant and room. \(elementDebugState(nextAction))"
-        )
-        XCTAssertTrue(app.descendants(matching: .any)["add-plant-step-avatar"].waitForExistence(timeout: 8), "Add Plant did not advance to the avatar step.")
-
-        XCTAssertTrue(
-            tapWhenSemanticallyHittable(nextAction, timeout: 8),
-            "Add Plant next action did not become semantically tappable on the avatar step. \(elementDebugState(nextAction))"
-        )
-        XCTAssertTrue(app.descendants(matching: .any)["add-plant-step-care-details"].waitForExistence(timeout: 8), "Add Plant did not advance to the care details step.")
-
-        XCTAssertTrue(
-            tapWhenSemanticallyHittable(nextAction, timeout: 8),
-            "Add Plant next action did not become semantically tappable on the care details step. \(elementDebugState(nextAction))"
-        )
-        XCTAssertTrue(app.descendants(matching: .any)["add-plant-step-confirm"].waitForExistence(timeout: 8), "Add Plant did not advance to the confirmation step.")
 
         let saveAction = app.buttons["add-plant-save-action"]
         XCTAssertTrue(

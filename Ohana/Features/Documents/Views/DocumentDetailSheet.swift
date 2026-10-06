@@ -11,7 +11,7 @@ import SwiftUI
 struct DocumentDetailSheet: View {
     let doc: PetDocument
     let pet: Pet
-    let onEdit: () -> Void
+    @State private var showsEditor = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -115,9 +115,20 @@ struct DocumentDetailSheet: View {
                 .padding(.top, 18)
             }
 
-            if let previewImageData {
-                imagePreview(previewImageData)
-                    .zIndex(20)
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showsEditor) {
+            ProtectionDocumentPopup(pet: pet, existing: doc) { showsEditor = false }
+        }
+        .sheet(isPresented: Binding(get: { previewImageData != nil }, set: { if !$0 { previewImageData = nil } })) {
+            NavigationStack {
+                if let previewImageData {
+                    imagePreview(previewImageData)
+                        .navigationTitle(l.tr(zh: "附件", en: "Attachment", de: "Anhang"))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { OhanaModalToolbar(onClose: dismissPreview) }
+                }
             }
         }
         .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: $showingDeleteAlert) {
@@ -154,7 +165,7 @@ struct DocumentDetailSheet: View {
                 .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -163,15 +174,7 @@ struct DocumentDetailSheet: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+
         }
     }
 
@@ -186,7 +189,7 @@ struct DocumentDetailSheet: View {
     private func metric(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(value)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -217,7 +220,7 @@ struct DocumentDetailSheet: View {
     private func detailRow(icon: String, label: String, value: String, tint: Color = Color.ohanaPrimaryText) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 24)
             Text(label)
@@ -225,7 +228,7 @@ struct DocumentDetailSheet: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer(minLength: 12)
             Text(value)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(tint)
                 .multilineTextAlignment(.trailing)
         }
@@ -238,7 +241,7 @@ struct DocumentDetailSheet: View {
         if !imageAttachmentItems.isEmpty || !fileAttachmentItems.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 Text(l.tr(zh: "附件", en: "Attachments", de: "Anhänge"))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 if !imageAttachmentItems.isEmpty {
@@ -254,7 +257,7 @@ struct DocumentDetailSheet: View {
                 ForEach(fileAttachmentItems) { attachment in
                     HStack(spacing: 12) {
                         Image(systemName: "doc.fill") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                         Text(attachment.name)
                             .font(OhanaFont.caption(.bold))
@@ -272,13 +275,10 @@ struct DocumentDetailSheet: View {
     private var actionRow: some View {
         HStack(spacing: 10) {
             Button {
-                dismiss()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.24) {
-                    onEdit()
-                }
+                showsEditor = true
             } label: {
                 Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity)
                     .frame(height: 48)
@@ -290,7 +290,7 @@ struct DocumentDetailSheet: View {
                 showingDeleteAlert = true
             } label: {
                 Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed)
                     .frame(width: 52, height: 48)
                     .background(Color.ohanaCardSurface, in: Capsule())
@@ -320,27 +320,12 @@ struct DocumentDetailSheet: View {
                     .tint(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
-            VStack {
-                HStack {
-                    Spacer()
-                    Button { dismissPreview() } label: {
-                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(16)
-                }
-                Spacer()
-            }
+
         }
     }
 
     private func dismissPreview() {
-        withAnimation(GoMotion.page) {
-            previewImageData = nil
-        }
+        previewImageData = nil
     }
 }
 

@@ -51,7 +51,7 @@ struct ProTipSection: View {
                 }
 
                 Text(l.petProTipTitle)
-                    .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .default))
                     .foregroundStyle(titleColor)
 
                 Spacer()

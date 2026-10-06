@@ -96,7 +96,7 @@ struct PlantBatchQuickRecordSheet: View {
     private var headerCard: some View {
         HStack(spacing: 12) {
             Image(systemName: careSymbol(for: selectedCareType))
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(careTint(for: selectedCareType))
                 .frame(width: 44, height: 44)
                 .background(careTint(for: selectedCareType).opacity(0.16), in: Circle())
@@ -104,7 +104,7 @@ struct PlantBatchQuickRecordSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(selectedCareType.displayName(l: l))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -127,7 +127,7 @@ struct PlantBatchQuickRecordSheet: View {
     private var typeSelector: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "护理类型", en: "Care type", de: "Pflegetyp"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
 
             categorySelector
@@ -163,10 +163,10 @@ struct PlantBatchQuickRecordSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: category.icon)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(category.shortTitle(l: l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -193,7 +193,7 @@ struct PlantBatchQuickRecordSheet: View {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Label(type.displayName(l: l), systemImage: careSymbol(for: type))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(selectedCareType == type ? careForeground(for: type) : Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
@@ -220,7 +220,7 @@ struct PlantBatchQuickRecordSheet: View {
                 UISelectionFeedbackGenerator().selectionChanged()
             } label: {
                 Label(l.tr(zh: "全选", en: "Select all", de: "Alle wählen"), systemImage: "checkmark.circle.fill")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
@@ -236,7 +236,7 @@ struct PlantBatchQuickRecordSheet: View {
                 UISelectionFeedbackGenerator().selectionChanged()
             } label: {
                 Label(l.tr(zh: "清空", en: "Clear", de: "Leeren"), systemImage: "xmark.circle.fill")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 11)
@@ -276,7 +276,7 @@ struct PlantBatchQuickRecordSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(target.name)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -289,7 +289,7 @@ struct PlantBatchQuickRecordSheet: View {
             Spacer(minLength: 0)
 
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(isSelected ? careTint(for: selectedCareType) : Color.ohanaTertiaryText)
                 .accessibilityHidden(true)
         }
@@ -323,7 +323,7 @@ struct PlantBatchQuickRecordSheet: View {
                     Label(recordTitle, systemImage: "checkmark.circle.fill")
                 }
             }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(careForeground(for: selectedCareType))
                 .lineLimit(2)
                 .multilineTextAlignment(.center)

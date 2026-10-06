@@ -27,7 +27,7 @@ extension TaskCenterRouteContainer {
         NavigationStack {
             Group {
                 if let context, canPresentContext {
-                    FamilyTaskPlanEditorDataContainer(planID: context.task?.planId) { planConfiguration in
+                    FamilyTaskPlanEditorDataContainer(planID: context.task?.planId, onClose: dismissFamilyTaskEditor) { planConfiguration in
                         FamilyTaskEditorPanel(
                             context: context,
                             humans: activeHumans,
@@ -102,9 +102,7 @@ extension TaskCenterRouteContainer {
             .navigationTitle(editorTitle(route))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n.current.cancel, action: dismissFamilyTaskEditor)
-                }
+                if context == nil || !canPresentContext { OhanaModalToolbar(onClose: dismissFamilyTaskEditor, isEditor: true) }
             }
         }
         .presentationDetents([.medium, .large])

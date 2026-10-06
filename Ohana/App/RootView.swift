@@ -126,8 +126,10 @@ struct RootView: View {
 
     private func rootContent(_ experienceController: AppExperienceController) -> some View {
         rootStack(experienceController)
-            .buttonStyle(ScaleButtonStyle())
-            .toggleStyle(OhanaPillToggleStyle())
+            .font(OhanaFont.body())
+            .fontDesign(.rounded)
+            .buttonStyle(.automatic)
+            .toggleStyle(.switch)
             .environment(\.hasSupporterPackEntitlement, appServices.commerce.allows(.supporterAppearance))
             .islandToastOverlay()
             .onAppear {
@@ -302,20 +304,6 @@ struct RootView: View {
                 .zIndex(900)
             }
 
-            if hasOnboarded,
-               experienceController.mode == .standard,
-               experienceController.shouldOfferZenIntroduction {
-                ZStack(alignment: .top) {
-                    Color.clear
-                        .allowsHitTesting(false)
-                    AppExperienceIntroductionBanner(appLanguage: appLanguage) {
-                        experienceController.dismissZenIntroduction()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                }
-                .zIndex(850)
-            }
 
             if shouldShowPrivacySnapshotCover {
                 AppPrivacySnapshotCover()

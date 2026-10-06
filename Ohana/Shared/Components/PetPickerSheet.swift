@@ -52,7 +52,7 @@ struct PetPickerSheet: View {
                         .font(OhanaFont.adaptive(size: 36))
                     VStack(alignment: .leading, spacing: 2) {
                         Text(actionTitle)
-                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "选择一只宠物继续", en: "Choose one pet to continue", de: "Waehle ein Haustier zum Fortfahren"))
                             .font(OhanaFont.adaptive(size: 14, weight: .medium))
@@ -80,7 +80,7 @@ struct PetPickerSheet: View {
 
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(pet.name)
-                                        .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .rounded))
+                                        .font(OhanaFont.adaptive(size: 17, weight: .bold, design: .default))
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                     Text(pet.localizedSpeciesBreedSummary(l: l))
                                         .font(OhanaFont.adaptive(size: 13, weight: .medium))

@@ -80,32 +80,111 @@ extension QuickFeedDetailContent {
 
     func systemFeedSheetContent(_ sheet: ActiveFeedSheet) -> some View {
         NavigationStack {
-            sheetContent(sheet)
+            feedSheetWithEditorChrome(sheet)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .petMemorialTone(isActive: pet.hasPassedAway)
                 .navigationTitle(feedSheetChrome(for: sheet).title)
                 .navigationBarTitleDisplayMode(.inline)
             .feedSheetScrollChrome()
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel) {
-                        closeActiveFeedSheet()
-                    }
-                    .accessibilityIdentifier("quick-feed-sheet-cancel-action")
+                if !sheet.isEditor {
+                    OhanaModalToolbar(
+                        onClose: closeActiveFeedSheet,
+                        closeIdentifier: "quick-feed-sheet-cancel-action"
+                    )
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                         dismissFeedKeyboard()
                     }
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .foregroundStyle(Color.goPrimary)
                 }
             }
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    @ViewBuilder
+    func feedSheetWithEditorChrome(_ sheet: ActiveFeedSheet) -> some View {
+        switch sheet {
+        case .manual, .treat, .stock, .editLog:
+            sheetContent(sheet)
+                .ohanaEditorChrome(
+                    hasChanges: draftStore.initialSheetEditorDraft != feedEditorDraft(sheet),
+                    isSaving: isRecordingFeed,
+                    closeIdentifier: "quick-feed-sheet-cancel-action",
+                    saveIdentifier: feedEditorSaveIdentifier(sheet),
+                    onCancel: {
+                        // Shared stock management fields reflect committed settings after discard.
+                        if sheet == .stock {
+                            draftStore.stockReminderEnabled = pet.foodReminderEnabled
+                            draftStore.stockReminderAdvanceDays = pet.foodReminderAdvanceDays
+                        }
+                        closeActiveFeedSheet()
+                    },
+                    onSave: { submitFeedEditor(sheet) }
+                )
+        default:
+            sheetContent(sheet)
+        }
+    }
+
+    func feedEditorDraft(_ sheet: ActiveFeedSheet) -> [String] {
+        let recorder = selectedActionHumanID?.uuidString ?? ""
+        switch sheet {
+        case .manual:
+            let values = [draftStore.manualFoodKindDraft.rawValue, draftStore.manualGramsText,
+                          draftStore.manualNote, String(draftStore.manualFeedDate.timeIntervalSinceReferenceDate),
+                          String(draftStore.manualDefaultEnabled), String(draftStore.saveManualAsDefault), recorder]
+            return values + draftStore.selectedSharedFeedPetIds.map(\.uuidString).sorted()
+        case .treat:
+            return [draftStore.selectedTreatKind.rawValue, draftStore.treatGramsText, recorder]
+        case .stock:
+            var values = [draftStore.selectedStockFoodKind.rawValue, draftStore.stockBrandText,
+                          draftStore.stockWeightText, draftStore.stockCalculationMode.rawValue]
+            values += [String(draftStore.stockHasPurchaseDate), String(draftStore.stockPurchaseDate.timeIntervalSinceReferenceDate),
+                       String(draftStore.stockHasOpenDate), String(draftStore.stockOpenDate.timeIntervalSinceReferenceDate)]
+            values += [draftStore.stockExpenseAmountText, draftStore.stockExpensePayerId ?? "",
+                       String(draftStore.stockReminderEnabled), String(draftStore.stockReminderAdvanceDays), recorder]
+            return values
+        case .editLog:
+            return [draftStore.editFeedLogGrams, String(draftStore.editFeedLogDate.timeIntervalSinceReferenceDate)]
+        default: return []
+        }
+    }
+
+    func feedEditorSaveIdentifier(_ sheet: ActiveFeedSheet) -> String {
+        switch sheet {
+        case .manual:
+            if draftStore.manualFeedSheetMode == .settingsOnly { return "quick-feed-manual-settings-save" }
+            return overviewSnapshot.nextPendingManualReminder == nil ? "quick-feed-manual-log-save" : "quick-feed-planned-complete"
+        case .treat: return "quick-feed-treat-save"
+        case .stock: return "quick-feed-stock-save"
+        default: return "quick-feed-log-edit-save"
+        }
+    }
+
+    func submitFeedEditor(_ sheet: ActiveFeedSheet) {
+        guard activeSheet == sheet, !draftStore.isSubmittingSheetEditor, !isRecordingFeed else { return }
+        draftStore.isSubmittingSheetEditor = true
+        defer { draftStore.isSubmittingSheetEditor = false }
+        switch sheet {
+        case .manual:
+            if draftStore.manualFeedSheetMode == .settingsOnly {
+                saveManualFeedSettings()
+            } else if overviewSnapshot.nextPendingManualReminder == nil {
+                commitManualFeed()
+            } else {
+                completeNextPlannedFeed()
+            }
+        case .treat: commitTreatFeed()
+        case .stock: saveStock()
+        case .editLog: saveFeedLogEdit()
+        default: break
+        }
     }
 
     func updateInlineKeyboardHeight(_ notification: Notification) {

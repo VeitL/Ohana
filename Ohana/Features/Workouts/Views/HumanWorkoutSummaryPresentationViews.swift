@@ -20,14 +20,14 @@ struct HumanWorkoutAppleHealthBindingCard: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: icon).accessibilityHidden(true)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(tint)
                     .frame(width: 44, height: 44)
                     .background(tint.opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(title)
-                        .font(OhanaFont.headline(.black))
+                        .font(OhanaFont.headline(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(subtitle)
                         .font(OhanaFont.callout(.semibold))
@@ -72,13 +72,13 @@ struct HumanWorkoutAppleHealthBindingCard: View {
                     l.tr(zh: "已绑定到 \(humanName)", en: "Bound to \(humanName)", de: "Mit \(humanName) verbunden"),
                     systemImage: "checkmark.seal.fill"
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.goTeal)
                 Spacer(minLength: 8)
                 Button(l.tr(zh: "解绑", en: "Unbind", de: "Trennen")) {
                     onRequestAction(.unbind)
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.goRed)
                 .frame(minWidth: 44, minHeight: 44)
                 .accessibilityIdentifier("human-workout-apple-health-unbind-action")
@@ -96,7 +96,7 @@ struct HumanWorkoutAppleHealthBindingCard: View {
                 l.tr(zh: "纪念档案不能绑定 Apple Health", en: "Memorial profiles cannot bind Apple Health", de: "Gedenkprofile können nicht mit Apple Health verbunden werden"),
                 systemImage: "lock.fill"
             )
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
@@ -109,7 +109,7 @@ struct HumanWorkoutAppleHealthBindingCard: View {
     ) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 48)
@@ -188,14 +188,14 @@ struct HumanWorkoutSectionHeading: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon).accessibilityHidden(true)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 44, height: 44)
                 .background(Color.goPrimary.opacity(0.14), in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if let subtitle {
                     Text(subtitle)
@@ -234,14 +234,14 @@ struct HumanWorkoutHealthSnapshotCards: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "heart.text.square.fill").accessibilityHidden(true)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary.opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(connectionTitle)
-                        .font(OhanaFont.headline(.black))
+                        .font(OhanaFont.headline(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(connectionSubtitle)
                         .font(OhanaFont.callout(.semibold))
@@ -262,7 +262,7 @@ struct HumanWorkoutHealthSnapshotCards: View {
                 if showsHealthSetupAction {
                     Button(action: onRequestHealthAccess) {
                         Text(connectionButtonTitle)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
@@ -275,7 +275,7 @@ struct HumanWorkoutHealthSnapshotCards: View {
 
                 Button(action: onRefresh) {
                     Image(systemName: "arrow.clockwise").accessibilityHidden(true)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 48, height: 48)
                         .background(Color.ohanaControlFill, in: Circle())
@@ -293,7 +293,7 @@ struct HumanWorkoutHealthSnapshotCards: View {
     private var activityRingsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(l.tr(zh: "活动环", en: "Activity Rings", de: "Aktivitätsringe"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             HStack(spacing: 18) {
@@ -691,7 +691,7 @@ private struct ActivityRingMetric: View {
                 .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -710,7 +710,7 @@ private struct HumanWorkoutMetricCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -725,7 +725,7 @@ private struct HumanWorkoutMetricCard: View {
                     .minimumScaleFactor(0.56)
                 if !unit.isEmpty {
                     Text(unit.uppercased())
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(tint)
                 }
             }
@@ -740,7 +740,7 @@ private struct HumanWorkoutMetricCard: View {
             HStack {
                 ForEach(["00", "06", "12", "18"], id: \.self) { label in
                     Text(label)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                     if label != "18" { Spacer() }
                 }

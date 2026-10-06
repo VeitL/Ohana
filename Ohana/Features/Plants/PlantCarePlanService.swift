@@ -500,7 +500,7 @@ nonisolated enum PlantCarePlanService {
                     priority: priority,
                     now: now,
                     calendar: calendar,
-                    deferredUntil: deferredUntil(for: type, history: history, calendar: calendar)
+                    deferredUntil: deferredUntil(for: type, after: lastDate, history: history, calendar: calendar)
                 )
             }
             .sorted {
@@ -1067,6 +1067,7 @@ nonisolated enum PlantCarePlanService {
 
     private static func deferredUntil(
         for type: PlantCareType,
+        after lastCareDate: Date?,
         history: PlantCarePlanningHistory,
         calendar: Calendar
     ) -> Date? {
@@ -1076,14 +1077,18 @@ nonisolated enum PlantCarePlanService {
             "skip:\(type.rawValue):"
         ]
         return history.recentCustomNotes
+            .filter { item in
+                guard let lastCareDate else { return true }
+                return item.date > lastCareDate
+            }
             .compactMap { item -> Date? in
                 guard let prefix = prefixes.first(where: { item.note.hasPrefix($0) }) else { return nil }
                 let raw = String(item.note.dropFirst(prefix.count))
                 let rawDate = raw.split(separator: "|", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? raw
                 return formatter.date(from: rawDate)
             }
+            .first
             .map { calendar.startOfDay(for: $0) }
-            .max()
     }
 
     private static func planningHistory(from logs: [PlantCareLog]) -> PlantCarePlanningHistory {

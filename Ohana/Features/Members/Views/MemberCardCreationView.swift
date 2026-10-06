@@ -46,6 +46,7 @@ struct MemberCardCreationContentView: View {
     @SceneStorage("memberCreation.pet.mediaRecovery") var petMediaRecoveryRaw = ""
     @SceneStorage("memberCreation.human.mediaRecovery") var humanMediaRecoveryRaw = ""
 
+    @State var initialDraft: MemberCreationDraft?
     @State var draft: MemberCreationDraft
     @FocusState var petCustomValueFieldFocused: Bool
     @State var decodedAvatar: UIImage?
@@ -241,23 +242,35 @@ struct MemberCardCreationContentView: View {
     }
 
     var body: some View {
+        if presentationStyle == .standard {
+            NavigationStack {
+                creationContent
+                    .navigationTitle(kind.title(l))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .ohanaEditorChrome(
+                        hasChanges: initialDraft.map { $0 != draft } ?? false,
+                        isSaving: isSaving || isJoinHandoffRunning,
+                        closeIdentifier: "member-creation-cancel-action",
+                        onCancel: { clearMediaReturnStepStorage(); onCancel?() }, onSave: nil
+                    )
+            }
+        } else {
+            creationContent
+        }
+    }
+
+    private var creationContent: some View {
         ZStack {
             if presentationStyle != .onboarding && !usesTransparentHomeJoinHandoffBackdrop {
                 OhanaAppBackground()
             }
             GeometryReader { proxy in
                 let cardHeight = MemberCreationCardLayout.cardHeight(
-                    in: proxy.size.height,
-                    includesTopChrome: presentationStyle.showsTopChrome
+                    in: proxy.size.height - (kind == .pet && currentStep == .avatar ? 52 : 0),
+                    includesTopChrome: false
                 )
                 VStack(spacing: MemberCreationCardLayout.stackSpacing) {
                     Spacer(minLength: 0)
-                    if presentationStyle.showsTopChrome {
-                        topChrome
-                            .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
-                            .opacity(isJoinHandoffRunning ? (presentationStyle == .onboarding ? 0 : 0.28) : 1)
-                            .allowsHitTesting(!isJoinHandoffRunning)
-                    }
                     creationCardArea
                         .frame(height: cardHeight)
                         .opacity(profileCardFlipOpacity)
@@ -277,13 +290,13 @@ struct MemberCardCreationContentView: View {
                 .frame(width: proxy.size.width, height: proxy.size.height)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .toolbar(presentationStyle == .onboarding ? .hidden : .visible, for: .navigationBar)
         .onAppear {
             MemberCreationPerformance.event("Member Creation Appeared")
             restoreMediaRecoverySnapshotIfNeeded()
             restoreMediaReturnStepFromSceneStorage()
             configureInitialAvatarIfNeeded()
+            if initialDraft == nil { initialDraft = draft }
             scheduleAvatarDecode()
             OhanaFrameScheduler.runAfterNextFrame(milliseconds: presentationStyle.cameraPreparationDelayMilliseconds) {
                 media.prepareCameraIfNeeded()

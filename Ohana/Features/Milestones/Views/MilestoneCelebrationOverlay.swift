@@ -111,7 +111,7 @@ struct MilestoneCelebrationOverlay: View {
             GeometryReader { geo in
                 ForEach(particles) { p in
                     Text(p.emoji)
-                        .font(OhanaFont.metric(size: p.size, .medium))
+                        .font(OhanaFont.brandMetric(size: p.size, .medium))
                         .position(
                             x: p.x * geo.size.width,
                             y: particleOffsets[p.id] ?? -40

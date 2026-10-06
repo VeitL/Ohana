@@ -122,10 +122,12 @@ struct AddExpenseSheetContent: View {
     @State var payerAmountInputs: [String: String] = [:]
     @State var activePayerAmountID: String?
     @State var selectedRecorderID: UUID?
-    @State var requiresRecorderSelection = false
+    @State var requiresRecorderSelection = true
     @State var selectedSharedExpensePetIds: Set<UUID> = []
     @State var showMore = false
     @State var isSaving = false
+    @State var savedRecord: PetRecordReference?
+    @State var didSaveExpense = false
     @State var receiptAttachments: [ExpenseReceiptAttachment] = []
     @State var photoPickerItems: [PhotosPickerItem] = []
     @State var showingCamera = false
@@ -310,16 +312,6 @@ struct AddExpenseSheetContent: View {
                     amountEntry
                     quickAmountStrip
                     categoryStrip
-                    sharedExpenseTargetSection
-                    payerSection
-                    QuickCareActionHumanPickerContainer(
-                        selectedHumanID: $selectedRecorderID,
-                        requiresSelection: $requiresRecorderSelection,
-                        role: .recorder,
-                        tint: sheetTint
-                    )
-                    .padding(.horizontal, 20)
-                    receiptSection
                     if selectedCategory == .insurancePremium {
                         insurancePolicyNotice
                     }
@@ -334,25 +326,28 @@ struct AddExpenseSheetContent: View {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(l.tr(zh: "添加花费", en: "Add Expense", de: "Ausgabe hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
+            .ohanaEditorChrome(
+                hasChanges: !amountInput.isEmpty || !noteInput.isEmpty || !receiptAttachments.isEmpty,
+                isSaving: isSaving,
+                isComplete: didSaveExpense,
+                canSave: canSave,
+                onCancel: closeSheet,
+                onSave: saveExpense
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { closeSheet() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if hasSavedMedicalExpense {
+                if hasSavedMedicalExpense {
+                    ToolbarItem(placement: .primaryAction) {
                         Button(l.quickExpenseApplyClaim) {
                             inputFocused = false
                             GoKeyboard.dismiss()
                             showClaimSheet = true
                         }
-                    } else {
-                        Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { saveExpense() }
-                            .disabled(!canSave || isSaving)
-                            .accessibilityHint(payerSplitValidationText ?? "")
                     }
                 }
             }
         }
+        .petRecordFeedback($savedRecord)
+        .petRecordAttribution(selectedHumanID: $selectedRecorderID, requiresSelection: $requiresRecorderSelection)
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
         .sheet(isPresented: $showClaimSheet) {
@@ -409,12 +404,7 @@ struct AddExpenseSheetContent: View {
         }
         .onAppear {
             configureInitialPayer()
-            selectedSharedExpensePetIds = SharedPetSelectionMemory.restoredSelection(
-                sourcePet: pet,
-                scope: "expense.shared",
-                candidates: sameSpeciesExpensePets,
-                defaultToAll: false
-            )
+            selectedSharedExpensePetIds = Set([pet.id])
         }
         .onChange(of: amountInput) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(newValue, countryCode: appCountry, maxFractionDigits: 2)

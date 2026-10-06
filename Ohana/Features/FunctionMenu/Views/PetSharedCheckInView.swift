@@ -104,7 +104,7 @@ struct PetSharedCheckInView: View {
     private var pageHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "checklist.checked") // a11y: allow decorative header glyph; title text owns meaning.
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive header glyph.
                 .accessibilityHidden(true)
@@ -114,7 +114,7 @@ struct PetSharedCheckInView: View {
                 es: "Check-in de varias mascotas", pt: "Check-in de vários pets", fr: "Check-in multi-animaux",
                 ja: "複数ペットのチェックイン", ko: "여러 반려동물 체크인", it: "Check-in multi-animale"
             ))
-                .font(OhanaFont.title2(.black))
+                .font(OhanaFont.title2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .accessibilityHint(l.tr(

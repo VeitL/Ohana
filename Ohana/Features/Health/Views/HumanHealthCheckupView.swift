@@ -212,14 +212,14 @@ struct HumanHealthCheckupContentView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "doc.viewfinder.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(HumanLabScanCopy.text(.scanLabReport, l: l))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(HumanLabScanCopy.text(.checkupEntryDetail, l: l))
                     .font(OhanaFont.caption(.semibold))
@@ -257,7 +257,7 @@ struct HumanHealthCheckupContentView: View {
                     en: "\(snapshot.trackedMetrics.count)\(snapshot.didReachFetchLimit ? "+" : "") tracked",
                     de: "\(snapshot.trackedMetrics.count)\(snapshot.didReachFetchLimit ? "+" : "") getrackt"
                 ))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -280,14 +280,14 @@ struct HumanHealthCheckupContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.goOrange)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.goOrange.opacity(0.14), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "录入任意指标后会生成追踪图", en: "Charts appear after you log a metric.", de: "Diagramme erscheinen nach dem ersten Wert."))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "从下方分类选择指标开始。", en: "Pick a metric from the catalog below.", de: "Wähle unten einen Wert aus dem Katalog."))
                         .font(OhanaFont.caption(.semibold))
@@ -308,7 +308,7 @@ struct HumanHealthCheckupContentView: View {
                         HumanHealthHomeText.chooseMetric.title(l),
                         systemImage: "plus.circle.fill"
                     )
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 12)
                     .frame(minHeight: 44)
@@ -345,35 +345,35 @@ struct HumanHealthCheckupContentView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: metric.category.systemImage)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(metric.category.color, in: Circle())
                     VStack(alignment: .leading, spacing: 1) {
                         Text(metric.displayName(l))
-                            .font(OhanaFont.subheadline(.black))
+                            .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
                         Text(unit.label)
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(metric.category.color)
                     }
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     Text(latest.map { unit.formattedValue($0.value, includeUnit: false) } ?? "—")
-                        .font(OhanaFont.metric(size: 27, .black))
+                        .font(OhanaFont.metric(size: 27, .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
                         .contentTransition(.numericText())
                     Text(unit.label)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(metric.category.color)
                     Spacer(minLength: 0)
                 }
@@ -488,13 +488,13 @@ struct HumanHealthCheckupContentView: View {
         return VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 9) {
                 Image(systemName: category.systemImage)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 32, height: 32) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(category.color, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                 VStack(alignment: .leading, spacing: 1) {
                     Text(category.displayName(l))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "\(metrics.count) 项", en: "\(metrics.count) metrics", de: "\(metrics.count) Werte"))
                         .font(OhanaFont.caption2(.bold))
@@ -557,7 +557,7 @@ struct HumanHealthCheckupContentView: View {
                 UISelectionFeedbackGenerator().selectionChanged()
             } label: {
                 Image(systemName: "chart.line.uptrend.xyaxis").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(metric.category.color)
                     .frame(width: 44, height: 44)
                     .background(metric.category.color.opacity(0.14), in: Circle())
@@ -594,13 +594,13 @@ struct HumanHealthCheckupContentView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 6) {
                     Text(metric.displayName(l))
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                     if let short = metric.shortNames.first, short != metric.displayName(l) {
                         Text(short)
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(metric.category.color)
                             .padding(.horizontal, 6)
                             .frame(height: 20)
@@ -624,7 +624,7 @@ struct HumanHealthCheckupContentView: View {
                 if let latest,
                    let unit = metric.unit(for: latest.unitCode) {
                     Text(unit.formattedValue(latest.value))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
@@ -638,7 +638,7 @@ struct HumanHealthCheckupContentView: View {
                             ? l.tr(zh: "暂无记录", en: "No log", de: "Kein Eintrag")
                             : l.tr(zh: "待记录", en: "Record", de: "Erfassen")
                     )
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(metric.category.color)
                 }
             }
@@ -662,14 +662,14 @@ struct HumanHealthCheckupContentView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: metric.category.systemImage)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                         .background(metric.category.color, in: Circle())
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(metric.displayName(l))
-                            .font(OhanaFont.subheadline(.black))
+                            .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         HStack(spacing: 5) {
@@ -687,13 +687,13 @@ struct HumanHealthCheckupContentView: View {
                     Spacer(minLength: 0)
 
                     Text(unit.formattedValue(log.value))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
 
                     Image(systemName: "chevron.right").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
                 .padding(.horizontal, 14)
@@ -711,7 +711,7 @@ struct HumanHealthCheckupContentView: View {
                 .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color.goTeal)
             Text(l.tr(zh: "还没有体检指标记录", en: "No checkup metrics yet", de: "Noch keine Check-up-Werte"))
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(zh: "从下方分类选择一个指标开始追踪。", en: "Pick a metric below to start tracking.", de: "Wähle unten einen Wert zum Tracken."))
                 .font(OhanaFont.caption(.semibold))
@@ -733,14 +733,14 @@ struct HumanHealthCheckupContentView: View {
     private func summaryItem(icon: String, value: String, label: String, tint: Color) -> some View {
         VStack(spacing: 7) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 .foregroundStyle(tint)
             Text(value)
-                .font(OhanaFont.metric(size: 24, .black))
+                .font(OhanaFont.metric(size: 24, .semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
             Text(label)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         }
@@ -753,7 +753,7 @@ struct HumanHealthCheckupContentView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
             .textCase(.uppercase)
             .tracking(0.8)

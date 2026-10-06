@@ -6,6 +6,16 @@ import Testing
 
 @MainActor
 struct HomeToolbarQuickRecordPolicyTests {
+    @Test func expandedMemberSkipsOtherTargetsAndStaleContextFallsBack() {
+        let human = makeCard(name: "Ari", isHuman: true)
+        let pet = makeCard(name: "Nori")
+        let targets = HomeToolbarQuickRecordPolicy.targets(for: .home, cards: [human, pet], plants: [])
+        #expect(HomeToolbarQuickRecordPolicy.contextualTargets(targets, expandedMemberID: human.id).map(\.entityID) == [human.id])
+        #expect(HomeToolbarQuickRecordPolicy.contextualTargets(targets, expandedMemberID: pet.id).map(\.entityID) == [pet.id])
+        #expect(HomeToolbarQuickRecordPolicy.contextualTargets(targets, expandedMemberID: nil) == targets)
+        #expect(HomeToolbarQuickRecordPolicy.contextualTargets(targets, expandedMemberID: UUID()) == targets)
+    }
+
     @Test func actionIsLimitedToMemberAndPlantTabs() {
         #expect(HomeToolbarQuickRecordPolicy.isVisible(for: .home))
         #expect(HomeToolbarQuickRecordPolicy.isVisible(for: .plants))
@@ -48,7 +58,7 @@ struct HomeToolbarQuickRecordPolicyTests {
         #expect(targets.map(\.name) == ["Ari", "Nori"])
         #expect(
             targets[0].quickActions.map(\.actionType)
-                == ["humanWeight", "humanMetrics", "humanWorkout", "humanMedication", "humanNote"]
+                == ["humanWeight", "humanMetrics", "humanObservation", "humanWorkout", "humanMedication", "humanNote"]
         )
         #expect(targets[1].quickActions.map(\.actionType) == ["weight"])
     }
@@ -353,7 +363,7 @@ struct HomeToolbarQuickRecordPolicyTests {
         #expect(handledRevision == target.id)
     }
 
-    @Test func splitIslandQuickRecordMenuWiresExistingRoutes() throws {
+    @Test func nativeQuickRecordMenuWiresExistingRoutes() throws {
         let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
         let nativeToolbarSource = toolbarSource.components(separatedBy: "struct HomeQuickRecordMenu").first
             ?? toolbarSource
@@ -383,27 +393,12 @@ struct HomeToolbarQuickRecordPolicyTests {
         #expect(quickMenuSource.contains("\\(target.accessibilityIdentifier)-\\(action.actionType)"))
         #expect(quickMenuSource.contains("\\(target.accessibilityIdentifier)-\\(action.actionType)-\\(option.id)"))
         #expect(quickMenuSource.contains("ja: \"すばやく記録\""))
-        #expect(bottomBarSource.contains("GlassEffectContainer(spacing: 10)"))
-        #expect(bottomBarSource.contains(".glassEffect(.regular.interactive(), in: Capsule())"))
-        #expect(bottomBarSource.contains(".glassEffect(.regular.tint(Color.goPrimary).interactive(), in: Circle())"))
-        #expect(bottomBarSource.contains(".accessibilityValue(accessibilityPosition)"))
-        #expect(bottomBarSource.contains("OasisTreeEnergyInjectionPolicy.starterPackageCost)🥥"))
-        #expect(bottomBarSource.contains("HomeQuickRecordPopoutControl("))
-        #expect(bottomBarSource.contains(".ohanaStaggeredMenuItem("))
-        #expect(bottomBarSource.contains("onQuickRecord(target, action, optionID)"))
-        #expect(!bottomBarSource.contains("@StateObject private var quickRecordActionRelay"))
-        #expect(!bottomBarSource.contains("routeRevision"))
-        #expect(bottomBarSource.contains(".onChange(of: selectedTab)"))
-        #expect(bottomBarSource.contains("milliseconds: canAnimate ? 390 : 0"))
-        #expect(bottomBarSource.contains("ForEach(Array(items.enumerated())"))
-        #expect(bottomBarSource.contains("ForEach(visibleTabs)"))
-        #expect(bottomBarSource.contains(".matchedGeometryEffect("))
-        #expect(bottomBarSource.contains("allowsSelectionMotion ? VerticalHomeTabTransitionPolicy.selectionAnimation"))
-        #expect(bottomBarSource.contains(".transition(.opacity)"))
+        // Native controls own selection/press animation. Behavioral UI coverage checks
+        // the same-row hit regions, menu actions, repeated dismissal and readback.
+        #expect(bottomBarSource.contains("onQuickRecord(target, action, option.id)"))
         #expect(routingSource.contains("controller.select(tab)"))
         #expect(!routingSource.contains("withAnimation(canAnimate ? VerticalHomeTabTransitionPolicy.selectionAnimation"))
         #expect(homeSource.contains("VerticalSolidHomeBottomBar("))
-        #expect(homeSource.contains("allowsSelectionMotion: canAnimate"))
         #expect(homeSource.contains("quickRecordTargets: homeToolbarQuickRecordTargets"))
         #expect(!homeSource.contains("quickRecordRouteRevision"))
         #expect(homeSource.contains("onQuickRecord: openHomeToolbarQuickRecord"))
@@ -418,7 +413,8 @@ struct HomeToolbarQuickRecordPolicyTests {
         #expect(routingSource.contains("HomeToolbarQuickRecordPolicy.usesPetPrimaryAction("))
         #expect(routingSource.contains("openQuickActionItem(action, card: card, usesPrimaryAction: usesPrimaryAction)"))
         #expect(routingSource.contains("openQuickActionItem(action, card: card, usesPrimaryAction: true)"))
-        #expect(routingSource.contains("routeCoordinator.openSheet(.humanMetrics(target.entityID))"))
+        #expect(routingSource.contains(".humanMetrics(target.entityID)"))
+        #expect(routingSource.contains(".humanObservationQuick(target.entityID)"))
         #expect(routingSource.contains("routeCoordinator.showHumanPrivacy()"))
         #expect(routingSource.contains("routeCoordinator.openSheet(.plantCareLog(target.entityID, initialCareType: .customNote))"))
         #expect(plantRouteSource.contains("candidate.isArchived ? nil : candidate"))
@@ -439,8 +435,8 @@ struct HomeToolbarQuickRecordPolicyTests {
         #expect(completionSource.contains("activeFullScreenRoute = nil"))
         #expect(completionSource.contains("onInlinePetSaved(savedPet)"))
         #expect(completionSource.contains("onInlineHumanSaved(savedHuman)"))
-        #expect(presentationSource.contains("onInlinePetSaved: { pet in\n                        onPetSavedFromAddEntity(pet)"))
-        #expect(presentationSource.contains("onInlineHumanSaved: { human in\n                        onHumanSavedFromAddEntity(human)"))
+        #expect(presentationSource.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).contains("onInlinePetSaved: { pet in onPetSavedFromAddEntity(pet)"))
+        #expect(presentationSource.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression).contains("onInlineHumanSaved: { human in onHumanSavedFromAddEntity(human)"))
         #expect(!rosterSource.contains("档案、钱包与成员管理"))
         #expect(!rosterSource.contains("请更换搜索内容或成员类型"))
         #expect(!rosterSource.contains("添加宠物或人类成员开始照顾"))

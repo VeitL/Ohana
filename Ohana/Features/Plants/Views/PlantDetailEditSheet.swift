@@ -56,7 +56,7 @@ struct EditPlantSheet: View {
     @State private var isIndoorSuitable = true
     @State private var remindersEnabled = true
     @State private var isSaving = false
-    @State private var showingDiscardConfirmation = false
+    @State private var didPrepare = false
     @State private var saveErrorMessage: String?
     @State private var selectedEditFocus: PlantEditFocusSection = .all
 }
@@ -328,18 +328,6 @@ extension EditPlantSheet {
                 fullCareEditor
             }
         }
-        .interactiveDismissDisabled(scope == .profile && (profileHasChanges || isSaving))
-        .confirmationDialog(
-            l.tr(zh: "放弃未保存的修改？", en: "Discard unsaved changes?", de: "Ungespeicherte Änderungen verwerfen?"),
-            isPresented: $showingDiscardConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button(l.tr(zh: "放弃修改", en: "Discard changes", de: "Änderungen verwerfen"), role: .destructive) {
-                dismiss()
-            }
-            .accessibilityIdentifier("plant-profile-discard-changes-action")
-            Button(l.tr(zh: "继续编辑", en: "Keep editing", de: "Weiter bearbeiten"), role: .cancel) {}
-        }
         .alert(
             l.tr(zh: "无法保存资料", en: "Could not save profile", de: "Profil konnte nicht gespeichert werden"),
             isPresented: Binding(
@@ -353,7 +341,9 @@ extension EditPlantSheet {
         }
         .accessibilityIdentifier(scope == .profile ? "plant-profile-editor" : "plant-edit-sheet")
         .onAppear {
+            guard !didPrepare else { return }
             prepareState()
+            didPrepare = true
         }
         .onDisappear {
             commandQueue.cancelAll()
@@ -361,19 +351,17 @@ extension EditPlantSheet {
     }
 
     private var fullCareEditor: some View {
-        OhanaSheetWrapper(title: l.tr(zh: "编辑植物", en: "Edit plant", de: "Pflanze bearbeiten"), onDismiss: { dismiss() }) {
+        OhanaEditorSheet(
+            title: l.tr(zh: "编辑植物", en: "Edit plant", de: "Pflanze bearbeiten"),
+            hasChanges: didPrepare && hasDraftChanges, isSaving: isSaving, canSave: canSave,
+            saveIdentifier: "plant-edit-save-action", onCancel: { dismiss() }, onSave: save
+        ) {
             VStack(spacing: 16) {
                 editProfileOverview
                 editFocusSwitcher
                 focusedEditSections
                 recalculationNoticeSection
 
-                Button { save() } label: {
-                    Text(isSaving ? l.tr(zh: "保存中…", en: "Saving...", de: "Speichern...") : l.tr(zh: "保存", en: "Save", de: "Speichern")).capsuleButton()
-                }
-                .padding(.top, 8)
-                .disabled(!canSave)
-                .accessibilityIdentifier("plant-edit-save-action")
             }
             .padding(.vertical, 16)
         }
@@ -511,23 +499,10 @@ extension EditPlantSheet {
             .tint(Color.goPrimary)
             .navigationTitle(l.tr(zh: "编辑资料", en: "Edit profile", de: "Profil bearbeiten"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), action: cancelProfileEditor)
-                        .disabled(isSaving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(action: save) {
-                        if isSaving {
-                            ProgressView()
-                        } else {
-                            Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                        }
-                    }
-                    .disabled(!canSave)
-                    .accessibilityIdentifier("plant-edit-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: didPrepare && hasDraftChanges, isSaving: isSaving, canSave: canSave,
+                saveIdentifier: "plant-edit-save-action", onCancel: { dismiss() }, onSave: save
+            )
         }
     }
 
@@ -580,23 +555,17 @@ extension EditPlantSheet {
             isIndoorSuitable != plant.isIndoorSuitable
     }
 
-    private func cancelProfileEditor() {
-        guard profileHasChanges else {
-            dismiss()
-            return
-        }
-        showingDiscardConfirmation = true
-    }
+
 
     private var editFocusSwitcher: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "编辑重点", en: "Edit focus", de: "Bearbeitungsfokus"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(editFocusSummary)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -714,16 +683,16 @@ extension EditPlantSheet {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(editOverviewTitle)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .fixedSize(horizontal: false, vertical: true)
                     Text("\(draftProfileName) · \(draftProfileSpecies)")
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                     Text(draftPlaceSummary)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -733,10 +702,10 @@ extension EditPlantSheet {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("\(profileCompletionPercent)%")
-                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                         .foregroundStyle(Color.goPrimary)
                     Text(l.tr(zh: "档案", en: "profile", de: "Profil"))
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .textCase(.uppercase)
                 }
@@ -775,11 +744,11 @@ extension EditPlantSheet {
     private func readinessPill(_ item: PlantEditReadinessItem) -> some View {
         HStack(spacing: 6) {
             Image(systemName: item.isComplete ? "checkmark.circle.fill" : "circle")
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(item.isComplete ? Color.goPrimary : Color.ohanaTertiaryText)
                 .accessibilityHidden(true)
             Text(item.title)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(item.isComplete ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -795,17 +764,17 @@ extension EditPlantSheet {
     private func editOverviewFact(icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 28, height: 28) // a11y: allow non-interactive overview glyph; adjacent text carries the fact.
                 .background(tint.opacity(0.14), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -864,7 +833,7 @@ extension EditPlantSheet {
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.localizedCommonName)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -873,7 +842,7 @@ extension EditPlantSheet {
                     en: "Water \(entry.defaultWateringDays)d",
                     de: "\(entry.defaultWateringDays) T. gießen"
                 ))
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                     .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -922,7 +891,7 @@ extension EditPlantSheet {
             Toggle(l.tr(zh: "植物提醒", en: "Plant reminders", de: "Pflanzenerinnerungen"), isOn: $remindersEnabled)
                 .tint(Color.goPrimary)
         }
-        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -963,7 +932,7 @@ extension EditPlantSheet {
                 .tint(Color.goPrimary)
         }
         .pickerStyle(.menu)
-        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -1018,7 +987,7 @@ extension EditPlantSheet {
                 .tint(Color.goPrimary)
         }
         .pickerStyle(.menu)
-        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -1045,7 +1014,7 @@ extension EditPlantSheet {
             Stepper(l.tr(zh: "冠幅 \(Int(currentSpreadCm)) cm", en: "Spread \(Int(currentSpreadCm)) cm", de: "Breite \(Int(currentSpreadCm)) cm"), value: $currentSpreadCm, in: 0 ... 300, step: 1)
                 .tint(Color.goPrimary)
         }
-        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(16)
         .goTranslucentCard(cornerRadius: OhanaRadius.controlLarge)
@@ -1074,11 +1043,11 @@ extension EditPlantSheet {
                         .foregroundStyle(Color.goPrimary)
                         .accessibilityHidden(true)
                     Text(l.tr(zh: "保存后会重算", en: "Recalculated after saving", de: "Nach dem Speichern neu berechnet"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     Text(l.tr(zh: "\(impacts.count) 项", en: "\(impacts.count) items", de: "\(impacts.count) Punkte"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -1092,10 +1061,10 @@ extension EditPlantSheet {
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(impact.title)
-                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(impact.detail)
-                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
@@ -1109,7 +1078,7 @@ extension EditPlantSheet {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .textCase(.uppercase)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1124,7 +1093,7 @@ extension EditPlantSheet {
             if let identifier {
                 TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .textFieldStyle(.plain)
-                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 52)
@@ -1133,7 +1102,7 @@ extension EditPlantSheet {
             } else {
                 TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                     .textFieldStyle(.plain)
-                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .padding(.horizontal, 14)
                     .frame(minHeight: 52)

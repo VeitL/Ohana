@@ -37,10 +37,10 @@ struct HumanPasscodePad: View {
                             Group {
                                 if key == "delete" {
                                     Image(systemName: "delete.left.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 } else {
                                     Text(key)
-                                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                             }
                             .foregroundStyle(Color.ohanaPrimaryText)

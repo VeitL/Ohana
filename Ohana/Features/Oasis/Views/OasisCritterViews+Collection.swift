@@ -49,11 +49,9 @@ extension OasisCritterCodexView {
                 let critter = ownedCritter(entry.id)
                 let owned = critter != nil
                 Button {
-                    withAnimation(GoMotion.feedback) {
-                        selectedCatalogId = entry.id
-                        focusedCodexCatalogId = entry.id
-                        lastInteractionOutcome = nil
-                    }
+                    selectedCatalogId = entry.id
+                    focusedCodexCatalogId = entry.id
+                    lastInteractionOutcome = nil
                 } label: {
                     VStack(spacing: 8) {
                         ZStack(alignment: .topTrailing) {

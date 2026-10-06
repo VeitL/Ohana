@@ -216,15 +216,7 @@ struct TaskCenterSystemJourneySheet: View {
                 .navigationTitle(l.tr(zh: "引导完成", en: "Guided setup", de: "Geführte Einrichtung"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button(action: onClose) {
-                            Image(systemName: "xmark") // a11y: allow decorative close glyph is hidden and the parent Button is labeled
-                                .frame(width: 44, height: 44)
-                                .accessibilityHidden(true)
-                        }
-                        .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                        .accessibilityIdentifier("task-center-starter-journey-close")
-                    }
+                    OhanaModalToolbar(onClose: onClose, closeIdentifier: "task-center-starter-journey-close")
                 }
             }
         }
@@ -263,7 +255,7 @@ struct TaskCenterSystemJourneySheet: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(item.title)
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -275,7 +267,7 @@ struct TaskCenterSystemJourneySheet: View {
                     }
                     Text("+\(item.rewardCoconuts) 🥥")
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.goPrimary)
             }
             Spacer(minLength: 0)
@@ -301,7 +293,7 @@ struct TaskCenterSystemJourneySheet: View {
                 Text(usesCompletionPercent
                     ? "\(guide.completionPercent ?? 0)%"
                     : "\(guide.completedCheckpointCount)/\(guide.requiredCheckpointCount)")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goPrimary)
                     .monospacedDigit()
             }
@@ -335,7 +327,7 @@ struct TaskCenterSystemJourneySheet: View {
         return VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 10) {
                 Text("\(questionIndex + 1)/\(guide.questions.count)")
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.goPrimary)
                 .padding(.horizontal, 10)
                 .frame(minHeight: 30)
@@ -348,7 +340,7 @@ struct TaskCenterSystemJourneySheet: View {
                         l.tr(zh: "已完成", en: "Complete", de: "Erledigt"),
                         systemImage: "checkmark.circle.fill"
                     )
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goTeal)
                 }
             }
@@ -360,7 +352,7 @@ struct TaskCenterSystemJourneySheet: View {
                     .accessibilityHidden(true)
 
                 Text(questionPrompt(question))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
@@ -447,7 +439,7 @@ struct TaskCenterSystemJourneySheet: View {
             prepareEditorRoute(checkpoint)
         } label: {
             Label(title, systemImage: openActionSymbol)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(maxWidth: .infinity, minHeight: 50)
         }
@@ -610,7 +602,7 @@ struct TaskCenterSystemJourneySheet: View {
                     : l.tr(zh: "所有问题都已完成", en: "All questions complete", de: "Alle Fragen abgeschlossen"),
                 systemImage: "checkmark.seal.fill"
             )
-            .font(OhanaFont.headline(.black))
+            .font(OhanaFont.headline(.semibold))
             .foregroundStyle(Color.goTeal)
 
             claimButton
@@ -634,7 +626,7 @@ struct TaskCenterSystemJourneySheet: View {
                 .accessibilityHidden(true)
 
             Text(l.tr(zh: "这项引导已完成", en: "Guided setup complete", de: "Einrichtung abgeschlossen"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .accessibilityIdentifier("task-center-starter-journey-complete")
 
@@ -643,7 +635,7 @@ struct TaskCenterSystemJourneySheet: View {
                 onClose()
             } label: {
                 Text(l.tr(zh: "返回待办", en: "Back to Tasks", de: "Zurück zu Aufgaben"))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 50)
             }
@@ -678,7 +670,7 @@ struct TaskCenterSystemJourneySheet: View {
                 en: "Claim \(item.rewardCoconuts) coconuts",
                 de: "\(item.rewardCoconuts) Kokosnüsse abholen"
             ))
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity, minHeight: 50)
         }
@@ -964,7 +956,7 @@ private extension TaskCenterSystemJourneySheet {
                     .font(OhanaFont.caption(.bold))
                     .accessibilityHidden(true)
             }
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity, minHeight: 50)
         }
@@ -1047,7 +1039,7 @@ private extension TaskCenterSystemJourneySheet {
                     .font(OhanaFont.caption(.bold))
                     .accessibilityHidden(true)
             }
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .frame(maxWidth: .infinity, minHeight: 50)
         }

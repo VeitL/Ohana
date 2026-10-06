@@ -222,7 +222,7 @@ struct WaterPrimaryButton: View {
     var body: some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.arkInk)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
@@ -291,9 +291,9 @@ struct WaterCoreCard: View {
                     Button(action: primaryAction) {
                         HStack(spacing: 5) {
                             Image(systemName: primaryIcon)
-                                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                             Text(primaryTitle)
-                                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         }
                         .foregroundStyle(Color.arkInk)
                         .frame(minWidth: 72)
@@ -307,7 +307,7 @@ struct WaterCoreCard: View {
                     if let secondaryTitle, let secondaryAction {
                         Button(action: secondaryAction) {
                             Text(secondaryTitle)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                                 .foregroundStyle(cardTint)
                                 .frame(minWidth: 72)
                                 .padding(.horizontal, 10)
@@ -365,21 +365,21 @@ struct WaterCoreCard: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     if isWarning {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     }
                 }
                 .foregroundStyle(isWarning ? Color.goRed : Color.ohanaPrimaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     .foregroundStyle(cardTint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                     .contentTransition(.numericText())
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(isWarning ? Color.goRed.opacity(0.92) : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -467,10 +467,10 @@ struct WaterHeroCard: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     Text(isAquatic ? l.tr(zh: "水体状态", en: "Water tank status", de: "Beckenstatus") : l.tr(zh: "今日饮水", en: "Today's water", de: "Trinken heute"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(isAquatic ? l.tr(zh: "管理", en: "Manage", de: "Verwalten") : localizedTimes(waterCount))
-                        .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 32, weight: .semibold, design: .default))
                         .foregroundStyle(tint)
                     HStack(spacing: 12) {
                         MiniWaterGauge(title: l.tr(zh: "换水", en: "Change", de: "Wechsel"), progress: waterDueProgress, tint: tint)
@@ -523,7 +523,7 @@ struct MiniWaterGauge: View {
                         .frame(width: max(6, 34 * min(max(progress, 0), 1)), height: 8)
                 }
             Text(title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
     }
@@ -553,17 +553,17 @@ struct WaterLogRow: View {
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(log.careType.label)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 if log.amountMl > 0 {
                     Text("\(Int(log.amountMl))ml")
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             Spacer()
             Text(log.date, format: .dateTime.month().day().hour().minute())
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if showDelete, log.canDelete {
                 Button(role: .destructive, action: onDelete) {
@@ -585,124 +585,47 @@ struct WaterAmountSettingsSheet: View {
     @Binding var amountEnabled: Bool
     @Binding var amountText: String
     let onSave: () -> Void
+    let onCancel: () -> Void
+    var isSaving = false
+    var additionalDraft: [String] = []
+    @State private var initialDraft: [String]?
+    private var draft: [String] { [String(amountEnabled), amountText] + additionalDraft }
 
-    @State private var showsAmountKeypad = false
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     private var l: L10n { L10n(appLanguage) }
 
     var body: some View {
-        VStack(spacing: 18) {
-            HStack(spacing: 14) {
-                Image(systemName: "drop.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 24, weight: .bold))
-                    .foregroundStyle(tint)
-                    .frame(width: 54, height: 54)
-                    .background(tint.opacity(0.15), in: Circle())
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "喂水", en: "Water", de: "Trinken"))
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
-                    Text(amountEnabled ? localizedDefaultAmount(displayAmount) : l.tr(zh: "只记录次数", en: "Count only", de: "Nur Anzahl"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-                Spacer()
-            }
-
-            Toggle(isOn: $amountEnabled.animation(GoMotion.feedback)) {
-                settingsRow(l.tr(zh: "记录水量", en: "Track amount", de: "Menge erfassen"), value: localizedToggle(amountEnabled))
-            }
-            .tint(tint)
-
+        Form {
+            Toggle(l.tr(zh: "记录水量", en: "Track amount", de: "Menge erfassen"), isOn: $amountEnabled)
             if amountEnabled {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(l.tr(zh: "默认水量", en: "Default amount", de: "Standardmenge"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    HStack(spacing: 10) {
-                        amountStepButton(systemName: "minus") {
-                            adjustAmount(by: -50)
-                        }
-                        Button {
-                            GoKeyboard.dismiss()
-                            withAnimation(GoMotion.feedback) {
-                                showsAmountKeypad.toggle()
-                            }
-                            UISelectionFeedbackGenerator().selectionChanged()
-                        } label: {
-                            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                                Text(amountText.isEmpty ? "250" : amountText)
-                                    .font(OhanaFont.adaptive(size: 36, weight: .black, design: .rounded))
-                                    .foregroundStyle(amountText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
-                                    .monospacedDigit()
-                                Text("ml")
-                                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
-                                    .foregroundStyle(tint)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        amountStepButton(systemName: "plus") {
-                            adjustAmount(by: 50)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
-
-                    if showsAmountKeypad {
-                        EmbeddedDecimalKeypad(
-                            text: $amountText,
-                            countryCode: AppCountry.code,
-                            maxFractionDigits: 0,
-                            accent: tint,
-                            isMini: true
-                        ) {
-                            withAnimation(GoMotion.feedback) {
-                                showsAmountKeypad = false
-                            }
-                        }
-                        .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
-                    }
-
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach([100, 150, 200, 250, 300, 500], id: \.self) { amount in
-                                Button {
-                                    withAnimation(GoMotion.feedback) {
-                                        amountText = "\(amount)"
-                                        showsAmountKeypad = false
-                                    }
-                                } label: {
-                                    Text("\(amount)ml")
-                                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
-                                        .foregroundStyle(Color.ohanaPrimaryText)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 7)
-                                        .background(Color.ohanaCardSurfaceElevated, in: Capsule())
-                                }
-                                .buttonStyle(ScaleButtonStyle())
-                            }
-                        }
-                    }
+                HStack {
+                    TextField(
+                        l.tr(zh: "默认水量", en: "Default amount", de: "Standardmenge"),
+                        text: $amountText
+                    )
+                    .keyboardType(.decimalPad)
+                    .accessibilityIdentifier("quick-water-default-amount-input")
+                    Text("ml").foregroundStyle(Color.ohanaSecondaryText)
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+                Stepper(value: Binding(
+                    get: { displayAmount },
+                    set: { amountText = String(max(0, $0)) }
+                ), in: 0...10_000, step: 50) {
+                    Text(localizedDefaultAmount(displayAmount))
+                }
             }
-
-            Button {
-                showsAmountKeypad = false
-                onSave()
-            } label: {
-                Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                    .foregroundStyle(Color.arkInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(tint, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
         }
-        .padding(20)
+        .tint(tint)
+        .scrollDismissesKeyboard(.interactively)
+        .ohanaEditorChrome(
+            hasChanges: initialDraft.map { $0 != draft } ?? false,
+            isSaving: isSaving,
+            canSave: !amountEnabled || (CountryDecimalInput.parse(amountText, countryCode: AppCountry.code) ?? 0) > 0,
+            onCancel: onCancel,
+            onSave: onSave
+        )
+        .onAppear { if initialDraft == nil { initialDraft = draft } }
     }
 
     private var displayAmount: Int {
@@ -717,40 +640,6 @@ struct WaterAmountSettingsSheet: View {
         )
     }
 
-    private func localizedToggle(_ isOn: Bool) -> String {
-        isOn ? l.tr(zh: "开", en: "On", de: "Ein") : l.tr(zh: "关", en: "Off", de: "Aus")
-    }
-
-    private func adjustAmount(by delta: Int) {
-        let current = displayAmount
-        let next = max(0, current + delta)
-        amountText = next > 0 ? "\(next)" : ""
-        showsAmountKeypad = false
-        UISelectionFeedbackGenerator().selectionChanged()
-    }
-
-    private func amountStepButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(Color.arkInk)
-                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(tint, in: Circle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-    }
-
-    private func settingsRow(_ title: String, value: String) -> some View {
-        HStack {
-            Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(tint)
-        }
-    }
 }
 
 struct WaterChangeSettingsSheet: View {
@@ -760,6 +649,11 @@ struct WaterChangeSettingsSheet: View {
     @Binding var reminderOn: Bool
     let nextDateText: String
     let onSave: () -> Void
+    let onCancel: () -> Void
+    var isSaving = false
+    var additionalDraft: [String] = []
+    @State private var initialDraft: [String]?
+    private var draft: [String] { [String(intervalDays), String(anchorDate.timeIntervalSinceReferenceDate), String(reminderOn)] + additionalDraft }
     let onDelete: () -> Void
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -774,47 +668,34 @@ struct WaterChangeSettingsSheet: View {
                 value: localizedNextDate(nextDateText)
             )
 
-            Stepper(value: $intervalDays.animation(GoMotion.feedback), in: 1 ... 30) {
+            Stepper(value: $intervalDays, in: 1 ... 30) {
                 settingsRow(l.tr(zh: "周期", en: "Cycle", de: "Zyklus"), value: localizedDays(intervalDays))
             }
             .tint(tint)
 
             DatePicker(l.tr(zh: "起算日", en: "Start date", de: "Startdatum"), selection: $anchorDate, displayedComponents: .date)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .tint(tint)
 
-            Toggle(isOn: $reminderOn.animation(GoMotion.feedback)) {
+            Toggle(isOn: $reminderOn) {
                 settingsRow(l.tr(zh: "日历提醒", en: "Calendar reminder", de: "Kalendererinnerung"), value: localizedToggle(reminderOn))
             }
             .tint(tint)
 
             HStack(spacing: 10) {
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goRed)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(Color.ohanaCardSurface, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
+                OhanaDeletePlanButton(title: l.tr(zh: "删除", en: "Delete", de: "Löschen")) { onDelete() }
 
-                Button {
-                    onSave()
-                } label: {
-                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(tint, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(20)
+        .ohanaEditorChrome(
+            hasChanges: initialDraft.map { $0 != draft } ?? false,
+            isSaving: isSaving,
+            saveIdentifier: "ohana-sheet-save-action",
+            onCancel: onCancel,
+            onSave: onSave
+        )
+        .onAppear { if initialDraft == nil { initialDraft = draft } }
     }
 
     private func settingsHero(icon: String, title: String, value: String) -> some View {
@@ -826,9 +707,9 @@ struct WaterChangeSettingsSheet: View {
                 .background(tint.opacity(0.15), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -838,11 +719,11 @@ struct WaterChangeSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
         }
     }
@@ -876,6 +757,11 @@ struct FilterSettingsSheet: View {
     let nextCleanText: String
     let nextReplaceText: String
     let onSave: () -> Void
+    let onCancel: () -> Void
+    var isSaving = false
+    var additionalDraft: [String] = []
+    @State private var initialDraft: [String]?
+    private var draft: [String] { [String(cleanIntervalDays), String(replaceIntervalDays), String(reminderOn)] + additionalDraft }
     let onDelete: () -> Void
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -892,9 +778,9 @@ struct FilterSettingsSheet: View {
                     .background(tint.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "滤芯计划", en: "Filter plan", de: "Filterplan"))
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     Text(localizedFilterSummary(cleanText: nextCleanText, replaceText: nextReplaceText))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
@@ -910,48 +796,35 @@ struct FilterSettingsSheet: View {
             }
             .tint(tint)
 
-            Toggle(isOn: $reminderOn.animation(GoMotion.feedback)) {
+            Toggle(isOn: $reminderOn) {
                 settingsRow(l.tr(zh: "提醒", en: "Reminder", de: "Erinnerung"), value: localizedToggle(reminderOn))
             }
             .tint(tint)
 
             HStack(spacing: 10) {
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.goRed)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(Color.ohanaCardSurface, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
+                OhanaDeletePlanButton(title: l.tr(zh: "删除", en: "Delete", de: "Löschen")) { onDelete() }
 
-                Button {
-                    onSave()
-                } label: {
-                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(Color.arkInk)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(tint, in: Capsule())
-                }
-                .buttonStyle(ScaleButtonStyle())
             }
         }
         .padding(20)
+        .ohanaEditorChrome(
+            hasChanges: initialDraft.map { $0 != draft } ?? false,
+            isSaving: isSaving,
+            saveIdentifier: "ohana-sheet-save-action",
+            onCancel: onCancel,
+            onSave: onSave
+        )
+        .onAppear { if initialDraft == nil { initialDraft = draft } }
     }
 
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
         }
     }
@@ -984,6 +857,11 @@ struct WaterPlanSettingsSheet: View {
     let completionText: String
     let onCountChange: (Int) -> Void
     let onSave: () -> Void
+    let onCancel: () -> Void
+    var isSaving = false
+    var additionalDraft: [String] = []
+    @State private var initialDraft: [String]?
+    private var draft: [String] { [String(count)] + times.map { String($0.timeIntervalSinceReferenceDate) } + additionalDraft }
     let onDelete: () -> Void
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
@@ -1001,9 +879,9 @@ struct WaterPlanSettingsSheet: View {
                         .background(tint.opacity(0.15), in: Circle())
                     VStack(alignment: .leading, spacing: 3) {
                         Text(l.tr(zh: "喂水计划", en: "Water plan", de: "Trinkplan"))
-                            .font(OhanaFont.adaptive(size: 21, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 21, weight: .semibold, design: .default))
                         Text(localizedPlanSummary(completionText: completionText, count: count))
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -1027,7 +905,7 @@ struct WaterPlanSettingsSheet: View {
                             ),
                             displayedComponents: .hourAndMinute
                         )
-                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                         .tint(tint)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -1036,31 +914,9 @@ struct WaterPlanSettingsSheet: View {
                 }
 
                 HStack(spacing: 10) {
-                    Button(role: .destructive) {
-                        onDelete()
-                    } label: {
-                        Text(l.tr(zh: "切回手动", en: "Back to manual", de: "Zurück zu manuell"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.goRed)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 13)
-                            .background(Color.ohanaCardSurface, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
+                    OhanaDeletePlanButton(title: l.tr(zh: "切回手动", en: "Back to manual", de: "Zurück zu manuell")) { onDelete() }
                     .accessibilityIdentifier("quick-water-plan-delete-action")
 
-                    Button {
-                        onSave()
-                    } label: {
-                        Text(l.tr(zh: "保存计划", en: "Save plan", de: "Plan speichern"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.arkInk)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 13)
-                            .background(tint, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityIdentifier("quick-water-plan-save-action")
                 }
             }
             .padding(.horizontal, 18)
@@ -1068,6 +924,14 @@ struct WaterPlanSettingsSheet: View {
             .padding(.bottom, 16)
         }
         .accessibilityIdentifier("quick-water-plan-settings-sheet")
+        .ohanaEditorChrome(
+            hasChanges: initialDraft.map { $0 != draft } ?? false,
+            isSaving: isSaving,
+            saveIdentifier: "quick-water-plan-save-action",
+            onCancel: onCancel,
+            onSave: onSave
+        )
+        .onAppear { if initialDraft == nil { initialDraft = draft } }
     }
 
     private func time(at index: Int) -> Date {
@@ -1087,11 +951,11 @@ struct WaterPlanSettingsSheet: View {
     private func settingsRow(_ title: String, value: String) -> some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(tint)
         }
     }
@@ -1135,7 +999,7 @@ struct WaterHistorySheet: View {
             List {
                 if logs.isEmpty {
                     Text(l.tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge"))
-                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 } else {
                     ForEach(logs) { log in

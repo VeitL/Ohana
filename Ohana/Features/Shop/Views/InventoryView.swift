@@ -52,7 +52,7 @@ struct InventoryContentView: View {
 
     // All items reference (shared with CoconutShopView)
     private var allEffectsAndTitles: [ShopItem] {
-        ShopCatalog.allItems(purchasedSet: purchasedSet)
+        ShopCatalog.inventoryItems(purchasedSet: purchasedSet)
     }
 
     private var purchasedSet: Set<String> {
@@ -111,16 +111,20 @@ struct InventoryContentView: View {
                         appIconRow(item)
                     }
                 } header: {
-                    sectionHeader(title: l.tr(zh: "App 图标", en: "App Icons", de: "App-Symbole"), icon: "app.badge.fill")
+                    sectionHeader(title: l.text(ShopShelfCopy.iconsTitle), icon: "app.badge.fill")
                 } footer: {
-                    Text(l.tr(zh: "默认图标属于基础外观，不计入已兑换内容。", en: "The default icon is a base appearance and does not count as a redeemed item.", de: "Das Standardsymbol gehört zur Grundausstattung und zählt nicht als eingelöster Artikel."))
+                    Text(l.tr(
+                        zh: "可随时恢复默认图标。", en: "Restore the default icon anytime.", de: "Jederzeit zum Standardsymbol zurückkehren.",
+                        es: "Restaura el icono predeterminado cuando quieras.", pt: "Restaure o ícone padrão quando quiser.", fr: "Rétablissez l’icône par défaut à tout moment.",
+                        ja: "いつでも標準アイコンに戻せます。", ko: "언제든 기본 아이콘으로 되돌릴 수 있어요.", it: "Ripristina l’icona predefinita quando vuoi."
+                    ))
                 }
 
                 if avatarPasses > 0 {
                     Section {
                         avatarPassRow
                     } header: {
-                        sectionHeader(title: l.tr(zh: "2.5D 头像", en: "2.5D Avatar", de: "2,5D-Avatar"), icon: "person.crop.square.fill")
+                        sectionHeader(title: l.text(ShopShelfCopy.avatarPassTitle), icon: "person.crop.square.fill")
                     }
                 }
 
@@ -150,7 +154,7 @@ struct InventoryContentView: View {
                             plantDecorRow(item)
                         }
                     } header: {
-                        sectionHeader(title: l.tr(zh: "绿洲植物装饰", en: "Oasis plant decor", de: "Oasis-Pflanzendeko"), icon: "leaf.fill")
+                        sectionHeader(title: l.text(ShopShelfCopy.oasisTitle), icon: "leaf.fill")
                     }
                 }
 
@@ -200,9 +204,7 @@ struct InventoryContentView: View {
             .navigationTitle(l.tr(zh: "我的百宝箱", en: "My treasure box", de: "Meine Schatzkiste"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
-                }
+                OhanaModalToolbar(onClose: { dismiss() })
             }
         }
         .onAppear { loadConsumableInventory() }
@@ -212,7 +214,11 @@ struct InventoryContentView: View {
             }
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
         }
-        .confirmationDialog(l.tr(zh: "选择要升级 2.5D 头像的成员", en: "Choose who gets the 2.5D avatar", de: "Wähle das 2,5D-Avatar-Ziel"), isPresented: $showAvatarTargetPicker, titleVisibility: .visible) {
+        .confirmationDialog(l.tr(
+            zh: "选择使用立体头像券的成员", en: "Choose a member for the avatar pass", de: "Mitglied für den Avatarpass wählen",
+            es: "Elige un miembro para el pase de avatar", pt: "Escolha um membro para o passe de avatar", fr: "Choisissez un membre pour le pass avatar",
+            ja: "立体アバターチケットを使うメンバーを選択", ko: "입체 아바타 이용권을 사용할 멤버 선택", it: "Scegli un membro per il pass avatar"
+        ), isPresented: $showAvatarTargetPicker, titleVisibility: .visible) {
             ForEach(activeHumans) { human in
                 Button(human.name) { upgradeHumanTo2DAvatar(human) }
             }
@@ -259,7 +265,7 @@ struct InventoryContentView: View {
                 .font(OhanaFont.adaptive(size: 28))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(zh: "2.5D 头像券", en: "2.5D Avatar Pass", de: "2,5D-Avatarpass"))
+                Text(l.text(ShopShelfCopy.avatarPassTitle))
                     .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "库存 ×\(avatarPasses) · 选择一位成员使用", en: "×\(avatarPasses) available · choose a member", de: "×\(avatarPasses) verfügbar · Mitglied wählen"))
@@ -366,7 +372,7 @@ struct InventoryContentView: View {
     // MARK: - Section Helper
     private func sectionHeader(title: String, icon: String) -> some View {
         Label(title, systemImage: icon)
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.goPrimary)
     }
 
@@ -550,7 +556,7 @@ struct InventoryContentView: View {
         return Toggle(isOn: isActive) {
             HStack(spacing: 14) {
                 Image(systemName: OasisPlantDecorID.symbolName(for: item.id))
-                    .font(OhanaFont.adaptive(size: 24, weight: .black))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 42, height: 42) // a11y: allow decorative row symbol; toggle owns the interaction.
                     .background(Color.goTeal.opacity(0.14), in: Circle())
@@ -602,7 +608,7 @@ struct InventoryContentView: View {
 
     private func consumableValue(count: Int, suffix: String?) -> some View {
         Text(suffix ?? "×\(count)")
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(suffix == nil ? Color.ohanaPrimaryText : Color.goPrimary)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -652,7 +658,11 @@ struct InventoryContentView: View {
                     ? l.tr(zh: "请先补充性别或生日资料后再试。", en: "Add gender or birthday details first.", de: "Ergänze zuerst Geschlecht oder Geburtstag.")
                     : l.tr(zh: "请先补充物种或品种资料后再试。", en: "Add species or breed details first.", de: "Ergänze zuerst Art oder Rasse.")
             case .noPass, nil:
-                l.tr(zh: "当前没有可用的 2.5D 头像券。", en: "No 2.5D avatar pass is available.", de: "Kein 2,5D-Avatarpass verfügbar.")
+                l.tr(
+                    zh: "当前没有可用的立体头像券。", en: "No avatar pass is available.", de: "Kein Avatarpass verfügbar.",
+                    es: "No hay pases de avatar disponibles.", pt: "Nenhum passe de avatar disponível.", fr: "Aucun pass avatar disponible.",
+                    ja: "利用可能な立体アバターチケットがありません。", ko: "사용 가능한 입체 아바타 이용권이 없어요.", it: "Nessun pass avatar disponibile."
+                )
             case .memberInactive:
                 l.tr(zh: "纪念成员不能再升级头像。", en: "Memorial members cannot upgrade avatars.", de: "Gedenkmitglieder können Avatare nicht mehr aktualisieren.")
             case .persistenceFailed:

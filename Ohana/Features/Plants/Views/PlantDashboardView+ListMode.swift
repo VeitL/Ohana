@@ -67,7 +67,7 @@ extension PlantDashboardView {
     func plantRoomListTitleBlock(_ summary: PlantDashboardRoomSummary) -> some View {
         HStack(alignment: .center, spacing: 8) {
             Image(systemName: "house.fill") // a11y: allow decorative room glyph; heading text names the room.
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 28, height: 28) // a11y: allow non-interactive decorative room glyph; section heading carries the accessible label.
                 .background(Color.goTeal.opacity(0.14), in: Circle())
@@ -75,7 +75,7 @@ extension PlantDashboardView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(summary.title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -84,7 +84,7 @@ extension PlantDashboardView {
                     en: "\(summary.plantCount) plants",
                     de: "\(summary.plantCount) Pflanzen"
                 ))
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -115,11 +115,11 @@ extension PlantDashboardView {
     func plantRoomListHeaderBadge(icon: String, text: String, tint: Color) -> some View {
         HStack(alignment: .center, spacing: 4) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(text)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -160,13 +160,13 @@ extension PlantDashboardView {
                     Text(plant.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                         ? l.tr(zh: "未命名植物", en: "Unnamed plant", de: "Unbenannte Pflanze")
                         : plant.name)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(plantRoomListSpeciesLine(for: plant, catalog: catalog))
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -195,13 +195,13 @@ extension PlantDashboardView {
     func plantRoomListInfoRow(signal: (icon: String, text: String, tint: Color)) -> some View {
         HStack(spacing: 6) {
             Image(systemName: signal.icon)
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                 .foregroundStyle(signal.tint)
                 .frame(width: 18, height: 18) // a11y: allow non-interactive status glyph; adjacent text carries the accessible value.
                 .background(signal.tint.opacity(0.14), in: Circle())
                 .accessibilityHidden(true)
             Text(signal.text)
-                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)

@@ -162,16 +162,16 @@ struct HumanMedicationTodayFocusCard: View {
                         Image(systemName: hasOverdueDose
                             ? "exclamationmark.triangle.fill"
                             : "pills.fill")
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(hasOverdueDose ? Color.goRed : Color.goPrimary)
                         Text(l.tr(zh: "TODAY FOCUS", en: "TODAY FOCUS", de: "HEUTE"))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .tracking(1.2)
                             .foregroundStyle(Color.ohanaTertiaryText)
                     }
 
                     Text(title)
-                        .font(OhanaFont.title2(.black))
+                        .font(OhanaFont.title2(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
 
@@ -239,7 +239,7 @@ private struct HumanMedicationProgressRing: View {
                     .font(OhanaFont.metric(size: 26))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "今日", en: "Today", de: "Heute"))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
@@ -252,7 +252,7 @@ private struct HumanMedicationOverviewPill: View {
 
     var body: some View {
         Text(text)
-            .font(OhanaFont.caption2(.black))
+            .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(color)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
@@ -313,10 +313,10 @@ private struct HumanMedicationOverviewMetricCard: View {
         VStack(spacing: 6) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(color)
                 Text(label)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .lineLimit(1)
             }
@@ -512,7 +512,7 @@ private struct HumanMedicationAdherenceChart: View {
                                 .weekday(.narrow)
                                 .locale(AppLanguage.effectiveLocale)
                         ))
-                        .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                         .foregroundStyle(
                             Calendar.current.isDateInToday(day.date)
                                 ? takenTint

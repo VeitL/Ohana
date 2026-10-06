@@ -19,6 +19,8 @@ enum PetAllFeatureDestination: Hashable {
     case documents
     case moments
     case timeline
+    case photos
+    case memory(PetRecordReference)
     case achievements
     case retention
     case weight
@@ -39,6 +41,8 @@ extension PetAllFeatureDestination: Identifiable {
         case .documents: "documents"
         case .moments: "moments"
         case .timeline: "timeline"
+        case .photos: "photos"
+        case let .memory(reference): "memory-\(reference.id)"
         case .achievements: "achievements"
         case .retention: "retention"
         case .weight: "weight"
@@ -65,7 +69,7 @@ extension PetAllFeatureDestination: Identifiable {
             .basicInfo
         case .documents:
             .documents
-        case .moments, .timeline:
+        case .moments, .timeline, .photos, .memory:
             .moments
         case .achievements:
             .achievements
@@ -80,7 +84,7 @@ extension PetAllFeatureDestination: Identifiable {
 
     var isAvailableInMemorialMode: Bool {
         switch self {
-        case .basicInfo, .documents, .moments, .timeline, .achievements, .retention:
+        case .basicInfo, .documents, .moments, .timeline, .photos, .memory, .achievements, .retention:
             true
         case .health, .medications, .food, .hygiene, .walks, .potty, .weight, .expense, .bondVault:
             false
@@ -116,6 +120,7 @@ nonisolated struct PetAllFeaturesActivitySummary: Equatable, Sendable {
     let weightChartPoints: [OhanaMinimalChartPoint]
     let expenseChartPoints: [OhanaMinimalChartPoint]
     let archiveChartPoints: [OhanaMinimalChartPoint]
+    let latestMemory: PetLatestMemorySnapshot?
 
     static let empty = PetAllFeaturesActivitySummary()
 
@@ -146,8 +151,10 @@ nonisolated struct PetAllFeaturesActivitySummary: Equatable, Sendable {
         healthChartPoints: [OhanaMinimalChartPoint] = [],
         weightChartPoints: [OhanaMinimalChartPoint] = [],
         expenseChartPoints: [OhanaMinimalChartPoint] = [],
-        archiveChartPoints: [OhanaMinimalChartPoint] = []
+        archiveChartPoints: [OhanaMinimalChartPoint] = [],
+        latestMemory: PetLatestMemorySnapshot? = nil
     ) {
+        self.latestMemory = latestMemory
         self.todayFeedCount = todayFeedCount
         self.todayNonFeedingCareCount = todayNonFeedingCareCount
         self.totalNonFeedingCareCount = totalNonFeedingCareCount
@@ -354,7 +361,8 @@ nonisolated struct PetAllFeaturesActivitySummary: Equatable, Sendable {
             archiveChartPoints: FeatureHubChartPointFactory.bars(
                 [Double(documents.count), Double(photoCount), Double(milestoneCount), Double(insuranceCount)],
                 idPrefix: "pet-all-archive"
-            )
+            ),
+            latestMemory: PetLatestMemorySnapshot.load(petID: petID, context: context)
         )
     }
 
@@ -447,6 +455,7 @@ struct PetAllFeaturesSheet: View {
                     subtitle: petSubtitle,
                     eyebrow: l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"),
                     onClose: { dismiss() },
+                    showsCloseButton: false,
                     avatar: {
                         FeatureHubAvatar(
                             imageCacheID: "pet-all-features-\(pet.id.uuidString)",
@@ -464,12 +473,15 @@ struct PetAllFeaturesSheet: View {
                 }
 
                 ForEach(visiblePetSections) { section in
+                    if section.id == "archive" { latestMemoryPreview }
                     FeatureHubSectionActionView(section: section) { destination in
                         open(destination)
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "feature-hub-close-action") }
             .petMemorialTone(isActive: pet.hasPassedAway)
         }
     }
@@ -482,6 +494,36 @@ struct PetAllFeaturesSheet: View {
             GrowthNewFeatureStore.markVisited(feature: feature)
         }
         onOpenDestination(destination)
+    }
+
+    @ViewBuilder
+    private var latestMemoryPreview: some View {
+        let copy = PetCareExperienceCopy(l: l)
+        if let memory = activitySummary.latestMemory {
+            Button { open(.memory(memory.reference)) } label: {
+                VStack(alignment: .leading, spacing: 6) {
+                    Label(copy.latestMemory, systemImage: "heart.text.clipboard")
+                        .font(.caption).foregroundStyle(Color.ohanaSecondaryText)
+                    Text(memory.title.isEmpty ? copy.viewRecord : memory.title)
+                        .font(.body).foregroundStyle(Color.ohanaPrimaryText)
+                    Text(memory.date, style: .date)
+                        .font(.caption).foregroundStyle(Color.ohanaSecondaryText)
+                    Label(copy.viewRecord, systemImage: "chevron.right").font(.callout)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.card))
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("pet-latest-memory")
+        } else {
+            Button { open(.photos) } label: {
+                Label(copy.addMemory, systemImage: "photo.badge.plus")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 12)
+            }
+            .accessibilityIdentifier("pet-add-first-memory")
+        }
     }
 
     private var petSections: [FeatureHubSectionData<PetAllFeatureDestination>] {
@@ -652,6 +694,24 @@ struct PetAllFeaturesSheet: View {
                 destination: .moments
             ),
             item(
+                id: "timeline",
+                title: PetMomentsTab.timeline.title(l),
+                value: "",
+                subtitle: PetCareExperienceCopy(l: l).viewHistory,
+                icon: "clock.arrow.circlepath",
+                tint: Color.goPrimary,
+                destination: .timeline
+            ),
+            item(
+                id: "photos",
+                title: PetMomentsTab.photos.title(l),
+                value: "\(activitySummary.photoCount)",
+                subtitle: momentsSub,
+                icon: "photo.on.rectangle",
+                tint: Color(hex: "EC4899"),
+                destination: .photos
+            ),
+            item(
                 id: "documents",
                 title: l.tr(zh: "证件保障", en: "Documents", de: "Dokumente"),
                 value: "\(activitySummary.protectionDocumentCount + activitySummary.insuranceCount)",
@@ -766,7 +826,7 @@ struct PetAllFeaturesSheet: View {
         let count = activitySummary.todayFeedCount
         return count > 0
             ? l.tr(zh: "今日喂食\(count)次", en: "\(count) feeds today", de: "\(count) Fütterungen heute")
-            : l.tr(zh: "今日未喂食", en: "No feed today", de: "Heute kein Futter")
+            : PetCareExperienceCopy(l: l).noRecord
     }
 
     private var hygieneSub: String {

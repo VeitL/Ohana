@@ -120,6 +120,16 @@ nonisolated enum PlantReminderPreferenceStore {
         defaults.set(value, forKey: key)
     }
 
+    static func restorePlanCalendarOverride(
+        _ value: Bool?,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCarePlanCalendarPrefix, plantID: plantID, careType: careType)
+        if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+    }
+
     static func planCalendarOverride(
         forPlantID plantID: UUID,
         careType: PlantCareType,
@@ -149,6 +159,16 @@ nonisolated enum PlantReminderPreferenceStore {
         guard controllableCareTypes.contains(careType) else { return }
         let key = plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType)
         defaults.set(value, forKey: key)
+    }
+
+    static func restoreSystemReminderOverride(
+        _ value: Bool?,
+        forPlantID plantID: UUID,
+        careType: PlantCareType,
+        defaults: UserDefaults = .standard
+    ) {
+        let key = plantCareKey(prefix: plantCareSystemReminderPrefix, plantID: plantID, careType: careType)
+        if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
     }
 
     static func systemReminderOverride(

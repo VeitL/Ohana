@@ -11,14 +11,7 @@ extension SettingsView {
     // MARK: - Toolbar
     @ToolbarContentBuilder
     var settingsToolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .cancellationAction) {
-            Button(role: .cancel) {
-                closeSettings()
-            } label: {
-                Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
-            }
-            .accessibilityIdentifier("settings-close-action")
-        }
+        OhanaModalToolbar(onClose: { closeSettings() }, closeIdentifier: "settings-close-action")
 
         #if DEBUG
             ToolbarItem(placement: .primaryAction) {
@@ -111,22 +104,14 @@ extension SettingsView {
         }
     }
 
-    func settingsRow(icon: String, title: String, subtitle: String, iconColor: Color = Color.goPrimary, action: @escaping () -> Void) -> some View {
+    func settingsRow(icon: String, title: String, subtitle: String, iconColor _: Color = Color.goPrimary, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                settingsIcon(icon, color: iconColor)
-                Text(title)
-                    .font(OhanaFont.body(.semibold))
-                    .foregroundStyle(primaryText)
-                Spacer()
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(OhanaFont.footnote())
-                        .foregroundStyle(tertiaryText)
-                }
+                SettingsNavigationLabel(icon: icon, title: title, subtitle: subtitle)
                 Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tertiaryText.opacity(0.6))
+                    .accessibilityHidden(true)
             }
             .frame(minHeight: 44)
         }
@@ -138,5 +123,6 @@ extension SettingsView {
             .foregroundStyle(Color.ohanaFunctionalIcon)
             .frame(width: 32, height: 32) // a11y: allow decorative non-interactive frame; hit area handled by parent
             .contentShape(Rectangle())
+            .accessibilityHidden(true)
     }
 }

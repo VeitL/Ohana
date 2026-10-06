@@ -167,7 +167,7 @@ private struct SettingsPlantReminderPanelContent: View {
 
     private var reminderStateBadge: some View {
         Text(reminderStateBadgeText)
-            .font(OhanaFont.caption2(.black))
+            .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(reminderOverviewTint)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
@@ -214,7 +214,7 @@ private struct SettingsPlantReminderPanelContent: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
             Text(value)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -792,11 +792,11 @@ private struct SettingsPlantReminderPanelContent: View {
     private func menuValueLabel(_ title: String) -> some View {
         HStack(spacing: 5) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
             Image(systemName: "chevron.down") // a11y: allow decorative dropdown affordance covered by menu label
-                .font(OhanaFont.adaptive(size: 9, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .accessibilityHidden(true)
         }
         .foregroundStyle(primaryText)

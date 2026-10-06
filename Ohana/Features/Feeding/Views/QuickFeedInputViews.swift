@@ -45,7 +45,7 @@ struct QuickFeedTreatKindPicker: View {
                     onSelect(treatKind)
                 } label: {
                     Label(title(treatKind), systemImage: treatKind.systemIconName)
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(selection == treatKind ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -70,7 +70,7 @@ struct QuickFeedBrandSuggestionChips: View {
                         onSelect(brand)
                     } label: {
                         Text(brand)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -96,18 +96,18 @@ struct QuickFeedGramInput<Keypad: View, Chips: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 10) {
                 QuickFeedGramStepButton(systemName: "minus", tint: tint, action: onDecrease)
                 Button(action: onOpenNumberPad) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(text.isEmpty ? "50" : text)
-                            .font(OhanaFont.adaptive(size: 32, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 32, weight: .semibold, design: .default))
                             .foregroundStyle(text.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                             .monospacedDigit()
                         Text("g")
-                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                     }
                     .frame(maxWidth: .infinity)
@@ -133,7 +133,7 @@ struct QuickFeedGramStepButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: Circle())
@@ -158,11 +158,11 @@ struct QuickFeedPlanMealGramEditor<Keypad: View>: View {
                 Button(action: onOpenNumberPad) {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Text(valueText.isEmpty ? "50" : valueText)
-                            .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                             .foregroundStyle(valueText.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                             .monospacedDigit()
                         Text("g")
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                     }
                     .frame(maxWidth: .infinity)
@@ -187,19 +187,19 @@ struct QuickFeedGramInputCompact<Keypad: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(spacing: 5) {
                 Button(action: onOpenNumberPad) {
                     Text(text.isEmpty ? "50" : text)
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                         .foregroundStyle(text.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 Text("g")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(tint)
             }
             .padding(12)
@@ -224,7 +224,7 @@ struct QuickFeedQuickGramChips: View {
                         onSelect(value)
                     } label: {
                         Text(title(value))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(tint)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 7)
@@ -258,11 +258,11 @@ struct QuickFeedPlanStepperCard<Control: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                     .foregroundStyle(tint)
                 Spacer()
                 control
@@ -282,11 +282,11 @@ struct QuickFeedCompactNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 18)
             Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -301,7 +301,7 @@ struct QuickFeedErrorText: View {
 
     var body: some View {
         Label(text, systemImage: "exclamationmark.triangle.fill")
-            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
             .foregroundStyle(Color.goRed)
             .padding(12)
             .feedFlatBlockSurface(cornerRadius: OhanaRadius.row)

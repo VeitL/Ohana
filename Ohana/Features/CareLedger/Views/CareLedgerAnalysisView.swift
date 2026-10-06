@@ -89,7 +89,7 @@ struct CareLedgerAnalysisContentView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "统一照护事件账本", en: "Unified care event ledger", de: "Einheitliches Pflegeereignis-Buch"))
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                 }
                 Spacer()
             }
@@ -104,7 +104,7 @@ struct CareLedgerAnalysisContentView: View {
                         l.tr(zh: "导出当前照护数据", en: "Export current care data", de: "Aktuelle Pflegedaten exportieren"),
                         systemImage: "square.and.arrow.up"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.ohanaControlFill, in: Capsule())
@@ -182,10 +182,10 @@ struct CareLedgerAnalysisContentView: View {
                 Text(title).lineLimit(1)
                 if isLocked {
                     Image(systemName: "lock.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 8, weight: .black))
+                        .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                 }
             }
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 12)
             .frame(minHeight: 36)
@@ -330,16 +330,16 @@ struct CareLedgerAnalysisContentView: View {
                             .background(event.kind.color.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text("\(event.kind.displayName(l: l)) · \(event.actionType)")
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                                 .lineLimit(1)
                             Text("\(screenModel.actorName(for: event.actorId, kind: event.actorKind, l: l)) → \(screenModel.subjectName(for: event.subjectId, kind: event.subjectKind, l: l))")
-                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(1)
                         }
                         Spacer()
                         Text(event.occurredAt, format: .dateTime.month().day().hour().minute())
-                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -356,7 +356,7 @@ struct CareLedgerAnalysisContentView: View {
             prepareExport()
         } label: {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.primary)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
@@ -368,9 +368,9 @@ struct CareLedgerAnalysisContentView: View {
     private func statBar(title: String, count: Int, total: Int, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(title).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                Text(title).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 Spacer()
-                Text("\(count)").font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)).foregroundStyle(color)
+                Text("\(count)").font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)).foregroundStyle(color)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
@@ -384,8 +384,8 @@ struct CareLedgerAnalysisContentView: View {
 
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
-            Text(value).font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)).foregroundStyle(color)
-            Text(label).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+            Text(value).font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default)).foregroundStyle(color)
+            Text(label).font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)).foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -395,14 +395,14 @@ struct CareLedgerAnalysisContentView: View {
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon).foregroundStyle(Color.goPrimary)
-            Text(title).font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+            Text(title).font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
             Spacer()
         }
     }
 
     private func emptyText(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)

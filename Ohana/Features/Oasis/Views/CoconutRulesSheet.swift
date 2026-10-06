@@ -277,16 +277,7 @@ struct CoconutRulesSheet: View {
             .navigationTitle(l.tr(zh: "椰子指南", en: "Coconut guide", de: "Kokosnuss-Guide"))
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 17, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                }
+                OhanaModalToolbar(onClose: { dismiss() })
             }
         }
         .ohanaSheetPagePresentation() // ui-v4: allow rules reference sheet

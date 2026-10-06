@@ -124,7 +124,7 @@ struct PlantQuickCareActorConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(spacing: 12) {
                     Image(systemName: careSymbol)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black))
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
                         .background(tint, in: Circle())
@@ -132,7 +132,7 @@ struct PlantQuickCareActorConfirmationSheet: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(draft.careType.displayName(l: l))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(draft.plantName)
                             .font(OhanaFont.caption(.semibold))
@@ -158,7 +158,7 @@ struct PlantQuickCareActorConfirmationSheet: View {
                         l.tr(zh: "确认已完成", en: "Confirm completed", de: "Als erledigt bestätigen"),
                         systemImage: "checkmark.circle.fill"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(tint, in: Capsule())

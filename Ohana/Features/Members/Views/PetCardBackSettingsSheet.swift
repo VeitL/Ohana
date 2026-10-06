@@ -140,7 +140,7 @@ struct PetCardBackSettingsSheet: View {
         HStack {
             Text("🌈").font(OhanaFont.adaptive(size: 20)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "永远的家人", en: "Forever Family", de: "Für immer Familie"))
-                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Spacer()
         }
     }

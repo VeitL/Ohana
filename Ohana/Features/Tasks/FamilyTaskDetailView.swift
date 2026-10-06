@@ -99,12 +99,7 @@ extension FamilyTaskDetailView {
             .navigationTitle(l.tr(zh: "任务详情", en: "Task details", de: "Aufgabendetails"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) {
-                        dismiss()
-                    }
-                    .accessibilityIdentifier("family-task-detail-close")
-                }
+                OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "family-task-detail-close")
 
                 if snapshot.capabilities.canEdit, onEdit != nil {
                     ToolbarItem(placement: .primaryAction) {
@@ -237,7 +232,7 @@ extension FamilyTaskDetailView {
 
                 VStack(alignment: .leading, spacing: 7) {
                     Text(snapshot.title)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .fixedSize(horizontal: false, vertical: true)
 

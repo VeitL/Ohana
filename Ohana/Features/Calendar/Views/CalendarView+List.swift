@@ -117,7 +117,7 @@ extension CalendarView {
                         .frame(width: 40)
 
                     Text(relativeDate(date))
-                        .font(OhanaFont.footnote(.black))
+                        .font(OhanaFont.footnote(.semibold))
                         .foregroundStyle(isMaterial ? Color(hex: "8E8E93") : classicSoftText)
                         .tracking(0.5)
 
@@ -170,7 +170,7 @@ extension CalendarView {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 8) {
                     Text(l.tr(zh: "今天", en: "Today", de: "Heute"))
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(chipAccent)
                     Text(count == 0 ? l.tr(zh: "暂无事件", en: "No events", de: "Keine Ereignisse") : l.tr(zh: "\(count) 项", en: "\(count) items", de: "\(count) Eintraege"))
                         .font(OhanaFont.footnote(.bold))
@@ -192,12 +192,12 @@ extension CalendarView {
         let dayNumber = Calendar.current.component(.day, from: date)
         return VStack(spacing: 3) {
             Text(weekdayShort(date))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(isToday ? chipAccent : classicSoftText)
                 .textCase(.uppercase)
 
             Text("\(dayNumber)")
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(isToday ? chipSelFg : classicPrimaryText)
                 .ohanaNumericMotion(dayNumber)
                 .frame(width: 34, height: 34) // a11y: allow fixed-format noninteractive date badge

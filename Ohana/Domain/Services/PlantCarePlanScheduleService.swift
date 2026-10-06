@@ -287,7 +287,8 @@ enum PlantCarePlanScheduleService {
     }
 
     private static func enabledCareTypes(for plant: Plant, defaults: UserDefaults) -> [PlantCareType] {
-        scheduledCareTypes.filter {
+        guard plant.remindersEnabled else { return [] }
+        return scheduledCareTypes.filter {
             PlantReminderPreferenceStore.isPlanCalendarEnabled(
                 forPlantID: plant.id,
                 careType: $0,

@@ -490,11 +490,11 @@ struct HumanLabResultImportView: View {
 
                             HStack(spacing: 6) {
                                 Text(candidateValueLabel(candidate, unit: unit))
-                                    .font(OhanaFont.headline(.black))
+                                    .font(OhanaFont.headline(.semibold))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                 if candidate.reportedFlag != .unknown {
                                     Text(flagLabel(candidate.reportedFlag))
-                                        .font(OhanaFont.caption2(.black))
+                                        .font(OhanaFont.caption2(.semibold))
                                         .foregroundStyle(flagColor(candidate.reportedFlag))
                                 }
                             }

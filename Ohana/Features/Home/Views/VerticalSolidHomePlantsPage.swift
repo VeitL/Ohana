@@ -193,10 +193,20 @@ struct VerticalSolidHomePlantsPage: View {
     }
 
     private var showsDueCareBanner: Bool {
-        dueCarePlantCount > 0 &&
-            selectedRoomId == nil &&
+        selectedRoomId == nil &&
             selectedCardId == nil &&
             heroDirection == 0
+    }
+
+    private var dueCareBannerText: String {
+        if dueCarePlantCount == 0 {
+            return hasMorePlants
+                ? l.tr(zh: "预览中暂无待关注", en: "Preview is clear for now", de: "Vorschau derzeit ohne Aufgaben", es: "La vista previa está al día", pt: "A prévia está em dia", fr: "Aucun soin dans l’aperçu", ja: "プレビュー内に今日の作業はありません", ko: "미리보기에는 오늘 할 일이 없어요", it: "Nessuna cura nell’anteprima")
+                : l.tr(zh: "今天无需操作", en: "Nothing to do today", de: "Heute nichts zu tun", es: "Nada que hacer hoy", pt: "Nada para fazer hoje", fr: "Rien à faire aujourd’hui", ja: "今日は作業不要です", ko: "오늘은 할 일이 없어요", it: "Niente da fare oggi")
+        }
+        return hasMorePlants
+            ? l.tr(zh: "预览中 \(dueCarePlantCount) 株待关注", en: "\(dueCarePlantCount) preview plants need attention", de: "\(dueCarePlantCount) Pflanzen der Vorschau brauchen Aufmerksamkeit", es: "\(dueCarePlantCount) plantas de la vista previa requieren atención", pt: "\(dueCarePlantCount) plantas da prévia precisam de atenção", fr: "\(dueCarePlantCount) plantes à vérifier dans l’aperçu", ja: "プレビュー内で確認が必要：\(dueCarePlantCount)株", ko: "미리보기에서 확인할 식물 \(dueCarePlantCount)개", it: "\(dueCarePlantCount) piante da controllare nell’anteprima")
+            : l.tr(zh: "今日 \(dueCarePlantCount) 株待关注", en: "\(dueCarePlantCount) plants to check today", de: "\(dueCarePlantCount) Pflanzen heute prüfen", es: "\(dueCarePlantCount) plantas para revisar hoy", pt: "\(dueCarePlantCount) plantas para verificar hoje", fr: "\(dueCarePlantCount) plantes à vérifier aujourd’hui", ja: "今日確認する植物：\(dueCarePlantCount)株", ko: "오늘 확인할 식물 \(dueCarePlantCount)개", it: "\(dueCarePlantCount) piante da controllare oggi")
     }
 
     private var plantDueCareBanner: some View {
@@ -209,32 +219,10 @@ struct VerticalSolidHomePlantsPage: View {
                     .font(OhanaFont.adaptive(size: 14, weight: .black))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 34, height: 34) // a11y: allow decorative glyph inside a 50pt labeled batch-care button.
-                    .background(Color.goYellow, in: Circle())
+                    .background(dueCarePlantCount == 0 ? Color.goTeal : Color.goYellow, in: Circle())
                     .accessibilityHidden(true)
 
-                Text(hasMorePlants
-                    ? l.tr(
-                        zh: "预览中 \(dueCarePlantCount) 株待照护",
-                        en: "\(dueCarePlantCount) preview plants need care",
-                        de: "\(dueCarePlantCount) Pflanzen der Vorschau brauchen Pflege",
-                        es: "\(dueCarePlantCount) plantas de la vista previa necesitan cuidados",
-                        pt: "\(dueCarePlantCount) plantas da prévia precisam de cuidados",
-                        fr: "\(dueCarePlantCount) plantes de l’aperçu à entretenir",
-                        ja: "プレビュー内でお手入れが必要：\(dueCarePlantCount)株",
-                        ko: "미리보기에서 관리가 필요한 식물 \(dueCarePlantCount)개",
-                        it: "\(dueCarePlantCount) piante nell’anteprima da curare"
-                    )
-                    : l.tr(
-                        zh: "今日 \(dueCarePlantCount) 株待照护",
-                        en: "\(dueCarePlantCount) plants need care today",
-                        de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege",
-                        es: "\(dueCarePlantCount) plantas necesitan cuidados hoy",
-                        pt: "\(dueCarePlantCount) plantas precisam de cuidados hoje",
-                        fr: "\(dueCarePlantCount) plantes à entretenir aujourd’hui",
-                        ja: "今日のお手入れ：\(dueCarePlantCount)株",
-                        ko: "오늘 관리가 필요한 식물 \(dueCarePlantCount)개",
-                        it: "\(dueCarePlantCount) piante da curare oggi"
-                    ))
+                Text(dueCareBannerText)
                 .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
@@ -256,17 +244,7 @@ struct VerticalSolidHomePlantsPage: View {
             .overlay(Capsule().strokeBorder(Color.ohanaCardStroke.opacity(0.66), lineWidth: 1))
         }
         .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(hasMorePlants
-            ? l.tr(
-                zh: "预览中 \(dueCarePlantCount) 株植物待照护，打开批量照护",
-                en: "\(dueCarePlantCount) preview plants need care, open batch care",
-                de: "\(dueCarePlantCount) Pflanzen der Vorschau brauchen Pflege, Batch-Pflege öffnen"
-            )
-            : l.tr(
-                zh: "今日 \(dueCarePlantCount) 株植物待照护，打开批量照护",
-                en: "\(dueCarePlantCount) plants need care today, open batch care",
-                de: "\(dueCarePlantCount) Pflanzen brauchen heute Pflege, Batch-Pflege öffnen"
-            ))
+        .accessibilityLabel("\(dueCareBannerText). \(l.tr(zh: "打开今日护理", en: "Open today care", de: "Pflege für heute öffnen"))")
         .accessibilityIdentifier("home-plants-due-care-banner")
     }
 

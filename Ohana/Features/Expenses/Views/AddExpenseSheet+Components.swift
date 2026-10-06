@@ -21,9 +21,9 @@ extension AddExpenseSheetContent {
     func receiptActionContent(icon: String, title: String) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
@@ -78,7 +78,7 @@ extension AddExpenseSheetContent {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
         }
         .foregroundStyle(Color.ohanaPrimaryActionText)
         .frame(maxWidth: .infinity)
@@ -95,9 +95,9 @@ extension AddExpenseSheetContent {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: category.systemIconName)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(l.expenseCategoryTitle(category))
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
             }
             .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : primaryText)
             .padding(.horizontal, 13)
@@ -125,7 +125,7 @@ extension AddExpenseSheetContent {
                     .frame(width: 24, height: 24) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.ohanaCardSurface, in: Circle())
                 Text(name)
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .lineLimit(1)
             }
             .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : primaryText)
@@ -193,7 +193,7 @@ extension AddExpenseSheetContent {
 
     func payerAmountPill(_ amount: String, isActive: Bool) -> some View {
         Text("\(AppCurrency.symbol)\(amount)")
-            .font(OhanaFont.subheadline(.black))
+            .font(OhanaFont.subheadline(.semibold))
             .foregroundStyle(isActive ? Color.ohanaPrimaryActionText : primaryText)
             .monospacedDigit()
             .padding(.horizontal, 11)

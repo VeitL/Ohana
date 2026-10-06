@@ -243,12 +243,12 @@ extension PlantDashboardView {
     private func roomEdgeRailLabel(_ option: RoomEdgeRailOption, isFocused: Bool) -> some View {
         VStack(spacing: 1) {
             Text(option.shortTitle)
-                .font(OhanaFont.adaptive(size: option.shortTitle.count > 2 ? 9 : 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: option.shortTitle.count > 2 ? 9 : 12, weight: .semibold, design: .default))
                 .foregroundStyle(isFocused ? Color.goPrimary : Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
             Text("\(option.count)")
-                .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                 .foregroundStyle(isFocused ? Color.goPrimary.opacity(0.72) : Color.ohanaSecondaryText)
                 .lineLimit(1)
         }

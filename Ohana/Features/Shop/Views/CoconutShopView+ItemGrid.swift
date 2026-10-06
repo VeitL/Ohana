@@ -18,20 +18,36 @@ extension CoconutShopView {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     Text(item.name(l))
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(primaryText)
-                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .lineLimit(nil)
                     if state.isEquipped {
                         Image(systemName: "checkmark.seal.fill") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goPrimary)
                     }
                 }
 
                 Text(item.description(l))
-                    .font(OhanaFont.caption2(.semibold))
+                    .font(OhanaFont.caption())
                     .foregroundStyle(tertiaryText)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(l.text(item.isConsumable ? ShopShelfCopy.singleUse : ShopShelfCopy.permanent))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
+                Spacer(minLength: 0)
+                Text("🥥 \(item.cost)")
+                    .font(OhanaFont.caption(.bold))
+                    .foregroundStyle(primaryText)
+            }
+            if item.application == .effect(.popoutCard) {
+                Text(l.text(ShopShelfCopy.transparentRequired))
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -47,7 +63,6 @@ extension CoconutShopView {
             RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
                 .strokeBorder(state.isEquipped ? Color.goPrimary.opacity(0.52) : Color.clear, lineWidth: 1.5)
         }
-        .opacity(state.isDisabled ? 0.58 : 1)
         .accessibilityElement(children: .contain)
     }
 
@@ -59,7 +74,7 @@ extension CoconutShopView {
             ShopAppliedPreview(
                 item: item,
                 human: currentHuman,
-                pet: pets.first,
+                pet: activePets.first,
                 isEquipped: isEquipped,
                 appLanguage: appLanguage
             )
@@ -80,7 +95,6 @@ extension CoconutShopView {
     struct ItemState {
         var label: String
         var tint: Color
-        var showCost: Bool = false
         var isEquipped: Bool = false
         var isDisabled: Bool = false
     }
@@ -97,21 +111,18 @@ extension CoconutShopView {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
                 Spacer()
-                if state.showCost {
-                    Text("🥥 \(item.cost)")
-                        .font(OhanaFont.caption(.semibold))
-                } else if item.isPurchased, item.appIcon == nil {
-                    Image(systemName: "chevron.forward") // a11y: allow decorative disclosure symbol; the button label names the action.
-                        .font(OhanaFont.caption2(.black))
+                if item.isPurchased, item.appIcon == nil {
+                    Image(systemName: "chevron.forward") // a11y: allow decorative disclosure; the button names its action.
+                        .font(OhanaFont.caption2(.bold))
                         .accessibilityHidden(true)
                 }
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 44)
         }
         .buttonStyle(.bordered)
         .tint(state.tint)
         .disabled(state.isDisabled)
-        .accessibilityLabel("\(item.name(l)), \(state.label)")
+        .accessibilityLabel("\(item.name(l)), \(state.label), \(item.cost)🥥")
         .accessibilityHint(
             purchaseSettlements[item.id] == .needsAttention
                 ? purchaseRecoverySafetyHint
@@ -160,12 +171,11 @@ extension CoconutShopView {
                 return .init(
                     label: l.tr(zh: "使用中", en: "In use", de: "Aktiv"),
                     tint: Color.goPrimary,
-                    isEquipped: true,
-                    isDisabled: true
+                    isEquipped: true
                 )
             }
             if item.isPurchased {
-                return .init(label: l.tr(zh: "设为当前图标", en: "Use this icon", de: "Dieses Symbol verwenden"), tint: Color.goTeal)
+                return .init(label: l.text(ShopShelfCopy.ownedManage), tint: Color.goTeal)
             }
             return purchaseItemState(item)
         }
@@ -186,8 +196,8 @@ extension CoconutShopView {
             let equipped = isOwnedItemEquipped(item)
             return .init(
                 label: equipped
-                    ? l.tr(zh: "已拥有 · 使用中", en: "Owned · In use", de: "Besitzt · Aktiv")
-                    : l.tr(zh: "已拥有 · 管理", en: "Owned · Manage", de: "Besitzt · Verwalten"),
+                    ? l.tr(zh: "使用中", en: "In use", de: "Aktiv")
+                    : l.text(ShopShelfCopy.ownedManage),
                 tint: Color.goPrimary,
                 isEquipped: equipped
             )
@@ -203,12 +213,11 @@ extension CoconutShopView {
     func purchaseItemState(_ item: ShopItem) -> ItemState {
         switch purchaseReadiness(for: item) {
         case .ready:
-            .init(label: l.tr(zh: "兑换", en: "Redeem", de: "Einlösen"), tint: Color.goYellow, showCost: true)
+            .init(label: l.tr(zh: "兑换", en: "Redeem", de: "Einlösen"), tint: Color.goYellow)
         case let .insufficient(missing):
             .init(
                 label: l.tr(zh: "还差 \(missing)🥥", en: "Need \(missing)🥥", de: "Noch \(missing)🥥"),
                 tint: tertiaryText,
-                showCost: true,
                 isDisabled: true
             )
         case .walletFrozen:
@@ -281,13 +290,13 @@ extension CoconutShopView {
             }
             return
         }
-        if let appIcon = item.appIcon {
-            handleAppIconTap(item, descriptor: appIcon)
+        if item.isPurchased {
+            showInventory = true
             return
         }
 
-        if item.isPurchased {
-            showInventory = true
+        if let appIcon = item.appIcon {
+            handleAppIconTap(item, descriptor: appIcon)
             return
         }
 

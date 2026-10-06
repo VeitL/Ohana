@@ -120,7 +120,7 @@ struct HumanHealthSummaryView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(human.name)
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -154,6 +154,10 @@ struct HumanHealthSummaryView: View {
                 HStack(spacing: 12) { quickRecordButtons }
                 VStack(alignment: .leading, spacing: 8) { quickRecordButtons }
             }
+            Text(HumanHealthPatternCopy.symptomDetail(l))
+                .font(OhanaFont.caption())
+                .foregroundStyle(Color.ohanaSecondaryText)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -271,7 +275,7 @@ struct HumanHealthSummaryView: View {
                     showingPinnedEditor = true
                 } label: {
                     Text(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
@@ -310,20 +314,20 @@ struct HumanHealthSummaryView: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: destination.systemImage)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                         .foregroundStyle(destination.tint)
                     Spacer(minLength: 6)
                     Image(systemName: "chevron.right") // a11y: allow decorative navigation affordance; link text supplies the label
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .accessibilityHidden(true)
                 }
                 Text(destination.title(l))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(destinationValue(destination, snapshot: snapshot))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(destination.tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -378,7 +382,7 @@ struct HumanHealthSummaryView: View {
     private func highlightRow(_ highlight: HumanHealthSummaryHighlight) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: highlightIcon(highlight))
-                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(highlightTint(highlight))
                 .frame(width: 28, height: 28) // a11y: allow decorative glyph; row is non-interactive and combines its text
                 .background(highlightTint(highlight).opacity(0.13), in: Circle())
@@ -405,7 +409,7 @@ struct HumanHealthSummaryView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "chart.xyaxis.line") // a11y: allow decorative icon; link text supplies the label
-                            .font(OhanaFont.adaptive(size: 18, weight: .black))
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                             .foregroundStyle(Color.goTeal)
                             .accessibilityHidden(true)
                         Text(l.tr(
@@ -454,14 +458,14 @@ struct HumanHealthSummaryView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: trendIcon(trend.direction))
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                     .foregroundStyle(trendTint(trend))
                     .frame(width: 38, height: 38) // a11y: allow decorative glyph; the enclosing link has a 54pt minimum height
                     .background(trendTint(trend).opacity(0.12), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(metricTitle(trend.metricKey))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(trend.currentDate, format: .dateTime.year().month().day())
                         .font(OhanaFont.caption2(.semibold))
@@ -470,16 +474,16 @@ struct HumanHealthSummaryView: View {
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(metricValue(trend.currentValue, metricKey: trend.metricKey, unitCode: trend.unitCode))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                     Text(trendDelta(trend))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(trendTint(trend))
                 }
                 Image(systemName: "chevron.right") // a11y: allow decorative navigation affordance; link text supplies the label
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .accessibilityHidden(true)
             }
@@ -545,7 +549,7 @@ struct HumanHealthSummaryView: View {
                             tint: .goRed
                         )
                         Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph; NavigationLink supplies the label
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.ohanaTertiaryText)
                             .accessibilityHidden(true)
                     }
@@ -558,7 +562,7 @@ struct HumanHealthSummaryView: View {
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "hand.raised.fill") // a11y: allow decorative privacy icon; adjacent text conveys the disclosure
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.goBlue)
                     .accessibilityHidden(true)
                 Text(l.tr(
@@ -580,7 +584,7 @@ struct HumanHealthSummaryView: View {
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "lock.shield.fill") // a11y: allow decorative privacy icon; adjacent text conveys the notice
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .accessibilityHidden(true)
                 Text(l.tr(
@@ -617,14 +621,14 @@ struct HumanHealthSummaryView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: isLocked ? "lock.fill" : icon)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                     .foregroundStyle(isLocked ? Color.goYellow : tint)
                     .frame(width: 38, height: 38) // a11y: allow decorative glyph; the enclosing link has a 58pt minimum height
                     .background((isLocked ? Color.goYellow : tint).opacity(0.12), in: Circle())
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(detail)
                         .font(OhanaFont.caption(.semibold))
@@ -634,13 +638,13 @@ struct HumanHealthSummaryView: View {
                 }
                 Spacer(minLength: 8)
                 Text(value)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(isLocked ? Color.ohanaTertiaryText : tint)
                     .multilineTextAlignment(.trailing)
                     .lineLimit(2)
                     .minimumScaleFactor(0.72)
                 Image(systemName: "chevron.right") // a11y: allow decorative navigation affordance; link text supplies the label
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .accessibilityHidden(true)
             }
@@ -661,7 +665,7 @@ struct HumanHealthSummaryView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: destination.systemImage)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                     .foregroundStyle(destination.tint)
                     .frame(width: 34, height: 34) // a11y: allow decorative glyph; the enclosing link has a 52pt minimum height
                     .accessibilityHidden(true)
@@ -670,10 +674,10 @@ struct HumanHealthSummaryView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 8)
                 Text(value)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Image(systemName: "chevron.right") // a11y: allow decorative navigation affordance; link text supplies the label
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .accessibilityHidden(true)
             }
@@ -692,13 +696,13 @@ struct HumanHealthSummaryView: View {
     ) -> some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 28, height: 28) // a11y: allow decorative glyph; source row is non-interactive and combines its text
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(detail)
                     .font(OhanaFont.caption(.semibold))
@@ -717,7 +721,7 @@ struct HumanHealthSummaryView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if let subtitle {
                 Text(subtitle)
@@ -733,7 +737,7 @@ struct HumanHealthSummaryView: View {
     private func inlineEmptyState(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .accessibilityHidden(true)
             Text(text)
@@ -784,19 +788,19 @@ struct HumanHealthSummaryCompactCard: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     Image(systemName: "heart.text.clipboard.fill") // a11y: allow decorative icon; button text supplies the label
-                        .font(OhanaFont.adaptive(size: 17, weight: .black))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                         .foregroundStyle(Color.goTeal)
                         .frame(width: 38, height: 38) // a11y: allow decorative glyph; the enclosing card button has a larger hit target
                         .background(Color.goTeal.opacity(0.13), in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "健康摘要", en: "Health Summary", de: "Gesundheitsübersicht"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.right") // a11y: allow decorative navigation affordance; button text supplies the label
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .accessibilityHidden(true)
                 }
@@ -911,7 +915,7 @@ struct HumanHealthSummaryCompactCard: View {
     private func compactMetric(value: String, label: String, tint: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -931,7 +935,7 @@ struct HumanHealthSummaryCompactCard: View {
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer(minLength: 8)
             Text(value)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
     }

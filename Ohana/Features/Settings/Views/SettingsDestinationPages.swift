@@ -547,11 +547,11 @@ private struct SettingsMenuValueLabel: View {
     var body: some View {
         HStack(spacing: 5) {
             Text(text)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
             Image(systemName: "chevron.down").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
         }
         .foregroundStyle(Color.ohanaPrimaryText)
         .frame(minHeight: 34)
@@ -567,16 +567,7 @@ private extension View {
             .background(OhanaStaticAppBackground())
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(role: .cancel, action: onClose) {
-                        Label(closeLabel, systemImage: "xmark")
-                    }
-                    .labelStyle(.iconOnly)
-                    .accessibilityLabel(closeLabel)
-                    .accessibilityIdentifier("settings-close-action")
-                }
-            }
+
             .accessibilityIdentifier("settings-destination-screen")
     }
 }

@@ -61,14 +61,14 @@ struct PetHygieneActionHumanConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: draft.type.systemIconName)
-                        .font(OhanaFont.adaptive(size: 18, weight: .black))
+                        .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                         .foregroundStyle(tintForeground)
                         .frame(width: 44, height: 44)
                         .background(tint, in: Circle())
                         .accessibilityHidden(true)
 
                     Text(draft.type.localizedLabel(l))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer(minLength: 0)
                 }
@@ -90,7 +90,7 @@ struct PetHygieneActionHumanConfirmationSheet: View {
                         l.tr(zh: "确认已完成", en: "Confirm completed", de: "Als erledigt bestätigen"),
                         systemImage: "checkmark.circle.fill"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(tintForeground)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(tint, in: Capsule())

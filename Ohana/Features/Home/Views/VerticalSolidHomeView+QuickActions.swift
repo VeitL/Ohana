@@ -29,16 +29,6 @@ enum HomeWalkQuickActionPresentationPolicy {
 
 extension VerticalSolidHomeView {
     func openHeaderCoconutDestination() {
-        if let card = headerContextCard {
-            if card.isHuman, interaction.containsHuman(card.id) {
-                routeCoordinator.openCoconutLog(.human(card.id))
-                return
-            }
-            if interaction.pet(id: card.id) != nil {
-                routeCoordinator.openCoconutLog(.pet(card.id))
-                return
-            }
-        }
         routeCoordinator.openCoconutLog(nil)
     }
 
@@ -71,7 +61,7 @@ extension VerticalSolidHomeView {
             performWithActionHuman(actionTitle: item.label) { executorID in
                 OhanaFeedback.light()
                 let petID = card.id
-                enqueueHomeCommand(.quickCare(entityID: petID, action: "groom:\(optionId)")) {
+                enqueuePetRecordCommand(.quickCare(entityID: petID, action: "groom:\(optionId)")) {
                     commandExecutor.applyGroomCheckIn(
                         raw: optionId,
                         petID: petID,
@@ -87,7 +77,7 @@ extension VerticalSolidHomeView {
             performWithActionHuman(actionTitle: item.label) { executorID in
                 OhanaFeedback.light()
                 let petID = card.id
-                enqueueHomeCommand(.quickCare(entityID: petID, action: "potty:\(optionId)")) {
+                enqueuePetRecordCommand(.quickCare(entityID: petID, action: "potty:\(optionId)")) {
                     commandExecutor.applyPottyCheckIn(
                         raw: optionId,
                         petID: petID,
@@ -100,7 +90,7 @@ extension VerticalSolidHomeView {
             performWithActionHuman(actionTitle: item.label) { executorID in
                 OhanaFeedback.light()
                 let petID = card.id
-                enqueueHomeCommand(.quickCare(entityID: petID, action: "health:\(optionId)")) {
+                enqueuePetRecordCommand(.quickCare(entityID: petID, action: "health:\(optionId)")) {
                     commandExecutor.applyHealthCheckIn(
                         raw: optionId,
                         petID: petID,
@@ -208,7 +198,7 @@ extension VerticalSolidHomeView {
     ) {
         guard let action = HomePetQuickActionKind(rawValue: actionType) else { return }
 
-        enqueueHomeCommand(.quickCare(entityID: petID, action: actionType)) {
+        enqueuePetRecordCommand(.quickCare(entityID: petID, action: actionType)) {
             commandExecutor.performQuickAction(
                 HomePetQuickActionRequest(
                     action: action,
@@ -231,7 +221,7 @@ extension VerticalSolidHomeView {
                         title: title,
                         message: message
                     ) {
-                        enqueueHomeCommand(.quickCare(entityID: petID, action: "\(actionType):confirmed")) {
+                        enqueuePetRecordCommand(.quickCare(entityID: petID, action: "\(actionType):confirmed")) {
                             pendingAction()
                         }
                     }
@@ -245,7 +235,17 @@ extension VerticalSolidHomeView {
         }
     }
 
+    private func enqueuePetRecordCommand(_ command: DomainCommand, operation: @escaping @MainActor () -> Void) {
+        guard pendingPetRecordCommands.insert(command).inserted else { return }
+        savedPetRecord = nil
+        enqueueHomeCommand(command) {
+            defer { pendingPetRecordCommands.remove(command) }
+            operation()
+        }
+    }
+
     func applyQuickActionExecutorFeedback(_ feedback: ExpandedQuickActionExecutor.Feedback) {
+        savedPetRecord = feedback.recordReference
         if feedback.coconutDelta > 0 {
             OhanaFeedback.success()
         }
@@ -270,6 +270,10 @@ extension VerticalSolidHomeView {
     func recordPlantQuickCare(_ type: PlantCareType, plantID: UUID) {
         let key = PlantQuickCareFeedbackKey.key(plantID: plantID, careType: type)
         guard !pendingPlantQuickCareKeys.contains(key) else { return }
+        let hasOpenUndo = PlantBatchCarePendingRewardStore.load().contains { token in
+            token.expiresAt > Date() && token.items.contains { $0.plantID == plantID && $0.careType == type }
+        }
+        guard !hasOpenUndo else { return }
         performWithActionHuman(actionTitle: type.displayName(l: l)) { executorID in
             performPlantQuickCare(type, plantID: plantID, executorID: executorID)
         }
@@ -281,26 +285,68 @@ extension VerticalSolidHomeView {
 
         OhanaFeedback.light()
         setPlantQuickCarePending(key)
+        let operationID = plantQuickCareOperationIDs[key] ?? UUID()
+        plantQuickCareOperationIDs[key] = operationID
         enqueueHomeCommand(.plantCare(plantID: plantID, action: type.rawValue)) {
-            guard let result = commandExecutor.recordPlantCare(
-                type,
-                plantID: plantID,
-                executorId: executorID
-            ) else {
+            let result = commandExecutor.recordPlantBatchQuickCare(
+                selections: [PlantBatchCareSelection(plantID: plantID, careType: type)],
+                executorId: executorID,
+                operationID: operationID
+            )
+            guard result.didPersist, result.skipped.isEmpty, let token = result.undoToken else {
                 setPlantQuickCareFailed(key)
                 UINotificationFeedbackGenerator().notificationOccurred(.error)
                 return
             }
-            guard result.didPersist else {
-                setPlantQuickCareFailed(key)
-                UINotificationFeedbackGenerator().notificationOccurred(.error)
-                return
-            }
+            plantQuickCareOperationIDs[key] = nil
+            PlantBatchCarePendingRewardStore.upsert(token)
+            publishHomePlantPendingRewardChange(token, action: "batchQuickRecordPendingRewardsChanged")
+            pendingHomePlantCareUndoToken = token
+            scheduleHomePlantCareRewardCommit(token)
             setPlantQuickCareCompleted(key)
             UINotificationFeedbackGenerator().notificationOccurred(.success)
-            applyPlantQuickCareRewardFeedback(result)
             applyTodayFocusMutationFeedback(entityId: plantID)
         }
+    }
+
+    func undoHomePlantQuickCare(_ token: PlantBatchCareUndoToken) {
+        homePlantCareRewardTasks[token.id]?.cancel()
+        homePlantCareRewardTasks[token.id] = nil
+        let result = commandExecutor.undoPlantBatchCare(token)
+        guard result.didPersist else {
+            scheduleHomePlantCareRewardCommit(token)
+            UINotificationFeedbackGenerator().notificationOccurred(.error)
+            return
+        }
+        if pendingHomePlantCareUndoToken?.id == token.id { pendingHomePlantCareUndoToken = nil }
+        PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+        publishHomePlantPendingRewardChange(token, action: "batchCarePendingRewardsChanged")
+        UINotificationFeedbackGenerator().notificationOccurred(.warning)
+    }
+
+    func scheduleHomePlantCareRewardCommit(_ token: PlantBatchCareUndoToken) {
+        homePlantCareRewardTasks[token.id] = Task { @MainActor in
+            let remaining = max(0, token.expiresAt.timeIntervalSinceNow)
+            try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
+            guard !Task.isCancelled else { return }
+            if pendingHomePlantCareUndoToken?.id == token.id { pendingHomePlantCareUndoToken = nil }
+            let result = commandExecutor.commitPlantBatchCareRewards(for: token)
+            if result.didPersist {
+                PlantBatchCarePendingRewardStore.remove(batchID: token.batchID)
+                OhanaFeedback.success()
+            }
+            publishHomePlantPendingRewardChange(token, action: "batchCarePendingRewardsChanged")
+            homePlantCareRewardTasks[token.id] = nil
+        }
+    }
+
+    func publishHomePlantPendingRewardChange(_ token: PlantBatchCareUndoToken, action: String) {
+        appServices.domainRevisions.publishPlantBatchCarePendingRewardsChanged(
+            batchID: token.batchID,
+            action: action,
+            pendingCount: PlantBatchCarePendingRewardStore.load().count,
+            note: "home.plantCare.pendingRewardsChanged"
+        )
     }
 
     func setPlantQuickCarePending(_ key: String) {

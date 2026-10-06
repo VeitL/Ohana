@@ -211,6 +211,8 @@ struct IslandWeightDashboard: View {
     @State private var requestedDayCount: Int? = 30
     @State private var requestedSubjectKey: String?
     @State private var loadTask: Task<Void, Never>?
+    @State private var isLoading = false
+    @State private var loadFailed = false
 
     init(standalone: Bool = true) {
         self.standalone = standalone
@@ -237,9 +239,11 @@ struct IslandWeightDashboard: View {
             humans: humans,
             snapshot: snapshot,
             onFilterChange: requestSnapshot,
-            onRefresh: { scheduleLoad(force: true) }
+            onRefresh: { scheduleLoad(force: true) },
+            isLoading: isLoading,
+            loadFailed: loadFailed
         )
-        .onAppear { scheduleLoad() }
+        .onAppear { scheduleLoad(force: isLoading || loadFailed) }
         .onChange(of: pets.count) { scheduleLoad(force: true) }
         .onChange(of: humans.count) { scheduleLoad(force: true) }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
@@ -264,6 +268,8 @@ struct IslandWeightDashboard: View {
     private func scheduleLoad(force: Bool = false) {
         guard force || !snapshot.hasLoaded else { return }
         loadTask?.cancel()
+        isLoading = true
+        loadFailed = false
         let container = modelContext.container
         let dayCount = requestedDayCount
         let subjectKey = requestedSubjectKey
@@ -286,11 +292,15 @@ struct IslandWeightDashboard: View {
             } catch is CancellationError {
                 return
             } catch {
+                guard !Task.isCancelled else { return }
+                loadFailed = true
                 OhanaLog.warning(
                     "Weight insight snapshot load failed: \(error.localizedDescription)",
                     category: "DashboardRecords"
                 )
             }
+            guard !Task.isCancelled else { return }
+            isLoading = false
             loadTask = nil
         }
     }

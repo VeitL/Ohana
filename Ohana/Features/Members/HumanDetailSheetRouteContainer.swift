@@ -18,6 +18,7 @@ enum AppHumanDetailSheetDestination: Hashable {
     case workout
     case workoutDashboard
     case metrics
+    case observationQuick
     case conditions
     case report
     case expenseQuick
@@ -33,7 +34,7 @@ extension AppHumanDetailSheetDestination {
         case .basicInfo, .noteQuick, .note:
             true
         case .medicationQuick, .medication, .weightQuick, .weight, .workoutQuick, .workout,
-             .workoutDashboard, .metrics, .conditions, .report, .expenseQuick, .expense, .wishlist:
+             .workoutDashboard, .metrics, .observationQuick, .conditions, .report, .expenseQuick, .expense, .wishlist:
             false
         }
     }
@@ -93,10 +94,7 @@ struct HumanAllFeaturesRouteContainer: View {
                     onOpenDestination(human.id, .achievements)
                 })
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
-                            .accessibilityIdentifier("human-all-features-close-action")
-                    }
+                    OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "human-all-features-close-action")
                 }
             }
         } else {
@@ -216,7 +214,7 @@ struct AppHumanDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .weight:
-                NavigationStack { HumanWeightHistoryView(human: human) }
+                HumanWeightHistoryView(human: human)
             case .workoutQuick:
                 QuickHumanWorkoutSheet(
                     human: human,
@@ -228,6 +226,8 @@ struct AppHumanDetailSheetRouteContainer: View {
                 NavigationStack { HumanWorkoutSummaryView(human: human) }
             case .metrics:
                 NavigationStack { HumanHealthCheckupView(human: human) }
+            case .observationQuick:
+                HumanObservationQuickRecordView(human: human) { _ in onDismiss() }
             case .conditions:
                 NavigationStack {
                     HumanHealthConditionsView(
@@ -241,9 +241,9 @@ struct AppHumanDetailSheetRouteContainer: View {
             case .expenseQuick:
                 // Kept as a compatibility route for restored navigation state.
                 // Human expense creation is retired; this surface is payer history only.
-                NavigationStack { HumanExpenseDetailView(human: human) }
+                HumanExpenseDetailView(human: human)
             case .expense:
-                NavigationStack { HumanExpenseDetailView(human: human) }
+                HumanExpenseDetailView(human: human)
             case .wishlist:
                 HumanWishlistView(human: human)
             case .noteQuick:
@@ -494,7 +494,7 @@ struct HumanRouteMissingEntityView: View {
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
             Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfügbar"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(localizedKind)
                 .font(OhanaFont.caption(.semibold))

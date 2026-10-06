@@ -17,7 +17,7 @@ struct PetMedicationLongLanguageLayoutTests {
         #expect(listSource.contains("func medicationCardHeader"))
         #expect(listSource.contains("func medicationCardActions"))
         #expect(listSource.contains("ViewThatFits(in: .horizontal)"))
-        #expect(listSource.contains(".lineLimit(2)"))
+        #expect(listSource.contains(".lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)"))
         #expect(!listSource.contains("func metricCell"))
 
         #expect(detailSource.contains("medicationDetailStatusStack"))

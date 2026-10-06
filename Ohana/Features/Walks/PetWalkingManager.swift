@@ -25,6 +25,7 @@ struct WalkStopRewardSummary: Equatable {
     let pottyCoconutDelta: Int
     let didPersist: Bool
     let persistenceErrorDescription: String?
+    var recordReference: PetRecordReference? = nil
 
     static let empty = WalkStopRewardSummary(
         walkLogID: nil,
@@ -1129,7 +1130,10 @@ private extension PetWalkingManager {
             walkCoconutDelta: walkRecord.coconutDelta,
             pottyCoconutDelta: pottyRecord.coconutDelta,
             didPersist: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            recordReference: walkRecord.sourceLog.map {
+                PetRecordReference(petID: draft.pet.id, recordID: $0.id, sharedSessionID: UUID(uuidString: $0.sharedSessionId))
+            }
         )
     }
 

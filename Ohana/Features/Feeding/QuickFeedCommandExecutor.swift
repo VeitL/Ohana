@@ -196,7 +196,9 @@ struct QuickFeedCommandExecutor {
         FeedStockExpenseLink.fetchExpense(id: id, context: context)
     }
 
-    func saveManualSettings(pet: Pet, foodKind: FeedFoodKind, grams: Double, defaultEnabled: Bool = true) {
+    @discardableResult
+    func saveManualSettings(pet: Pet, foodKind: FeedFoodKind, grams: Double, defaultEnabled: Bool = true) -> Bool {
+        if pet.mainFoodKind == foodKind, pet.dailyPortionGrams == (defaultEnabled ? grams : 0) { return true }
         let didChange = ManualFeedCommand.saveSettings(
             pet: pet,
             foodKind: foodKind,
@@ -205,6 +207,7 @@ struct QuickFeedCommandExecutor {
             context: context
         )
         deriveFeedMutation(.feedSettings(petID: pet.id), pets: [pet], wroteBusinessFact: didChange)
+        return didChange
     }
 
     func recordManual(
@@ -216,7 +219,8 @@ struct QuickFeedCommandExecutor {
         foodRecords: [PetFoodRecord],
         allEvents: [Event],
         executorId: String?,
-        date: Date = Date()
+        date: Date = Date(),
+        note: String = ""
     ) -> ManualFeedCommandResult {
         let result = ManualFeedCommand.recordManual(
             pet: pet,
@@ -229,7 +233,8 @@ struct QuickFeedCommandExecutor {
             context: context,
             executorId: executorId,
             careEvents: careEvents,
-            date: date
+            date: date,
+            note: note
         )
         deriveFeedMutation(
             .feedLog(petID: pet.id, source: "manual"),

@@ -381,7 +381,7 @@ extension OasisCritterCodexView {
     func critterDailyWishCard(_ wish: OasisCritterDailyWish, isCompleted: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: isCompleted ? "checkmark.seal.fill" : wish.icon)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.brandTitle(.title3, weight: .bold))
                 .foregroundStyle(isCompleted ? Color.arkInk : Color.ohanaPrimaryActionText)
                 .frame(width: 44, height: 44)
                 .background(isCompleted ? Color.goPrimary : Color.goPurple, in: Circle())
@@ -424,7 +424,7 @@ extension OasisCritterCodexView {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: critter.starLevel >= OasisCompanionCurrency.maxStarLevel ? "star.circle.fill" : "star.fill")
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.brandTitle(.title3, weight: .bold))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(critter.starLevel >= OasisCompanionCurrency.maxStarLevel
                         ? l.tr(zh: "已满星", en: "Maximum stars", de: "Maximale Sterne")

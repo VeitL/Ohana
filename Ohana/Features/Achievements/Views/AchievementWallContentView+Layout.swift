@@ -11,7 +11,7 @@ extension AchievementWallContentView {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "成就解锁", en: "Badges", de: "Abzeichen"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.brandTitle(.title3, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(activeMemberName)
                     .font(OhanaFont.caption(.bold))
@@ -27,15 +27,7 @@ extension AchievementWallContentView {
             }
             .accessibilityLabel(l.tr(zh: "椰子历史", en: "Coconut history", de: "Kokosnuss-Verlauf"))
 
-            Button { dismiss() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+
         }
     }
 
@@ -74,7 +66,7 @@ extension AchievementWallContentView {
                 activeMemberAvatar(size: 58)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(unlocked.count)/\(achievements.count)")
-                        .font(OhanaFont.metric(size: 42))
+                        .font(OhanaFont.brandMetric(size: 42))
                         .foregroundStyle(Color.goPrimary)
                         .monospacedDigit()
                         .contentTransition(.numericText())
@@ -85,7 +77,7 @@ extension AchievementWallContentView {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("\(Int(percent * 100))%")
-                        .font(OhanaFont.metric(size: 30))
+                        .font(OhanaFont.brandMetric(size: 30))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .monospacedDigit()
                         .contentTransition(.numericText())

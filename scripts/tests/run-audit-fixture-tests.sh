@@ -211,7 +211,7 @@ assert_bad scripts/audit-ui-v4.sh "$fixtures/UiV4Bad.swift" \
   direct-go-lime hardcoded-motion hardcoded-detent-height hardcoded-corner-radius \
   native-sheet-chrome native-custom-sheet-scene native-inline-presentation native-settings-card \
   native-custom-search native-manual-toggle native-custom-segment \
-  native-legacy-overlay-call native-inline-popup-mode
+  native-legacy-overlay-call native-inline-popup-mode native-root-navigation
 assert_good scripts/audit-ui-v4.sh "$fixtures/UiV4Good.swift"
 
 assert_bad scripts/audit-accessibility.sh "$fixtures/A11yBad.swift" \

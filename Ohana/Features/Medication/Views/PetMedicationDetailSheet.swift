@@ -65,7 +65,6 @@ struct PetMedicationDetailContentSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
             ZStack {
                 OhanaAppBackground()
                 ScrollView(showsIndicators: false) {
@@ -89,7 +88,7 @@ struct PetMedicationDetailContentSheet: View {
 
                         if !noteBody.isEmpty {
                             Text(l.tr(zh: "备注：\(noteBody)", en: "Note: \(noteBody)", de: "Notiz: \(noteBody)"))
-                                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .padding(.top, 4)
                         }
@@ -100,7 +99,8 @@ struct PetMedicationDetailContentSheet: View {
                     .padding(.top, 18)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "用药详情", en: "Medication detail", de: "Medikationsdetail"))
+            .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingEdit) {
                 AddPetMedicationSheet(
                     pet: pet,
@@ -110,7 +110,6 @@ struct PetMedicationDetailContentSheet: View {
                     }
                 )
             }
-        }
         .petMedicationDoseActorConfirmation(draft: $pendingDoseActorDraft) { _, executorID in
             recordDose(executorID: executorID)
         }
@@ -128,10 +127,10 @@ struct PetMedicationDetailContentSheet: View {
             )
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "用药详情", en: "Medication detail", de: "Medikationsdetail"))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(pet.name)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -141,7 +140,7 @@ struct PetMedicationDetailContentSheet: View {
                 showingEdit = true
             } label: {
                 Image(systemName: "pencil").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(Color.ohanaControlFill, in: Circle())
@@ -164,21 +163,13 @@ struct PetMedicationDetailContentSheet: View {
                 }
             } label: {
                 Image(systemName: "ellipsis").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             }
             .buttonStyle(ScaleButtonStyle())
 
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 42, height: 42) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-            }
-            .buttonStyle(ScaleButtonStyle())
+
         }
     }
 
@@ -190,7 +181,7 @@ struct PetMedicationDetailContentSheet: View {
                     .frame(width: 14, height: 14) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .padding(.top, 8)
                 Text(medication.name.isEmpty ? l.tr(zh: "未命名药品", en: "Unnamed medication", de: "Unbenanntes Medikament") : medication.name)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -199,7 +190,7 @@ struct PetMedicationDetailContentSheet: View {
                 en: "\(localizedFrequency(medication.frequency)) · per dose \(localizedDose)",
                 de: "\(localizedFrequency(medication.frequency)) · pro Dosis \(localizedDose)"
             ))
-                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -217,7 +208,7 @@ struct PetMedicationDetailContentSheet: View {
                 Text("+1 🥥")
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
-            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(14)
             .background(chromeAccent, in: Capsule())
@@ -297,7 +288,7 @@ struct PetMedicationDetailContentSheet: View {
     private var courseProgressCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "疗程进度", en: "Course progress", de: "Verlauf"))
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if let end = medication.endDate {
                 let cal = Calendar.current
@@ -310,20 +301,20 @@ struct PetMedicationDetailContentSheet: View {
                 let p = min(1, Double(passed) / Double(total))
 
                 Text(l.tr(zh: "第 \(dayIndex) / \(total) 天", en: "Day \(dayIndex) / \(total)", de: "Tag \(dayIndex) / \(total)"))
-                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                 ProgressView(value: p)
                     .tint(themeColor)
                     .scaleEffect(x: 1, y: 1.6, anchor: .center)
                 Text("\(medication.startDate, format: .dateTime.year().month().day()) → \(end, format: .dateTime.year().month().day())")
-                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text(l.tr(zh: "长期用药", en: "Long-term medication", de: "Langzeitmedikation"))
-                    .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                 Text(l.tr(zh: "未设置结束日期", en: "No end date set", de: "Kein Enddatum festgelegt"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -351,28 +342,28 @@ struct PetMedicationDetailContentSheet: View {
     private var bentoTodayStatus: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(l.tr(zh: "今日状态", en: "Today", de: "Heute"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             if todayRequired == 0 {
                 Text(l.tr(zh: "无需记录", en: "No dose needed", de: "Keine Dosis nötig"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             } else if todayDone >= todayRequired {
                 Label(l.tr(zh: "已喂完", en: "Done", de: "Erledigt"), systemImage: "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .foregroundStyle(themeColor)
                     .lineLimit(2)
             } else {
                 Text(l.tr(zh: "还需 \(todayRequired - todayDone) 次", en: "\(todayRequired - todayDone) left", de: "Noch \(todayRequired - todayDone)"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .foregroundStyle(Color.goYellow)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let last = medEvents.filter({ Calendar.current.isDateInToday($0.startDate) }).first {
                 Text(last.startDate, format: .dateTime.hour().minute())
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                     .foregroundStyle(.tertiary)
             }
         }
@@ -384,7 +375,7 @@ struct PetMedicationDetailContentSheet: View {
     private var bentoAdministration: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(l.tr(zh: "喂药方式", en: "How to give", de: "Gabe"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(alignment: .top, spacing: 6) {
                 Image(systemName: "fork.knife").accessibilityHidden(true)
@@ -392,7 +383,7 @@ struct PetMedicationDetailContentSheet: View {
                     .foregroundStyle(themeColor)
                     .padding(.top, 2)
                 Text(administrationDisplay)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .lineLimit(3)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -415,7 +406,7 @@ struct PetMedicationDetailContentSheet: View {
                 en: "At this schedule, about \(max(estDays, 0)) days left",
                 de: "Bei diesem Plan reichen sie noch ca. \(max(estDays, 0)) Tage"
             ))
-                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -455,12 +446,12 @@ struct PetMedicationDetailContentSheet: View {
             Image(systemName: "cube.box.fill").accessibilityHidden(true)
                 .foregroundStyle(themeColor)
         }
-        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
     }
 
     private func medicationRemainingValue(_ value: String) -> some View {
         Text(value)
-            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -468,13 +459,13 @@ struct PetMedicationDetailContentSheet: View {
     private var historySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "打卡历史", en: "Dose history", de: "Verlauf"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(themeColor)
 
             ForEach(historyDayRows, id: \.dayStart) { row in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(row.title)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     medicationHistoryChips(row: row)
                 }
@@ -486,7 +477,7 @@ struct PetMedicationDetailContentSheet: View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8) {
             ForEach(row.events) { ev in
                 Label(ev.startDate.formatted(.dateTime.hour().minute()), systemImage: "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .padding(.horizontal, 9)
@@ -496,7 +487,7 @@ struct PetMedicationDetailContentSheet: View {
             if row.missedCount > 0 {
                 ForEach(0 ..< row.missedCount, id: \.self) { _ in
                     Label(l.tr(zh: "漏喂", en: "Missed", de: "Verpasst"), systemImage: "xmark.circle.fill")
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.goRed.opacity(0.85))
                         .lineLimit(1)
                         .padding(.horizontal, 9)

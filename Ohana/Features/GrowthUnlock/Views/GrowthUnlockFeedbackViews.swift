@@ -22,7 +22,7 @@ struct StarterGiftHomePreparationRecoveryOverlay: View {
                             en: "Refresh Home",
                             de: "Home aktualisieren"
                         ))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.brandTitle(.title3, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
 
                         Text(message)
@@ -91,7 +91,7 @@ struct StarterGiftCeremonyOverlay: View {
 
                         VStack(alignment: .leading, spacing: 2) {
                             Text(localized(zh: "新人椰子礼包", en: "Starter coconut gift", de: "Starter-Kokosgeschenk"))
-                                .font(OhanaFont.title3(.black))
+                                .font(OhanaFont.brandTitle(.title3, weight: .bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text("+\(amount)🥥")
                                 .font(OhanaFont.callout(.black))
@@ -515,7 +515,7 @@ struct GrowthUnlockPopupView: View {
         return VStack(spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: status.step.icon)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.brandTitle(.title3, weight: .bold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color(hex: status.step.tintHex))
                     .frame(width: 48, height: 48)
@@ -524,7 +524,7 @@ struct GrowthUnlockPopupView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(unlockedTitle)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.brandTitle(.title3, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.78)

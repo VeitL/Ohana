@@ -31,10 +31,10 @@ struct TaskCenterCalendarWorkflowStrip: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Text(l.tr(zh: "家庭分工", en: "Household assignments", de: "Aufgabenverteilung"))
-                        .font(OhanaFont.footnote(.black))
+                        .font(OhanaFont.footnote(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text("\(items.count)")
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.goPurple)
                     Spacer()
                 }
@@ -63,7 +63,7 @@ struct TaskCenterCalendarWorkflowStrip: View {
                                     Button(actionTitle(action)) {
                                         _ = onAction(item, action)
                                     }
-                                    .font(OhanaFont.caption2(.black))
+                                    .font(OhanaFont.caption2(.semibold))
                                     .buttonStyle(.bordered)
                                     .tint(action == .reject ? Color.goRed : Color.goPrimary)
                                 }
@@ -115,6 +115,7 @@ struct TaskCenterHeader: View {
     let onClose: (() -> Void)?
 
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var l: L10n { L10n(appLanguage) }
 
@@ -122,16 +123,19 @@ struct TaskCenterHeader: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
+                    if !showsCloseButton {
                     Text(l.tr(zh: "待办", en: "Tasks", de: "Aufgaben"))
-                        .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                        .font(OhanaFont.title2())
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.76)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
 
                     Text(summaryText)
                         .font(OhanaFont.footnote(.semibold))
                         .foregroundStyle(summaryTint)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .fixedSize(horizontal: false, vertical: true)
                         .contentTransition(.numericText())
                 }
 
@@ -141,7 +145,7 @@ struct TaskCenterHeader: View {
                     Button(action: onOpenInbox) {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: inboxUnreadCount > 0 ? "tray.full.fill" : "tray")
-                                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                                 .foregroundStyle(inboxUnreadCount > 0 ? Color.goPrimary : Color.ohanaPrimaryText)
                                 .frame(width: 44, height: 44)
                                 .background(Color.ohanaControlFill, in: Circle())
@@ -150,7 +154,7 @@ struct TaskCenterHeader: View {
 
                             if inboxUnreadCount > 0 {
                                 Text(inboxUnreadCount > 99 ? "99+" : "\(inboxUnreadCount)")
-                                    .font(OhanaFont.caption2(.black))
+                                    .font(OhanaFont.caption2(.semibold))
                                     .foregroundStyle(Color.ohanaPrimaryActionText)
                                     .padding(.horizontal, inboxUnreadCount > 9 ? 5 : 0)
                                     .frame(minWidth: 19, minHeight: 19)
@@ -168,7 +172,7 @@ struct TaskCenterHeader: View {
                 if showsAddButton {
                     Button(action: onAdd) {
                         Image(systemName: "plus") // a11y: allow decorative symbol inside the labeled 44pt button
-                            .font(OhanaFont.adaptive(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(width: 44, height: 44)
                             .background(Color.goPrimary, in: Circle())
@@ -180,82 +184,49 @@ struct TaskCenterHeader: View {
                     .accessibilityIdentifier("task-center-add-action")
                 }
 
-                if showsCloseButton, let onClose {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark") // a11y: allow decorative symbol inside the labeled 44pt button
-                            .font(OhanaFont.adaptive(size: 14, weight: .black))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .frame(width: 44, height: 44)
-                            .background(Color.ohanaControlFill, in: Circle())
-                            .contentShape(Circle())
-                            .accessibilityHidden(true)
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                    .accessibilityIdentifier("task-center-close-action")
-                }
+
             }
 
             surfacePicker
 
             if let filterLabel {
                 Label(filterLabel, systemImage: "line.3.horizontal.decrease.circle.fill")
-                    .font(OhanaFont.caption(.bold))
-                    .foregroundStyle(Color.goPrimary)
-                    .padding(.horizontal, 10)
-                    .frame(minHeight: 32)
-                    .background(Color.goPrimary.opacity(0.12), in: Capsule())
+                    .font(OhanaFont.footnote())
+                    .foregroundStyle(Color.ohanaSecondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("task-center-active-filter")
             }
         }
-        .padding(.horizontal, 18)
+        .padding(.horizontal, OhanaSpacing.pageMargin)
         .padding(.top, showsCloseButton ? 12 : 6)
         .padding(.bottom, 10)
         .accessibilityIdentifier("task-center-header")
     }
 
     private var surfacePicker: some View {
-        HStack(spacing: 4) {
-            surfaceButton(
-                .tasks,
-                title: l.tr(zh: "清单", en: "List", de: "Liste"),
-                symbol: "checklist"
-            )
-            surfaceButton(
-                .calendar,
-                title: l.tr(zh: "日历", en: "Calendar", de: "Kalender"),
-                symbol: "calendar"
-            )
+        Picker(l.tr(
+            zh: "待办视图", en: "Task view", de: "Aufgabenansicht",
+            es: "Vista de tareas", pt: "Visualização de tarefas", fr: "Vue des tâches",
+            ja: "タスク表示", ko: "할 일 보기", it: "Vista attività"
+        ), selection: $selectedSurface) {
+            Text(l.tr(
+                zh: "清单", en: "List", de: "Liste",
+                es: "Lista", pt: "Lista", fr: "Liste",
+                ja: "リスト", ko: "목록", it: "Elenco"
+            ))
+            .tag(TaskCenterSurface.tasks)
+            .accessibilityIdentifier("task-center-surface-tasks")
+            Text(l.tr(
+                zh: "日历", en: "Calendar", de: "Kalender",
+                es: "Calendario", pt: "Calendário", fr: "Calendrier",
+                ja: "カレンダー", ko: "달력", it: "Calendario"
+            ))
+            .tag(TaskCenterSurface.calendar)
+            .accessibilityIdentifier("task-center-surface-calendar")
         }
-        .padding(4)
-        .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
-        .accessibilityElement(children: .contain)
+        .ohanaContentTabsPickerStyle()
+        .frame(minHeight: 44)
         .accessibilityIdentifier("task-center-surface-picker")
-    }
-
-    private func surfaceButton(
-        _ surface: TaskCenterSurface,
-        title: String,
-        symbol: String
-    ) -> some View {
-        let isSelected = selectedSurface == surface
-        return Button {
-            guard selectedSurface != surface else { return }
-            selectedSurface = surface
-        } label: {
-            Label(title, systemImage: symbol)
-                .font(OhanaFont.footnote(.black))
-                .foregroundStyle(isSelected ? Color.ohanaPrimaryText : Color.ohanaSecondaryText)
-                .frame(maxWidth: .infinity, minHeight: 44)
-                .background(
-                    isSelected ? Color.ohanaCardSurfaceElevated : Color.clear,
-                    in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous)
-                )
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-        .accessibilityIdentifier("task-center-surface-\(surface.rawValue)")
     }
 
     private var summaryText: String {
@@ -448,7 +419,7 @@ private extension TaskCenterView {
                     .monospacedDigit()
                     .opacity(isSelected ? 0.86 : 0.72)
             }
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 14)
             .frame(minHeight: 44)
@@ -506,7 +477,7 @@ private extension TaskCenterView {
 
                 VStack(spacing: 0) {
                     Text("\(displayedSnapshot.todayPendingCount)")
-                        .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .monospacedDigit()
                     Text(l.tr(zh: "今天", en: "today", de: "heute"))
@@ -566,7 +537,7 @@ private extension TaskCenterView {
                 .frame(width: 8, height: 8) // a11y: allow non-interactive metric legend glyph
                 .accessibilityHidden(true)
             Text("\(value)")
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .monospacedDigit()
                 .frame(minWidth: 24, alignment: .trailing)
@@ -589,10 +560,10 @@ private extension TaskCenterView {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 8) {
                     Text(title)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(badgeText ?? "\(items.count)")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(tint)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
@@ -670,7 +641,7 @@ private extension TaskCenterView {
                     onDismissSuggestion(item)
                 } label: {
                     Image(systemName: "xmark") // a11y: allow decorative glyph; the dismiss Button supplies a localized label
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .frame(width: 44, height: 44)
                         .background(Color.ohanaControlFill, in: Circle())
                         .accessibilityHidden(true)
@@ -703,7 +674,7 @@ private extension TaskCenterView {
                 performSystemJourneyPrimaryAction(for: item)
             } label: {
                 Text(systemActionTitle(for: item))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .padding(.horizontal, 10)
                     .frame(minHeight: 32)
                     .background(systemActionTint(for: item).opacity(0.14), in: Capsule())
@@ -725,13 +696,13 @@ private extension TaskCenterView {
                     } label: {
                         if action == .complete {
                             Image(systemName: "checkmark") // a11y: allow decorative glyph inside the labeled action button
-                                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                                 .frame(width: 28, height: 28) // a11y: allow decorative glyph inside the enclosing 44pt button
                                 .background(itemTint(item).opacity(0.14), in: Circle())
                                 .accessibilityHidden(true)
                         } else {
                             Text(actionTitle(action))
-                                .font(OhanaFont.caption2(.black))
+                                .font(OhanaFont.caption2(.semibold))
                                 .padding(.horizontal, 8)
                                 .frame(minHeight: 32)
                                 .background(actionTint(action).opacity(0.14), in: Capsule())
@@ -751,7 +722,7 @@ private extension TaskCenterView {
     private var emptyState: some View {
         VStack(spacing: 16) {
             Image(systemName: "checkmark") // a11y: allow decorative empty-state symbol combined with the explanatory copy
-                .font(OhanaFont.adaptive(size: 26, weight: .black))
+                .font(OhanaFont.adaptive(size: 26, weight: .semibold))
                 .foregroundStyle(Color.arkInk)
                 .frame(width: 64, height: 64)
                 .background(Color.goTeal, in: Circle())
@@ -762,7 +733,7 @@ private extension TaskCenterView {
                 es: "Todo al día", pt: "Tudo em dia", fr: "Tout est à jour",
                 ja: "すべて完了", ko: "모두 완료했어요", it: "Tutto fatto"
             ))
-                .font(OhanaFont.title2(.black))
+                .font(OhanaFont.title2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)
@@ -842,7 +813,7 @@ private extension TaskCenterView {
                     ko: "선택 제안",
                     it: "Suggerimento facoltativo"
                 ))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
                 VStack(spacing: 0) {
@@ -965,7 +936,7 @@ private extension TaskCenterView {
     private func rowStatus(_ item: TaskCenterItemSnapshot) -> some View {
         if item.source == .systemJourney {
             Text(dueText(item))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(itemTint(item))
                 .padding(.horizontal, 8)
                 .frame(minHeight: 28)

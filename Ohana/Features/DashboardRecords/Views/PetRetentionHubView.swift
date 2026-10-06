@@ -102,7 +102,13 @@ struct PetRetentionHubView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
+            if showsCloseButton { NavigationStack { content } } else { content }
+        }
+    }
+
+    private var content: some View {
+        Group {
             ZStack {
                 OhanaAppBackground().ignoresSafeArea()
 
@@ -129,7 +135,9 @@ struct PetRetentionHubView: View {
                 }
                 .scrollBounceBehavior(.basedOnSize)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "成长档案", en: "Growth Archive", de: "Entwicklungsarchiv"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "pet-retention-close-action") } }
             .sheet(item: $pdfShare) { share in
                 PetVetPDFShareSheet(pdfURL: share.url, pet: pet)
             }
@@ -159,7 +167,7 @@ struct PetRetentionHubView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "成长档案", en: "Growth Archive", de: "Entwicklungsarchiv"))
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text("\(pet.name) · \(profileStatus)")
@@ -170,17 +178,7 @@ struct PetRetentionHubView: View {
 
             Spacer()
 
-            if showsCloseButton {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            }
+
         }
     }
 
@@ -238,11 +236,11 @@ struct PetRetentionHubView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .lastTextBaseline) {
                 Text("\(archiveSnapshot.score)/\(archiveSnapshot.total)")
-                    .font(OhanaFont.adaptive(size: 38, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 38, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion("\(archiveSnapshot.score)")
                 Text(l.tr(zh: "档案完整度", en: "archive complete", de: "Archiv komplett"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
             }
@@ -261,10 +259,10 @@ struct PetRetentionHubView: View {
     private func metric(title: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -276,14 +274,14 @@ struct PetRetentionHubView: View {
         NavigationLink(destination: nextStepDestination(archiveSnapshot.nextStep.kind)) {
             HStack(spacing: 12) {
                 Image(systemName: archiveSnapshot.nextStep.icon)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     .background(Color.goPrimary, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(archiveSnapshot.nextStep.title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(archiveSnapshot.nextStep.subtitle)
                         .font(OhanaFont.caption(.semibold))
@@ -292,7 +290,7 @@ struct PetRetentionHubView: View {
                 }
                 Spacer()
                 Image(systemName: "chevron.right").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
@@ -324,7 +322,7 @@ struct PetRetentionHubView: View {
                 title: l.tr(zh: "成长回忆", en: "Memories", de: "Erinnerungen"),
                 value: "\(memoryCount)",
                 subtitle: l.tr(zh: "最近：\(recentMemoryText)", en: "Latest: \(recentMemoryText)", de: "Zuletzt: \(recentMemoryText)"),
-                destination: PetMomentsHubRouteContainer(pet: pet)
+                destination: PetMomentsHubRouteContainer(pet: pet, showsCloseButton: false)
             )
 
             archiveNavigationCard(
@@ -346,7 +344,7 @@ struct PetRetentionHubView: View {
                     title: l.tr(zh: "记录中心 · 全部", en: "Moments · All", de: "Momente · Alle"),
                     value: "\(timelineCount)",
                     tint: Color(hex: "8B5CF6"),
-                    destination: PetMomentsHubRouteContainer(pet: pet)
+                    destination: PetMomentsHubRouteContainer(pet: pet, showsCloseButton: false)
                 )
 
                 compactNavigationAction(
@@ -354,19 +352,19 @@ struct PetRetentionHubView: View {
                     title: l.tr(zh: "成就墙", en: "Awards", de: "Erfolge"),
                     value: "\(achievementProgress.unlocked)/\(achievementProgress.total)",
                     tint: Color(hex: "F59E0B"),
-                    destination: AchievementWallView(pet: pet)
+                    destination: AchievementWallView(pet: pet, showsCloseButton: false)
                 )
             }
 
             Button { renderPDF() } label: {
                 HStack(spacing: 12) {
                     Image(systemName: isRenderingPDF ? "hourglass" : "square.and.arrow.up.fill")
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(Color.goTeal)
                         .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "导出兽医档案", en: "Export Vet File", de: "Tierarztakte exportieren"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "PDF · 体重、健康、用药、证件", en: "PDF · weight, health, meds, documents", de: "PDF · Gewicht, Gesundheit, Medikamente, Dokumente"))
                             .font(OhanaFont.caption2(.semibold))
@@ -381,11 +379,11 @@ struct PetRetentionHubView: View {
                         Image(systemName: "lock.fill").accessibilityLabel(
                             l.tr(zh: "需要 Ohana Personal", en: "Requires Ohana Personal", de: "Ohana Personal erforderlich")
                         )
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                             .foregroundStyle(Color.goPrimary)
                     } else {
                         Image(systemName: "chevron.right").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                 }
@@ -404,7 +402,7 @@ struct PetRetentionHubView: View {
     private var memorialSummary: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(l.tr(zh: "纪念档案", en: "Memorial archive", de: "Gedenkarchiv"), systemImage: "sparkles")
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(memorialDetail)
                 .font(OhanaFont.caption(.semibold))
@@ -435,7 +433,7 @@ struct PetRetentionHubView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.horizontal, 2)
     }
@@ -451,18 +449,18 @@ struct PetRetentionHubView: View {
         NavigationLink(destination: destination) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold))
                     .foregroundStyle(accent)
                     .frame(width: 44, height: 44)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
                         Text(title)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text(value.isEmpty ? "--" : value)
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(accent)
                     }
                     Text(subtitle)
@@ -472,7 +470,7 @@ struct PetRetentionHubView: View {
                 }
 
                 Image(systemName: "chevron.right").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(14)
@@ -496,17 +494,17 @@ struct PetRetentionHubView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(tint)
                     Spacer()
                     Text(value)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                 }
                 Text(title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -529,11 +527,11 @@ struct PetRetentionHubView: View {
         case .documents:
             DocumentsListView(pet: pet)
         case .moments:
-            PetMomentsHubRouteContainer(pet: pet)
+            PetMomentsHubRouteContainer(pet: pet, showsCloseButton: false)
         case .weight:
-            WeightHistoryView(pet: pet)
+            WeightHistoryView(pet: pet, showsCloseButton: false)
         case .retention:
-            PetMomentsHubRouteContainer(pet: pet)
+            PetMomentsHubRouteContainer(pet: pet, showsCloseButton: false)
         }
     }
 

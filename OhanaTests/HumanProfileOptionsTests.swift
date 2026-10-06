@@ -116,4 +116,16 @@ struct HumanProfileOptionsTests {
         #expect(HumanProfileOptions.visibleNoteParts(from: notes) == ["喜欢周末遛狗"])
         #expect(HumanProfileOptions.genderMetadata(from: notes) == "女")
     }
+
+    @Test func visibleNoteEntriesExcludeEmptyAndMetadataOnlyParagraphs() {
+        #expect(HumanProfileOptions.visibleNoteEntries(from: "").isEmpty)
+        #expect(HumanProfileOptions.visibleNoteEntries(from: "性别:female｜关系:妈妈").isEmpty)
+        #expect(HumanProfileOptions.visibleNoteEntries(from: " \n\n ").isEmpty)
+        #expect(HumanProfileOptions.visibleNoteEntries(
+            from: "性别:female｜关系:妈妈\n\n[2026-10-04] Morning walk\n\n[2026-10-04] Felt rested"
+        ) == ["[2026-10-04] Morning walk", "[2026-10-04] Felt rested"])
+        #expect(HumanProfileOptions.visibleNoteEntries(
+            from: "关系:妈妈｜Likes walking\n\n[2026-10-04] First line\nSecond line｜More text"
+        ) == ["Likes walking", "[2026-10-04] First line\nSecond line｜More text"])
+    }
 }

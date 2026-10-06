@@ -71,6 +71,8 @@ extension CareEventService {
         date: Date = Date(),
         foodKind: FeedFoodKind = .dry,
         source: CareLedgerSource = .quickAction,
+        note: String = "",
+        persist providedPersist: ((ModelContext) -> ModelContextSaveResult)? = nil,
         dependencies providedDependencies: CareEventServiceDependencies? = nil
     ) -> (result: CareRecordResult, reward: (humanGot: Int, petGot: Int), log: PetCareLog) {
         let dependencies = providedDependencies ?? DomainServiceDependencyRegistry.careEventDependencies()
@@ -79,7 +81,7 @@ extension CareEventService {
                 type: .feeding,
                 amountGrams: amountGrams,
                 amountMl: 0,
-                note: PetCareLog.manualFeedNoteMarker,
+                note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? PetCareLog.manualFeedNoteMarker : "\(PetCareLog.manualFeedNoteMarker)\n\(note.trimmingCharacters(in: .whitespacesAndNewlines))",
                 foodKind: foodKind,
                 treatKind: nil,
                 autoFeedDedupKey: "",
@@ -103,8 +105,9 @@ extension CareEventService {
             )
         }
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
-        let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        let saveResult = providedPersist?(context) ?? context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            defer { context.delete(log) }
             return (
                 CareRecordResult(
                     logID: log.id,
@@ -240,6 +243,7 @@ extension CareEventService {
         let log = DomainCareFactWriter.createCareLog(plan: write, context: context).log
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
         guard saveResult.didSave else {
+            defer { context.delete(log) }
             return (
                 result: TreatFeedRecordResult(
                     logID: log.id,

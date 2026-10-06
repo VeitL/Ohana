@@ -323,19 +323,15 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
     @ViewBuilder let floating: () -> Floating
 
     var body: some View {
-        if showsCloseButton { NavigationStack { pageContent } } else { pageContent }
-    }
-
-    private var pageContent: some View {
-        Group {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack(alignment: .bottomTrailing) {
                 ScrollView(showsIndicators: false) {
                     content()
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, OhanaSpacing.pageMargin)
                         .padding(.top, 12)
-                        .padding(.bottom, 128)
+                        .padding(.bottom, Floating.self == EmptyView.self ? OhanaSpacing.section : 112)
                 }
-                .scrollBounceBehavior(.always, axes: .vertical)
+                .scrollBounceBehavior(.basedOnSize, axes: .vertical)
                 .scrollDismissesKeyboard(.interactively)
 
                 floating()
@@ -346,21 +342,18 @@ struct OhanaSheetPageScaffold<Leading: View, Trailing: View, Content: View, Floa
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItemGroup(placement: .cancellationAction) {
-                    if showsCloseButton {
-                        Button(role: .cancel, action: onClose) {
-                            Label(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
-                        }
-                        .accessibilityIdentifier("ohana-sheet-close-action")
-                    }
+                if showsCloseButton {
+                    OhanaModalToolbar(onClose: onClose)
+                }
+                ToolbarItemGroup(placement: .topBarLeading) {
                     leading()
                 }
                 ToolbarItem(placement: .principal) {
                     if let subtitle, !subtitle.isEmpty {
-                        VStack(spacing: 1) {
-                            Text(title)
+                        HStack(spacing: 8) {
+                            Text(title).font(OhanaFont.headline()).lineLimit(1)
                             Text(subtitle)
-                                .font(.caption2)
+                                .font(OhanaFont.caption2()).lineLimit(1)
                                 .foregroundStyle(.secondary) // native-ui: allow system toolbar subtitle follows platform contrast
                         }
                     }
@@ -395,8 +388,8 @@ struct OhanaSheetWrapper<Content: View>: View {
 extension View {
     /// Standard presentation chrome for long Ohana sheet pages.
     ///
-    /// The page content itself should use `OhanaSheetPageScaffold` (fixed title/close
-    /// chrome, hidden navigation bar, elastic vertical content). This modifier keeps
+    /// The page content itself should use `OhanaSheetPageScaffold` (native title,
+    /// toolbar actions, and scrollable content). This modifier keeps
     /// the host sheet behavior consistent across entry points.
     func ohanaSheetPagePresentation(
         detents: Set<PresentationDetent> = OhanaSheetDetents.full,

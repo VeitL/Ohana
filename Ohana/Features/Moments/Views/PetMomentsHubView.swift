@@ -10,30 +10,6 @@ import PhotosUI
 import SwiftData
 import SwiftUI
 
-private enum PetMomentsTab: String, CaseIterable, Identifiable {
-    case highlights
-    case timeline
-    case photos
-
-    var id: String { rawValue }
-
-    func title(_ l: L10n) -> String {
-        switch self {
-        case .highlights: l.tr(zh: "高光", en: "Highlights", de: "Highlights")
-        case .timeline: l.tr(zh: "时光", en: "Diary", de: "Tagebuch")
-        case .photos: l.tr(zh: "相册", en: "Album", de: "Album")
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .highlights: "sparkles"
-        case .timeline: "clock.arrow.circlepath"
-        case .photos: "photo.on.rectangle"
-        }
-    }
-}
-
 private enum PetMomentsArchiveFilter: String, CaseIterable, Identifiable {
     case memories
     case all
@@ -69,12 +45,22 @@ private struct PendingSharedSessionDelete: Identifiable {
     let title: String
 }
 
+private struct PetHistoryDestination: Identifiable {
+    let id: UUID
+    let destination: AppPetDetailSheetDestination
+}
+
 struct PetMomentsHubView: View {
     let pet: Pet
+    let showsCloseButton: Bool
     let sharedCareSessions: [SharedCareSession]
     let renderData: PetMomentsHubRenderData
     let albumRenderData: PetPhotoAlbumRenderData
     let dataRevision: Int
+    let initialRoute: PetMomentsRoute
+    var hasLoaded = true
+    @State private var didFocusRecord = false
+    @State private var historyDestination: PetHistoryDestination?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -85,6 +71,9 @@ struct PetMomentsHubView: View {
     @State private var tab: PetMomentsTab = .highlights
     @State private var archiveFilter: PetMomentsArchiveFilter = .memories
     @State private var photosPickerItems: [PhotosPickerItem] = []
+    @State private var isSavingPhotos = false
+    @State private var photoSaveFailed = false
+    @State private var savedPhotoRecord: PetRecordReference?
     @State private var showingQuickMoment = false
     @State private var pendingSharedSessionDelete: PendingSharedSessionDelete?
     @State private var mediaBlobLoader: SwiftDataMediaBlobLoader?
@@ -94,13 +83,21 @@ struct PetMomentsHubView: View {
         sharedCareSessions: [SharedCareSession],
         renderData: PetMomentsHubRenderData = .empty,
         albumRenderData: PetPhotoAlbumRenderData = .empty,
-        dataRevision: Int = 0
+        dataRevision: Int = 0,
+        initialRoute: PetMomentsRoute = .highlights,
+        hasLoaded: Bool = true,
+        showsCloseButton: Bool = true
     ) {
         self.pet = pet
+        self.showsCloseButton = showsCloseButton
         self.sharedCareSessions = sharedCareSessions
         self.renderData = renderData
         self.albumRenderData = albumRenderData
         self.dataRevision = dataRevision
+        self.initialRoute = initialRoute
+        self.hasLoaded = hasLoaded
+        _tab = State(initialValue: initialRoute.tab)
+        _archiveFilter = State(initialValue: PetMomentsArchiveFilter.allCases.first { $0.mode == initialRoute.filter } ?? .all)
     }
 
     private var l: L10n { L10n(appLanguage) }
@@ -130,7 +127,7 @@ struct PetMomentsHubView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack(alignment: .bottomTrailing) {
                 OhanaAppBackground().ignoresSafeArea()
 
@@ -161,20 +158,19 @@ struct PetMomentsHubView: View {
                     }
                 }
                 .onChange(of: photosPickerItems) { _, newItems in
-                    PetPhotoAlbumView.consumePickerItems(
-                        newItems,
-                        pet: pet,
-                        modelContext: modelContext,
-                        services: appServices
-                    )
-                    photosPickerItems = []
+                    saveSelectedPhotos()
                 }
 
                 activeAddButton
                     .padding(.trailing, 18)
                     .padding(.bottom, 24)
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .sheet(item: $historyDestination) { route in
+                AppPetDetailSheetRouteContainer(id: pet.id, destination: route.destination, onMissing: { historyDestination = nil })
+            }
+            .navigationTitle(l.tr(zh: "记录中心", en: "Moments", de: "Momente"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "pet-moments-close") } }
             .confirmationDialog(
                 pendingSharedSessionDelete?.title ?? l.tr(zh: "删除共同记录？", en: "Delete shared record?", de: "Gemeinsamen Eintrag löschen?"),
                 isPresented: sharedSessionDeleteBinding,
@@ -207,6 +203,33 @@ struct PetMomentsHubView: View {
                 }
             }
             .petMemorialTone(isActive: pet.hasPassedAway)
+            .accessibilityIdentifier("pet-moments-hub")
+        }
+        .petRecordFeedback($savedPhotoRecord)
+        .overlay {
+            if isSavingPhotos { ProgressView(PetCareExperienceCopy(l: l).saving) }
+        }
+        .alert(PetCareExperienceCopy(l: l).saveFailed, isPresented: $photoSaveFailed) {
+            Button(PetCareExperienceCopy(l: l).retry) { saveSelectedPhotos() }
+            Button(l.cancel, role: .cancel) {}
+        }
+    }
+
+    private func saveSelectedPhotos() {
+        guard !photosPickerItems.isEmpty, !isSavingPhotos else { return }
+        isSavingPhotos = true
+        savedPhotoRecord = nil
+        PetPhotoAlbumView.consumePickerItems(photosPickerItems, pet: pet, modelContext: modelContext, services: appServices) { result in
+            isSavingPhotos = false
+            switch result {
+            case let .success(receipt):
+                photosPickerItems = []
+                if let id = receipt.photoIDs.first {
+                    savedPhotoRecord = PetRecordReference(petID: pet.id, recordID: id, filter: .memories)
+                }
+            case .failure:
+                photoSaveFailed = true
+            }
         }
     }
 
@@ -223,7 +246,7 @@ struct PetMomentsHubView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "记录中心", en: "Moments", de: "Momente"))
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(pet.name)
                     .font(OhanaFont.caption(.semibold))
@@ -232,15 +255,7 @@ struct PetMomentsHubView: View {
 
             Spacer()
 
-            Button { dismiss() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+
         }
     }
 
@@ -255,10 +270,10 @@ struct PetMomentsHubView: View {
     private func metric(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .contentTransition(.numericText())
         }
@@ -285,13 +300,15 @@ struct PetMomentsHubView: View {
             withAnimation(GoMotion.selection) { tab = target }
         } label: {
             Label(target.title(l), systemImage: target.icon)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(tab == target ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
-                .frame(height: 38)
+                .frame(minHeight: 44)
                 .background(tab == target ? Color.goPrimary : Color.clear, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityIdentifier("pet-moments-tab-\(target.rawValue)")
+        .accessibilityAddTraits(tab == target ? .isSelected : [])
     }
 
     private var filterChips: some View {
@@ -303,7 +320,7 @@ struct PetMomentsHubView: View {
                         withAnimation(GoMotion.selection) { archiveFilter = filter }
                     } label: {
                         Text(filter.title(l))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(archiveFilter == filter ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                             .padding(.horizontal, 13)
                             .padding(.vertical, 9)
@@ -316,12 +333,18 @@ struct PetMomentsHubView: View {
     }
 
     private var archiveScroll: some View {
+        ScrollViewReader { proxy in
         ScrollView(showsIndicators: false) {
             VStack(alignment: .leading, spacing: 14) {
-                if currentSections.isEmpty {
+                if !hasLoaded {
+                    ProgressView().frame(maxWidth: .infinity).padding()
+                } else if currentSections.isEmpty {
                     emptyState
                 } else {
                     timelineSections
+                }
+                if hasLoaded, let id = initialRoute.focusedRecordID, archiveFilter.mode == initialRoute.filter, !currentSections.flatMap(\.items).contains(where: { $0.containsRecord(id) }) {
+                    Text(PetCareExperienceCopy(l: l).recordUnavailable).font(.callout).foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
             .padding(.top, 2)
@@ -330,6 +353,13 @@ struct PetMomentsHubView: View {
         .scrollBounceBehavior(.basedOnSize)
         .animation(GoMotion.stateChange, value: tab)
         .animation(GoMotion.stateChange, value: archiveFilter)
+        .onChange(of: dataRevision, initial: true) { _, _ in
+            guard !didFocusRecord, let id = initialRoute.focusedRecordID,
+                  let item = currentSections.flatMap(\.items).first(where: { $0.containsRecord(id) }) else { return }
+            proxy.scrollTo(item.id, anchor: .center)
+            didFocusRecord = true
+        }
+        }
     }
 
     private var timelineSections: some View {
@@ -338,7 +368,7 @@ struct PetMomentsHubView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .lastTextBaseline) {
                         Text(section.title)
-                            .font(OhanaFont.headline(.black))
+                            .font(OhanaFont.headline(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text(section.subtitle)
@@ -349,12 +379,18 @@ struct PetMomentsHubView: View {
 
                     VStack(alignment: .leading, spacing: 10) {
                         ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
-                            if item.style == .story {
-                                storyRow(item)
-                            } else {
-                                railRow(item, isLast: index == section.items.count - 1)
-                                    .padding(.horizontal, 18)
+                            Group {
+                                if item.style == .story {
+                                    storyRow(item)
+                                } else {
+                                    railRow(item, isLast: index == section.items.count - 1)
+                                        .padding(.horizontal, 18)
+                                }
                             }
+                            .id(item.id)
+                            .background(initialRoute.focusedRecordID.map { item.containsRecord($0) } == true ? Color.goPrimary.opacity(0.10) : Color.clear)
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("pet-timeline-record-\(item.id.uuidString)")
                         }
                     }
                 }
@@ -366,16 +402,16 @@ struct PetMomentsHubView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 9) {
                 Image(systemName: item.iconName)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(item.colorToken.color)
                     .frame(width: 22, height: 22) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Text(item.title)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                 Spacer()
                 Text(item.date, format: .dateTime.hour().minute())
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 sharedSessionActionMenu(for: item)
             }
@@ -419,7 +455,7 @@ struct PetMomentsHubView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(item.title)
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 if !item.subtitle.isEmpty {
@@ -439,24 +475,45 @@ struct PetMomentsHubView: View {
         }
     }
 
+    private func careHistoryDestination(_ item: PetTimelineRenderItem) -> AppPetDetailSheetDestination? {
+        guard !pet.hasPassedAway else { return nil }
+        switch item.type {
+        case "weight": return .weight
+        case "expense": return .expense
+        case "health": return .health(nil)
+        case "walk": return .walkSummary
+        case "potty": return .potty
+        case "care":
+            switch item.actionType {
+            case CareType.feeding.rawValue: return .feed(false)
+            case CareType.watering.rawValue, CareType.waterChange.rawValue, CareType.filterClean.rawValue: return .water
+            case CareType.play.rawValue: return .play
+            case CareType.litter.rawValue: return .litter
+            default: return .hygiene
+            }
+        default: return nil
+        }
+    }
+
     @ViewBuilder
     private func sharedSessionActionMenu(for item: PetTimelineRenderItem) -> some View {
-        if item.sharedSessionID != nil {
+        if let destination = careHistoryDestination(item) {
+            Button(PetCareExperienceCopy(l: l).viewHistory) {
+                historyDestination = PetHistoryDestination(id: item.id, destination: destination)
+            }
+            .font(.caption)
+            .frame(minHeight: 44)
+        }
+        if item.sharedSessionID != nil, !pet.hasPassedAway {
             Menu {
-                Button(role: .destructive) {
-                    requestDeleteSharedSession(item)
-                } label: {
+                Button(role: .destructive) { requestDeleteSharedSession(item) } label: {
                     Label(l.tr(zh: "删除整组共同记录", en: "Delete shared record", de: "Gemeinsamen Eintrag löschen"), systemImage: "trash")
                 }
             } label: {
                 Label(l.tr(zh: "共同记录操作", en: "Shared record actions", de: "Aktionen für gemeinsamen Eintrag"), systemImage: "ellipsis")
-                    .labelStyle(.iconOnly)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy icon token; menu frame carries the hit target in compact rows.
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .font(.caption)
+                    .frame(minHeight: 44)
             }
-            .accessibilityLabel(l.tr(zh: "共同记录操作", en: "Shared record actions", de: "Aktionen für gemeinsamen Eintrag"))
         }
     }
 
@@ -579,17 +636,17 @@ struct PetMomentsHubView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: tab == .highlights ? "sparkles" : "sparkles.rectangle.stack.fill")
-                .font(OhanaFont.adaptive(size: 38, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 38, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(emptyTitle)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if tab == .highlights {
                 Button {
                     withAnimation(GoMotion.selection) { tab = .timeline }
                 } label: {
                     Text(l.tr(zh: "去记录", en: "Add a Moment", de: "Moment speichern"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 20)
                         .frame(height: 46)
@@ -599,7 +656,7 @@ struct PetMomentsHubView: View {
             } else {
                 Button { showingQuickMoment = true } label: {
                     Text(l.tr(zh: "记录第一刻", en: "Add First Moment", de: "Ersten Moment speichern"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 20)
                         .frame(height: 46)
@@ -649,15 +706,17 @@ struct PetMomentsHubView: View {
                 )
             }
             .buttonStyle(ScaleButtonStyle())
+            .disabled(isSavingPhotos)
+            .accessibilityIdentifier("pet-album-add")
         }
     }
 
     private func addButtonLabel(icon: String, title: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
         }
         .foregroundStyle(Color.ohanaPrimaryActionText)
         .padding(.horizontal, 22)

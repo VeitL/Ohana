@@ -45,9 +45,7 @@ struct SitterCardPreviewSheet: View {
             .navigationTitle(l.tr(zh: "寄养名片", en: "Sitter card", de: "Sitter-Karte"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(l.tr(zh: "关闭", en: "Close", de: "Schliessen")) { dismiss() }
-                }
+                OhanaModalToolbar(onClose: { dismiss() })
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Task { await renderAndShare() }
@@ -94,7 +92,7 @@ struct SitterCardPreviewSheet: View {
                 .overlay(Circle().strokeBorder(Color(hex: pet.safeThemeColorHex).opacity(0.5), lineWidth: 2))
                 VStack(alignment: .leading, spacing: 4) {
                     Text(pet.name)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -170,7 +168,7 @@ struct SitterCardPreviewSheet: View {
                 GoDashedDivider().padding(.horizontal, 16)
                 VStack(alignment: .leading, spacing: 6) {
                     Label(l.tr(zh: "特别说明", en: "Special notes", de: "Besondere Hinweise"), systemImage: "note.text")
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     Text(pet.notes)
                         .font(OhanaFont.adaptive(size: 13, weight: .medium))
@@ -185,7 +183,7 @@ struct SitterCardPreviewSheet: View {
             HStack {
                 Spacer()
                 Text(l.tr(zh: "由 Ohana 生成 🏝️", en: "Made with Ohana 🏝️", de: "Erstellt mit Ohana 🏝️"))
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.2))
                     .padding(.bottom, 16)
                     .padding(.trailing, 20)
@@ -218,12 +216,12 @@ struct SitterCardPreviewSheet: View {
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text(label)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.42))
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.85))
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
@@ -263,7 +261,7 @@ struct SitterCardPreviewSheet: View {
 
     private func capsuleTag(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.6))
             .padding(.horizontal, 8).padding(.vertical, 3)
             .goGlassBackground(Capsule())

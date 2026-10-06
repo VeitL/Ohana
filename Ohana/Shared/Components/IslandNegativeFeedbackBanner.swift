@@ -48,11 +48,11 @@ struct IslandNegativeFeedbackBanner: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(signal.title)
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(signal.detail)
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
                         .lineLimit(1)
                 }
@@ -61,7 +61,7 @@ struct IslandNegativeFeedbackBanner: View {
 
                 if signals.count > 1 {
                     Text("\(selectedIndex + 1)/\(signals.count)")
-                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                         .padding(.horizontal, 5).padding(.vertical, 2)
                         .background(Color.white.opacity(0.08), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.

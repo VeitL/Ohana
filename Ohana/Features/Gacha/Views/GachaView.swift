@@ -184,6 +184,7 @@ private struct GachaOddsRulesSheet: View {
 }
 
 struct GachaView: View {
+    let showsCloseButton: Bool
     var drawsBackground: Bool = true
     var onClose: (() -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
@@ -220,6 +221,7 @@ struct GachaView: View {
     @State private var presentedFlowSheet: GachaFlowSheet?
     @State private var displayedStardustBalance = 0
     init(
+        showsCloseButton: Bool = true,
         drawsBackground: Bool = true,
         onClose: (() -> Void)? = nil,
         onPresentCoconutLog: ((CoconutLogSubject?) -> Void)? = nil,
@@ -227,6 +229,7 @@ struct GachaView: View {
         ownedItems: [GachaOwnedItem] = [],
         drawLogs: [GachaDrawLog] = []
     ) {
+        self.showsCloseButton = showsCloseButton
         self.drawsBackground = drawsBackground
         self.onClose = onClose
         self.onPresentCoconutLog = onPresentCoconutLog
@@ -343,7 +346,7 @@ struct GachaView: View {
 
 extension GachaView {
     var body: some View {
-        NavigationStack {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack {
                 if drawsBackground {
                     OhanaAppBackground()
@@ -373,9 +376,7 @@ extension GachaView {
             .navigationTitle(l.tr(zh: "Ohana 盲盒", en: "Ohana Blind Box", de: "Ohana Blindbox"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel) { close() }
-                }
+                if showsCloseButton { OhanaModalToolbar(onClose: close) }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         presentedFlowSheet = .odds
@@ -444,9 +445,7 @@ extension GachaView {
             .navigationTitle(collectionDisplayName(for: item))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel) { dismissCollectionDetail() }
-                }
+                OhanaModalToolbar(onClose: dismissCollectionDetail)
             }
         }
         .presentationDetents([.medium, .large])
@@ -461,7 +460,7 @@ extension GachaView {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "Ohana 盲盒", en: "Ohana Blind Box", de: "Ohana Blindbox"))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.brandTitle(.title3, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
@@ -511,47 +510,34 @@ extension GachaView {
 
     private var economyOverview: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                Label(
-                    currentHuman?.name ?? l.tr(zh: "未选择归属人", en: "No owner selected", de: "Keine Person gewählt"),
-                    systemImage: "person.crop.circle.fill"
-                )
-                .font(OhanaFont.subheadline(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                Spacer()
-                Button {
-                    presentedFlowSheet = .odds
-                } label: {
-                    Label(
-                        l.tr(zh: "概率与规则", en: "Odds & rules", de: "Chancen & Regeln"),
-                        systemImage: "info.circle"
-                    )
-                    .font(OhanaFont.caption(.bold))
-                }
-                .buttonStyle(.plain)
-            }
+            Label(
+                currentHuman?.name ?? l.tr(zh: "未选择归属人", en: "No owner selected", de: "Keine Person gewählt"),
+                systemImage: "person.crop.circle.fill"
+            )
+            .font(OhanaFont.subheadline(.black))
+            .foregroundStyle(Color.ohanaPrimaryText)
 
-            Grid(alignment: .leading, horizontalSpacing: 18, verticalSpacing: 8) {
-                GridRow {
-                    economyMetric(
-                        value: "\(currentCoconutBalance)🥥",
-                        label: l.tr(zh: "个人余额", en: "Personal", de: "Persönlich")
-                    )
-                    economyMetric(
-                        value: "\(islandSpendableHumanBalance)🥥",
-                        label: l.tr(zh: "岛屿可用", en: "Island spendable", de: "Insel verfügbar")
-                    )
-                }
-                GridRow {
-                    economyMetric(
-                        value: "\(displayedStardustBalance)✦",
-                        label: l.tr(zh: "伙伴星光", en: "Companion stardust", de: "Begleiter-Sternlicht")
-                    )
-                    economyMetric(
-                        value: guaranteeSummary,
-                        label: l.tr(zh: "下一保底", en: "Next guarantee", de: "Nächste Garantie")
-                    )
-                }
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), alignment: .leading), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2),
+                alignment: .leading,
+                spacing: 8
+            ) {
+                economyMetric(
+                    value: "\(currentCoconutBalance)🥥",
+                    label: l.tr(zh: "个人余额", en: "Personal", de: "Persönlich")
+                )
+                economyMetric(
+                    value: "\(islandSpendableHumanBalance)🥥",
+                    label: l.tr(zh: "岛屿可用", en: "Island spendable", de: "Insel verfügbar")
+                )
+                economyMetric(
+                    value: "\(displayedStardustBalance)✦",
+                    label: l.tr(zh: "伙伴星光", en: "Companion stardust", de: "Begleiter-Sternlicht")
+                )
+                economyMetric(
+                    value: guaranteeSummary,
+                    label: l.tr(zh: "下一保底", en: "Next guarantee", de: "Nächste Garantie")
+                )
             }
         }
         .padding(14)
@@ -564,7 +550,7 @@ extension GachaView {
             Text(value)
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(label)
                 .font(OhanaFont.caption2(.bold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -837,8 +823,10 @@ extension GachaView {
             requestDraw()
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: canDraw ? "sparkles" : "lock.fill")
+                Image(systemName: isDrawing ? "hourglass" : (canDraw ? "sparkles" : "lock.fill"))
+                    .accessibilityHidden(true)
                 Text(drawButtonTitle)
+                    .fixedSize(horizontal: false, vertical: true)
                 if canDraw {
                     Text("-\(appServices.gacha.costPerDraw)🥥")
                         .foregroundStyle(Color.ohanaPrimaryActionText.opacity(0.72))
@@ -852,24 +840,39 @@ extension GachaView {
         }
         .buttonStyle(ScaleButtonStyle())
         .disabled(!canDraw)
+        .accessibilityIdentifier("gacha-draw-action")
     }
 
     private var drawButtonTitle: String {
+        if isDrawing {
+            return l.tr(
+                zh: "打开中", en: "Opening", de: "Öffnet",
+                es: "Abriendo", pt: "Abrindo", fr: "Ouverture",
+                ja: "開封中", ko: "여는 중", it: "Apertura"
+            )
+        }
         if currentHuman == nil {
-            return l.tr(zh: "先切换本人账户", en: "Choose your account", de: "Konto wählen")
+            return l.tr(
+                zh: "请先添加人类成员", en: "Add a human member first", de: "Zuerst eine Person hinzufügen",
+                es: "Añade primero una persona", pt: "Adicione uma pessoa primeiro", fr: "Ajoutez d’abord une personne",
+                ja: "先に人のメンバーを追加", ko: "먼저 사람 멤버를 추가하세요", it: "Aggiungi prima una persona"
+            )
         }
         if currentHumanWalletIsFrozen {
             return l.tr(zh: "钱包已冻结", en: "Wallet frozen", de: "Wallet eingefroren")
         }
         if islandSpendableHumanBalance < appServices.gacha.costPerDraw {
-            return l.tr(zh: "椰子不足", en: "Not enough coconuts", de: "Nicht genug Kokos")
+            let shortfall = appServices.gacha.costPerDraw - islandSpendableHumanBalance
+            return l.tr(
+                zh: "还差 \(shortfall)🥥", en: "Need \(shortfall)🥥 more", de: "Noch \(shortfall)🥥 nötig",
+                es: "Faltan \(shortfall)🥥", pt: "Faltam \(shortfall)🥥", fr: "Il manque \(shortfall)🥥",
+                ja: "あと \(shortfall)🥥 必要", ko: "\(shortfall)🥥 더 필요해요", it: "Mancano \(shortfall)🥥"
+            )
         }
         if !selectedSeriesUnlocked {
             return l.tr(zh: "系列未解锁", en: "Series locked", de: "Serie gesperrt")
         }
-        return isDrawing
-            ? l.tr(zh: "打开中", en: "Opening", de: "Öffnet")
-            : l.tr(zh: "敲开椰子", en: "Crack it open", de: "Kokos öffnen")
+        return l.tr(zh: "敲开椰子", en: "Crack it open", de: "Kokos öffnen")
     }
 
     private var collectionSection: some View {
@@ -1031,7 +1034,7 @@ extension GachaView {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(collectionDisplayName(for: item))
-                            .font(OhanaFont.title3(.black))
+                            .font(OhanaFont.brandTitle(.title3, weight: .bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(item.rarity.name(l))
                             .font(OhanaFont.caption(.black))

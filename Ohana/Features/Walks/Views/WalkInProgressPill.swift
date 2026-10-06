@@ -51,7 +51,7 @@ struct WalkInProgressPill: View {
                 // 中：宠物名 + 时长
                 VStack(alignment: .leading, spacing: 1) {
                     Text(l.tr(zh: "\(pet.name) 正在巡岛", en: "\(pet.name) is walking", de: "\(pet.name) ist unterwegs"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     walkElapsedLabel
@@ -94,7 +94,7 @@ struct WalkInProgressPill: View {
         let m = elapsed / 60
         let s = elapsed % 60
         return Text(String(format: "已巡 %02d:%02d", m, s))
-            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.55))
             .monospacedDigit()
             .contentTransition(.numericText())

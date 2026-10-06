@@ -34,6 +34,7 @@ struct QuickHumanWorkoutSheet: View {
     @State private var popupVisible = false
     @State private var isClosing = false
     @State private var isSaving = false
+    @State private var saveFailed = false
     @State private var popupDragOffset: CGFloat = 0
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
@@ -57,7 +58,7 @@ struct QuickHumanWorkoutSheet: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                     typeGrid
                     durationBlock
-                    EmbeddedDecimalKeypad(
+                    OhanaDecimalInput(
                         text: $durationText,
                         countryCode: appCountry,
                         maxFractionDigits: 0,
@@ -77,16 +78,14 @@ struct QuickHumanWorkoutSheet: View {
             .accessibilityIdentifier("quick-human-workout-sheet")
             .navigationTitle(l.tr(zh: "快速运动", en: "Quick Workout", de: "Schnelles Training"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { close() }
-                        .accessibilityIdentifier("ohana-sheet-close-action")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!canSave || isSaving)
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: durationText != "30" || selectedType != .walking, isSaving: isSaving, canSave: canSave,
+                closeIdentifier: "ohana-sheet-close-action", saveIdentifier: "quick-human-workout-save-action",
+                onCancel: close, onSave: save
+            )
+        }
+        .alert(l.tr(zh: "保存失败，输入已保留，请重试。", en: "Could not save. Your input was kept; try again.", de: "Speichern fehlgeschlagen. Deine Eingabe bleibt erhalten. Versuche es erneut."), isPresented: $saveFailed) {
+            Button(l.done, role: .cancel) {}
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
@@ -138,14 +137,14 @@ struct QuickHumanWorkoutSheet: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(accent.opacity(0.18))
                 Image(systemName: selectedType.icon)
-                    .font(OhanaFont.adaptive(size: 19, weight: .black))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold))
                     .foregroundStyle(accent)
             }
             .frame(width: 58, height: 58)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "快速运动", en: "Quick Workout", de: "Schnelles Training"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
@@ -170,9 +169,9 @@ struct QuickHumanWorkoutSheet: View {
                 } label: {
                     VStack(spacing: 5) {
                         Image(systemName: type.icon)
-                            .font(OhanaFont.adaptive(size: 15, weight: .black))
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                         Text(type.rawValue)
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .lineLimit(1)
                             .minimumScaleFactor(0.75)
                     }
@@ -194,14 +193,14 @@ struct QuickHumanWorkoutSheet: View {
     private var durationBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "时长", en: "Duration", de: "Dauer"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(durationText.isEmpty ? "0" : durationText)
                     .font(OhanaFont.metric(size: 44))
                     .foregroundStyle(durationText.isEmpty ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
                 Text(l.tr(zh: "分钟", en: "min", de: "Min."))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Spacer()
             }
@@ -221,7 +220,7 @@ struct QuickHumanWorkoutSheet: View {
                     }
                 } label: {
                     Text("\(value)")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(duration == value ? accentForeground : Color.ohanaPrimaryText)
                         .frame(maxWidth: .infinity)
                         .frame(height: 34)
@@ -237,12 +236,12 @@ struct QuickHumanWorkoutSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存运动", en: "Save Workout", de: "Training speichern")
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
             }
             .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
@@ -270,12 +269,11 @@ struct QuickHumanWorkoutSheet: View {
     private func save() {
         guard !isSaving, canSave else { return }
         isSaving = true
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         let savedType = selectedType
         let savedDuration = duration
         let command = DomainCommand.quickHumanWorkout(humanID: human.id)
         commandQueue.enqueue(command) {
-            HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
+            let result = HumanCareCommandExecutor(context: modelContext, services: appServices).recordWorkout(
                 human: human,
                 type: savedType,
                 durationMinutes: savedDuration,
@@ -283,6 +281,12 @@ struct QuickHumanWorkoutSheet: View {
                 command: command,
                 note: "quick.human.workout"
             )
+            isSaving = false
+            guard result.didPersist else {
+                saveFailed = true
+                return
+            }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved?()
             close()
         }

@@ -45,6 +45,18 @@ struct FamilyTaskEditorPanel: View {
     @State private var endsAt: Date
     @State private var hasReminder: Bool
     @State private var reminderLeadMinutes: Int
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        let details = [title, note, selectedHumanId, String(includesReward), String(reward),
+                       String(hasDueDate), String(dueAt.timeIntervalSince1970), emoji]
+        let schedule = [String(describing: recurrenceKind), String(intervalDays),
+                        selectedWeekdays.map { String(describing: $0) }.sorted().joined(separator: ","),
+                        String(monthlyDay), String(isAllDay), String(hasStartDate),
+                        String(startsAt.timeIntervalSince1970), String(hasEndDate),
+                        String(endsAt.timeIntervalSince1970), String(hasReminder),
+                        String(reminderLeadMinutes), String(describing: editScope)]
+        return details + schedule
+    }
     @State private var isSaving = false
     @State private var editScope: FamilyTaskEditScope
     @State private var planSubjectName: String
@@ -166,10 +178,16 @@ struct FamilyTaskEditorPanel: View {
             taskSection
             assignmentSection
             scheduleSection
-            saveSection
             deleteSection
         }
         .scrollDismissesKeyboard(.interactively)
+        .ohanaEditorChrome(
+            hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+            isSaving: isSaving, canSave: canSave,
+            saveTitle: saveActionTitle, saveIdentifier: "family-task-save-action",
+            onCancel: onClose, onSave: save
+        )
+        .onAppear { if initialDraft == nil { initialDraft = editorDraft } }
         .alert(
             l.tr(zh: "操作未完成", en: "Could not complete", de: "Aktion nicht abgeschlossen"),
             isPresented: Binding(
@@ -510,24 +528,7 @@ struct FamilyTaskEditorPanel: View {
         }
     }
 
-    private var saveSection: some View {
-        Section {
-            Button {
-                save()
-            } label: {
-                if isSaving {
-                    ProgressView()
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                } else {
-                    Label(saveActionTitle, systemImage: "paperplane.fill")
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                }
-            }
-            .ohanaPrimaryProminentButton()
-            .disabled(!canSave || isSaving)
-            .accessibilityIdentifier("family-task-save-action")
-        }
-    }
+
 
     @ViewBuilder
     private var deleteSection: some View {
@@ -623,6 +624,7 @@ struct FamilyTaskEditorPanel: View {
     }
 
     private func save() {
+        guard !isSaving else { return }
         guard canSave else {
             saveErrorMessage = validationFailureMessage
             return

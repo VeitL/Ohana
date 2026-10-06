@@ -61,9 +61,12 @@ struct VerticalSolidHomeView: View {
     @AppStorage("home_cards_enable_ambient_float") var enablesHomeCardAmbientFloat = false
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
+    @Environment(AppExperienceController.self) private var experienceController
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @ObservedObject var workloadPolicy = AppWorkloadPolicy.shared
 
+    @State var savedPetRecord: PetRecordReference?
+    @State var pendingPetRecordCommands: Set<DomainCommand> = []
     @State var headerContextCardId: UUID?
     @State var taskCenterBadge = TaskCenterBadgeSnapshot.empty
     @State var calendarAddEventTrigger = 0
@@ -90,6 +93,9 @@ struct VerticalSolidHomeView: View {
     @State var completedPlantQuickCareKeys: Set<String> = []
     @State var failedPlantQuickCareKeys: Set<String> = []
     @State var plantQuickCareFeedbackClearTasks: [String: Task<Void, Never>] = [:]
+    @State var plantQuickCareOperationIDs: [String: UUID] = [:]
+    @State var pendingHomePlantCareUndoToken: PlantBatchCareUndoToken?
+    @State var homePlantCareRewardTasks: [UUID: Task<Void, Never>] = [:]
     var treeManager: OasisTreeManaging { appServices.oasisTree }
     @State var showGrowthOnboarding = false
     @State var growthOnboardingTask: Task<Void, Never>?
@@ -259,14 +265,14 @@ struct VerticalSolidHomeView: View {
             let backgroundViewportTopOffset = max(0, globalFrame.minY)
             let backgroundViewportSize = ScreenCompat.bounds.size
             let safeTop: CGFloat = 0
-            let safeBottom = proxy.safeAreaInsets.bottom
             let headerTopGap: CGFloat = 0
             let headerContentHeight: CGFloat = 0
             let compactContentGap: CGFloat = 8
             let compactTopChromeHeight = safeTop + headerTopGap + headerContentHeight + compactContentGap
             let homeCollapsedTopInset: CGFloat = 0
             let topChromeHeight = compactTopChromeHeight
-            let bottomHeight = max(84, safeBottom + 70)
+            // safeAreaInset reserves the complete bottom row before content is measured.
+            let bottomHeight: CGFloat = 0
             let contentHeight = VerticalSolidHomePageContentHeightPolicy.height(
                 selectedTab: controller.selectedTab,
                 containerHeight: proxy.size.height,
@@ -327,20 +333,7 @@ struct VerticalSolidHomeView: View {
                     }
                     .frame(width: proxy.size.width, height: contentHeight)
 
-                    VerticalSolidHomeBottomBar(
-                        selectedTab: controller.selectedTab,
-                        visibleTabs: currentVisibleHomeTabs,
-                        taskCenterBadge: taskCenterBadge,
-                        quickRecordTargets: homeToolbarQuickRecordTargets,
-                        safeBottom: safeBottom,
-                        allowsSelectionMotion: canAnimate,
-                        contextActionDisabledReason: homeBottomContextActionDisabledReason,
-                        localization: l,
-                        onSelect: { tab in selectTab(tab) },
-                        onQuickRecord: openHomeToolbarQuickRecord,
-                        onContextAction: performHomeBottomContextAction
-                    )
-                    .frame(width: proxy.size.width, height: bottomHeight, alignment: .bottom)
+
                 }
                 .frame(
                     width: proxy.size.width,
@@ -362,7 +355,7 @@ struct VerticalSolidHomeView: View {
                 if shouldShowStarterOasisTabPrompt {
                     StarterOasisTabPromptView(localization: l)
                         .padding(.horizontal, 18)
-                        .padding(.bottom, max(146, safeBottom + 128))
+                        .padding(.bottom, 48)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .zIndex(12)
@@ -375,7 +368,7 @@ struct VerticalSolidHomeView: View {
                         appLanguage: appLanguage
                     )
                     .padding(.horizontal, 12)
-                    .padding(.bottom, max(92, safeBottom + 84))
+                    .padding(.bottom, 12)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(61)
@@ -410,6 +403,57 @@ struct VerticalSolidHomeView: View {
 
     var body: some View {
         homeGeometryContent
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            VerticalSolidHomeBottomBar(
+                selectedTab: controller.selectedTab,
+                visibleTabs: currentVisibleHomeTabs,
+                taskCenterBadge: taskCenterBadge,
+                quickRecordTargets: homeToolbarQuickRecordTargets,
+                contextActionDisabledReason: homeBottomContextActionDisabledReason,
+                localization: l,
+                onSelect: { tab in selectTab(tab) },
+                onQuickRecord: openHomeToolbarQuickRecord,
+                onContextAction: performHomeBottomContextAction
+            )
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if hasOnboarded,
+               experienceController.shouldOfferZenIntroduction,
+               !(controller.selectedTab == .home && isHomeCardExpandedOrTransitioning) {
+                AppExperienceIntroductionBanner(appLanguage: appLanguage) {
+                    experienceController.dismissZenIntroduction()
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if !pendingPetRecordCommands.isEmpty, controller.selectedTab == .home {
+                ProgressView(PetCareExperienceCopy(l: l).saving)
+                    .padding()
+                    .accessibilityIdentifier("pet-record-saving")
+            } else if let savedPetRecord, controller.selectedTab == .home {
+                PetRecordReceiptView(
+                    onView: { onPresentAppSheet(.petMomentHistory(savedPetRecord.petID, initialRoute: savedPetRecord.route)) },
+                    onDismiss: { self.savedPetRecord = nil }
+                )
+            }
+            if let token = pendingHomePlantCareUndoToken, controller.selectedTab == .plants {
+                HStack(spacing: 12) {
+                    Label(l.tr(zh: "已记录", en: "Logged", de: "Erfasst"), systemImage: "checkmark.circle.fill")
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
+                    Spacer(minLength: 8)
+                    Button(l.tr(zh: "撤销", en: "Undo", de: "Widerrufen")) {
+                        undoHomePlantQuickCare(token)
+                    }
+                    .frame(minWidth: 44, minHeight: 44)
+                    .accessibilityIdentifier("home-plant-care-undo")
+                }
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .padding(.horizontal, 16)
+                .background(Color.ohanaCardSurface, in: Capsule())
+                .padding(.horizontal, 16)
+                .accessibilityIdentifier("home-plant-care-result")
+            }
+        }
         .sheet(isPresented: $isCalendarAddEventPresented, onDismiss: completeCalendarAddEventDismissal) {
             AddEventView(onClose: closeCalendarAddEvent, plants: calendarAddEventPlants)
         }
@@ -437,6 +481,9 @@ struct VerticalSolidHomeView: View {
             scheduleHomeAppearHandoff()
             scheduleMemberMediaAttachmentIndexRepair()
             handleCreatedEntitySignalIfNeeded(createdEntitySignal)
+            if let token = pendingHomePlantCareUndoToken, homePlantCareRewardTasks[token.id] == nil {
+                scheduleHomePlantCareRewardCommit(token)
+            }
         }
         .onChange(of: dataSignature) { _, _ in
             if !interaction.petsByID.isEmpty || !interaction.humansByID.isEmpty {
@@ -464,6 +511,7 @@ struct VerticalSolidHomeView: View {
             showsHomeReadModelLoadingOverlay = true
         }
         .onDisappear {
+            pendingPetRecordCommands.removeAll()
             homeAppearHandoffTask?.cancel()
             homeAppearHandoffTask = nil
             clearArrivalState()
@@ -476,6 +524,8 @@ struct VerticalSolidHomeView: View {
             oasisEnergyInjectionTask?.cancel()
             oasisEnergyInjectionTask = nil
             plantQuickCareFeedbackClearTasks.values.forEach { $0.cancel() }
+            homePlantCareRewardTasks.values.forEach { $0.cancel() }
+            homePlantCareRewardTasks.removeAll()
             pendingOasisEnergyInjectionCount = 0
             pendingPlantQuickCareKeys.removeAll()
             completedPlantQuickCareKeys.removeAll()

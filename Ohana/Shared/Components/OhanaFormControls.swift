@@ -41,6 +41,15 @@ extension View {
     }
 }
 
+// MARK: - Content Rhythm
+
+enum OhanaSpacing {
+    static let pageMargin: CGFloat = 16
+    static let section: CGFloat = 24
+    static let row: CGFloat = 12
+    static let related: CGFloat = 8
+}
+
 // MARK: - Radius Scale
 // Anchored on verified V4 values already shipping in the app. Do not invent
 // new steps here without updating ui规范.selection.json and docs/design/ui规范.md.
@@ -176,7 +185,7 @@ struct OhanaChoiceChipRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -204,7 +213,7 @@ struct OhanaChoiceChipRow: View {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Text(option)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)

@@ -189,7 +189,7 @@ struct HumanLifecycleDangerZone: View {
                     ko: "별세일: \(date.formatted(.dateTime.year().month().day()))",
                     it: "Data del decesso: \(date.formatted(.dateTime.year().month().day()))"
                 ))
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
             }
             Text(l.tr(
@@ -203,7 +203,7 @@ struct HumanLifecycleDangerZone: View {
                 ko: "함께한 \(human.daysTogetherAtPassing)일 · \(localizedAgeAtPassing)",
                 it: "\(human.daysTogetherAtPassing) giorni insieme · \(localizedAgeAtPassing)"
             ))
-                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -226,7 +226,7 @@ struct HumanLifecycleDangerZone: View {
                 Image(systemName: icon) // a11y: allow decorative icon covered by surrounding text or control
                     .font(OhanaFont.adaptive(size: 14, weight: .bold))
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -275,7 +275,7 @@ private struct HumanDeleteConfirmationSheet: View {
                 VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
@@ -285,16 +285,16 @@ private struct HumanDeleteConfirmationSheet: View {
                             es: "Eliminar a \(humanName)", pt: "Excluir \(humanName)", fr: "Supprimer \(humanName)",
                             ja: "\(humanName)を削除", ko: "\(humanName)님 삭제", it: "Elimina \(humanName)"
                         ))
-                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "输入名字后才能继续", en: "Enter the name to continue", de: "Namen eingeben, um fortzufahren"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button(action: cancelAfterResigningKeyboard) {
                         Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(Color.primary.opacity(0.08), in: Circle())
@@ -316,19 +316,19 @@ private struct HumanDeleteConfirmationSheet: View {
                         ko: "구성원 프로필과 건강, 복약, 작업, 코코넛 원장, 활동 기록, 메모 첨부 파일을 포함한 모든 관련 로컬 데이터를 영구 삭제합니다. 되돌릴 수 없습니다.",
                         it: "Questa azione elimina definitivamente il profilo e tutti i dati locali correlati, inclusi salute, farmaci, attività, registri delle noci di cocco, cronologia e allegati delle note. Non può essere annullata."
                     ))
-                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
                     Text(l.tr(
                         zh: "请输入：\(humanName)", en: "Enter: \(humanName)", de: "Eingeben: \(humanName)",
                         es: "Escribe: \(humanName)", pt: "Digite: \(humanName)", fr: "Saisissez : \(humanName)",
                         ja: "入力：\(humanName)", ko: "입력: \(humanName)", it: "Inserisci: \(humanName)"
                     ))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
                 TextField(l.tr(zh: "成员名字", en: "Member name", de: "Mitgliedsname"), text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -345,7 +345,7 @@ private struct HumanDeleteConfirmationSheet: View {
                 HStack(spacing: 10) {
                     Button(action: cancelAfterResigningKeyboard) {
                         Text(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -362,7 +362,7 @@ private struct HumanDeleteConfirmationSheet: View {
                                     .tint(Color.white) // ui-v4: allow high-contrast progress indicator on destructive red fill
                             } else {
                                 Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
-                                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             }
                         }
                         .foregroundStyle(canDelete || isDeleting ? Color.white : Color.ohanaTertiaryText) // ui-v4: allow destructive red button needs white contrast

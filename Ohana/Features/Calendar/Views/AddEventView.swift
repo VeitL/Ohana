@@ -40,6 +40,13 @@ struct AddEventContentView: View {
     @State var rewardCoconuts = 0
     @State private var showsTypePicker = false
     @State var isSaving = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [title, String(describing: eventType), String(startDate.timeIntervalSince1970), String(isAllDay),
+         relatedEntityType, relatedEntityId, String(describing: recurrenceOption), String(recurrenceDays),
+         String(recurrenceEndDate.timeIntervalSince1970), String(describing: reminderLeadOption),
+         String(hasReminder), assigneeId ?? "", String(rewardCoconuts)]
+    }
     @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @State private var didSave = false
     @State private var keyboardHeight: CGFloat = 0
@@ -430,19 +437,14 @@ extension AddEventContentView {
             .scrollDismissesKeyboard(.interactively)
             .navigationTitle(editorTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, isComplete: didSave, canSave: canSave,
+                saveTitle: primaryActionTitle,
+                saveIdentifier: "add-event-navigation-save-action",
+                onCancel: closeEditor, onSave: saveEvent
+            )
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) {
-                        closeEditor()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(didSave ? savedActionTitle : primaryActionTitle) {
-                        saveEvent()
-                    }
-                    .disabled(!canSave)
-                    .accessibilityIdentifier("add-event-navigation-save-action")
-                }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
@@ -461,7 +463,6 @@ extension AddEventContentView {
             }
         }
         .ohanaSheetPagePresentation() // ui-v4: allow long calendar editor uses system sheet
-        .interactiveDismissDisabled(isSaving)
         .sheet(item: $personalUpgradePrompt) { prompt in
             PersonalPlanView(prompt: prompt)
                 .ohanaSheetPagePresentation()
@@ -501,11 +502,13 @@ extension AddEventContentView {
         }
         #endif
         .onAppear {
+            guard initialDraft == nil else { return }
             if !isEditing,
                assigneeId == nil,
                activeHumans.contains(where: { $0.id.uuidString == currentActiveHumanId }) {
                 assigneeId = currentActiveHumanId
             }
+            initialDraft = editorDraft
         }
         .onDisappear {
             commandQueue.cancelAll()
@@ -620,7 +623,7 @@ extension AddEventContentView {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(editorTitle)
-                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(dateSummary)
@@ -635,7 +638,7 @@ extension AddEventContentView {
                 closeEditor()
             } label: {
                 Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -659,9 +662,9 @@ extension AddEventContentView {
                     } label: {
                         HStack(spacing: 3) {
                             Image(systemName: eventType.silhouetteSymbol)
-                                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                             Image(systemName: "chevron.down").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 8, weight: .black))
+                                .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                                 .rotationEffect(.degrees(showsTypePicker ? 180 : 0))
                                 .offset(y: 1)
                         }
@@ -677,7 +680,7 @@ extension AddEventContentView {
                         .submitLabel(.done)
                         .textInputAutocapitalization(.sentences)
                         .autocorrectionDisabled()
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .onSubmit {
                             titleFocused = false
@@ -719,7 +722,7 @@ extension AddEventContentView {
                 Spacer()
                 Toggle(isOn: $isAllDay) {
                     Text(l.tr(zh: "全天", en: "All day", de: "Ganztägig"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .toggleStyle(.switch)
@@ -866,7 +869,7 @@ extension AddEventContentView {
                         OhanaFeedback.light()
                     } label: {
                         Text(option.title(l))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -935,7 +938,7 @@ extension AddEventContentView {
                     Image(systemName: didSave ? "checkmark.circle.fill" : (isEditing ? "checkmark.circle" : "calendar.badge.plus"))
                     Text(didSave ? savedActionTitle : primaryActionTitle)
                 }
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(canSave ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
@@ -993,7 +996,7 @@ extension AddEventContentView {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
@@ -1041,12 +1044,12 @@ extension AddEventContentView {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: type.silhouetteSymbol)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
                 Text(eventTypeTitle(type))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -1055,7 +1058,7 @@ extension AddEventContentView {
 
                 if selected {
                     Image(systemName: "checkmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                 }
             }
@@ -1075,12 +1078,12 @@ extension AddEventContentView {
     ) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer()
@@ -1101,7 +1104,7 @@ extension AddEventContentView {
             OhanaFeedback.light()
         } label: {
             Text(option.title(l))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
@@ -1134,11 +1137,11 @@ extension AddEventContentView {
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 Text(title)
                     .lineLimit(1)
             }
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 12)
@@ -1179,7 +1182,7 @@ extension AddEventContentView {
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(isSelected ? selectedForeground : Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .padding(.leading, 8)
@@ -1243,10 +1246,8 @@ extension AddEventContentView {
 
     func finishSuccessfulSave() {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
-        withAnimation(GoMotion.feedback) { didSave = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.22) {
-            closeEditor()
-        }
+        didSave = true
+        closeEditor()
     }
 
     private func closeEditor() {

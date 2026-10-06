@@ -34,7 +34,7 @@ enum AppPetDetailSheetDestination: Hashable {
     case walkSummary
     case health(PetHealthInitialSection?)
     case medication
-    case momentHistory
+    case momentHistory(PetMomentsRoute = .highlights)
     case documents
     case achievements
     case retention
@@ -137,7 +137,7 @@ struct AppPetDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .weight:
-                NavigationStack { WeightHistoryView(pet: pet) }
+                WeightHistoryView(pet: pet)
             case .expenseQuick:
                 PetExpenseQuickRouteContent(
                     pet: pet,
@@ -146,7 +146,7 @@ struct AppPetDetailSheetRouteContainer: View {
                     onDismiss: onDismiss
                 )
             case .expense:
-                NavigationStack { ExpenseHistoryView(pet: pet) }
+                ExpenseHistoryView(pet: pet)
             case let .feed(opensManualSheet):
                 QuickFeedDetailRouteContainer(
                     id: pet.id,
@@ -165,7 +165,7 @@ struct AppPetDetailSheetRouteContainer: View {
             case .hygiene:
                 NavigationStack { PetHygieneDetailView(pet: pet) }
             case .walkSummary:
-                NavigationStack { WalkSummarySheet(pet: pet) }
+                WalkSummarySheet(pet: pet)
             case let .health(initialSection):
                 NavigationStack {
                     PetHealthDetailView(
@@ -176,9 +176,9 @@ struct AppPetDetailSheetRouteContainer: View {
                     )
                 }
             case .medication:
-                NavigationStack { PetMedicationView(pet: pet) }
-            case .momentHistory:
-                PetMomentsHubRouteContainer(pet: pet)
+                PetMedicationView(pet: pet)
+            case let .momentHistory(route):
+                PetMomentsHubRouteContainer(pet: pet, initialRoute: route)
             case .documents:
                 DocumentsListView(
                     pet: pet,
@@ -311,7 +311,7 @@ struct PetRouteMissingEntityView: View {
                 .foregroundStyle(Color.goPrimary)
                 .accessibilityHidden(true)
             Text(l.tr(zh: "内容已不可用", en: "Content is no longer available", de: "Inhalt ist nicht mehr verfuegbar"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(kind)
                 .font(OhanaFont.caption(.semibold))

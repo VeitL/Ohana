@@ -64,7 +64,7 @@ extension QuickFeedDetailContent {
 
     var mainFoodKindLabel: some View {
         Text(l.tr(zh: "当前主粮", en: "Current food", de: "Aktuelles Futter"))
-            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.82)
@@ -79,7 +79,7 @@ extension QuickFeedDetailContent {
                     }
                 } label: {
                     Text(foodKind.title(l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(pet.mainFoodKind == foodKind ? Color.arkInk : foodKindTint(foodKind))
                         .lineLimit(1)
                         .minimumScaleFactor(0.82)
@@ -262,7 +262,7 @@ extension QuickFeedDetailContent {
     var manualDefaultToggle: some View {
         Toggle(isOn: $draftStore.saveManualAsDefault) {
             Text(l.tr(zh: "保存为默认克数", en: "Save as default", de: "Als Standard speichern"))
-                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .tint(mainFoodTint)
@@ -306,7 +306,7 @@ extension QuickFeedDetailContent {
         maxFractionDigits: Int
     ) -> some View {
         if focusedField == field {
-            EmbeddedDecimalKeypad(
+            OhanaDecimalInput(
                 text: text,
                 countryCode: AppCountry.code,
                 maxFractionDigits: maxFractionDigits,

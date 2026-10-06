@@ -87,11 +87,15 @@ extension HumanDetailView {
     }
 
     // MARK: - Notes Section
+    private var visibleNotes: String {
+        HumanProfileOptions.visibleNoteEntries(from: human.notes).joined(separator: "\n\n")
+    }
+
     var notesSection: some View {
         Group {
             if human.isPrivate(.note, viewedBy: activeHumanId) {
                 privacyPlaceholderCard(label: l.tr(zh: "备注", en: "Notes", de: "Notizen"))
-            } else if !human.notes.isEmpty {
+            } else if !visibleNotes.isEmpty {
                 VStack(spacing: 10) {
                     HumanPrivateDataNotice(human: human, field: .note)
 
@@ -104,7 +108,7 @@ extension HumanDetailView {
                                 .font(OhanaFont.headline(.bold))
                                 .foregroundStyle(Color(hex: "1E3A8A"))
                         }
-                        Text(human.notes)
+                        Text(visibleNotes)
                             .font(OhanaFont.body())
                             .foregroundStyle(Color(hex: "475569"))
                             .fixedSize(horizontal: false, vertical: true)
@@ -145,7 +149,7 @@ extension HumanDetailView {
                 .fill(Color.goPrimary)
                 .frame(width: 3, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(text)
-                .font(OhanaFont.footnote(.black))
+                .font(OhanaFont.footnote(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(1.2)

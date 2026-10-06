@@ -52,13 +52,13 @@ extension FamilyCollaborationDashboardView {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                 Text(title)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("\(count)")
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .monospacedDigit()
                     .padding(.horizontal, 7)
@@ -84,13 +84,13 @@ extension FamilyCollaborationDashboardView {
         let event = reminder.event
         return HStack(spacing: 12) {
             Image(systemName: event?.silhouetteListSymbol ?? "checklist")
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(role == .mine ? Color.goPurple : Color.goTeal)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(reminderTitle(reminder))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text(reminderSubtitle(reminder))
@@ -102,7 +102,7 @@ extension FamilyCollaborationDashboardView {
             Spacer()
 
             Text(reminder.scheduledAt.formatted(.dateTime.hour().minute()))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .monospacedDigit()
         }
@@ -118,12 +118,12 @@ extension FamilyCollaborationDashboardView {
         } label: {
             HStack(spacing: 12) {
                 Text(pet.avatarEmoji)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(pet.name)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(labels.prefix(3).joined(separator: " · "))
@@ -136,7 +136,7 @@ extension FamilyCollaborationDashboardView {
 
                 if openCount > 0 {
                     Text("\(openCount)")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.arkInk)
                         .monospacedDigit()
                         .padding(.horizontal, 9)
@@ -145,7 +145,7 @@ extension FamilyCollaborationDashboardView {
                 }
 
                 Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)
@@ -162,10 +162,10 @@ extension FamilyCollaborationDashboardView {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Text(pet.avatarEmoji)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(pet.name)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(missing.isEmpty
@@ -191,12 +191,12 @@ extension FamilyCollaborationDashboardView {
     func activityRow(_ activity: CollaborationActivity) -> some View {
         HStack(spacing: 11) {
             Image(systemName: activity.icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(activity.tint)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(activity.actor) · \(activity.title)")
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                 Text("\(activity.petName) · \(relativeTime(from: activity.date))")
@@ -211,7 +211,7 @@ extension FamilyCollaborationDashboardView {
     func compactEmpty(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(text)
@@ -226,7 +226,7 @@ extension FamilyCollaborationDashboardView {
     func smallAction(title: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)

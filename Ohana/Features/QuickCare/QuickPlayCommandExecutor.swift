@@ -101,7 +101,8 @@ struct QuickPlayCommandExecutor {
         petID: UUID,
         executorId: String?,
         rewardTitle: String,
-        date: Date = Date()
+        date: Date = Date(),
+        note: String = ""
     ) -> QuickPlayCommandResult? {
         guard let pet = fetchPet(id: petID), EconomyWalletWritePolicy.canWrite(pet) else {
             derivations.derive(
@@ -130,7 +131,8 @@ struct QuickPlayCommandExecutor {
             quality: .none,
             date: date,
             source: .quickAction,
-            createsLinkedPottyLog: false
+            createsLinkedPottyLog: false,
+            note: note
         )
         guard recorded.result.didWriteFact else {
             derivations.derive(

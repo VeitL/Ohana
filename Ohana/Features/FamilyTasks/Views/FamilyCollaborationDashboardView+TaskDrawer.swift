@@ -11,10 +11,10 @@ extension FamilyCollaborationDashboardView {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: drawerIcon)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(drawerTint)
                 Text(drawerTitle)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
             }
@@ -38,7 +38,7 @@ extension FamilyCollaborationDashboardView {
                     Spacer()
                     Image(systemName: "chevron.right") // a11y: allow decorative icon covered by surrounding text or control
                 }
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.top, 2)
             }
@@ -130,12 +130,12 @@ extension FamilyCollaborationDashboardView {
         let assignTitle = l.tr(zh: "分配", en: "Assign", de: "Zuweisen")
         return HStack(spacing: 12) {
             Image(systemName: reminder.event?.silhouetteListSymbol ?? "checklist")
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
             VStack(alignment: .leading, spacing: 3) {
                 Text(reminderTitle(reminder))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -146,9 +146,9 @@ extension FamilyCollaborationDashboardView {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "person.crop.circle.badge.plus") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(assignTitle)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                 }
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 13)
@@ -169,14 +169,14 @@ extension FamilyCollaborationDashboardView {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: task.relatedPetId == nil ? "checklist" : "pawprint.fill")
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(task.title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(taskSubtitle(task))
@@ -187,7 +187,7 @@ extension FamilyCollaborationDashboardView {
                 Spacer(minLength: 6)
                 if task.rewardCoconuts > 0 {
                     Text("+\(task.rewardCoconuts)🥥")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.arkInk)
                         .padding(.horizontal, 9)
                         .padding(.vertical, 5)
@@ -200,7 +200,7 @@ extension FamilyCollaborationDashboardView {
                         .ohanaShine(trigger: task.statusRaw, cornerRadius: OhanaRadius.row, isEnabled: task.status == .pendingReview)
                 }
                 Image(systemName: "chevron.right").accessibilityHidden(true)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
             .padding(12)

@@ -595,6 +595,51 @@ struct HomeCommandExecutor {
         return result
     }
 
+    @discardableResult
+    func deferPlantCare(
+        plant: Plant,
+        careType: PlantCareType,
+        until date: Date,
+        wetSoil: Bool = false,
+        skip: Bool = false,
+        executorId: String?,
+        now: Date = Date()
+    ) -> PlantReminderToggleResult {
+        let result = PlantReminderControlService.deferTask(
+            plant: plant,
+            careType: careType,
+            until: date,
+            wetSoil: wetSoil,
+            skip: skip,
+            context: modelContext,
+            executorId: resolvedExecutorId(executorId),
+            now: now
+        )
+        revisions.publish(DomainMutationResult(
+            command: .command("plants", "deferCare", ["careType": careType.rawValue]),
+            affectedEntityIDs: [plant.id],
+            wroteBusinessFact: result.didPersist && result.didChange,
+            note: "home.plantCare.deferCare"
+        ))
+        return result
+    }
+
+    @discardableResult
+    func enablePlantWateringCheck(plant: Plant, intervalDays: Int) -> PlantReminderToggleResult {
+        let result = PlantReminderControlService.enableWateringCheck(
+            plant: plant,
+            intervalDays: intervalDays,
+            context: modelContext
+        )
+        revisions.publish(DomainMutationResult(
+            command: .command("plants", "enableWateringCheck", ["plantID": plant.id.uuidString]),
+            affectedEntityIDs: [plant.id],
+            wroteBusinessFact: result.didPersist && result.didChange,
+            note: "home.plantCare.enableWateringCheck"
+        ))
+        return result
+    }
+
     func confirmCoconutExchange(_ request: CoconutExchangeRequest, receiver: Human) throws {
         do {
             try coconutExchange.confirm(request, by: receiver, context: modelContext)
@@ -655,7 +700,8 @@ struct HomeCommandExecutor {
             ExpandedQuickActionExecutor.Feedback(
                 cardId: pet.id,
                 coconutDelta: delta,
-                label: ExpandedQuickActionExecutor.rewardLabel(actionType: "feed", delta: delta)
+                label: ExpandedQuickActionExecutor.rewardLabel(actionType: "feed", delta: delta),
+                recordReference: result.recordReference
             )
         )
         UINotificationFeedbackGenerator().notificationOccurred(.success)

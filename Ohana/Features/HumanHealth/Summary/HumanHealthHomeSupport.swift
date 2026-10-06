@@ -32,7 +32,7 @@ enum HumanHealthHomeText {
         case .recordMetric:
             l.tr(zh: "记指标", en: "Log a metric", de: "Wert erfassen", es: "Registrar medición", pt: "Registrar medição", fr: "Noter une mesure", ja: "測定値を記録", ko: "측정값 기록", it: "Registra misura")
         case .recordState:
-            l.tr(zh: "记状态", en: "Log a state", de: "Zustand erfassen", es: "Registrar estado", pt: "Registrar estado", fr: "Noter un état", ja: "状態を記録", ko: "상태 기록", it: "Registra stato")
+            HumanHealthPatternCopy.recordSymptoms(l)
         case .more:
             l.tr(zh: "更多", en: "More", de: "Mehr", es: "Más", pt: "Mais", fr: "Plus", ja: "その他", ko: "더 보기", it: "Altro")
         case .profile:

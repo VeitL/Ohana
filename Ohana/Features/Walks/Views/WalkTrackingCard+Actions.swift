@@ -273,6 +273,8 @@ extension WalkTrackingCard {
             scope: "walk.shared",
             candidates: sameSpeciesWalkPets
         )
+        savedRecord = rewardSummary.recordReference
+        selectedSharedWalkPetIds = [pet.id]
         lastStopRewardSummary = rewardSummary.hasReward ? rewardSummary : nil
         if rewardSummary.hasReward {
             OhanaFeedback.success()

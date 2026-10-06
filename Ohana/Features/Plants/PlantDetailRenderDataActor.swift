@@ -62,6 +62,16 @@ actor PlantDetailRenderDataActor {
             logs: photoLogs,
             languageCode: request.languageCode
         )
+        var oldestPhotoDescriptor = Self.visiblePhotoLogDescriptor(plantID: plantID, sortOrder: .forward)
+        oldestPhotoDescriptor.fetchLimit = 1
+        let oldestPhoto = try modelContext.fetch(oldestPhotoDescriptor).first.map(PlantDetailLogSnapshot.init(log:))
+        let comparisonLogs = [oldestPhoto, photoLogs.first].compactMap(\.self)
+        let growthComparisonPhotos = Self.galleryPhotoItems(
+            for: plant,
+            logs: comparisonLogs,
+            languageCode: request.languageCode,
+            includeProfile: false
+        )
         let taskSummary = Self.taskSummary(
             for: plant,
             tasks: tasks
@@ -80,6 +90,7 @@ actor PlantDetailRenderDataActor {
             taskSummary: taskSummary,
             logSummary: logSummary,
             galleryPhotoItems: photos,
+            growthComparisonPhotos: growthComparisonPhotos,
             growthDiaryPhotoCount: logPhotoCount
         )
     }
@@ -124,6 +135,11 @@ actor PlantDetailRenderDataActor {
                 Self.visibleLogDescriptor(plantID: plantID, careType: careType, since: windowStart)
             )
         }
+        let recentCareCount = try PlantCareCategory.schedulableCareTypes.reduce(into: 0) { count, careType in
+            count += try modelContext.fetchCount(
+                Self.visibleLogDescriptor(plantID: plantID, careType: careType, since: windowStart)
+            )
+        }
 
         return PlantDetailLogSummary(
             logCount: logCount,
@@ -132,7 +148,8 @@ actor PlantDetailRenderDataActor {
             latestLog: latestLog,
             latestHealthReviewLog: latestHealthReviewLog,
             recentStressSignalCount: recentStressSignalCount,
-            recentObservationLogCount: recentObservationLogCount
+            recentObservationLogCount: recentObservationLogCount,
+            recentCareCount: recentCareCount
         )
     }
 
@@ -221,7 +238,10 @@ actor PlantDetailRenderDataActor {
         )
     }
 
-    private static func visiblePhotoLogDescriptor(plantID: UUID) -> FetchDescriptor<PlantCareLog> {
+    private static func visiblePhotoLogDescriptor(
+        plantID: UUID,
+        sortOrder: SortOrder = .reverse
+    ) -> FetchDescriptor<PlantCareLog> {
         let customNoteRaw = PlantCareType.customNote.rawValue
         let absentStateRaw = PlantCarePhotoAttachmentState.absent.rawValue
         let deferPrefix = PlantCareHistoryPolicy.internalDeferPrefix
@@ -233,19 +253,20 @@ actor PlantDetailRenderDataActor {
                     (log.careTypeRaw != customNoteRaw ||
                         (!log.note.starts(with: deferPrefix) && !log.note.starts(with: skipPrefix)))
             },
-            sortBy: [SortDescriptor(\PlantCareLog.date, order: .reverse)]
+            sortBy: [SortDescriptor(\PlantCareLog.date, order: sortOrder)]
         )
     }
 
     private static func galleryPhotoItems(
         for plant: Plant,
         logs: [PlantDetailLogSnapshot],
-        languageCode: String
+        languageCode: String,
+        includeProfile: Bool = true
     ) -> [PlantDetailPhotoItem] {
         let l = L10n(languageCode)
         var items: [PlantDetailPhotoItem] = []
 
-        if plant.hasAvatarImageAttachment {
+        if includeProfile && plant.hasAvatarImageAttachment {
             items.append(
                 PlantDetailPhotoItem(
                     id: "\(plant.id.uuidString)-profile",

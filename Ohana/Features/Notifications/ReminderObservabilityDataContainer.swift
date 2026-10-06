@@ -208,7 +208,7 @@ struct ReminderSafetySummaryView: View {
                 l.tr(zh: "提醒安全状态", en: "Reminder safety status", de: "Sicherheitsstatus der Erinnerungen"),
                 systemImage: "bell.badge.fill"
             )
-            .font(OhanaFont.title3(.black))
+            .font(OhanaFont.title3(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
 
             HStack(spacing: 10) {
@@ -250,7 +250,7 @@ struct ReminderSafetySummaryView: View {
     private func safetyMetric(_ title: String, _ value: String, _ tint: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)

@@ -29,6 +29,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
     let quickAccessibilityLabel: String
     let detailAccessibilityLabel: String
     let detailAction: (() -> Void)?
+    let usesLabeledMenu: Bool
+    let quickActionTitle: String?
+    let primarySemantic: PetQuickActionSemantic?
     let optionAction: (String) -> Void
     let action: () -> Void
 
@@ -53,6 +56,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         quickAccessibilityLabel: String = "Quick action",
         detailAccessibilityLabel: String = "Details",
         detailAction: (() -> Void)? = nil,
+        usesLabeledMenu: Bool = false,
+        quickActionTitle: String? = nil,
+        primarySemantic: PetQuickActionSemantic? = nil,
         optionAction: @escaping (String) -> Void = { _ in },
         action: @escaping () -> Void
     ) {
@@ -77,6 +83,9 @@ struct VerticalHomeEmbeddedAction: Identifiable {
         self.quickAccessibilityLabel = quickAccessibilityLabel
         self.detailAccessibilityLabel = detailAccessibilityLabel
         self.detailAction = detailAction
+        self.usesLabeledMenu = usesLabeledMenu
+        self.quickActionTitle = quickActionTitle
+        self.primarySemantic = primarySemantic
         self.optionAction = optionAction
         self.action = action
     }
@@ -359,7 +368,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     private var header: some View {
         HStack {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goCardWhite.opacity(0.92))
             Spacer()
             if let onToggleEdit {
@@ -371,7 +380,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     onToggleEdit()
                 } label: {
                     Image(systemName: isEditMode ? "checkmark" : "pencil")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(isEditMode ? Color.goPrimary : Color.goCardWhite)
                         .frame(
@@ -391,11 +400,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
     @ViewBuilder
     private func actionCell(_ item: VerticalHomeEmbeddedAction, index: Int) -> some View {
         let cell = ZStack {
-            Button {
-                performActionCellTap(item)
-            } label: {
-                actionCellContent(item)
-            }
+            actionCellTrigger(item)
             .buttonStyle(ScaleButtonStyle())
             .frame(maxWidth: .infinity)
             .frame(height: cellHeight)
@@ -446,6 +451,45 @@ struct VerticalHomeEmbeddedQuickActions: View {
         #endif
     }
 
+    @ViewBuilder
+    private func actionCellTrigger(_ item: VerticalHomeEmbeddedAction) -> some View {
+        if item.usesLabeledMenu, !isEditMode {
+            Menu {
+                if item.menuOptions.isEmpty, item.showsQuickButton || item.primarySemantic == .fillRecord {
+                    Button {
+                        item.action()
+                    } label: {
+                        Label(item.quickActionTitle ?? item.quickAccessibilityLabel, systemImage: item.primaryIcon)
+                    }
+                    .disabled(item.isPrimaryDisabled)
+                    .accessibilityIdentifier("home-quick-action-menu-\(item.id)-quick")
+                }
+                ForEach(item.menuOptions) { option in
+                    Button {
+                        item.optionAction(option.id)
+                    } label: {
+                        Label(option.title, systemImage: option.icon)
+                    }
+                    .accessibilityIdentifier("home-quick-action-menu-\(item.id)-\(option.id)")
+                }
+                if let detailAction = item.detailAction {
+                    Button(action: detailAction) {
+                        Label(item.detailAccessibilityLabel, systemImage: item.detailIcon)
+                    }
+                    .accessibilityIdentifier("home-quick-action-menu-\(item.id)-detail")
+                }
+            } label: {
+                actionCellContent(item)
+            }
+        } else {
+            Button {
+                performActionCellTap(item)
+            } label: {
+                actionCellContent(item)
+            }
+        }
+    }
+
     private func legacyDropCell(_ content: some View, targetID: String) -> some View {
         content.onDrop(
             of: [.plainText, .utf8PlainText],
@@ -485,18 +529,18 @@ struct VerticalHomeEmbeddedQuickActions: View {
                 }
                 if item.isLocked, !isEditMode {
                     Image(systemName: "lock.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 8, weight: .black))
+                        .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                         .foregroundStyle(Color.goYellow)
                         .offset(x: 4, y: -4)
                 }
             }
             Text(item.title)
-                .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10.5, weight: .semibold, design: .default))
                 .foregroundStyle(state.foreground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
             Text(statusLine)
-                .font(OhanaFont.adaptive(size: 8.4, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 8.4, weight: .regular))
                 .foregroundStyle(state.statusForeground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
@@ -675,13 +719,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: "plus").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 38, height: 38) // a11y: allow visual glyph frame; parent button owns the 72pt quick-action hit target.
                     .background(Color.goCardWhite.opacity(0.12), in: Circle())
                 Text(l.tr(zh: "添加", en: "Add", de: "Hinzufügen"))
-                    .font(OhanaFont.adaptive(size: 10.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10.5, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goCardWhite.opacity(0.74))
                     .lineLimit(1)
                     .minimumScaleFactor(0.55)
@@ -705,7 +749,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
         VStack(spacing: 9) {
             HStack(spacing: 8) {
                 Text(l.tr(zh: "添加快捷操作", en: "Add quick action", de: "Schnellaktion hinzufügen"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 0)
                 Button {
@@ -715,7 +759,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     }
                 } label: {
                     Image(systemName: "xmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                         .background(Color.ohanaControlFill, in: Circle())
@@ -768,13 +812,13 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     primaryColor: item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText
                 )
                 Text(item.title)
-                    .font(OhanaFont.adaptive(size: 9.5, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9.5, weight: .semibold, design: .default))
                     .foregroundStyle(item.isAddDisabled ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
                 if let status = item.statusText, !status.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     Text(status)
-                        .font(OhanaFont.adaptive(size: 7.6, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 7.6, weight: .semibold, design: .default))
                         .foregroundStyle(item.isAddDisabled ? Color.ohanaTertiaryText : Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.58)
@@ -785,7 +829,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
 
             if item.isAddDisabled {
                 Image(systemName: "checkmark.circle.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .padding(6)
@@ -820,7 +864,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     )
                     .frame(width: 44, height: 44)
                     Text(item.title)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .fixedSize()
@@ -837,7 +881,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
                     .fill(Color.goRed)
                     .frame(width: 20, height: 20) // a11y: allow visual glyph frame; parent button owns the 44pt hit target.
                 Image(systemName: "minus").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.arkInk)
             }
@@ -970,6 +1014,7 @@ struct VerticalHomeEmbeddedQuickActions: View {
             return l.tr(zh: "待处理", en: "Needs care", de: "Offen")
         }
         if showsCheckInStatus(for: item) {
+            if item.usesLabeledMenu { return PetCareExperienceCopy(l: l).noRecord }
             return l.tr(zh: "未打卡", en: "Open", de: "Offen")
         }
         return " "

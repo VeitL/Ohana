@@ -69,35 +69,22 @@ extension MemberCardCreationContentView {
         )
     }
 
-    var topChrome: some View {
-        HStack(spacing: 10) {
-            Button {
-                clearMediaReturnStepStorage()
-                onCancel?()
-            } label: {
-                Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.cancel)
-            .accessibilityIdentifier("member-creation-cancel-action")
-
-            Text(kind.title(l))
-                .font(OhanaFont.title(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Spacer()
-        }
-    }
-
     @ViewBuilder
     var cardControls: some View {
         VStack(alignment: .leading, spacing: cardControlsSpacing) {
             currentStepContent
                 .frame(maxWidth: .infinity, alignment: .bottomLeading)
+            if kind == .pet, currentStep == .petPersonality || currentStep == .avatar {
+                Text(PetCareExperienceCopy(l: l).optionalLater)
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(cardSecondaryForeground)
+            }
+            if let fieldMessage = creationFieldMessage {
+                Text(fieldMessage)
+                    .font(OhanaFont.caption())
+                    .foregroundStyle(cardSecondaryForeground)
+                    .accessibilityIdentifier("member-creation-field-message")
+            }
             if kind != .human || currentStep != .basicInfo {
             MemberCreationStepIndicator(
                 steps: creationSteps,
@@ -154,12 +141,12 @@ extension MemberCardCreationContentView {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "chevron.left").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                             Text(l.tr(zh: "上一步", en: "Back", de: "Zurück"))
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                         }
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                         .frame(minWidth: 96, idealWidth: 112, maxWidth: 154, minHeight: 54)
                         .background(Color.goCardWhite.opacity(0.12), in: Capsule())
@@ -185,16 +172,17 @@ extension MemberCardCreationContentView {
                             ProgressView()
                                 .tint(Color.ohanaPrimaryActionText)
                         } else {
-                            Image(systemName: savesImmediately ? "checkmark.seal.fill" : "chevron.right")
+                            Image(systemName: savesImmediately ? "checkmark.seal.fill" : "chevron.right").accessibilityHidden(true)
                         }
-                        Text(savesImmediately ? creationCTA : l.tr(zh: "下一步", en: "Next", de: "Weiter"))
-                            .lineLimit(1)
+                        Text(creationPrimaryTitle)
+                            .lineLimit(2)
                             .minimumScaleFactor(0.78)
                     }
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(isEnabled ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 54)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 54)
                     .background(isEnabled ? Color.goPrimary : Color.goCardWhite.opacity(0.12), in: Capsule())
                     .overlay {
                         Capsule()
@@ -214,6 +202,39 @@ extension MemberCardCreationContentView {
                     .disabled(!canAdvanceStep || isSaving)
                     .accessibilityIdentifier("member-human-customize-action")
             }
+            if kind == .pet, currentStep == .avatar {
+                Button(PetCareExperienceCopy(l: l).finishWithDefaultAvatar) {
+                    finishPetWithDefaultAvatar()
+                }
+                .font(OhanaFont.callout())
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .frame(minHeight: 44)
+                .disabled(!canSave)
+                .accessibilityIdentifier("member-pet-avatar-skip")
+            }
+        }
+    }
+
+    var creationPrimaryTitle: String {
+        if kind == .pet, currentStep == .petPersonality, draft.personalityTagIds.isEmpty {
+            return PetCareExperienceCopy(l: l).skipPersonality
+        }
+        return (isLastStep || (kind == .human && currentStep == .basicInfo)) ? creationCTA : l.tr(zh: "下一步", en: "Next", de: "Weiter")
+    }
+
+    var creationFieldMessage: String? {
+        guard kind == .pet else { return nil }
+        let copy = PetCareExperienceCopy(l: l)
+        switch currentStep {
+        case .petName:
+            return draft.trimmedName.isEmpty ? copy.requiredName : nil
+        case .petIdentity:
+            return draft.resolvedSpecies.isEmpty || draft.resolvedBreed.isEmpty ? copy.requiredSpeciesBreed : nil
+        case .petAppearance:
+            return ["boy", "girl"].contains(draft.petGender) ? nil : copy.requiredSex
+        default:
+            return nil
         }
     }
 

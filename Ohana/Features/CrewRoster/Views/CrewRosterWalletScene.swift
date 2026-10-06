@@ -84,7 +84,7 @@ private struct CrewRosterWalletCard: View {
                     if card.homePrimaryMetricValue != "\(card.coconutBalance)"
                         || card.homePrimaryMetricUnit != "c" {
                         Label("\(card.coconutBalance)", systemImage: "wallet.bifold.fill")
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 9)
                             .padding(.vertical, 6)
@@ -315,11 +315,11 @@ struct CrewRosterProfileSummaryHeader: View {
             HStack(alignment: .bottom, spacing: 14) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(snapshot.eyebrow)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.goCardWhite.opacity(0.64))
                         .textCase(.uppercase)
                     Text(snapshot.summaryText)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.goCardWhite.opacity(0.84))
                         .lineLimit(2)
                         .minimumScaleFactor(0.76)
@@ -346,9 +346,9 @@ struct CrewRosterProfileSummaryHeader: View {
     private func inlineFact(_ text: String, icon: String) -> some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
             Text(text)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .lineLimit(1)
         }
         .foregroundStyle(Color.goCardWhite.opacity(0.78))
@@ -358,10 +358,10 @@ struct CrewRosterProfileSummaryHeader: View {
     private func plainMetric(_ metric: CrewRosterProfileSummaryMetric) -> some View {
         VStack(alignment: .trailing, spacing: 2) {
             Image(systemName: metric.icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
             Text(metric.value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .monospacedDigit()
                 .lineLimit(1)
@@ -379,12 +379,12 @@ struct CrewRosterProfileSummaryHeader: View {
     private func compactInfoTile(_ row: CrewRosterProfileSummaryRow) -> some View {
         HStack(spacing: 8) {
             Image(systemName: row.icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 Text(row.value)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goCardWhite)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)

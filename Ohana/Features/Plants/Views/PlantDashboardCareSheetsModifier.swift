@@ -19,7 +19,7 @@ struct PlantDashboardCareSheetsModifier: ViewModifier {
     let imageDataProvider: @Sendable (PersistentIdentifier) async -> Data?
     let onRecordBatchCare: @MainActor ([PlantBatchCareSelection], UUID?) async -> Bool
     let onConfirmQuickCare: (PlantQuickCareActorDraft, UUID?) -> Void
-    let onSaveCareLog: (Plant, PlantCareType, String, Data?, PlantHealthStatus, UUID?) -> Void
+    let onSaveCareLog: (Plant, PlantCareType, String, Data?, PlantHealthStatus, UUID?, @escaping (Bool) -> Void) -> Void
 
     func body(content: Content) -> some View {
         content
@@ -41,8 +41,8 @@ struct PlantDashboardCareSheetsModifier: ViewModifier {
                     plant: draft.plant,
                     initialCareType: draft.careType,
                     currentHealthStatus: draft.plant.healthStatus
-                ) { type, careNote, healthStatus, photoData, executorID in
-                    onSaveCareLog(draft.plant, type, careNote, photoData, healthStatus, executorID)
+                ) { type, careNote, healthStatus, photoData, executorID, completion in
+                    onSaveCareLog(draft.plant, type, careNote, photoData, healthStatus, executorID, completion)
                 }
             }
             .sheet(item: $careAggregateDraft) { draft in

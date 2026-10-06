@@ -19,6 +19,7 @@ struct FeatureGroupDashboardView: View {
 
     @Environment(AppServices.self) private var appServices
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedItemID: String?
     @State private var showingPersonalPlan = false
 
@@ -63,7 +64,6 @@ struct FeatureGroupDashboardView: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                pageHeader
                 if items.isEmpty {
                     unavailableGroupFallback
                 } else {
@@ -82,59 +82,45 @@ struct FeatureGroupDashboardView: View {
         .accessibilityIdentifier("function-menu-group-screen-\(group.rawValue)")
     }
 
-    private var pageHeader: some View {
-        HStack(spacing: 10) {
-            Image(systemName: group.icon)
-                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(group.color)
-                .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-            Text(group.title(l: l))
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-            Spacer(minLength: 54)
-        }
-        .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 6)
-    }
-
     private var segmentBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(items) { item in
                     let access = householdAccess(for: item)
                     Button {
-                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                        withAnimation(GoMotion.feedback) {
-                            selectedItemID = item.id
-                        }
+                        guard effectiveSelectedItemID != item.id else { return }
+                        OhanaFeedback.selection()
+                        selectedItemID = item.id
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: item.icon)
+                                .accessibilityHidden(true)
                                 .font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             Text(item.title)
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
                             if case let .locked(requiredLevel) = access {
                                 Image(systemName: "lock.fill").accessibilityHidden(true)
-                                    .font(OhanaFont.adaptive(size: 8, weight: .black))
+                                    .font(OhanaFont.adaptive(size: 8, weight: .semibold))
                                 Text("Lv.\(requiredLevel)")
-                                    .font(OhanaFont.caption2(.black))
+                                    .font(OhanaFont.caption2(.semibold))
                             }
                         }
                         .foregroundStyle(effectiveSelectedItemID == item.id ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .padding(.horizontal, 13)
                         .padding(.vertical, 8)
-                        .background(effectiveSelectedItemID == item.id ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+                        .frame(minHeight: 44)
+                        .background(effectiveSelectedItemID == item.id ? Color.goPrimary : Color.clear, in: Capsule())
+                        .animation(reduceMotion ? GoMotion.reduced : GoMotion.selection, value: effectiveSelectedItemID == item.id)
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    .buttonStyle(ScaleButtonStyle(triggersHaptic: false))
+                    .accessibilityAddTraits(effectiveSelectedItemID == item.id ? .isSelected : [])
                     .accessibilityIdentifier("function-menu-group-segment-\(item.id)")
                     .accessibilityValue(segmentAccessibilityValue(for: item, access: access))
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.vertical, 6)
         }
     }
 
@@ -144,8 +130,7 @@ struct FeatureGroupDashboardView: View {
             content(for: selectedItem)
                 .id(selectedItem.id)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.opacity)
-                .animation(GoMotion.page, value: effectiveSelectedItemID)
+                .ohanaContextHandoff(effectiveSelectedItemID, initialScale: 1)
         }
     }
 

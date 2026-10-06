@@ -32,7 +32,7 @@ struct PerformanceDiagnosticsView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(l.tr(zh: "性能诊断", en: "Performance diagnostics", de: "Leistungsdiagnose"))
-                            .font(OhanaFont.adaptive(size: 30, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 30, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text(l.tr(
                             zh: "用于验收启动、首页、头像、点击和相机链路。数值越低越好。",
@@ -57,7 +57,7 @@ struct PerformanceDiagnosticsView: View {
                                     .font(OhanaFont.adaptive(size: 28, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.goPrimary)
                                 Text(l.tr(zh: "还没有性能样本", en: "No performance samples yet", de: "Noch keine Leistungsdaten"))
-                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(primaryText)
                                 Text(l.tr(
                                     zh: "回到首页、点击卡片或进入头像裁剪后，这里会记录链路耗时。",
@@ -91,7 +91,7 @@ struct PerformanceDiagnosticsView: View {
                         monitor.clear()
                     } label: {
                         Label(l.tr(zh: "清空样本", en: "Clear samples", de: "Samples loeschen"), systemImage: "trash")
-                            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
@@ -125,10 +125,10 @@ struct PerformanceDiagnosticsView: View {
                 .background(Color.goPrimary.opacity(0.16), in: Circle())
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
             }
             Spacer(minLength: 0)
@@ -150,7 +150,7 @@ struct PerformanceDiagnosticsView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "轻量视觉 A/B", en: "Reduced visual effects A/B", de: "Reduzierte Effekte A/B"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 Text(l.tr(
                     zh: "关闭常驻玻璃、噪点和文字投影，用于真机丝滑度对比。",
@@ -189,7 +189,7 @@ struct PerformanceDiagnosticsView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(sample.name)
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 if let note = sample.note, !note.isEmpty {
                     Text(note)
@@ -202,7 +202,7 @@ struct PerformanceDiagnosticsView: View {
             }
             Spacer(minLength: 8)
             Text(formatMS(sample.valueMS))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(sample.valueMS > 1000 ? Color.goRed : Color.goPrimary)
         }
         .padding(.vertical, 10)

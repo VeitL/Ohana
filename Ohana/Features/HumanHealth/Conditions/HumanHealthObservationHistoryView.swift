@@ -117,7 +117,7 @@ struct HumanHealthObservationHistoryView: View {
     private var historyHeader: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(condition.name)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .fixedSize(horizontal: false, vertical: true)
             Text(l.tr(
@@ -462,7 +462,7 @@ struct HumanHealthObservationCard: View {
             time: .shortened,
             locale: appLocale
         )))
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -470,7 +470,7 @@ struct HumanHealthObservationCard: View {
 
     private var severityLabel: some View {
         Text("\(observation.severity)/10 · \(HumanHealthSeverityLabel.text(for: observation.severity, l: l))")
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(category.tint)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)

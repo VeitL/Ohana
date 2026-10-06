@@ -16,7 +16,7 @@ struct IslandToastView: View {
     var body: some View {
         HStack(spacing: 8) {
             Text(message)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .multilineTextAlignment(.center)
         }

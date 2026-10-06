@@ -388,9 +388,7 @@ private struct PetBondVaultPreviewOverlay: View {
             .navigationTitle(l.text(item.title))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, action: close)
-                }
+                OhanaModalToolbar(onClose: close)
             }
         }
     }

@@ -133,6 +133,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanObservationQuick,
              .humanConditions,
              .humanReport,
              .humanExpense,
@@ -206,6 +207,8 @@ private extension HomeSheetRoute {
             "humanWorkoutDashboard"
         case .humanMetrics:
             "humanMetrics"
+        case .humanObservationQuick:
+            "humanObservationQuick"
         case .humanConditions:
             "humanConditions"
         case .humanReport:

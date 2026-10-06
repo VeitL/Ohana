@@ -541,6 +541,61 @@ set -e
 [[ -f "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/Debug-iphonesimulator/Ohana.app" ]] || \
   fail "test-intermediates apply deleted an executable product"
 
+project_cache="${OHANA_XCODE_DERIVED_DATA_ROOT}/Ohana-verified"
+unverified_cache="${OHANA_XCODE_DERIVED_DATA_ROOT}/Ohana-unrelated"
+linked_cache="${OHANA_XCODE_DERIVED_DATA_ROOT}/Ohana-linked"
+mkdir -p "${fake_repo}/Ohana.xcodeproj"
+python3 - "${project_cache}" "${unverified_cache}" "${linked_cache}" "${fake_repo}" <<'PY'
+from pathlib import Path
+import plistlib
+import sys
+
+for index, value in enumerate(sys.argv[1:4]):
+    root = Path(value)
+    for suffix in ("Build/Intermediates.noindex", "Build/Products", "Index.noindex", "Logs/Test"):
+        child = root / suffix
+        child.mkdir(parents=True)
+        (child / "proof.txt").write_text("preserve or rebuild\n")
+    workspace = str(Path(sys.argv[4]) / "Ohana.xcodeproj") if index != 1 else "/other/Ohana.xcodeproj"
+    (root / "info.plist").write_bytes(plistlib.dumps({"WorkspacePath": workspace}))
+    if index == 2:
+        for suffix in ("Build/Intermediates.noindex", "Build/Products"):
+            (root / suffix / "source-link").symlink_to(Path(sys.argv[4]) / "Ohana.xcodeproj")
+PY
+project_report_output="$("${repo_root}/scripts/cleanup-local-build-storage.sh" --scope project-build-cache 2>&1)"
+project_candidates="$(awk '/^Candidates:$/ { inside = 1; next } /^Estimated reclaim:/ { inside = 0 } inside' <<< "${project_report_output}")"
+grep -qF "${project_cache}/Build/Intermediates.noindex" <<< "${project_candidates}" || \
+  fail "project-build-cache omitted verified intermediates"
+grep -qF "${project_cache}/Build/Products" <<< "${project_candidates}" || \
+  fail "project-build-cache omitted verified products"
+if grep -qE 'Ohana-unrelated|Ohana-linked|Index.noindex|Logs/Test|Ohana-old-checkout' <<< "${project_candidates}"; then
+  fail "project-build-cache included unverified content, symlinks, indexes, or evidence"
+fi
+[[ -d "${project_cache}/Build/Products" ]] || fail "project-build-cache report deleted products"
+project_token="$(awk '/^Plan token:/ { print $3 }' <<< "${project_report_output}")"
+[[ -n "${project_token}" ]] || fail "project-build-cache omitted its plan token"
+set +e
+project_active_output="$(FAKE_LSOF_ACTIVE_PATH="${project_cache}/Build" \
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope project-build-cache --apply "${project_token}" 2>&1)"
+project_active_status=$?
+project_wrong_output="$("${repo_root}/scripts/cleanup-local-build-storage.sh" \
+  --scope project-build-cache --apply wrong-token 2>&1)"
+project_wrong_status=$?
+set -e
+[[ "${project_active_status}" == "75" ]] || fail "project-build-cache deleted active files: ${project_active_output}"
+[[ "${project_wrong_status}" == "2" ]] || fail "project-build-cache accepted the wrong token: ${project_wrong_output}"
+[[ -d "${project_cache}/Build/Products" ]] || fail "project-build-cache refusal mutated products"
+project_apply_output="$("${repo_root}/scripts/cleanup-local-build-storage.sh" \
+  --scope project-build-cache --apply "${project_token}" 2>&1)" || \
+  fail "project-build-cache apply failed: ${project_apply_output}"
+[[ ! -e "${project_cache}/Build/Products" && ! -e "${project_cache}/Build/Intermediates.noindex" ]] || \
+  fail "project-build-cache retained verified build output"
+for preserved in "${project_cache}/Index.noindex/proof.txt" "${project_cache}/Logs/Test/proof.txt" \
+  "${project_cache}/info.plist" "${unverified_cache}/Build/Products/proof.txt" \
+  "${linked_cache}/Build/Products/proof.txt" "${OHANA_TEST_DERIVED_DATA_PATH}/Build/Products/proof.txt"; do
+  [[ -f "${preserved}" ]] || fail "project-build-cache removed protected content: ${preserved}"
+done
+
 test_dead_root="${fake_home}/Library/Developer/CoreSimulator/Devices/TEST-UDID/data/Library/Caches/com.apple.containermanagerd/Dead"
 safe_dead_cache="${test_dead_root}/temp.ohana"
 unrelated_dead_cache="${test_dead_root}/temp.unrelated"
@@ -561,7 +616,8 @@ printf '%s\n' \
   > "${unrelated_dead_cache}/APP-UUID/.com.apple.mobile_container_manager.metadata.plist"
 set +e
 app_cache_report_output="$(
-  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-app-cache 2>&1
+  FAKE_INCLUDE_IOS27_TESTS=1 OHANA_TEST_SIMULATOR_UDID=TEST-UDID \
+    "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-app-cache 2>&1
 )"
 app_cache_report_status=$?
 set -e
@@ -574,8 +630,23 @@ if grep -qF "${unrelated_dead_cache}" <<< "${app_cache_report_output}"; then
 fi
 app_cache_token="$(awk '/^Plan token:/ { print $3 }' <<< "${app_cache_report_output}")"
 set +e
+dogfood_cache_output="$(OHANA_TEST_SIMULATOR_UDID=DOGFOOD-UDID \
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-app-cache 2>&1)"
+dogfood_cache_status=$?
+other_cache_output="$(OHANA_TEST_SIMULATOR_UDID=OTHER-UDID \
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-app-cache 2>&1)"
+other_cache_status=$?
+booted_cache_output="$(FAKE_TEST_SIMULATOR_STATE=Booted OHANA_TEST_SIMULATOR_UDID=TEST-UDID \
+  "${repo_root}/scripts/cleanup-local-build-storage.sh" --scope test-app-cache 2>&1)"
+booted_cache_status=$?
+set -e
+[[ "${dogfood_cache_status}" == "2" ]] || fail "cache selector accepted Dogfood: ${dogfood_cache_output}"
+[[ "${other_cache_status}" == "2" ]] || fail "cache selector accepted another phone: ${other_cache_output}"
+[[ "${booted_cache_status}" == "75" ]] || fail "cache selector accepted a booted phone: ${booted_cache_output}"
+set +e
 app_cache_apply_output="$(
-  "${repo_root}/scripts/cleanup-local-build-storage.sh" \
+  FAKE_INCLUDE_IOS27_TESTS=1 OHANA_TEST_SIMULATOR_UDID=TEST-UDID \
+    "${repo_root}/scripts/cleanup-local-build-storage.sh" \
     --scope test-app-cache \
     --apply "${app_cache_token}" 2>&1
 )"

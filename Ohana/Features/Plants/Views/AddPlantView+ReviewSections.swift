@@ -18,22 +18,22 @@ extension AddPlantView {
                         .foregroundStyle(Color.goYellow)
                         .accessibilityHidden(true)
                     Text(l.tr(zh: "可能重复", en: "Possible duplicate", de: "Möglicherweise doppelt"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Spacer()
                     if duplicateAcknowledgementKey == currentDuplicateAcknowledgementKey {
                         Text(l.tr(zh: "已确认", en: "Confirmed", de: "Bestätigt"))
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                             .foregroundStyle(Color.goPrimary)
                     }
                 }
                 ForEach(duplicateCandidates) { candidate in
                     VStack(alignment: .leading, spacing: 3) {
                         Text(candidate.title)
-                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text("\(candidate.reason) · \(candidate.detail)")
-                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -44,7 +44,7 @@ extension AddPlantView {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     Label(l.tr(zh: "仍然添加为新植物", en: "Still add as a new plant", de: "Trotzdem als neue Pflanze hinzufügen"), systemImage: "plus.circle")
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .foregroundStyle(Color.goPrimary)
@@ -62,7 +62,7 @@ extension AddPlantView {
     var environmentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(l.tr(zh: "室内植物", en: "Indoor plant", de: "Zimmerpflanze"), isOn: $isIndoor)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             Picker(l.tr(zh: "窗户朝向", en: "Window direction", de: "Fensterausrichtung"), selection: $windowDirection) {
@@ -96,7 +96,7 @@ extension AddPlantView {
                 }
             }
             Toggle(l.tr(zh: "靠近空调/暖气", en: "Near AC/heater", de: "Nahe an Klimaanlage/Heizung"), isOn: $isNearClimateSource)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
         }
@@ -124,7 +124,7 @@ extension AddPlantView {
                         en: "Marked as an ingestion risk for pets/children. Details and reminders will prioritize safety.",
                         de: "Als Verschluckrisiko für Haustiere/Kinder markiert. Details und Erinnerungen betonen Sicherheit."
                     ))
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
             }

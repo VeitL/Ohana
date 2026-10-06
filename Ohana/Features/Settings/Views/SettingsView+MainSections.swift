@@ -292,7 +292,7 @@ private struct SettingsExperienceModeSelector: View {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                         .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goPrimary)
                         .frame(width: 44, height: 44)
                         .background(isSelected ? Color.goPrimary : Color.goPrimary.opacity(0.12), in: Circle())
@@ -307,7 +307,7 @@ private struct SettingsExperienceModeSelector: View {
                 }
 
                 Text(mode.title(l))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 Text(compactScope(for: mode))

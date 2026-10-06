@@ -138,6 +138,9 @@ struct HumanObservationQuickRecordView: View {
                             Text(HumanHealthHomeText.loadFailed.title(l))
                             Button(l.tr(zh: "重试", en: "Retry", de: "Erneut versuchen")) { loadPage(older: false) }
                         } else {
+                            Text(HumanHealthPatternCopy.symptomDetail(l))
+                                .font(OhanaFont.caption())
+                                .foregroundStyle(Color.ohanaSecondaryText)
                             ForEach(conditions) { condition in
                                 Button(condition.name) { selectedCondition = condition }
                                     .accessibilityIdentifier("human-health-quick-condition-\(condition.id.uuidString)")

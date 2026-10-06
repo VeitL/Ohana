@@ -47,6 +47,24 @@ struct HumanAllFeaturesRouteSummaryTests {
     }
 
     @MainActor
+    @Test func noteSummaryCountsVisibleTimelineEntriesRatherThanProfileMetadata() {
+        let human = Human(name: "Lin")
+        human.notes = "性别:female｜关系:妈妈\n\n[2026-10-04] Morning walk\n\n[2026-10-04] Felt rested"
+        let summary = HumanAllFeaturesActivitySummary.load(
+            human: human, allMeds: [], allReports: [], allExpenses: []
+        )
+        #expect(summary.noteCount == 2)
+        #expect(summary.noteChartPoints.first?.value == 2)
+
+        human.notes = "性别:female｜关系:妈妈"
+        let emptySummary = HumanAllFeaturesActivitySummary.load(
+            human: human, allMeds: [], allReports: [], allExpenses: []
+        )
+        #expect(emptySummary.noteCount == 0)
+        #expect(emptySummary.noteChartPoints.first?.value == 0)
+    }
+
+    @MainActor
     @Test func humanAllFeaturesSummaryUsesRouteScopedRows() throws {
         let calendar = Calendar(identifier: .gregorian)
         let now = date(year: 2026, month: 7, day: 7, hour: 12)

@@ -63,17 +63,7 @@ struct ZenStarterJourneySheet: View {
             ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: onClose) {
-                        Image(systemName: "xmark") // a11y: allow decorative glyph; the close Button has a localized label
-                            .frame(width: 44, height: 44)
-                            .accessibilityHidden(true)
-                    }
-                    .accessibilityLabel(l.tr(
-                        zh: "关闭", en: "Close", de: "Schließen", es: "Cerrar",
-                        pt: "Fechar", fr: "Fermer", ja: "閉じる", ko: "닫기", it: "Chiudi"
-                    ))
-                }
+                OhanaModalToolbar(onClose: onClose)
             }
         }
         .sheet(item: $humanGuideItem) { item in

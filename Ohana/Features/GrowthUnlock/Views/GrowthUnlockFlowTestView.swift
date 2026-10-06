@@ -66,7 +66,7 @@ struct OhanaGrowthOnboardingOverlay: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(step.title(language: appLanguage))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.brandTitle(.title3, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(localized(zh: "生命之树 Lv.\(treeLevel)", en: "Life Tree Lv.\(treeLevel)", de: "Lebensbaum Lv.\(treeLevel)"))
                         .font(OhanaFont.caption(.black))
@@ -271,7 +271,7 @@ struct GrowthUnlockFlowTestView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(localized(zh: "成长解锁流程测试", en: "Growth unlock flow test", de: "Wachstums-Test"))
-                        .font(OhanaFont.title2(.black))
+                        .font(OhanaFont.brandTitle(.title2, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(localized(zh: "模拟新手引导、功能锁和树等级节奏", en: "Preview onboarding, feature locks, and tree pacing", de: "Onboarding, Sperren und Baumstufen testen"))
                         .font(OhanaFont.caption(.semibold))

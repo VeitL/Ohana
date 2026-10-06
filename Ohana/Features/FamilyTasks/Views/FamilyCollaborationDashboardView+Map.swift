@@ -13,7 +13,7 @@ extension FamilyCollaborationDashboardView {
             HStack(alignment: .bottom, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "宠物地图", en: "Pet map", de: "Tierkarte"))
-                        .font(OhanaFont.title2(.black))
+                        .font(OhanaFont.title2(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
@@ -42,12 +42,12 @@ extension FamilyCollaborationDashboardView {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(title)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .lineLimit(1)
                 Text("\(count)")
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .monospacedDigit()
             }
             .foregroundStyle(selected ? selectedForeground : Color.ohanaSecondaryText)
@@ -61,12 +61,12 @@ extension FamilyCollaborationDashboardView {
     var progressScopePill: some View {
         HStack(spacing: 6) {
             Image(systemName: "chart.line.uptrend.xyaxis") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "完成", en: "Done", de: "Fertig"))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .lineLimit(1)
             Text("\(Int(boardProgress * 100))%")
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .monospacedDigit()
                 .contentTransition(.numericText())
         }
@@ -133,7 +133,7 @@ extension FamilyCollaborationDashboardView {
                 .background(Color.ohanaControlFill, in: Circle())
                 .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.20 : 0.10), radius: 8, x: 0, y: 5) // ui-v4: allow small floating avatar shadow
             Text(human.name)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(human.id.uuidString == activeHumanId ? Color.goPrimary : Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .frame(width: 44)
@@ -185,7 +185,7 @@ extension FamilyCollaborationDashboardView {
                     petMapAvatar(pet, selected: selected, tint: tint)
                     if count > 0 {
                         Text("\(count)")
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(badgeForeground)
                             .monospacedDigit()
                             .frame(width: 23, height: 23) // a11y: allow decorative non-interactive frame; hit area handled by parent
@@ -194,7 +194,7 @@ extension FamilyCollaborationDashboardView {
                     }
                 }
                 Text(pet.name)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .frame(width: 82)

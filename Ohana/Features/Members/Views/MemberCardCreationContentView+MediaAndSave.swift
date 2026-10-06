@@ -368,6 +368,18 @@ extension MemberCardCreationContentView {
         }
     }
 
+    func finishPetWithDefaultAvatar() {
+        guard kind == .pet, canSave else { return }
+        // A skipped avatar is the species placeholder, not an earned profile checkpoint.
+        draft.avatarSource = .placeholder
+        draft.avatarImageData = nil
+        draft.selectedAvatarCandidateId = nil
+        draft.usesPurchasedOrInventoryPass = false
+        decodedAvatar = nil
+        decodedAvatarTransparent = false
+        save()
+    }
+
     var homeJoinHandoffStartDelayMilliseconds: UInt64 {
         reduceMotion ? 20 : 24
     }

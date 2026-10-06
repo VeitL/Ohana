@@ -90,16 +90,16 @@ struct CoHealthDashboardContentView: View {
     private var lockedCard: some View {
         HStack(spacing: 12) {
             Image(systemName: "lock.shield.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(Color.goYellow.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "人宠共健仅本人可见", en: "Co-health is private", de: "Gemeinsame Gesundheit ist privat"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "请切换至本人档案", en: "Switch to this profile", de: "Zu diesem Profil wechseln"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
@@ -114,7 +114,7 @@ struct CoHealthDashboardContentView: View {
                 Text("🏃")
                     .font(OhanaFont.adaptive(size: 18))
                 Text(l.tr(zh: "人宠共健仪表盘", en: "Co-health Dashboard", de: "Gemeinsames Gesundheitsdashboard"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
             }
@@ -122,7 +122,7 @@ struct CoHealthDashboardContentView: View {
 
             // 趣味总结
             Text(summaryText)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goPrimary)
                 .padding(.horizontal, 20).padding(.bottom, 16)
                 .lineLimit(2)
@@ -170,12 +170,12 @@ struct CoHealthDashboardContentView: View {
     private func miniStat(value: String, unit: String, label: String, color: Color) -> some View {
         VStack(spacing: 3) {
             Text(label)
-                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 .textCase(.uppercase)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .minimumScaleFactor(0.6).lineLimit(1)
                 Text(unit)
@@ -198,7 +198,7 @@ struct CoHealthDashboardContentView: View {
 
         VStack(alignment: .leading, spacing: 8) {
             Text(l.tr(zh: "体重对比趋势", en: "Weight Trend Comparison", de: "Gewichtstrend-Vergleich"))
-                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                 .textCase(.uppercase)
 

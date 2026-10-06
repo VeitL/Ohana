@@ -188,13 +188,7 @@ struct OasisCritterCodexView: View {
     }
 
     var body: some View {
-        Group {
-            if mode == .nest, isPopup {
-                nestPopupBody
-            } else {
-                pageBody
-            }
-        }
+        NavigationStack { pageBody }
         .onAppear {
             if let initialCatalogId {
                 selectedCatalogId = initialCatalogId

@@ -109,6 +109,7 @@ struct VerticalSolidHomePageDeck<HomePage: View, CalendarPage: View, OasisPage: 
                 .badge(tab == .calendar ? taskCenterBadge.attentionCount : 0)
             }
         }
+        .tabViewStyle(.page(indexDisplayMode: .never))
         .tint(Color.goPrimary)
         .toolbarVisibility(.hidden, for: .tabBar)
         .accessibilityIdentifier("home-content-tab-view")

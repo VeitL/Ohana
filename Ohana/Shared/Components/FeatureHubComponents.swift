@@ -138,7 +138,7 @@ struct FeatureHubScaffold<Header: View, Content: View>: View {
         ZStack {
             OhanaAppBackground().ignoresSafeArea()
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: OhanaSpacing.section) {
                     header
                     content
                 }
@@ -156,38 +156,69 @@ struct FeatureHubHeader<Avatar: View>: View {
     let subtitle: String
     let eyebrow: String
     let onClose: () -> Void
+    var closeAccessibilityIdentifier = "feature-hub-close-action"
+    var showsCloseButton = true
     @ViewBuilder var avatar: Avatar
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            avatar
-            VStack(alignment: .leading, spacing: 3) {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    avatar.accessibilityHidden(true)
+                    Spacer()
+                    if showsCloseButton { closeButton }
+                }
+                heading
+            }
+        } else {
+            HStack(alignment: .top, spacing: 12) {
+                avatar.accessibilityHidden(true)
+                heading
+                Spacer(minLength: 8)
+                if showsCloseButton { closeButton }
+            }
+        }
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            if !eyebrow.isEmpty {
                 Text(eyebrow)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(title)
-                    .font(OhanaFont.title2(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text(title)
+                .font(OhanaFont.title2(.semibold))
+                .foregroundStyle(Color.ohanaPrimaryText)
+            if !subtitle.isEmpty {
                 Text(subtitle)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            Spacer(minLength: 8)
-            Button(action: onClose) {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-            }
-            .ohanaGlassIconButton()
-            .contentShape(Circle())
         }
+        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var closeButton: some View {
+        Button(action: onClose) {
+            Image(systemName: "xmark")
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
+        }
+        .ohanaGlassIconButton()
+        .contentShape(Circle())
+        .accessibilityLabel(L10n(appLanguage).tr(
+            zh: "关闭", en: "Close", de: "Schließen",
+            es: "Cerrar", pt: "Fechar", fr: "Fermer",
+            ja: "閉じる", ko: "닫기", it: "Chiudi"
+        ))
+        .accessibilityIdentifier(closeAccessibilityIdentifier)
     }
 }
 
@@ -480,25 +511,22 @@ struct FeatureHubMetricStrip: View {
 
     var body: some View {
         LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
-            ForEach(Array(metrics.enumerated()), id: \.element.id) { index, metric in
+            ForEach(metrics) { metric in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(metric.title)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(metric.value)
-                        .font(OhanaFont.headline(.black))
+                        .font(OhanaFont.headline(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                         .ohanaNumericMotion(metric.value)
                 }
-                .frame(maxWidth: .infinity, minHeight: 62, alignment: .topLeading)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 11)
-                .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
-                .ohanaSmoothAppear(index: index)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .padding(.vertical, 8)
             }
         }
     }
@@ -527,14 +555,12 @@ struct FeatureHubSummaryPanel: View {
 
             FeatureHubMetricStrip(metrics: metrics)
         }
-        .padding(14)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
         .accessibilityElement(children: .contain)
     }
 
     private var summaryTitle: some View {
         Text(title)
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -542,7 +568,7 @@ struct FeatureHubSummaryPanel: View {
 
     private var summaryStatus: some View {
         Text(statusText)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(statusTint)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -573,7 +599,7 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(section.title)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -600,7 +626,6 @@ struct FeatureHubSectionActionView<Destination: Hashable>: View {
         index: Int
     ) -> some View {
         Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onSelect(item.destination)
         } label: {
             if item.data.chart != nil {
@@ -634,7 +659,7 @@ struct FeatureSummaryChartCard: View {
             VStack(alignment: .leading, spacing: 11) {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: data.icon) // a11y: allow decorative card glyph; combined card label owns meaning.
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(data.tint)
                         .frame(width: 28, height: 28) // a11y: allow decorative non-interactive glyph inside larger button card.
                         .background(data.tint.opacity(0.13), in: Circle())
@@ -643,21 +668,21 @@ struct FeatureSummaryChartCard: View {
                     Spacer(minLength: 4)
 
                     Image(systemName: "chevron.right") // a11y: allow decorative navigation glyph; card button label owns action.
-                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .accessibilityHidden(true)
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(data.title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
 
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
                         Text(data.value)
-                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                             .foregroundStyle(data.tint)
                             .lineLimit(2)
                             .minimumScaleFactor(0.72)
@@ -764,7 +789,7 @@ private struct OrangeLightFeatureSummaryCard: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: data.icon)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .frame(width: 44, height: 44)
                 .background(Color.goCardWhite.opacity(0.14), in: Circle())
@@ -775,7 +800,7 @@ private struct OrangeLightFeatureSummaryCard: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(data.title)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .fontWidth(.condensed)
                     .foregroundStyle(Color.goCardWhite)
                     .lineLimit(1)
@@ -789,7 +814,7 @@ private struct OrangeLightFeatureSummaryCard: View {
             Spacer(minLength: 8)
 
             Image(systemName: "chevron.right").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goCardWhite.opacity(0.52))
         }
     }
@@ -814,7 +839,7 @@ private struct OrangeLightFeatureSummaryCard: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Text(metric.value)
-                    .font(OhanaFont.adaptive(size: 19, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold, design: .default))
                     .fontWidth(.condensed)
                     .foregroundStyle(Color.goCardWhite)
                     .lineLimit(1)
@@ -881,7 +906,7 @@ private struct OrangeLightFeatureSummaryCard: View {
     private var footer: some View {
         HStack(alignment: .lastTextBaseline, spacing: 6) {
             Text(distanceParts.value)
-                .font(OhanaFont.adaptive(size: 44, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 44, weight: .semibold, design: .default))
                 .fontWidth(.condensed)
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
@@ -899,11 +924,11 @@ private struct OrangeLightFeatureSummaryCard: View {
 
             ZStack {
                 Image(systemName: "heart.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 48, weight: .black))
+                    .font(OhanaFont.adaptive(size: 48, weight: .semibold))
                     .foregroundStyle(Color.goCardWhite.opacity(0.13))
 
                 Text("\(Int((clampedProgress * 100).rounded()))")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goCardWhite)
                     .monospacedDigit()
             }
@@ -945,32 +970,35 @@ private struct OrangeLightFeatureSummaryCard: View {
 private struct FeatureHubTile: View {
     let data: FeatureHubTileData
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Image(systemName: data.icon)
-                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .accessibilityHidden(true)
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaFunctionalIcon)
                         .ohanaSymbolPulse(trigger: data.value)
                     Spacer()
                     Text(data.value)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                         .fixedSize(horizontal: false, vertical: true)
                         .ohanaNumericMotion(data.value)
                 }
                 VStack(alignment: .leading, spacing: 3) {
                     Text(data.title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(data.subtitle)
                         .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
-                        .lineLimit(2)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -1000,14 +1028,14 @@ struct PetMemorialBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "彩虹桥纪念模式", en: "Rainbow Bridge memorial mode", de: "Regenbogenbruecken-Gedenkmodus"))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1047,9 +1075,9 @@ struct PetMemorialBadge: View {
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(daysTogether > 0 ? "\(daysTogether)d" : "纪念")
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
         }
         .foregroundStyle(Color.ohanaPrimaryText)
         .padding(.horizontal, 9)

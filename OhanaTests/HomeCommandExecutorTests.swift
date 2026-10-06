@@ -43,6 +43,8 @@ struct HomeCommandExecutorTests {
         #expect(logs.first?.pet?.id == pet.id)
         #expect(logs.first?.careType == .watering)
         #expect(feedbacks.map(\.cardId) == [pet.id])
+        #expect(feedbacks.first?.recordReference?.recordID == logs.first?.id)
+        #expect(feedbacks.first?.recordReference?.route.filter == .care)
         #expect(openedWaterRoute == false)
     }
 
@@ -9243,7 +9245,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         let questManager = TestQuestManagerProjection.manager
         let oldCoconutCount = questManager.coconutCount
         let oldCoconutLogs = questManager.coconutLogs
@@ -9259,7 +9261,7 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Starfall",
+            itemName: "Redeemed Ceramic Pots",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9294,7 +9296,7 @@ struct HomeCommandExecutorTests {
         let duplicate = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Starfall",
+            itemName: "Redeemed Ceramic Pots",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9348,12 +9350,13 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func shopCatalogRejectsLegacyFulfillmentItemAsANewSale() throws {
+    @Test(arguments: ShopCatalog.inventoryItems().filter { !ShopCatalog.isSellable(itemID: $0.id) }.map(\.id))
+    func shopCatalogRejectsLegacyFulfillmentItemAsANewSale(itemID: String) throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 1000
-        let legacyItem = try #require(ShopCatalog.item(id: "boost_backdate_pack"))
+        let legacyItem = try #require(ShopCatalog.item(id: itemID))
         context.insert(human)
         try context.save()
 
@@ -9421,7 +9424,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Plant Decor Buyer")
         let plant = Plant(name: "Pothos", wateringIntervalDays: 1, fertilizingIntervalDays: 14)
-        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.hangingVines))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.greenhouseCorner))
         human.coconutBalance = item.cost
         context.insert(human)
         context.insert(plant)
@@ -9430,7 +9433,7 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Hanging Vines",
+            itemName: "Redeemed Greenhouse Corner",
             context: context,
             questManager: QuestManager(),
             wallet: SwiftDataCoconutWalletManager(),
@@ -9505,7 +9508,7 @@ struct HomeCommandExecutorTests {
         contributor.coconutBalance = 100
         contributor.createdAt = buyer.createdAt.addingTimeInterval(1)
         contributor.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         context.insert(buyer)
         context.insert(contributor)
         try context.save()
@@ -9546,7 +9549,7 @@ struct HomeCommandExecutorTests {
         let activeContributor = Human(name: "Guan")
         activeContributor.coconutBalance = 100
         activeContributor.coconutBalance = 500
-        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         context.insert(buyer)
         context.insert(frozenContributor)
         context.insert(activeContributor)
@@ -9579,7 +9582,7 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 0
-        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         let account = CoconutAccount(
             accountKey: CoconutAccountKey.human(human.id),
             ownerKind: .human,
@@ -9603,7 +9606,7 @@ struct HomeCommandExecutorTests {
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Starfall",
+            itemName: "Redeemed Ceramic Pots",
             context: context,
             questManager: questManager,
             wallet: SwiftDataCoconutWalletManager(),
@@ -9687,14 +9690,14 @@ struct HomeCommandExecutorTests {
         let context = container.mainContext
         let human = Human(name: "Guan")
         human.coconutBalance = 10
-        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         context.insert(human)
         try context.save()
 
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Starfall",
+            itemName: "Redeemed Ceramic Pots",
             context: context,
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
@@ -9735,7 +9738,7 @@ struct HomeCommandExecutorTests {
     }
 
     @MainActor
-    @Test func dogEffectRequiresAnActiveDogAndThenPurchasesNormally() throws {
+    @Test func retiredDogEffectCannotBePurchasedEvenWithAnActiveDog() throws {
         let container = try makeInMemoryContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
@@ -9756,7 +9759,7 @@ struct HomeCommandExecutorTests {
         )
 
         #expect(!blocked.didPurchase)
-        #expect(blocked.failure == .applicationUnavailable(.activeDog))
+        #expect(blocked.failure == .invalidItem)
         #expect(human.coconutBalance == 1000)
 
         context.insert(Pet(name: "Kiko", species: "狗"))
@@ -9770,10 +9773,12 @@ struct HomeCommandExecutorTests {
             careLedger: CareLedgerService()
         )
 
-        #expect(purchased.didPurchase)
-        #expect(purchased.failure == nil)
-        #expect(human.coconutBalance == 1000 - item.cost)
-        #expect(try ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context))
+        #expect(!purchased.didPurchase)
+        #expect(purchased.failure == .invalidItem)
+        #expect(human.coconutBalance == 1000)
+        #expect(try !ShopPurchaseRecordStore.isOwned(itemID: item.id, context: context))
+        #expect(try context.fetch(FetchDescriptor<CoconutLedgerEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<CareLedgerEvent>()).isEmpty)
     }
 
     @MainActor
@@ -9783,14 +9788,14 @@ struct HomeCommandExecutorTests {
         let human = Human(name: "Guan")
         human.coconutBalance = 500
         human.passedAwayDate = makeDate(year: 2026, month: 6, day: 1)
-        let item = try #require(ShopCatalog.item(id: "fx_stars"))
+        let item = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         context.insert(human)
         try context.save()
 
         let result = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Redeemed Starfall",
+            itemName: "Redeemed Ceramic Pots",
             context: context,
             wallet: SwiftDataCoconutWalletManager(),
             careLedger: CareLedgerService()
@@ -10935,11 +10940,11 @@ struct HomeCommandExecutorTests {
             activeHumanSelection: UserDefaultsActiveHumanSelection()
         )
         let beforeRevision = revisionCenter.homeRevision.value
-        let shopItem = try #require(ShopCatalog.item(id: "fx_stars"))
+        let shopItem = try #require(ShopCatalog.item(id: OasisPlantDecorID.ceramicPotSkin))
         let purchase = executor.purchase(
             item: shopItem,
             buyer: human,
-            itemName: "Redeemed Starfall",
+            itemName: "Redeemed Ceramic Pots",
             note: "test.reward.purchase"
         )
         var mutation = try #require(revisionCenter.lastMutation)

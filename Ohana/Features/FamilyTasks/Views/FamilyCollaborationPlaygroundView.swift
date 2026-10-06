@@ -57,7 +57,7 @@ struct FamilyCollaborationPlaygroundView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(l.tr(zh: "家庭协作实验台", en: "Family collaboration lab", de: "Familien-Labor"))
-                .font(OhanaFont.title2(.black))
+                .font(OhanaFont.title2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(
                 zh: "这里全是假数据，用来比较协作页的真实手感。",
@@ -76,7 +76,7 @@ struct FamilyCollaborationPlaygroundView: View {
                     withAnimation(GoMotion.feedback) { previewMode = mode }
                 } label: {
                     Text(mode == .dark ? l.tr(zh: "深色", en: "Dark", de: "Dunkel") : l.tr(zh: "浅色", en: "Light", de: "Hell"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(previewMode == mode ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
@@ -103,9 +103,9 @@ struct FamilyCollaborationPlaygroundView: View {
         } label: {
             VStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 Text(title)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
@@ -152,13 +152,13 @@ struct FamilyCollaborationPlaygroundView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: done ? "checkmark.seal.fill" : icon)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                     .foregroundStyle(tint)
                     .frame(width: 46, height: 46)
                     .background(tint.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(done ? l.tr(zh: "已完成", en: "Done", de: "Fertig") : subtitle)
                         .font(OhanaFont.caption(.bold))
@@ -167,7 +167,7 @@ struct FamilyCollaborationPlaygroundView: View {
                 }
                 Spacer()
                 Text(done ? "OK" : l.tr(zh: "点按", en: "Tap", de: "Tippen"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
@@ -200,10 +200,10 @@ struct FamilyCollaborationPlaygroundView: View {
                 petNode(id: "rio", emoji: "🐟", name: "Rio", badge: "✓", x: -20, y: 82, tint: Color.goTeal, tintForeground: Color.arkInk)
                 VStack(spacing: 3) {
                     Image(systemName: "house.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black))
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                     Text(l.tr(zh: "家", en: "Home", de: "Zuhause"))
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -234,14 +234,14 @@ struct FamilyCollaborationPlaygroundView: View {
                         .background(selectedPetID == id ? tint.opacity(0.24) : Color.ohanaCardSurface, in: Circle())
                         .overlay(Circle().strokeBorder(selectedPetID == id ? tint : Color.ohanaCardStroke, lineWidth: selectedPetID == id ? 2 : 1))
                     Text(badge)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(tintForeground)
                         .frame(width: 22, height: 22) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                         .background(tint, in: Circle())
                         .offset(x: 2, y: -2)
                 }
                 Text(name)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
         }
@@ -259,7 +259,7 @@ struct FamilyCollaborationPlaygroundView: View {
             Image(systemName: "sparkles").accessibilityHidden(true)
                 .foregroundStyle(Color.goPrimary)
             Text(label)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
         }
@@ -296,11 +296,11 @@ struct FamilyCollaborationPlaygroundView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text(name)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Spacer()
                         Text("\(score)")
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(tint)
                             .monospacedDigit()
                     }
@@ -318,11 +318,11 @@ struct FamilyCollaborationPlaygroundView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(title)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(Int(progress * 100))%")
-                    .font(OhanaFont.metric(size: 24, .black))
+                    .font(OhanaFont.metric(size: 24, .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .monospacedDigit()
             }
@@ -341,10 +341,10 @@ struct FamilyCollaborationPlaygroundView: View {
     private var designNotes: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label(l.tr(zh: "测试页不会读取或修改真实数据", en: "This page does not read or mutate real data", de: "Diese Seite liest oder ändert keine echten Daten"), systemImage: "checkmark.shield.fill")
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Label(l.tr(zh: "选定方向后再合并到真实 Ohana 成员页", en: "Pick a direction before merging into the real member page", de: "Erst auswählen, dann in die echte Mitgliederseite übernehmen"), systemImage: "wand.and.stars")
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .padding(.top, 2)

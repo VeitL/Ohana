@@ -100,7 +100,8 @@ extension PlantCareFeatureDetailView {
         careNote: String,
         healthStatus: PlantHealthStatus,
         photoData: Data?,
-        executorID: UUID?
+        executorID: UUID?,
+        completion: ((Bool) -> Void)? = nil
     ) {
         let request = PlantCareCommandRequest(
             careType: careType,
@@ -119,6 +120,7 @@ extension PlantCareFeatureDetailView {
         if result.didPersist {
             scheduleRouteSnapshotRefresh(force: true, delayMilliseconds: 0)
         }
+        completion?(result.didPersist)
     }
 
     func scheduleRouteSnapshotRefresh(force: Bool = false, delayMilliseconds: UInt64 = 24) {
@@ -252,7 +254,7 @@ extension PlantCareFeatureDetailView {
 
     func plantAvatar(_ plant: Plant) -> some View {
         Text(plant.avatarEmoji.isEmpty ? "🌱" : plant.avatarEmoji)
-            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
             .frame(width: 44, height: 44)
             .background(Color(hex: plant.themeColorHex).opacity(0.16), in: Circle())
             .accessibilityHidden(true)

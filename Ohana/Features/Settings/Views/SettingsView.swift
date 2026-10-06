@@ -203,15 +203,7 @@ struct SettingsView: View {
                     NavigationStack {
                         ReminderObservabilityView()
                             .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button {
-                                        showingReminderObservability = false
-                                    } label: {
-                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
-                                    }
-                                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                                    .accessibilityIdentifier("reminder-observability-close-action")
-                                }
+                                OhanaModalToolbar(onClose: { showingReminderObservability = false }, closeIdentifier: "reminder-observability-close-action")
                             }
                     }
                     .ohanaSheetPagePresentation() // ui-v4: allow developer reminder observability console as long sheet
@@ -238,15 +230,7 @@ struct SettingsView: View {
                     NavigationStack {
                         FamilyWeeklyReportDashboardView()
                             .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button {
-                                        showingFamilyWeeklyReportDebug = false
-                                    } label: {
-                                        Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding label
-                                    }
-                                    .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                                    .accessibilityIdentifier("family-weekly-report-debug-close-action")
-                                }
+                                OhanaModalToolbar(onClose: { showingFamilyWeeklyReportDebug = false }, closeIdentifier: "family-weekly-report-debug-close-action")
                             }
                     }
                     .ohanaSheetPagePresentation() // ui-v4: allow developer weekly report console as long sheet

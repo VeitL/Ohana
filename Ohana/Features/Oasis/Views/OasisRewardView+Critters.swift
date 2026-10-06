@@ -18,7 +18,7 @@ extension OasisRewardView {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 7) {
                             Text(l.tr(zh: "电子宠物小窝", en: "Critter Nest", de: "Critter-Nest"))
-                                .font(OhanaFont.title3(.black))
+                                .font(OhanaFont.brandTitle(.title3, weight: .bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(l.tr(zh: critter.rarity.zh, en: critter.rarity.en, de: critter.rarity.de))
                                 .font(OhanaFont.caption2(.black))
@@ -28,7 +28,7 @@ extension OasisRewardView {
                                 .background(critterRarityColor(critter.rarity), in: Capsule())
                         }
                         Text(critter.displayName(l))
-                            .font(OhanaFont.title(.black))
+                            .font(OhanaFont.brandTitle(.title, weight: .bold))
                             .foregroundStyle(Color.goPrimary)
                             .contentTransition(.numericText())
                         HStack(spacing: 8) {
@@ -41,7 +41,7 @@ extension OasisRewardView {
                     OasisCritterIllustration(catalogId: OasisUpgradeRewardCatalog.firstCritterId, locked: true, size: 104)
                     VStack(alignment: .leading, spacing: 8) {
                         Text(l.tr(zh: "升级生命树，唤醒电子宠物", en: "Level the tree. Wake critters.", de: "Baum leveln. Critter wecken."))
-                            .font(OhanaFont.title2(.black))
+                            .font(OhanaFont.brandTitle(.title2, weight: .bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(2)
                         Text(nextCritterGoalText)
@@ -462,7 +462,7 @@ extension OasisRewardView {
                         .fill(isMilestone ? Color.goPrimary.opacity(0.2) : Color.ohanaControlFill)
                         .frame(width: 46, height: 46)
                     Text("🥥")
-                        .font(OhanaFont.metric(size: 26))
+                        .font(OhanaFont.brandMetric(size: 26))
                         .rotationEffect(.degrees(isOpening ? -12 : 0))
                         .scaleEffect(isOpening ? 1.16 : 1)
                 }

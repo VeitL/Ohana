@@ -162,7 +162,7 @@ struct ProfileIdentityHero<Avatar: View, Badges: View>: View {
 
                 VStack(spacing: 5) {
                     Text(name)
-                        .font(OhanaFont.title(.black))
+                        .font(OhanaFont.title(.semibold))
                         .foregroundStyle(Color.goCardWhite)
                         .multilineTextAlignment(.center)
                         .lineLimit(2)
@@ -463,7 +463,7 @@ struct ProfileCompletionCard: View {
                 Spacer(minLength: 8)
 
                 Text("\(snapshot.completionPercent)%")
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(tint)
                     .monospacedDigit()
                     .contentTransition(.numericText())

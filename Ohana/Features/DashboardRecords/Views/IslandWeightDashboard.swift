@@ -45,30 +45,12 @@ private enum IslandWeightEntryRoute: Identifiable {
 private struct AnimatedWeightSparkline: View {
     let history: [SparkPoint]
     let accentColor: Color
-    @State private var revealProgress: CGFloat = 0
-
-    private var animationKey: String {
-        history
-            .map { "\($0.date.timeIntervalSince1970):\(String(format: "%.3f", $0.weight))" }
-            .joined(separator: "|")
-    }
-
-    private func playAnimation() {
-        revealProgress = 0
-        withAnimation(GoMotion.page) {
-            revealProgress = 1
-        }
-    }
-
     var body: some View {
         OhanaMinimalTrendChart(
             points: history.map { OhanaMinimalChartPoint(date: $0.date, value: $0.weight, id: $0.id.uuidString) },
             tint: accentColor,
-            progress: Double(revealProgress),
             showsLatestPoint: false
         )
-        .onAppear { playAnimation() }
-        .onChange(of: animationKey) { _, _ in playAnimation() }
     }
 }
 
@@ -81,6 +63,8 @@ struct IslandWeightDashboardContentView: View {
     let snapshot: WeightInsightSnapshot
     let onFilterChange: (WeightTimeFilter, String?) -> Void
     let onRefresh: () -> Void
+    var isLoading = false
+    var loadFailed = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.colorScheme) private var colorScheme
@@ -91,7 +75,6 @@ struct IslandWeightDashboardContentView: View {
     @State private var vm = IslandUnifiedStatsViewModel()
     @State private var weightTimeRange: WeightTimeFilter = .days30
     @State private var selectedSeriesID: String? = nil
-    @State private var chartRevealProgress: CGFloat = 0
     @State private var activeWeightEntryRoute: IslandWeightEntryRoute? = nil
     @State private var showingPersonalPlan = false
     @State private var preparedWeightCSV = "date,subject_id,subject_name,kilograms"
@@ -271,8 +254,11 @@ extension IslandWeightDashboardContentView {
                     OhanaAppBackground().ignoresSafeArea()
                     scrollContent
                 }
-                .ignoresSafeArea(edges: .top)
-                .navigationBarHidden(true)
+                .navigationTitle(l.tr(zh: "体重", en: "Weight", de: "Gewicht", es: "Peso", pt: "Peso", fr: "Poids", ja: "体重", ko: "체중", it: "Peso"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    OhanaModalToolbar(onClose: { dismiss() })
+                }
             }
         } else {
             scrollContent
@@ -281,12 +267,10 @@ extension IslandWeightDashboardContentView {
 
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                if standalone { navBar }
+            VStack(spacing: OhanaSpacing.section) {
                 privateWeightNotice
                 analysisLimitNotice
                 weightPlanetHero
-                memberSelector
                 if appServices.commerce.allows(.extendedTrends) {
                     weightExportButton
                 }
@@ -294,99 +278,69 @@ extension IslandWeightDashboardContentView {
                 if appServices.commerce.allows(.extendedTrends) {
                     weightBadgeStrip
                 }
-                individualSparklineCard
+                if selectedSeriesID == nil, !buildSparklineEntries().isEmpty {
+                    individualSparklineCard
+                }
                 Color.clear.frame(height: 40)
             }
             .padding(.horizontal, 16)
             .padding(.top, standalone ? 0 : 14)
         }
-        .overlay {
-            if let activeWeightEntryRoute {
-                GenericWeightEntrySheet(
-                    target: activeWeightEntryRoute.target,
-                    onSaved: {
-                        onRefresh()
-                    },
-                    onDismiss: {
-                        withAnimation(GoMotion.feedback) {
-                            self.activeWeightEntryRoute = nil
-                        }
-                    }
-                )
-                .id(activeWeightEntryRoute.id)
-                .zIndex(30)
-            }
+        .sheet(item: $activeWeightEntryRoute) { route in
+            GenericWeightEntrySheet(
+                target: route.target,
+                onSaved: { onRefresh() },
+                onDismiss: { activeWeightEntryRoute = nil }
+            )
         }
     }
 
-    // MARK: - Nav Bar
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(primaryText)
-                    .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.ohanaControlFill, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            Spacer()
-            Text(l.tr(zh: "体重星球", en: "Weight Planet", de: "Gewichtsplanet"))
-                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(primaryText)
-            Spacer()
-            Color.clear.frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
-        }
-        .padding(.top, 50)
-    }
-
-    // MARK: - Entity Selector
+    // MARK: - Subject selection
     private var memberSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                weightEntityChip(
-                    title: l.tr(zh: "全部", en: "All", de: "Alle"),
-                    icon: "sparkles",
-                    tint: Color.goPrimary,
-                    isSelected: selectedSeriesID == nil,
-                    isLocked: !appServices.commerce.allows(.extendedTrends)
-                ) {
-                    guard appServices.commerce.allows(.extendedTrends) else {
-                        showingPersonalPlan = true
-                        UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                        return
-                    }
-                    selectedSeriesID = nil
-                    onFilterChange(weightTimeRange, nil)
+        Menu {
+            Button {
+                guard appServices.commerce.allows(.extendedTrends) else {
+                    showingPersonalPlan = true
+                    return
                 }
-
-                ForEach(visiblePets) { pet in
-                    let seriesID = "pet:\(pet.id.uuidString)"
-                    weightEntityChip(
-                        title: pet.name,
-                        avatar: { FMPetAvatar(pet: pet, size: 28) },
-                        tint: Color(hex: pet.safeThemeColorHex),
-                        isSelected: selectedSeriesID == seriesID
-                    ) {
-                        selectedSeriesID = seriesID
-                        onFilterChange(weightTimeRange, seriesID)
-                    }
-                }
-
-                ForEach(visibleWeightHumans) { human in
-                    let seriesID = "human:\(human.id.uuidString)"
-                    weightEntityChip(
-                        title: human.name,
-                        avatar: { humanAvatarView(human, size: 28) },
-                        tint: Color(hex: human.safeThemeColorHex),
-                        isSelected: selectedSeriesID == seriesID
-                    ) {
-                        selectedSeriesID = seriesID
-                        onFilterChange(weightTimeRange, seriesID)
-                    }
-                }
+                selectedSeriesID = nil
+                onFilterChange(weightTimeRange, nil)
+            } label: {
+                Label(
+                    l.tr(zh: "全部成员", en: "All members", de: "Alle Mitglieder", es: "Todos los miembros", pt: "Todos os membros", fr: "Tous les membres", ja: "すべてのメンバー", ko: "모든 구성원", it: "Tutti i membri"),
+                    systemImage: !appServices.commerce.allows(.extendedTrends) ? "lock.fill" : (selectedSeriesID == nil ? "checkmark" : "person.2")
+                )
             }
-            .padding(.vertical, 2)
+            ForEach(visiblePets) { pet in
+                subjectOption(name: pet.name, seriesID: "pet:\(pet.id.uuidString)")
+            }
+            ForEach(visibleWeightHumans) { human in
+                subjectOption(name: human.name, seriesID: "human:\(human.id.uuidString)")
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text(selectedEntityName)
+                    .font(OhanaFont.headline())
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Image(systemName: "chevron.down")
+                    .font(OhanaFont.caption())
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .foregroundStyle(primaryText)
+        .accessibilityIdentifier("weight-insight-subject-picker")
+    }
+
+    private func subjectOption(name: String, seriesID: String) -> some View {
+        Button {
+            guard selectedSeriesID != seriesID else { return }
+            selectedSeriesID = seriesID
+            onFilterChange(weightTimeRange, seriesID)
+        } label: {
+            Label(name, systemImage: selectedSeriesID == seriesID ? "checkmark" : "person")
         }
     }
 
@@ -395,16 +349,16 @@ extension IslandWeightDashboardContentView {
         if !privateVisibleWeightHumans.isEmpty {
             HStack(spacing: 10) {
                 Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goYellow)
                     .frame(width: 26, height: 26) // a11y: allow decorative non-interactive frame; hit area handled by parent
                     .background(Color.goYellow.opacity(0.16), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "包含仅自己可见的体重数据", en: "Includes private weight data", de: "Enthält private Gewichtsdaten"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(primaryText)
                     Text(privateWeightNoticeText)
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(secondaryText)
                         .lineLimit(2)
                 }
@@ -454,7 +408,7 @@ extension IslandWeightDashboardContentView {
                 l.tr(zh: "导出当前体重数据", en: "Export current weight data", de: "Aktuelle Gewichtsdaten exportieren"),
                 systemImage: "square.and.arrow.up"
             )
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(Color.ohanaControlFill, in: Capsule())
@@ -475,114 +429,48 @@ extension IslandWeightDashboardContentView {
         preparedWeightCSV = lines.joined(separator: "\n")
     }
 
-    private func weightEntityChip(
-        title: String,
-        icon: String,
-        tint: Color,
-        isSelected: Bool,
-        isLocked: Bool = false,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .frame(width: 26, height: 26) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(isSelected ? Color.arkInk.opacity(0.16) : tint.opacity(0.18), in: Circle())
-                weightEntityChipText(title: title, isSelected: isSelected)
-                if isLocked {
-                    Image(systemName: "lock.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 8, weight: .black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                }
-            }
-            .padding(.leading, 8)
-            .padding(.trailing, 14)
-            .padding(.vertical, 8)
-            .background(isSelected ? tint : Color.ohanaControlFill.opacity(0.74), in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(isLocked ? "\(title), Ohana Personal" : title)
-        .accessibilityValue(isSelected
-            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
-            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
+    private var displayedWeightKg: Double? {
+        if let selectedSeriesID { return latestWeight(for: selectedSeriesID) }
+        let values = visibleSeriesIDs.compactMap { latestWeight(for: $0) }
+        return values.isEmpty ? nil : values.reduce(0, +)
     }
 
-    private func weightEntityChip(
-        title: String,
-        @ViewBuilder avatar: () -> some View,
-        tint: Color,
-        isSelected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                avatar()
-                weightEntityChipText(title: title, isSelected: isSelected)
-            }
-            .padding(.leading, 8)
-            .padding(.trailing, 14)
-            .padding(.vertical, 8)
-            .background(isSelected ? tint : Color.ohanaControlFill.opacity(0.74), in: Capsule())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityValue(isSelected
-            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
-            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
+    private var noWeightRecordsText: String {
+        l.tr(
+            zh: "尚无体重记录", en: "No weight records yet", de: "Noch keine Gewichtseinträge",
+            es: "Aún no hay registros de peso", pt: "Ainda não há registros de peso", fr: "Aucun poids enregistré",
+            ja: "体重の記録はまだありません", ko: "아직 체중 기록이 없어요", it: "Nessun peso registrato"
+        )
     }
 
-    private func weightEntityChipText(title: String, isSelected: Bool) -> some View {
-        Text(title)
-            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-    }
-
-    // MARK: - 首屏：体重星球
     private var weightPlanetHero: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 14) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: selectedSeriesID == nil ? "globe.asia.australia.fill" : "scalemass.fill")
-                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(Color.arkInk)
-                            .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                            .background(chartAccentColor, in: Circle())
-
-                        Text(selectedSeriesID == nil ? l.tr(zh: "体重星球", en: "Weight Planet", de: "Gewichtsplanet") : selectedEntityName)
-                            .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(primaryText)
-                    }
-
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(String(format: "%.1f", latestChartValue ?? totalIslandWeightKg))
-                            .font(OhanaFont.adaptive(size: 58, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(primaryText)
-                            .ohanaNumericMotion(latestChartValue ?? totalIslandWeightKg)
-                            .minimumScaleFactor(0.55)
-                            .lineLimit(1)
-                        Text("kg")
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(secondaryText)
-                    }
-
-                    HStack(spacing: 8) {
-                        trendDeltaPill
-                        Text(selectedSeriesID == nil ? weightComparison : selectedEntitySubtitle)
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                            .foregroundStyle(secondaryText)
-                            .lineLimit(1)
-                    }
+        VStack(alignment: .leading, spacing: OhanaSpacing.related) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: OhanaSpacing.row) {
+                    memberSelector
+                    Spacer(minLength: 8)
+                    recordWeightActionButton
                 }
+                VStack(alignment: .leading, spacing: OhanaSpacing.related) {
+                    memberSelector
+                    recordWeightActionButton
+                }
+            }
 
-                Spacer(minLength: 8)
-
-                recordWeightActionButton
+            if snapshot.hasLoaded, let kilograms = displayedWeightKg {
+                Text(AppMeasurementSystem.formatWeightKilograms(kilograms))
+                    .font(OhanaFont.metric(size: 34))
+                    .foregroundStyle(primaryText)
+                    .ohanaNumericMotion(kilograms)
+                    .accessibilityIdentifier("weight-insight-current-value")
+                if let delta = periodDeltaKg {
+                    Label(deltaText(for: delta), systemImage: deltaIcon(for: delta))
+                        .font(OhanaFont.footnote())
+                        .foregroundStyle(deltaTint(for: delta))
+                }
             }
         }
-        .padding(.top, standalone ? 4 : 0)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var recordWeightActionButton: some View {
@@ -591,17 +479,17 @@ extension IslandWeightDashboardContentView {
                 withAnimation(GoMotion.feedback) {
                     activeWeightEntryRoute = route
                 }
-            } else if let first = buildSparklineEntries(includeSelection: false).first {
-                withAnimation(GoMotion.feedback) {
-                    selectedSeriesID = first.seriesID
-                }
+            } else if let firstID = visiblePets.first.map({ "pet:\($0.id.uuidString)" })
+                ?? visibleWeightHumans.first.map({ "human:\($0.id.uuidString)" }) {
+                selectedSeriesID = firstID
+                onFilterChange(weightTimeRange, firstID)
             }
         } label: {
             HStack(spacing: 7) {
                 Image(systemName: selectedWeightEntryRoute == nil ? "person.crop.circle.badge.plus" : "plus")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(selectedWeightEntryRoute == nil ? l.tr(zh: "选成员", en: "Choose", de: "Wählen") : l.tr(zh: "记录", en: "Record", de: "Eintragen"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
@@ -609,24 +497,8 @@ extension IslandWeightDashboardContentView {
             .background(Color.goPrimary, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
-        .disabled(buildSparklineEntries(includeSelection: false).isEmpty && selectedWeightEntryRoute == nil)
-        .opacity(buildSparklineEntries(includeSelection: false).isEmpty && selectedWeightEntryRoute == nil ? 0.55 : 1)
-    }
-
-    @ViewBuilder
-    private var trendDeltaPill: some View {
-        let delta = periodDeltaKg
-        HStack(spacing: 5) {
-            Image(systemName: deltaIcon(for: delta))
-                .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(deltaText(for: delta))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .ohanaNumericMotion(deltaText(for: delta))
-        }
-        .foregroundStyle(deltaTint(for: delta))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(deltaTint(for: delta).opacity(colorScheme == .dark ? 0.16 : 0.13), in: Capsule())
+        .disabled(visiblePets.isEmpty && visibleWeightHumans.isEmpty)
+        .opacity(visiblePets.isEmpty && visibleWeightHumans.isEmpty ? 0.55 : 1)
     }
 
     private func deltaText(for delta: Double?) -> String {
@@ -649,65 +521,78 @@ extension IslandWeightDashboardContentView {
 
     // MARK: - 模块 1: 极简趋势
     private var weightHeroCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(selectedSeriesID == nil ? l.tr(zh: "全岛总质量趋势", en: "Total Weight Trend", de: "Gesamtgewichtstrend") : l.tr(zh: "体重趋势", en: "Weight Trend", de: "Gewichtstrend"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(primaryText)
-                    Text(weightTimeRange == .all ? l.tr(zh: "全部记录", en: "All records", de: "Alle Einträge") : l.tr(zh: "近 \(weightTimeRange.rawValue) 天", en: "Last \(weightTimeRange.rawValue) days", de: "Letzte \(weightTimeRange.rawValue) Tage"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(secondaryText)
-                }
-                Spacer()
+        VStack(alignment: .leading, spacing: OhanaSpacing.row) {
+            HStack(alignment: .firstTextBaseline, spacing: OhanaSpacing.row) {
+                Text(l.tr(zh: "体重趋势", en: "Weight trend", de: "Gewichtsverlauf", es: "Tendencia de peso", pt: "Tendência de peso", fr: "Évolution du poids", ja: "体重の推移", ko: "체중 추이", it: "Andamento del peso"))
+                    .font(OhanaFont.headline())
+                    .foregroundStyle(primaryText)
+                Spacer(minLength: 8)
                 rangeSelector
             }
 
-            if chartTrendPoints.isEmpty {
-                emptyState(l.tr(zh: "记录体重后出现趋势", en: "Add weight records to show the trend", de: "Gewicht erfassen, um den Trend zu sehen"))
-                    .frame(height: 188)
+            if loadFailed {
+                OhanaFeedbackState(
+                    state: .error,
+                    title: l.recordsLoadFailed,
+                    message: l.recordsRetryMessage,
+                    actionLabel: l.retryRecords,
+                    action: onRefresh,
+                    layout: .compact
+                )
+            } else if isLoading || !snapshot.hasLoaded {
+                OhanaFeedbackState(
+                    state: .loading,
+                    title: l.tr(zh: "正在读取记录", en: "Loading records", de: "Einträge werden geladen", es: "Cargando registros", pt: "Carregando registros", fr: "Chargement des données", ja: "記録を読み込み中", ko: "기록 불러오는 중", it: "Caricamento dei dati"),
+                    message: "",
+                    layout: .compact
+                )
+            } else if chartTrendPoints.isEmpty {
+                OhanaFeedbackState(
+                    state: .empty,
+                    title: noWeightRecordsText,
+                    message: l.tr(
+                        zh: "这段时间还没有记录，添加一次体重即可开始。", en: "No records in this period. Add a weight to get started.", de: "In diesem Zeitraum gibt es noch keine Einträge. Erfasse ein Gewicht.",
+                        es: "No hay registros en este período. Añade un peso para empezar.", pt: "Sem registros neste período. Adicione um peso para começar.", fr: "Aucune donnée sur cette période. Ajoutez un poids pour commencer.",
+                        ja: "この期間の記録はありません。体重を記録して始めましょう。", ko: "이 기간에는 기록이 없어요. 체중을 기록해 보세요.", it: "Nessun dato in questo periodo. Aggiungi un peso per iniziare."
+                    ),
+                    accessibilityIdentifier: "weight-insight-empty-state",
+                    layout: .compact
+                )
             } else {
                 weightTrendChart
                     .frame(height: 188)
             }
         }
-        .padding(16)
-        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.hero, style: .continuous))
+        .padding(OhanaSpacing.pageMargin)
+        .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous))
     }
 
     private var rangeSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 5) {
-                ForEach(WeightTimeFilter.allCases) { range in
-                    Button {
-                        guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
-                            showingPersonalPlan = true
-                            UINotificationFeedbackGenerator().notificationOccurred(.warning)
-                            return
-                        }
-                        withAnimation(GoMotion.feedback) {
-                            weightTimeRange = range
-                        }
-                        onFilterChange(range, selectedSeriesID)
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        HStack(spacing: 2) {
-                            Text(range.localizedTitle(l))
-                            if range.requiresPersonal && !appServices.commerce.allows(.extendedTrends) {
-                                Image(systemName: "lock.fill").accessibilityHidden(true)
-                                    .font(OhanaFont.adaptive(size: 7, weight: .black))
-                            }
-                        }
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(weightTimeRange == range ? Color.ohanaPrimaryActionText : primaryText)
-                        .frame(minWidth: range == .all ? 42 : 30)
-                        .padding(.vertical, 7)
-                        .background(weightTimeRange == range ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
+        Menu {
+            ForEach(WeightTimeFilter.allCases) { range in
+                Button {
+                    guard !range.requiresPersonal || appServices.commerce.allows(.extendedTrends) else {
+                        showingPersonalPlan = true
+                        return
                     }
-                    .buttonStyle(ScaleButtonStyle())
+                    guard weightTimeRange != range else { return }
+                    weightTimeRange = range
+                    onFilterChange(range, selectedSeriesID)
+                    OhanaFeedback.selection()
+                } label: {
+                    Label(
+                        range.localizedTitle(l),
+                        systemImage: range.requiresPersonal && !appServices.commerce.allows(.extendedTrends)
+                            ? "lock.fill" : (weightTimeRange == range ? "checkmark" : "calendar")
+                    )
                 }
             }
+        } label: {
+            Label(weightTimeRange.localizedTitle(l), systemImage: "chevron.down")
+                .font(OhanaFont.subheadline())
+                .frame(minHeight: 44)
         }
+        .accessibilityIdentifier("weight-insight-range-picker")
     }
 }
 
@@ -732,19 +617,6 @@ extension IslandWeightDashboardContentView {
         return aggregateWeightTrend()
     }
 
-    private var chartAnimationKey: String {
-        chartTrendPoints
-            .map { "\($0.id):\(String(format: "%.3f", $0.value))" }
-            .joined(separator: "|")
-    }
-
-    private func playChartReveal() {
-        chartRevealProgress = 0
-        withAnimation(GoMotion.page) {
-            chartRevealProgress = 1
-        }
-    }
-
     private var weightTrendChart: some View {
         OhanaMinimalTrendChart(
             points: chartTrendPoints.map {
@@ -753,14 +625,11 @@ extension IslandWeightDashboardContentView {
             xDomain: chartXDomainForTrend,
             yDomain: chartYDomainForTrend,
             tint: chartAccentColor,
-            progress: Double(chartRevealProgress),
             showsLatestPoint: true,
             yReferenceLineCount: 3,
             yReferenceFormatter: { OhanaChartStyle.weightReferenceLabel(kilograms: $0, domain: $1) }
         )
         .frame(maxWidth: .infinity)
-        .onAppear { playChartReveal() }
-        .onChange(of: chartAnimationKey) { _, _ in playChartReveal() }
     }
 
     private var latestChartValue: Double? {
@@ -821,6 +690,10 @@ extension IslandWeightDashboardContentView {
             .filter { visibleSeriesIDs.contains($0.seriesID) }
             .sorted { $0.date < $1.date }
         guard !allPoints.isEmpty else { return [] }
+        if allPoints.count == 1, let point = allPoints.first {
+            guard chartCutoff().map({ point.date >= $0 }) ?? true else { return [] }
+            return [IslandWeightTrendPoint(id: point.id.uuidString, date: point.date, value: point.weight)]
+        }
 
         let cal = Calendar.current
         let now = Date()
@@ -896,20 +769,20 @@ extension IslandWeightDashboardContentView {
     private func rankingPill(title: String, ranking: FameRanking?, accent: Color, fallback: String) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(accent)
             if let ranking {
                 Text(ranking.emoji)
                     .font(OhanaFont.adaptive(size: 16)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(ranking.entityName)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .lineLimit(1)
                 Text("\(ranking.deltaPercent >= 0 ? "+" : "")\(String(format: "%.1f", ranking.deltaPercent))%")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(accent)
             } else {
                 Text(fallback)
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText)
             }
         }
@@ -925,11 +798,11 @@ extension IslandWeightDashboardContentView {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label(l.tr(zh: "成员", en: "Members", de: "Mitglieder"), systemImage: "person.2.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 Spacer()
                 Text("\(buildSparklineEntries(includeSelection: false).count)")
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(secondaryText)
                     .ohanaNumericMotion(buildSparklineEntries(includeSelection: false).count)
             }
@@ -1010,17 +883,17 @@ extension IslandWeightDashboardContentView {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.name)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(primaryText)
                 HStack(alignment: .firstTextBaseline, spacing: 5) {
                     Text(String(format: "%.1f", entry.current))
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(entry.accentColor)
                     Text("kg")
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
                     Text(deltaText(for: entry.delta))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(deltaTint(for: entry.delta))
                 }
             }
@@ -1050,12 +923,12 @@ extension IslandWeightDashboardContentView {
 
         return Group {
             if let pet = entry.petRef {
-                NavigationLink(destination: WeightHistoryView(pet: pet)) {
+                NavigationLink(destination: WeightHistoryView(pet: pet, showsCloseButton: false)) {
                     rowContent
                 }
                 .buttonStyle(ScaleButtonStyle())
             } else if let human = entry.humanRef {
-                NavigationLink(destination: HumanWeightHistoryView(human: human)) {
+                NavigationLink(destination: HumanWeightHistoryView(human: human, showsCloseButton: false)) {
                     rowContent
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -1082,7 +955,7 @@ extension IslandWeightDashboardContentView {
     // MARK: - Empty State
     private func emptyState(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(tertiaryText)
             .frame(maxWidth: .infinity, alignment: .center)
     }

@@ -43,11 +43,13 @@ struct FamilyTaskPlanEditorDataContainer<Content: View>: View {
     @Environment(\.modelContext) private var modelContext
     @State private var routeData: FamilyTaskPlanEditorRouteData
 
+    private let onClose: (() -> Void)?
     private let planID: UUID?
     private let content: (FamilyTaskPlanEditorSnapshot?) -> Content
 
     init(
         planID rawPlanID: String?,
+        onClose: (() -> Void)? = nil,
         @ViewBuilder content: @escaping (FamilyTaskPlanEditorSnapshot?) -> Content
     ) {
         planID = rawPlanID.flatMap(UUID.init(uuidString:))
@@ -56,6 +58,7 @@ struct FamilyTaskPlanEditorDataContainer<Content: View>: View {
                 ? FamilyTaskPlanEditorRouteData(snapshot: nil, hasLoaded: true)
                 : FamilyTaskPlanEditorRouteData()
         )
+        self.onClose = onClose
         self.content = content
     }
 
@@ -67,6 +70,7 @@ struct FamilyTaskPlanEditorDataContainer<Content: View>: View {
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, minHeight: 220)
+                    .toolbar { if let onClose { OhanaModalToolbar(onClose: onClose, isEditor: true) } }
                     .accessibilityLabel(L10n.current.tr(
                         zh: "正在载入任务设置",
                         en: "Loading task settings",

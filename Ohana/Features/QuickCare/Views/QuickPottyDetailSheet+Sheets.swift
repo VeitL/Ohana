@@ -52,17 +52,13 @@ extension QuickPottyDetailSheet {
                         syncScoopPlan(showToast: true)
                     }
                 },
+                onCancel: closeActivePottySheet,
+                isSaving: isSavingPottyPlan,
                 onDelete: {
                     startPottyPlanSave {
                         deleteScoopPlan()
                     }
                 }
-            )
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: 460,
-                maxHeight: 720,
-                chromePadding: 70
             )
         case .litterSettings:
             PoopCycleSettingsSheet(
@@ -83,17 +79,13 @@ extension QuickPottyDetailSheet {
                         syncLitterChangePlan(showToast: true)
                     }
                 },
+                onCancel: closeActivePottySheet,
+                isSaving: isSavingPottyPlan,
                 onDelete: {
                     startPottyPlanSave {
                         deleteLitterChangePlan()
                     }
                 }
-            )
-            .ohanaAdaptiveSheetContentHeight(
-                $adaptiveSheetHeight,
-                minHeight: 460,
-                maxHeight: 720,
-                chromePadding: 70
             )
         case .pottyOverview:
             pottyOverviewSheet
@@ -196,7 +188,7 @@ extension QuickPottyDetailSheet {
                         openPottySheet(.scoopSettings)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(scoopTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -236,7 +228,7 @@ extension QuickPottyDetailSheet {
                         openPottySheet(.litterSettings)
                     } label: {
                         Label(l.tr(zh: "管理", en: "Manage", de: "Verwalten"), systemImage: "slider.horizontal.3")
-                            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(litterTint)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
@@ -273,15 +265,15 @@ extension QuickPottyDetailSheet {
                     .background(litterTint.opacity(0.14), in: Circle())
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "整盆换砂", en: "Full litter change", de: "Kompletter Streuwechsel"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(relativeDayText(for: lastFullChange))
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer()
                 Text(lastFullChange, format: .dateTime.month().day().hour().minute())
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             .padding(.vertical, 3)
@@ -299,10 +291,10 @@ extension QuickPottyDetailSheet {
                 .background(tint.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 22, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 22, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer(minLength: 0)
@@ -336,7 +328,7 @@ extension QuickPottyDetailSheet {
                             Image(systemName: "lock.fill").accessibilityHidden(true)
                         }
                     }
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(overviewRange == range ? Color.arkInk : tint)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
@@ -381,11 +373,11 @@ extension QuickPottyDetailSheet {
     func pottySheetChromeTitleContent(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 30, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(title)
-                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.82)
@@ -396,16 +388,16 @@ extension QuickPottyDetailSheet {
     func poopOverviewMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -419,11 +411,11 @@ extension QuickPottyDetailSheet {
     func poopOverviewLineChart(title: String, subtitle: String?, points: [PoopChartPoint], tint: Color, emptyText: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             if let subtitle, !subtitle.isEmpty {
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -449,11 +441,11 @@ extension QuickPottyDetailSheet {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(progressDaysText(elapsed: elapsed, interval: max(interval, 1)))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
             }
             GeometryReader { proxy in
@@ -473,7 +465,7 @@ extension QuickPottyDetailSheet {
 
     func overviewSectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.top, 4)
     }
@@ -483,7 +475,7 @@ extension QuickPottyDetailSheet {
             Image(systemName: icon)
                 .font(OhanaFont.adaptive(size: 16, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(text)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.ohanaSecondaryText)
         .frame(maxWidth: .infinity)
@@ -498,11 +490,11 @@ extension QuickPottyDetailSheet {
                 .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(tint.opacity(0.14), in: Circle())
             Text(title)
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
         }
         .padding(12)

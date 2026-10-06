@@ -73,6 +73,11 @@ struct EditPetExpenseSheet: View {
         guard contributions.count == selectedPayerIDs.count else { return nil }
         return try? ExpensePayerContributionPolicy.validated(contributions, total: total)
     }
+    private var hasChanges: Bool {
+        storedAmount != log.amount || selectedCategory != log.expenseCategory
+            || noteInput != Self.editableNote(for: log) || date != log.date || payerSelectionEdited
+    }
+
     private var canSave: Bool {
         guard let storedAmount, !isSaving, !pet.hasPassedAway else { return false }
         if !payerSelectionEdited {
@@ -147,21 +152,14 @@ struct EditPetExpenseSheet: View {
             .background(OhanaAppBackground())
             .navigationTitle(l.tr(zh: "编辑花费", en: "Edit Expense", de: "Ausgabe bearbeiten"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { dismiss() }
-                        .disabled(isSaving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern"), action: save)
-                        .disabled(!canSave)
-                        .accessibilityIdentifier("pet-expense-edit-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: hasChanges, isSaving: isSaving, canSave: canSave,
+                saveIdentifier: "pet-expense-edit-save-action",
+                onCancel: { dismiss() }, onSave: save
+            )
         }
         .tint(Color.goPrimary)
         .environment(\.locale, AppLanguage.effectiveLocale)
-        .interactiveDismissDisabled(isSaving)
         .onChange(of: amountInput) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(
                 newValue,

@@ -15,6 +15,8 @@ struct EditHumanSheet: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @State private var isSaving = false
+    @State private var initialDraft: [String]?
     @State private var name: String = ""
     @State private var avatarEmoji: String = ""
     @State private var birthday: Date = .init()
@@ -35,8 +37,12 @@ struct EditHumanSheet: View {
 
     private var l: L10n { L10n(appLanguage) }
 
+    private var editorDraft: [String] {
+        [name, avatarEmoji, String(birthday.timeIntervalSince1970), String(hasBirthday), bloodType, role, gender, notes, nationality, city, String(privateWeight), String(privateWorkout), String(privateMedication), String(privateNote), String(privateWishlist), String(privateExpense)]
+    }
+
     var body: some View {
-        OhanaSheetWrapper(title: l.tr(zh: "编辑成员", en: "Edit Member", de: "Mitglied bearbeiten"), onDismiss: { dismiss() }) {
+        OhanaEditorSheet(title: l.tr(zh: "编辑成员", en: "Edit Member", de: "Mitglied bearbeiten"), hasChanges: initialDraft.map { $0 != editorDraft } ?? false, isSaving: isSaving, canSave: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, onCancel: { dismiss() }, onSave: save) {
             VStack(spacing: 16) {
                 formField(l.tr(zh: "姓名", en: "Name", de: "Name"), text: $name)
 
@@ -58,7 +64,7 @@ struct EditHumanSheet: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                         Spacer(minLength: 8)
                         Text(Human.westernZodiacDisplay(for: birthday, l: l))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .accessibilityElement(children: .combine)
@@ -110,17 +116,12 @@ struct EditHumanSheet: View {
                     }
                 }
 
-                Button {
-                    save()
-                } label: {
-                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                        .capsuleButton()
-                }
-                .padding(.top, 8)
+
             }
             .padding(.vertical, 16)
         }
         .onAppear {
+            guard initialDraft == nil else { return }
             name = human.name
             avatarEmoji = human.avatarEmoji
             birthday = human.birthday ?? Date()
@@ -139,6 +140,7 @@ struct EditHumanSheet: View {
             privateNote = fields.contains(HumanPrivateField.note.rawValue)
             privateWishlist = fields.contains(HumanPrivateField.wishlist.rawValue)
             privateExpense = fields.contains(HumanPrivateField.expense.rawValue)
+            initialDraft = editorDraft
         }
     }
 
@@ -153,6 +155,7 @@ struct EditHumanSheet: View {
     }
 
     private func save() {
+        guard !isSaving else { return }
         let input = HumanProfileCommandInput(
             name: name,
             avatarImageData: human.avatarImageData,
@@ -170,7 +173,9 @@ struct EditHumanSheet: View {
             preservedNoteParts: preservedRelationshipMetadataParts,
             privateFieldsRaw: HumanLocalPrivacyPolicy.isEnabled ? editedPrivateFieldsRaw : nil
         )
+        isSaving = true
         commandQueue.enqueue(.memberProfile(entityID: human.id, kind: EntityKind.human.rawValue)) {
+            defer { isSaving = false }
             let result = MemberCommandExecutor(context: modelContext, services: appServices).updateHumanProfile(
                 human,
                 input: input,

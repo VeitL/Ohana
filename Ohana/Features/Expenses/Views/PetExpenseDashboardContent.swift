@@ -112,7 +112,7 @@ struct PetExpenseDashboardContent: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "时间分布", en: "Timeline", de: "Zeitverlauf"))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 DashboardRangePicker(
@@ -161,7 +161,7 @@ struct PetExpenseDashboardContent: View {
     private var historyBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if historyLogs.isEmpty {
                 emptyState(icon: AppCurrency.systemIconName, text: l.tr(zh: "还没有花费记录", en: "No expenses yet", de: "Noch keine Kosten"))
@@ -176,7 +176,7 @@ struct PetExpenseDashboardContent: View {
     private var addButton: some View {
         Button(action: onAdd) {
             Image(systemName: "plus").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
@@ -196,9 +196,9 @@ struct PetExpenseDashboardContent: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 Text(title)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
             .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 12)
@@ -217,12 +217,12 @@ struct PetExpenseDashboardContent: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: log.expenseCategory.systemIconName)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                         .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                         Text(rowSubtitle(log))
@@ -232,7 +232,7 @@ struct PetExpenseDashboardContent: View {
                     }
                     Spacer()
                     Text(AppCurrency.format(log.amount, fractionDigits: 2))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(log.amount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -308,10 +308,10 @@ struct PetExpenseDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)

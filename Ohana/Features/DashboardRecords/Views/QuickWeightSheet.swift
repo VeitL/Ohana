@@ -17,8 +17,12 @@ struct QuickWeightSheet: View {
     @State private var weightText: String = ""
     @State private var recordDate: Date = .init()
     @State private var didSave = false
+    @State private var isSaving = false
+    @State private var savedRecord: PetRecordReference?
+    @State private var saveError: String?
+    @State private var moreOptionsExpanded = false
     @State private var selectedRecorderHumanID: UUID?
-    @State private var requiresRecorderSelection = false
+    @State private var requiresRecorderSelection = true
     @State private var latestPetWeightKg: Double?
     @State private var latestPetWeightLoadTask: Task<Void, Never>?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
@@ -51,10 +55,10 @@ struct QuickWeightSheet: View {
                     )
                     VStack(alignment: .leading, spacing: 2) {
                         Text(pet.name)
-                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "记录体重", en: "Record Weight", de: "Gewicht erfassen"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                     }
                 }
@@ -94,7 +98,7 @@ struct QuickWeightSheet: View {
                     Image(systemName: "clock.arrow.circlepath").accessibilityHidden(true)
                         .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     Text(l.tr(zh: "上次记录：\(latestWeightText) kg", en: "Last record: \(latestWeightText) kg", de: "Letzter Eintrag: \(latestWeightText) kg"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                 }
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.35))
                 .padding(.top, 10)
@@ -102,13 +106,14 @@ struct QuickWeightSheet: View {
 
             Spacer(minLength: 20)
 
+            DisclosureGroup(PetCareExperienceCopy(l: l).moreOptions, isExpanded: $moreOptionsExpanded) {
             // ── 日期选择
             HStack(spacing: 10) {
                 Image(systemName: "calendar").accessibilityHidden(true)
                     .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 Text(l.tr(zh: "记录日期", en: "Record Date", de: "Eintragsdatum"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 Spacer()
                 DatePicker("", selection: $recordDate, in: ...Date(), displayedComponents: [.date])
@@ -130,13 +135,16 @@ struct QuickWeightSheet: View {
             .padding(.horizontal, 20)
             .padding(.top, 10)
 
+            }
+            .padding(.horizontal, 20)
+            if let saveError { Text(saveError).font(.caption).foregroundStyle(Color.goRed).padding(.horizontal, 20) }
             // ── 保存按钮
             Button { saveWeight() } label: {
                 HStack(spacing: 8) {
                     Image(systemName: didSave ? "checkmark.circle.fill" : "scalemass.fill")
                         .font(OhanaFont.adaptive(size: 16, weight: .bold))
                     Text(didSave ? l.tr(zh: "已保存 ✓", en: "Saved ✓", de: "Gespeichert ✓") : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag sichern"))
-                        .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                 }
                 .foregroundStyle(
                     didSave
@@ -150,13 +158,15 @@ struct QuickWeightSheet: View {
                     in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous)
                 )
             }
-            .disabled(!isValid || didSave || requiresRecorderSelection)
+            .disabled(!isValid || didSave || isSaving || requiresRecorderSelection)
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 20)
             .padding(.top, 16)
             .padding(.bottom, 32)
         }
         .background(Color.ohanaCardSurface)
+        .petRecordFeedback($savedRecord)
+        .petRecordAttribution(selectedHumanID: $selectedRecorderHumanID, requiresSelection: $requiresRecorderSelection)
         .onAppear {
             scheduleLatestPetWeightLoad()
         }
@@ -176,12 +186,16 @@ struct QuickWeightSheet: View {
     }
 
     private func saveWeight() {
-        guard !requiresRecorderSelection, let v = parsedWeight, v > 0 else { return }
+        guard !isSaving, !didSave, !requiresRecorderSelection, let v = parsedWeight, v > 0 else { return }
+        isSaving = true
+        saveError = nil
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
         let executorId = selectedRecorderHumanID?.uuidString
         let command = DomainCommand.quickWeight(petID: pet.id)
         commandQueue.enqueue(command) {
+            defer { isSaving = false }
             do {
-                try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
+                let result = try DashboardRecordCommandExecutor(context: modelContext, services: appServices).recordPetWeight(
                     pet: pet,
                     weight: v,
                     date: recordDate,
@@ -192,8 +206,9 @@ struct QuickWeightSheet: View {
                 )
                 UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
                 didSave = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { dismiss() }
+                savedRecord = PetRecordReference(petID: pet.id, recordID: result.logID, filter: .health)
             } catch {
+                saveError = PetCareExperienceCopy(l: l).saveFailed
                 appServices.domainRevisions.publishFailure(command: command, error: error)
             }
         }

@@ -9,26 +9,9 @@ import SwiftUI
 extension CoconutShopView {
     var header: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Group {
-                if dynamicTypeSize.isAccessibilitySize {
-                    VStack(alignment: .leading, spacing: 12) {
-                        personalBalanceMetric
-                        spendableMetric
-                        inventoryMetric
-                        if CoconutExchangeFeatureGate.isEnabled {
-                            pendingExchangeMetric
-                        }
-                    }
-                } else {
-                    HStack(spacing: 18) {
-                        personalBalanceMetric
-                        spendableMetric
-                        inventoryMetric
-                        if CoconutExchangeFeatureGate.isEnabled {
-                            pendingExchangeMetric
-                        }
-                    }
-                }
+            HStack(alignment: .center, spacing: 18) {
+                spendableMetric
+                inventoryMetric
             }
 
             buyerSummaryControl
@@ -81,17 +64,7 @@ extension CoconutShopView {
 
     var spendableMetric: some View {
         metric(
-            label: l.tr(
-                zh: "全岛可用",
-                en: "Island available",
-                de: "Inselweit verfügbar",
-                es: "Disponible en la isla",
-                pt: "Disponível na ilha",
-                fr: "Disponible sur l’île",
-                ja: "島全体で利用可能",
-                ko: "섬 전체 사용 가능",
-                it: "Disponibile sull’isola"
-            ),
+            label: l.text(ShopShelfCopy.availableBalance),
             value: "\(islandSpendableHumanBalance)",
             suffix: "🥥",
             tint: Color.goYellow,
@@ -123,28 +96,14 @@ extension CoconutShopView {
         Button {
             showInventory = true
         } label: {
-            metric(
-                label: l.tr(zh: "百宝箱", en: "Treasure box", de: "Schatzkiste"),
-                value: "\(ownedCount)",
-                suffix: "",
-                tint: Color.goPrimary,
-                accessibilityIdentifier: nil
-            )
+            Label(l.tr(zh: "百宝箱", en: "Treasure box", de: "Schatzkiste"), systemImage: "shippingbox")
+                .font(OhanaFont.caption(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44)
         }
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .buttonStyle(.bordered)
         .accessibilityIdentifier("coconut-shop-owned-count")
         .accessibilityHint(l.tr(zh: "打开百宝箱管理已拥有内容", en: "Opens your owned items for management", de: "Öffnet deine gekauften Inhalte zur Verwaltung"))
-    }
-
-    var pendingExchangeMetric: some View {
-        metric(
-            label: l.tr(zh: "待确认", en: "Pending", de: "Offen"),
-            value: "\(incomingPendingExchanges.count)",
-            suffix: "",
-            tint: Color.goTeal,
-            accessibilityIdentifier: nil
-        )
     }
 
     @ViewBuilder
@@ -159,16 +118,8 @@ extension CoconutShopView {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(
                         needsAttention
-                            ? l.tr(
-                                zh: "有一笔最终成交正在等待应用。商品权益已保留，不会再次扣款；可继续恢复。",
-                                en: "A final-sale purchase is waiting to be applied. Its entitlement is preserved with no second charge; recovery can continue.",
-                                de: "Ein endgültiger Kauf wartet auf die Anwendung. Der Anspruch bleibt ohne erneute Belastung erhalten; die Wiederherstellung kann fortgesetzt werden."
-                            )
-                            : l.tr(
-                                zh: "上一笔最终成交仍在应用；对应商品不会再次扣款。",
-                                en: "A previous final-sale purchase is still being applied. That item cannot be charged again.",
-                                de: "Ein früherer endgültiger Kauf wird noch angewendet. Dieser Artikel wird nicht erneut belastet."
-                            )
+                            ? l.text(ShopShelfCopy.settlementAttention)
+                            : l.text(ShopShelfCopy.settlementPending)
                     )
                     .fixedSize(horizontal: false, vertical: true)
                     if let recoveryItemID,
@@ -221,25 +172,8 @@ extension CoconutShopView {
     }
 
     var currentHumanSummary: String {
-        guard let currentHuman else {
-            return l.tr(
-                zh: "先选择一位在世家庭成员，才能发起兑换。",
-                en: "Choose an active family member before redeeming.",
-                de: "Wähle vor dem Einlösen ein aktives Familienmitglied."
-            )
-        }
-        guard EconomyWalletWritePolicy.canWrite(currentHuman) else {
-            return l.tr(
-                zh: "当前成员：\(currentHuman.name) · 纪念钱包已冻结",
-                en: "Current member: \(currentHuman.name) · memorial wallet frozen",
-                de: "Aktuelles Mitglied: \(currentHuman.name) · Gedenk-Wallet eingefroren"
-            )
-        }
-        return l.tr(
-            zh: "当前成员：\(currentHuman.name) · 不足时由其他在世成员共同补足",
-            en: "Current member: \(currentHuman.name) · active members can cofund a shortfall",
-            de: "Aktuelles Mitglied: \(currentHuman.name) · aktive Mitglieder können gemeinsam ergänzen"
-        )
+        guard let currentHuman else { return l.text(ShopShelfCopy.chooseBuyer) }
+        return "\(l.text(ShopShelfCopy.payingMember)): \(currentHuman.name)"
     }
 
     func metric(label: String, value: String, suffix: String, tint: Color, accessibilityIdentifier: String?) -> some View {
@@ -269,78 +203,26 @@ extension CoconutShopView {
         .accessibilityIdentifier(accessibilityIdentifier ?? "coconut-shop-metric-\(label)")
     }
 
-    var categoryRail: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(ShopItem.ShopCategory.visibleCases) { category in
-                        Button {
-                            OhanaFeedback.selection()
-                            withAnimation(GoMotion.feedback) {
-                                selectedCategory = category
-                                proxy.scrollTo(category.id, anchor: .center)
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName: category.icon)
-                                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                                Text(category.title(l))
-                                    .font(OhanaFont.caption(.black))
-                            }
-                            .foregroundStyle(selectedCategory == category ? Color.ohanaPrimaryActionText : primaryText)
-                            .padding(.horizontal, 13)
-                            .frame(minHeight: 44)
-                            .background(selectedCategory == category ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                        }
-                        .buttonStyle(ScaleButtonStyle())
-                        .accessibilityIdentifier("coconut-shop-category-\(category.rawValue)")
-                        .accessibilityAddTraits(selectedCategory == category ? .isSelected : [])
-                        .id(category.id)
-                    }
-                }
-                .padding(.horizontal, 20)
-            }
-            .onAppear {
-                proxy.scrollTo(effectiveSelectedCategory.id, anchor: .center)
-            }
-            .onChange(of: effectiveSelectedCategory) { _, category in
-                withAnimation(GoMotion.feedback) {
-                    proxy.scrollTo(category.id, anchor: .center)
-                }
-            }
-        }
-    }
+    func shopShelfSection(_ section: ShopShelfSection) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(section.title(l))
+                .font(OhanaFont.title3(.bold))
+                .foregroundStyle(primaryText)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("coconut-shop-section-\(section.id)")
 
-    @ViewBuilder
-    var categoryIntro: some View {
-        if effectiveSelectedCategory == .plantDecor {
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: "leaf.circle.fill") // a11y: allow decorative category marker; nearby copy names the shelf
-                    .font(OhanaFont.adaptive(size: 22, weight: .black))
-                    .foregroundStyle(Color.goTeal)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "植物装饰只影响绿洲外观", en: "Plant decor is cosmetic", de: "Pflanzendeko ist kosmetisch"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(primaryText)
-                    Text(l.tr(
-                        zh: "添加植物、护理计划、资料库和提醒仍然免费；这里兑换的是场景、盆器和岛屿氛围。",
-                        en: "Adding plants, care plans, catalog, and reminders stay free. This shelf unlocks scenes, pot skins, and island ambience.",
-                        de: "Pflanzen, Pflegepläne, Katalog und Erinnerungen bleiben kostenlos. Dieses Regal schaltet Szenen, Topf-Skins und Inselstimmung frei."
-                    ))
-                    .font(OhanaFont.caption2(.semibold))
+            if section == .oasis {
+                Text(l.text(ShopShelfCopy.plantCosmetic))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+
+            LazyVGrid(columns: shopGridColumns, spacing: 12) {
+                ForEach(allItems.filter(section.contains)) { item in
+                    shopItemCard(item)
                 }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: OhanaRadius.cardSoft, style: .continuous)
-                    .strokeBorder(Color.goTeal.opacity(0.22), lineWidth: 1)
-            }
-            .accessibilityElement(children: .combine)
         }
     }
 }

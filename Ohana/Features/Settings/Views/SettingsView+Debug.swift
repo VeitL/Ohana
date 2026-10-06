@@ -96,15 +96,7 @@ extension SettingsView {
 
                 NavigationLink {
                     PerformanceDiagnosticsView()
-                        .toolbar {
-                            ToolbarItem(placement: .primaryAction) {
-                                Button(role: .cancel) { closeSettings() } label: {
-                                    Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
-                                }
-                                .labelStyle(.iconOnly)
-                                .accessibilityIdentifier("settings-close-action")
-                            }
-                        }
+
                 } label: {
                     SettingsNavigationLabel(
                         icon: "speedometer",

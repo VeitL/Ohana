@@ -9,15 +9,18 @@ struct CoconutShopRouteContainer: View {
     @State private var dataLoadTask: Task<Void, Never>?
     @State private var didRunEntryRecovery = false
 
+    let showsCloseButton: Bool
     let initialCategory: ShopItem.ShopCategory
 
-    init(initialCategory: ShopItem.ShopCategory = .effect) {
+    init(initialCategory: ShopItem.ShopCategory = .plantDecor, showsCloseButton: Bool = true) {
         self.initialCategory = initialCategory
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
         CoconutShopView(
             initialCategory: initialCategory,
+            showsCloseButton: showsCloseButton,
             humans: routeData.humans,
             pets: routeData.pets,
             purchaseRecords: routeData.purchaseRecords,

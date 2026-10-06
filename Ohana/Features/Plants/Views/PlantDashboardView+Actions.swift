@@ -247,7 +247,8 @@ extension PlantDashboardView {
         careNote: String,
         photoData: Data?,
         healthStatus: PlantHealthStatus,
-        executorID: UUID?
+        executorID: UUID?,
+        completion: @escaping (Bool) -> Void
     ) {
         recordPlantCare(
             type,
@@ -255,7 +256,8 @@ extension PlantDashboardView {
             executorId: executorID?.uuidString,
             careNote: careNote,
             photoData: photoData,
-            healthStatus: healthStatus
+            healthStatus: healthStatus,
+            completion: completion
         )
     }
 
@@ -265,11 +267,12 @@ extension PlantDashboardView {
         executorId: String?,
         careNote: String = "",
         photoData: Data? = nil,
-        healthStatus: PlantHealthStatus? = nil
+        healthStatus: PlantHealthStatus? = nil,
+        completion: ((Bool) -> Void)? = nil
     ) {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
         commandQueue.enqueue(.plantCare(plantID: plant.id, action: type.rawValue)) {
-            commandExecutor.recordPlantCare(
+            let result = commandExecutor.recordPlantCare(
                 type,
                 plant: plant,
                 executorId: executorId,
@@ -277,6 +280,7 @@ extension PlantDashboardView {
                 photoData: photoData,
                 healthStatus: healthStatus
             )
+            completion?(result.didPersist)
         }
     }
 
@@ -452,26 +456,16 @@ extension PlantDashboardView {
 
     func deferTaskOneDay(_ task: PlantCareTaskSnapshot) {
         guard let plant = plants.first(where: { $0.id == task.plantID }) else { return }
-        let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        recordPlantCare(
-            .customNote,
-            plant: plant,
-            executorId: currentExecutorId(),
-            careNote: "defer:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
-        )
+        let result = commandExecutor.deferPlantCare(plant: plant, careType: task.careType, until: tomorrow, executorId: currentExecutorId())
+        if !result.didPersist { UINotificationFeedbackGenerator().notificationOccurred(.error) }
     }
 
     func skipTask(_ task: PlantCareTaskSnapshot) {
         guard let plant = plants.first(where: { $0.id == task.plantID }) else { return }
-        let formatter = ISO8601DateFormatter()
         let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date().addingTimeInterval(86400)
-        recordPlantCare(
-            .customNote,
-            plant: plant,
-            executorId: currentExecutorId(),
-            careNote: "skip:\(task.careType.rawValue):\(formatter.string(from: tomorrow))"
-        )
+        let result = commandExecutor.deferPlantCare(plant: plant, careType: task.careType, until: tomorrow, skip: true, executorId: currentExecutorId())
+        if !result.didPersist { UINotificationFeedbackGenerator().notificationOccurred(.error) }
     }
 
     func currentExecutorId() -> String? {

@@ -252,7 +252,7 @@ struct HumanHealthReportLinkedMetricsView: View {
                 l.tr(zh: "本次导入指标", en: "Imported results", de: "Importierte Werte"),
                 systemImage: "list.bullet.clipboard.fill"
             )
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
 
             if dataPhase == .loading {
@@ -400,13 +400,13 @@ struct HumanHealthReportLinkedMetricsView: View {
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 8)
                 Text(value)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .multilineTextAlignment(.trailing)
             }
             HStack(spacing: 8) {
                 Text(reportedFlagText(log.reportedFlag))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(log.reportedFlag == .unknown ? Color.ohanaSecondaryText : Color.goOrange)
                 Text(referenceText(log, unit: unit))
                     .font(OhanaFont.caption2(.semibold))

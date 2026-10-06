@@ -65,6 +65,13 @@ enum ActiveFeedSheet: Identifiable, Equatable {
         }
     }
 
+    var isEditor: Bool {
+        switch self {
+        case .manual, .treat, .plan, .stock, .editLog: true
+        default: false
+        }
+    }
+
     var usesInlineOverlay: Bool {
         false
     }
@@ -227,7 +234,7 @@ struct FeedPlanMonthlyCalendarView: View {
             LazyVGrid(columns: columns, spacing: 6) {
                 ForEach(weekdayTitles, id: \.self) { title in
                     Text(title)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                         .foregroundStyle(secondaryTextColor)
                         .frame(maxWidth: .infinity)
                 }
@@ -251,7 +258,7 @@ struct FeedPlanMonthlyCalendarView: View {
                 } label: {
                     VStack(spacing: 5) {
                         Text("\(day.dayNumber)")
-                            .font(OhanaFont.adaptive(size: 13, weight: (day.isToday || isSelected) ? .black : .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: (day.isToday || isSelected) ? .semibold : .bold, design: .default))
                             .foregroundStyle(textColor)
                             .frame(width: 30, height: 24) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             .background {
@@ -270,7 +277,7 @@ struct FeedPlanMonthlyCalendarView: View {
                             }
                             if day.markers.count > 6 {
                                 Text("+")
-                                    .font(OhanaFont.adaptive(size: 7, weight: .black, design: .rounded))
+                                    .font(OhanaFont.adaptive(size: 7, weight: .semibold, design: .default))
                                     .foregroundStyle(secondaryTextColor)
                             }
                         }

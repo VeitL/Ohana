@@ -67,9 +67,6 @@ struct FunctionMenuSheet: View {
                     onSelect: { path.append($0) },
                     onClose: { dismiss() }
                 )
-                .navigationTitle("")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: FMDest.self) { dest in
                     navigationDestinationView(dest)
                 }
@@ -119,20 +116,16 @@ struct FunctionMenuSheet: View {
         }
     }
 
-    @ViewBuilder
     private func directLandingHost(_ landing: FMDest, closeAction: @escaping () -> Void) -> some View {
-        OhanaMotionScene(role: .hero, alignment: .topTrailing, isActive: true) {
-            destinationRouter(landing)
-
-            if directLandingNeedsHostClose(landing) {
-                pageCloseButton(action: closeAction)
-                    .padding(.top, 12)
-                    .padding(.trailing, 16)
-                    .zIndex(100)
+        destinationRouter(landing)
+            .navigationTitle(destinationChrome(for: landing).title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                if directLandingNeedsHostClose(landing) {
+                    OhanaModalToolbar(onClose: closeAction, closeIdentifier: "function-menu-page-close")
+                }
             }
-        }
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
     }
 
     private func directLandingPlaceholder(_ landing: FMDest, closeAction: @escaping () -> Void) -> some View {
@@ -143,14 +136,14 @@ struct FunctionMenuSheet: View {
             VStack(spacing: 14) {
                 Spacer(minLength: 0)
                 Image(systemName: destinationChrome(for: landing).icon)
-                    .font(OhanaFont.adaptive(size: 26, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 58, height: 58)
                     .background(Color.ohanaCardSurface, in: Circle())
 
                 Text(destinationChrome(for: landing).title)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 ProgressView()
@@ -161,23 +154,21 @@ struct FunctionMenuSheet: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            pageCloseButton(action: closeAction)
-                .padding(.top, 12)
-                .padding(.trailing, 16)
+
         }
-        .toolbar(.hidden, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationTitle(destinationChrome(for: landing).title)
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarBackButtonHidden(true)
+        .toolbar(.visible, for: .navigationBar)
+        .toolbar {
+            OhanaModalToolbar(onClose: closeAction, closeIdentifier: "function-menu-page-close")
+        }
     }
 
-    @ViewBuilder
     private func navigationDestinationView(_ destination: FMDest) -> some View {
-        if directLandingNeedsHostClose(destination) {
-            directLandingHost(destination) {
-                closePushedDestination()
-            }
-        } else {
-            destinationRouter(destination)
-        }
+        destinationRouter(destination)
+            .toolbar(.visible, for: .navigationBar)
+            .navigationBarBackButtonHidden(false)
     }
 
     @ViewBuilder
@@ -204,31 +195,11 @@ struct FunctionMenuSheet: View {
              .familyLongTermReview,
              .careLedgerAnalysis,
              .reminderObservability,
-             .bountyBoard:
+             .bountyBoard, .coconutShop, .gacha, .wealthDashboard:
             true
         default:
             false
         }
-    }
-
-    private func closePushedDestination() {
-        if path.isEmpty {
-            dismiss()
-        } else {
-            path.removeLast()
-        }
-    }
-
-    private func pageCloseButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .frame(width: 44, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(L10n(appLanguage).tr(zh: "关闭", en: "Close", de: "Schließen"))
     }
 
     private func destinationChrome(for destination: FMDest) -> (title: String, icon: String) {

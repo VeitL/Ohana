@@ -42,12 +42,12 @@ struct AddWizardJoinCelebrationOverlay: View {
                         .fill(accent)
                         .frame(width: 72, height: 72)
                     Image(systemName: systemImage)
-                        .font(OhanaFont.adaptive(size: 30, weight: .black))
+                        .font(OhanaFont.adaptive(size: 30, weight: .semibold))
                         .symbolRenderingMode(.monochrome)
                         .foregroundStyle(Color.arkInk)
                 }
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .multilineTextAlignment(.center)
             }

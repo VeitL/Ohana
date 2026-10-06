@@ -30,6 +30,8 @@ private struct TaskCenterFamilyTaskInboxRoute: Identifiable, Equatable {
 struct TaskCenterRouteContainer: View {
     @Environment(\.modelContext) var modelContext
     @Environment(AppServices.self) var appServices
+    @Environment(\.ohanaAppLanguageCode) private var appLanguage
+    @Environment(\.dismiss) private var dismiss
     @AppStorage(StarterGiftStorageKey.ceremonySeen) private var starterGiftCeremonySeen = false
 
     @State private var selectedSurface: TaskCenterSurface
@@ -106,7 +108,24 @@ struct TaskCenterRouteContainer: View {
     }
 
     var body: some View {
-        lifecycleContent
+        if presentation == .sheet {
+            NavigationStack {
+                lifecycleContent
+                    .navigationTitle(L10n(appLanguage).tr(zh: "待办", en: "Tasks", de: "Aufgaben"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        OhanaModalToolbar(onClose: { if let onDismiss { onDismiss() } else { dismiss() } }, closeIdentifier: "task-center-close-action")
+                        ToolbarItem(placement: .primaryAction) {
+                            Button(action: requestAdd) {
+                                Label(L10n(appLanguage).tr(zh: "添加待办", en: "Add task", de: "Aufgabe hinzufügen"), systemImage: "plus")
+                            }
+                            .accessibilityIdentifier("task-center-add-action")
+                        }
+                    }
+            }
+        } else {
+            lifecycleContent
+        }
     }
 
     private var taskCenterContent: some View {
@@ -138,7 +157,7 @@ struct TaskCenterRouteContainer: View {
             selectedSurface: $selectedSurface,
             snapshot: headerSnapshot,
             isLoading: !routeData.hasLoaded,
-            showsAddButton: true,
+            showsAddButton: false,
             showsCloseButton: presentation == .sheet,
             filterLabel: scopeLabel,
             inboxUnreadCount: familyTaskUnreadActivityCount,
@@ -168,7 +187,7 @@ struct TaskCenterRouteContainer: View {
             selectedMemberFilter: $selectedMemberFilter,
             snapshot: visibleSnapshot,
             isLoading: !routeData.hasLoaded,
-            bottomClearance: presentation == .embeddedHome ? 190 : 42,
+            bottomClearance: 24,
             showsDailyProgress: routeContext.scope == .all,
             focusedItemID: focusedItemID,
             focusRequestID: routeContext.focusRequestID,

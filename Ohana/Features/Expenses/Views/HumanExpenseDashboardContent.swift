@@ -130,7 +130,7 @@ struct HumanExpenseDashboardContent: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "时间分布", en: "Timeline", de: "Zeitverlauf"))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 DashboardRangePicker(
@@ -179,7 +179,7 @@ struct HumanExpenseDashboardContent: View {
     private var historyBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if historyLogs.isEmpty {
                 emptyState(icon: AppCurrency.systemIconName, text: l.tr(zh: "还没有花费记录", en: "No expenses yet", de: "Noch keine Kosten"))
@@ -188,12 +188,12 @@ struct HumanExpenseDashboardContent: View {
                     ForEach(historyLogs) { log in
                         HStack(spacing: 12) {
                             Image(systemName: log.expenseCategory.systemIconName)
-                                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                                 .foregroundStyle(Color.goPrimary)
                                 .frame(width: 34, height: 34) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(rowTitle(log))
-                                    .font(OhanaFont.callout(.black))
+                                    .font(OhanaFont.callout(.semibold))
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .lineLimit(1)
                                 Text(rowSubtitle(log))
@@ -204,7 +204,7 @@ struct HumanExpenseDashboardContent: View {
                             Spacer()
                             let attributedAmount = ExpenseSummaryBuilder.amountPaid(by: human.id, for: log)
                             Text(AppCurrency.format(attributedAmount, fractionDigits: 2))
-                                .font(OhanaFont.callout(.black))
+                                .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(attributedAmount >= 0 ? Color.ohanaPrimaryText : Color.goTeal)
                         }
                         .padding(14)
@@ -248,9 +248,9 @@ struct HumanExpenseDashboardContent: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 Text(title)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
             .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .padding(.horizontal, 12)
@@ -263,10 +263,10 @@ struct HumanExpenseDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)

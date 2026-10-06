@@ -136,12 +136,7 @@ struct FamilyTaskInboxView: View {
             .navigationTitle(l.tr(zh: "协作消息", en: "Collaboration", de: "Zusammenarbeit"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) {
-                        dismiss()
-                    }
-                    .accessibilityIdentifier("family-task-inbox-close")
-                }
+                OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "family-task-inbox-close")
 
                 if unreadCount > 0 {
                     ToolbarItem(placement: .primaryAction) {
@@ -178,7 +173,7 @@ struct FamilyTaskInboxView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     HStack(alignment: .firstTextBaseline, spacing: 7) {
                         Text(activityTitle(activity))
-                            .font(OhanaFont.callout(activity.isUnread ? .black : .bold))
+                            .font(OhanaFont.callout(activity.isUnread ? .semibold : .bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)

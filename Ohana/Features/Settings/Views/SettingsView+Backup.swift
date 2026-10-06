@@ -50,15 +50,7 @@ struct SettingsBackupPage: View {
         .background(OhanaStaticAppBackground())
         .navigationTitle(SettingsDestination.dataAndBackup.title(l))
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button(role: .cancel, action: onClose) {
-                    Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
-                }
-                .labelStyle(.iconOnly)
-                .accessibilityIdentifier("settings-close-action")
-            }
-        }
+
         .alert(l.tr(zh: "重置 App", en: "Reset App", de: "App zurücksetzen"), isPresented: $showingAppResetAlert) {
             Button(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"), role: .cancel) {}
             Button(l.tr(zh: "重置", en: "Reset", de: "Zurücksetzen"), role: .destructive) { resetApp() }
@@ -151,7 +143,7 @@ extension SettingsBackupPage {
                     settingsIcon("arrow.down.doc.fill", color: Color.goTeal)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "导出备份", en: "Export Backup", de: "Backup exportieren"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text(l.tr(
                             zh: "受限备份包，媒体分离存储",
@@ -251,7 +243,7 @@ extension SettingsBackupPage {
                         settingsIcon("lock.fill", color: Color.goTeal)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(l.tr(zh: "密码加密", en: "Password encryption", de: "Passwortschutz"))
-                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                                 .foregroundStyle(primaryText)
                             Text(l.tr(zh: "导出时可选，恢复加密备份时填写", en: "Optional for export; required to restore encrypted backups", de: "Optional beim Export, nötig für verschlüsselte Backups"))
                                 .font(OhanaFont.adaptive(size: 11, weight: .medium))
@@ -300,7 +292,7 @@ extension SettingsBackupPage {
                     settingsIcon("square.and.arrow.down.fill", color: Color.goOrange)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "从备份恢复", en: "Restore from Backup", de: "Aus Backup wiederherstellen"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(primaryText)
                         Text(l.tr(
                             zh: "选择刚才保存的 .ohanabackup，旧 .json 仍可恢复",
@@ -407,7 +399,7 @@ extension SettingsBackupPage {
                 settingsIcon("icloud.and.arrow.up.fill", color: Color.goBlue)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "自动备份", en: "Automatic backup", de: "Automatisches Backup"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(primaryText)
                     Text(automaticBackupSubtitle)
                         .font(OhanaFont.adaptive(size: 11, weight: .medium))
@@ -816,7 +808,7 @@ extension SettingsBackupPage {
     func backupPill(_ label: String, icon: String, color: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon).font(OhanaFont.adaptive(size: 11, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-            Text(label).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            Text(label).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(color)
         .frame(minHeight: 34)

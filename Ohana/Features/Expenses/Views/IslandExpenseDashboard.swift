@@ -34,6 +34,9 @@ struct IslandExpenseDashboardContentView: View {
     let humans: [Human]
     let snapshot: ExpenseInsightSnapshot
     let onFilterChange: (ExpenseDashboardRange, String?) -> Void
+    var onRefresh: () -> Void = {}
+    var isLoading = false
+    var loadFailed = false
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppServices.self) private var appServices
@@ -245,11 +248,15 @@ struct IslandExpenseDashboardContentView: View {
     @ViewBuilder
     private var dashboardBody: some View {
         if standalone {
-            ZStack {
-                OhanaAppBackground().ignoresSafeArea()
+            NavigationStack {
                 scrollContent
+                    .background(OhanaAppBackground())
+                    .navigationTitle(l.tr(zh: "花费", en: "Expenses", de: "Ausgaben", es: "Gastos", pt: "Despesas", fr: "Dépenses", ja: "支出", ko: "지출", it: "Spese"))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        OhanaModalToolbar(onClose: { dismiss() })
+                    }
             }
-            .ignoresSafeArea(edges: .top)
         } else {
             scrollContent
         }
@@ -257,26 +264,24 @@ struct IslandExpenseDashboardContentView: View {
 
     private var scrollContent: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 18) {
-                if standalone { navBar }
+            VStack(alignment: .leading, spacing: OhanaSpacing.section) {
                 analysisLimitNotice
                 subjectSelector
-                if appServices.commerce.allows(.extendedTrends) {
-                    expenseExportButton
+                if snapshot.hasLoaded, !visibleExpenseLogs.isEmpty {
+                    expensePlanetHero
                 }
-                expensePlanetHero
                 expenseTrendCard
-                if appServices.commerce.allows(.extendedTrends) {
-                    expenseBadgeStrip
+                if appServices.commerce.allows(.extendedTrends), !visibleExpenseLogs.isEmpty {
                     humanSpendSection
                     petSpendSection
+                    expenseExportButton
                 }
                 if totalReimbursed > 0 {
                     reimbursementStrip
                 }
                 Color.clear.frame(height: 40)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, OhanaSpacing.pageMargin)
             .padding(.top, standalone ? 0 : 14)
         }
     }
@@ -322,7 +327,7 @@ struct IslandExpenseDashboardContentView: View {
                 l.tr(zh: "导出当前花费数据", en: "Export current expense data", de: "Aktuelle Ausgaben exportieren"),
                 systemImage: "square.and.arrow.up"
             )
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background(Color.ohanaControlFill, in: Capsule())
@@ -377,165 +382,61 @@ struct IslandExpenseDashboardContentView: View {
         )
     }
 
+    private var selectedSubjectName: String {
+        visiblePets.first(where: { selectedSubjectID == "pet:\($0.id.uuidString)" })?.name
+            ?? visibleExpenseHumans.first(where: { selectedSubjectID == "human:\($0.id.uuidString)" })?.name
+            ?? l.tr(zh: "全部成员", en: "All members", de: "Alle Mitglieder", es: "Todos los miembros", pt: "Todos os membros", fr: "Tous les membres", ja: "すべてのメンバー", ko: "모든 멤버", it: "Tutti i membri")
+    }
+
     private var subjectSelector: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                expenseSubjectChip(
-                    id: nil,
-                    title: l.tr(zh: "全部", en: "All", de: "Alle"),
-                    symbol: "person.2.fill",
-                    tint: .goPrimary,
-                    isLocked: !appServices.commerce.allows(.extendedTrends)
-                )
-                ForEach(visiblePets) { pet in
-                    expenseSubjectChip(
-                        id: "pet:\(pet.id.uuidString)",
-                        title: pet.name,
-                        textAvatar: pet.avatarEmoji,
-                        tint: Color(hex: pet.safeThemeColorHex)
-                    )
-                }
-                ForEach(visibleExpenseHumans) { human in
-                    expenseSubjectChip(
-                        id: "human:\(human.id.uuidString)",
-                        title: human.name,
-                        textAvatar: human.avatarEmoji,
-                        tint: humanThemeColor(human)
-                    )
-                }
+        Menu {
+            subjectOption(id: nil, title: l.tr(zh: "全部", en: "All", de: "Alle", es: "Todos", pt: "Todos", fr: "Tous", ja: "すべて", ko: "전체", it: "Tutti"), isLocked: !appServices.commerce.allows(.extendedTrends))
+            ForEach(visiblePets) { pet in
+                subjectOption(id: "pet:\(pet.id.uuidString)", title: pet.name)
             }
-            .padding(.vertical, 2)
+            ForEach(visibleExpenseHumans) { human in
+                subjectOption(id: "human:\(human.id.uuidString)", title: human.name)
+            }
+        } label: {
+            HStack(spacing: OhanaSpacing.related) {
+                Text(selectedSubjectName)
+                    .font(OhanaFont.headline())
+                    .lineLimit(2)
+                Image(systemName: "chevron.down")
+                    .font(OhanaFont.caption())
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44, alignment: .leading)
         }
         .accessibilityIdentifier("expense-subject-selector")
     }
 
-    private func expenseSubjectChip(
-        id: String?,
-        title: String,
-        symbol: String? = nil,
-        textAvatar: String? = nil,
-        tint: Color,
-        isLocked: Bool = false
-    ) -> some View {
-        let isSelected = selectedSubjectID == id
-        let avatarText = (textAvatar?.isEmpty == false ? textAvatar : nil)
-            ?? String(title.prefix(1))
-        return Button {
+    private func subjectOption(id: String?, title: String, isLocked: Bool = false) -> some View {
+        Button {
             guard !isLocked else {
                 showingPersonalPlan = true
-                UINotificationFeedbackGenerator().notificationOccurred(.warning)
                 return
             }
-            withAnimation(GoMotion.feedback) {
-                selectedSubjectID = id
-            }
+            guard selectedSubjectID != id else { return }
+            selectedSubjectID = id
             onFilterChange(selectedRange, id)
-            UISelectionFeedbackGenerator().selectionChanged()
+            OhanaFeedback.selection()
         } label: {
-            HStack(spacing: 7) {
-                if let symbol {
-                    Image(systemName: symbol)
-                        .font(OhanaFont.adaptive(size: 11, weight: .black))
-                } else {
-                    Text(avatarText)
-                        .font(OhanaFont.callout(.black))
-                }
-                Text(title)
-                    .font(OhanaFont.callout(.black))
-                    .lineLimit(1)
-                if isLocked {
-                    Image(systemName: "lock.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 8, weight: .black))
-                }
-            }
-            .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
-            .padding(.horizontal, 13)
-            .frame(minHeight: 40)
-            .background(isSelected ? tint : Color.ohanaControlFill, in: Capsule())
+            Label(title, systemImage: isLocked ? "lock.fill" : (selectedSubjectID == id ? "checkmark" : "person"))
         }
-        .buttonStyle(ScaleButtonStyle())
-        .accessibilityLabel(isLocked ? "\(title), Ohana Personal" : title)
-        .accessibilityValue(isSelected
-            ? l.tr(zh: "已选中", en: "Selected", de: "Ausgewählt")
-            : l.tr(zh: "未选中", en: "Not selected", de: "Nicht ausgewählt"))
-    }
-
-    private var navBar: some View {
-        HStack {
-            Button { dismiss() } label: {
-                Image(systemName: "chevron.left").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-                    .background(Color.ohanaControlFill, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-
-            Spacer()
-            Text(l.tr(zh: "花费星球", en: "Expense Planet", de: "Ausgabenplanet"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Color.clear.frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
-        }
-        .padding(.top, 50)
     }
 
     private var expensePlanetHero: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(Color.goPrimary.opacity(0.16))
-                        .frame(width: 56, height: 56)
-                    Image(systemName: "creditcard.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black))
-                        .foregroundStyle(Color.goPrimary)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(l.tr(zh: "本期花费", en: "Spent", de: "Ausgaben"))
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(Color.ohanaSecondaryText)
-                    HStack(alignment: .lastTextBaseline, spacing: 8) {
-                        Text(AppCurrency.format(totalAmount, fractionDigits: 0))
-                            .font(OhanaFont.adaptive(size: 38, weight: .black, design: .rounded))
-                            .foregroundStyle(Color.ohanaPrimaryText)
-                            .ohanaNumericMotion(totalAmount)
-                        if let periodDelta {
-                            trendDeltaPill(periodDelta)
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 10) {
-                if let topCategory {
-                    miniMetric(
-                        title: l.tr(zh: "最多", en: "Top", de: "Top"),
-                        value: l.expenseCategoryTitle(topCategory.category),
-                        icon: topCategory.category.systemIconName,
-                        tint: expenseTint(topCategory.category)
-                    )
-                }
-                if appServices.commerce.allows(.extendedTrends), let topPayer {
-                    miniMetric(
-                        title: l.tr(zh: "成员", en: "Member", de: "Mitglied"),
-                        value: topPayer.name,
-                        icon: "person.fill",
-                        tint: topPayer.color
-                    )
-                }
-                if appServices.commerce.allows(.extendedTrends), let topPet {
-                    miniMetric(
-                        title: l.tr(zh: "宠物", en: "Pet", de: "Tier"),
-                        value: topPet.name,
-                        icon: "pawprint.fill",
-                        tint: topPet.color
-                    )
-                }
-            }
+        VStack(alignment: .leading, spacing: OhanaSpacing.related) {
+            Text(l.tr(zh: "本期花费", en: "Spent", de: "Ausgaben"))
+                .font(OhanaFont.subheadline())
+                .foregroundStyle(Color.ohanaSecondaryText)
+            Text(AppCurrency.format(totalAmount, fractionDigits: 0))
+                .font(OhanaFont.metric(size: 34))
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .ohanaNumericMotion(totalAmount)
+                .fixedSize(horizontal: false, vertical: true)
+            if let periodDelta { trendDeltaPill(periodDelta) }
         }
     }
 
@@ -543,7 +444,7 @@ struct IslandExpenseDashboardContentView: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center) {
                 Label(l.tr(zh: "花费节奏", en: "Spend rhythm", de: "Ausgabenrhythmus"), systemImage: "chart.bar.xaxis")
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 DashboardRangePicker(
@@ -555,10 +456,26 @@ struct IslandExpenseDashboardContentView: View {
                 }
             }
 
-            if trendBuckets.allSatisfy({ $0.amount == 0 }) {
+            if loadFailed {
+                OhanaFeedbackState(
+                    state: .error,
+                    title: l.recordsLoadFailed,
+                    message: l.recordsRetryMessage,
+                    actionLabel: l.retryRecords,
+                    action: onRefresh,
+                    layout: .compact
+                )
+            } else if isLoading || !snapshot.hasLoaded {
+                OhanaFeedbackState(
+                    state: .loading,
+                    title: l.tr(zh: "正在读取记录", en: "Loading records", de: "Einträge werden geladen", es: "Cargando registros", pt: "Carregando registros", fr: "Chargement des données", ja: "記録を読み込み中", ko: "기록을 불러오는 중", it: "Caricamento dei dati"),
+                    message: "",
+                    layout: .compact
+                )
+            } else if visibleExpenseLogs.isEmpty {
                 emptyState(
                     icon: "creditcard",
-                    text: l.tr(zh: "暂无花费趋势", en: "No expense trend", de: "Noch kein Ausgabentrend")
+                    text: l.noRecords
                 )
             } else {
                 ExpenseBarDashboardChart(buckets: trendBuckets, accent: .goPrimary)
@@ -664,14 +581,14 @@ struct IslandExpenseDashboardContentView: View {
     private var reimbursementStrip: some View {
         HStack(spacing: 10) {
             Image(systemName: "arrow.uturn.backward.circle.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 15, weight: .black))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                 .foregroundStyle(Color(hex: "06B6D4"))
             Text(l.tr(zh: "已记录报销", en: "Refunds logged", de: "Erstattungen erfasst"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             Spacer()
             Text(AppCurrency.format(totalReimbursed, fractionDigits: 0))
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 4)
@@ -684,7 +601,7 @@ struct IslandExpenseDashboardContentView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             content()
         }
@@ -707,7 +624,7 @@ struct IslandExpenseDashboardContentView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(name)
-                        .font(OhanaFont.body(.black))
+                        .font(OhanaFont.body(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(categorySummaryText(categories, prefix: detailPrefix))
@@ -719,7 +636,7 @@ struct IslandExpenseDashboardContentView: View {
                 Spacer()
 
                 Text(AppCurrency.format(amount, fractionDigits: 0))
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(amount)
             }
@@ -754,11 +671,11 @@ struct IslandExpenseDashboardContentView: View {
         let tint = isUp ? Color.goRed : Color.goTeal
         return HStack(spacing: 4) {
             Image(systemName: isUp ? "arrow.up.right" : "arrow.down.right")
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
             Text(AppCurrency.format(abs(delta), fractionDigits: 0))
                 .ohanaNumericMotion(delta)
         }
-        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
         .foregroundStyle(tint)
         .padding(.horizontal, 8)
         .frame(height: 24)
@@ -768,14 +685,14 @@ struct IslandExpenseDashboardContentView: View {
     private func miniMetric(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -786,15 +703,15 @@ struct IslandExpenseDashboardContentView: View {
     private func statBadge(title: String, value: String, icon: String, tint: Color) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(value)
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
             }
         }
@@ -802,16 +719,7 @@ struct IslandExpenseDashboardContentView: View {
     }
 
     private func emptyState(icon: String, text: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 20, weight: .black))
-                .foregroundStyle(Color.ohanaTertiaryText)
-            Text(text)
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, minHeight: 120)
+        OhanaFeedbackState(state: .empty, title: text, message: "", layout: .compact)
     }
 
     private func visibleLogs(

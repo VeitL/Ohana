@@ -24,8 +24,10 @@ final class QuickFeedDraftStore: ObservableObject {
     @Published var manualFoodKindDraft: FeedFoodKind = .dry
     @Published var manualFeedDate = Date()
     @Published var manualGramsText = ""
+    @Published var manualNote = ""
     @Published var manualDefaultEnabled = true
-    @Published var saveManualAsDefault = true
+    @Published var saveManualAsDefault = false
+    @Published var manualMoreOptionsExpanded = false
     @Published var selectedSharedFeedPetIds: Set<UUID> = []
     @Published var selectedSharedPlanPetIds: Set<UUID> = []
 
@@ -35,6 +37,14 @@ final class QuickFeedDraftStore: ObservableObject {
     @Published var planTimes: [Date] = []
     @Published var planMeals: [FeedPlanMealDraft] = []
     @Published var isSavingFeedPlan = false
+    var initialPlanEditorDraft: [String] = []
+    var initialSheetEditorDraft: [String] = []
+    var isSubmittingSheetEditor = false
+    var planEditorDraft: [String] {
+        [String(planCount)] + planMeals.flatMap {
+            [String($0.time.timeIntervalSinceReferenceDate), $0.foodKind.rawValue, String($0.grams)]
+        } + selectedSharedPlanPetIds.map(\.uuidString).sorted()
+    }
 
     @Published var stockBrandText = ""
     @Published var stockWeightText = ""

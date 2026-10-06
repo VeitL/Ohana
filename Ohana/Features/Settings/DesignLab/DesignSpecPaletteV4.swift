@@ -105,7 +105,7 @@ struct DesignSpecTokenButtonStyleV4: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .font(.system(size: kind == .icon ? 13 : 13, weight: kind == .primary ? .black : .bold, design: fontDesign))
+            .font(.system(size: kind == .icon ? 13 : 13, weight: selection.type == "system" ? .semibold : (kind == .primary ? .black : .bold), design: fontDesign))
             .foregroundStyle(foreground)
             .padding(.horizontal, kind == .icon ? 10 : 14)
             .padding(.vertical, selection.button == "compact" ? 9 : 11)
@@ -144,7 +144,7 @@ struct DesignSpecTokenButtonStyleV4: ButtonStyle {
     }
 
     private var fontDesign: Font.Design {
-        selection.type == "mono" ? .monospaced : .rounded
+        selection.type == "system" ? .default : (selection.type == "mono" ? .monospaced : .rounded)
     }
 
     private var buttonAnimation: Animation {
@@ -189,8 +189,9 @@ enum DesignSpecUIV4 {
         case "editorial": size * 1.06
         default: size
         }
-        let design: Font.Design = selection.type == "mono" ? .monospaced : .rounded
-        return .system(size: adjusted, weight: weight, design: design)
+        let design: Font.Design = selection.type == "system" ? .default : (selection.type == "mono" ? .monospaced : .rounded)
+        let resolvedWeight: Font.Weight = selection.type == "system" && (weight == .black || weight == .heavy) ? .semibold : weight
+        return .system(size: adjusted, weight: resolvedWeight, design: design)
     }
 
     static func density(_ compact: CGFloat, _ balanced: CGFloat, _ airy: CGFloat, selection: DesignSpecSelectionV4) -> CGFloat {

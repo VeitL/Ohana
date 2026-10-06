@@ -13,12 +13,14 @@ struct GachaRouteContainer: View {
     @Query(sort: \GachaOwnedItem.latestObtainedAt, order: .reverse) private var ownedItems: [GachaOwnedItem]
     @Query(sort: \GachaDrawLog.drawDate, order: .reverse) private var drawLogs: [GachaDrawLog]
 
+    var showsCloseButton = true
     var drawsBackground: Bool = true
     var onClose: (() -> Void)?
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
 
     var body: some View {
         GachaView(
+            showsCloseButton: showsCloseButton,
             drawsBackground: drawsBackground,
             onClose: onClose,
             onPresentCoconutLog: onPresentCoconutLog,

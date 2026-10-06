@@ -90,13 +90,13 @@ struct HumanWorkoutHistoryOverviewCard: View {
 
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: historyTrendIcon).accessibilityHidden(true)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(historyTrendTint)
                     .frame(width: 44, height: 44)
                     .background(historyTrendTint.opacity(0.14), in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "本地时长趋势", en: "Local Duration Trend", de: "Lokaler Dauertrend"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(historyTrendText)
                         .font(OhanaFont.caption(.semibold))
@@ -174,12 +174,12 @@ struct HumanWorkoutHistoryOverviewCard: View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Text(unit)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Text(title)
@@ -204,7 +204,7 @@ struct HumanWorkoutHistoryOverviewCard: View {
     private func historySourceLabel(icon: String, count: Int, title: String, tint: Color) -> some View {
         Label {
             Text("\(historyMetricValue("\(count)")) \(title)")
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
         } icon: {
@@ -345,7 +345,7 @@ struct HumanWorkoutRecentWorkoutsCard: View {
                     en: "\(selectedPeriod.dayCount)-Day History",
                     de: "Verlauf: \(selectedPeriod.dayCount) Tage"
                 ))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text(recentWorkoutsCountText)
@@ -412,7 +412,7 @@ struct HumanWorkoutRecentWorkoutsCard: View {
         HStack(spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: row.type.icon)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color(hex: row.type.colorHex))
                     .frame(width: 44, height: 44)
                     .background(Color(hex: row.type.colorHex).opacity(0.16), in: Circle())
@@ -420,7 +420,7 @@ struct HumanWorkoutRecentWorkoutsCard: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
                         Text(row.title)
-                            .font(OhanaFont.subheadline(.black))
+                            .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
@@ -454,7 +454,7 @@ struct HumanWorkoutRecentWorkoutsCard: View {
 
                 VStack(alignment: .trailing, spacing: 3) {
                     Text("\(row.durationMinutes) min")
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color(hex: row.type.colorHex))
                     Text(row.secondaryMetric)
                         .font(OhanaFont.caption(.semibold))
@@ -472,7 +472,7 @@ struct HumanWorkoutRecentWorkoutsCard: View {
 
     private func sourceBadge(_ title: String, tint: Color, foreground: Color = .arkInk) -> some View {
         Text(title)
-            .font(OhanaFont.caption2(.black))
+            .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(foreground)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
@@ -488,7 +488,7 @@ struct HumanWorkoutRecentWorkoutsCard: View {
                 onDelete(log)
             } label: {
                 Image(systemName: "trash").accessibilityHidden(true)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.58))
                     .frame(width: 44, height: 44)
             }

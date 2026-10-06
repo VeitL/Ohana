@@ -123,7 +123,7 @@ extension CalendarView {
                                 .foregroundStyle(isSelected ? chipSelFg : (isMaterial ? Color(hex: "8E8E93") : classicSoftText))
 
                             Text("\(dayNumber)")
-                                .font(OhanaFont.title3(.black))
+                                .font(OhanaFont.title3(.semibold))
                                 .foregroundStyle(isSelected ? chipSelFg : (isToday ? chipAccent : (isMaterial ? .primary : classicPrimaryText)))
                                 .ohanaNumericMotion(dayNumber)
 

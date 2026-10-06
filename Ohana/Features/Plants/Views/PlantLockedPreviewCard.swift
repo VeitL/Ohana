@@ -31,7 +31,7 @@ struct PlantLockedPreviewCard: View {
                     es: "Guardar para después", pt: "Salvar para depois", fr: "Enregistrer pour plus tard",
                     ja: "あとで使うため保存", ko: "나중을 위해 저장", it: "Salva per dopo"
                 ))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 ForEach(PlantCatalog.entries.prefix(3)) { entry in
@@ -57,14 +57,14 @@ struct PlantLockedPreviewCard: View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: "leaf.fill") // a11y: allow decorative locked-preview glyph; card title owns the label.
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; parent card text carries meaning.
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(PlantUnlockCopy.lockedTitle(language: appLanguage))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -103,7 +103,7 @@ struct PlantLockedPreviewCard: View {
 
     private func previewMetric(icon: String, text: String) -> some View {
         Label(text, systemImage: icon)
-            .font(OhanaFont.caption2(.black))
+            .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.72)
@@ -132,14 +132,14 @@ private struct PlantLockedPreviewCatalogRow: View {
         HStack(spacing: 10) {
             Image(systemName: entry.isIndoorSuitable ? "house.fill" : "sun.max.fill") // a11y: allow decorative catalog glyph; row text carries meaning.
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 30, height: 30) // a11y: allow decorative non-interactive frame; bookmark is the only row control.
                 .background(Color.ohanaControlFill, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(entry.localizedCommonName) · \(entry.localizedCareDifficulty)")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.82)
@@ -155,7 +155,7 @@ private struct PlantLockedPreviewCatalogRow: View {
             Button(action: onToggleFavorite) {
                 Image(systemName: isFavorite ? "bookmark.fill" : "bookmark")
                     .accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(isFavorite ? Color.goPrimary : Color.ohanaSecondaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())

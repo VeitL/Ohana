@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PetMedicationView: View {
     let pet: Pet
+    var showsCloseButton = true
     var onDataChanged: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
@@ -13,6 +14,7 @@ struct PetMedicationView: View {
     var body: some View {
         PetMedicationContentView(
             pet: pet,
+            showsCloseButton: showsCloseButton,
             medications: routeData.medications,
             doseEvents: routeData.doseEvents,
             onDataChanged: {

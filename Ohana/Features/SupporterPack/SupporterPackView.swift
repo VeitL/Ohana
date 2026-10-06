@@ -83,20 +83,7 @@ struct PersonalPlanView: View {
             .navigationTitle("Ohana Personal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .cancel) {
-                        dismiss()
-                    } label: {
-                        Label(l.tr(zh: "关闭", en: "Close", de: "Schließen",
-                            es: "Cerrar",
-                            pt: "Fechar",
-                            fr: "Fermer",
-                            ja: "閉じる",
-                            ko: "닫기",
-                            it: "Chiudi"), systemImage: "xmark")
-                    }
-                    .accessibilityIdentifier("personal-plan-close-action")
-                }
+                OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "personal-plan-close-action")
             }
         }
         .accessibilityIdentifier("personal-plan-screen")

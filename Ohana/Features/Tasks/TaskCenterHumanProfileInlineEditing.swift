@@ -229,7 +229,7 @@ struct TaskCenterHumanProfileInlineEditor: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer(minLength: 8)
                     Text(Human.westernZodiacDisplay(for: birthday, l: l))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 .font(OhanaFont.callout(.semibold))
@@ -270,7 +270,7 @@ struct TaskCenterHumanProfileInlineEditor: View {
                             Spacer(minLength: 0)
                             if isSelected {
                                 Image(systemName: "checkmark") // a11y: allow decorative selection glyph; hidden by the chained modifier below
-                                    .font(OhanaFont.caption(.black))
+                                    .font(OhanaFont.caption(.semibold))
                                     .accessibilityHidden(true)
                             }
                         }
@@ -363,7 +363,7 @@ struct TaskCenterHumanProfileInlineEditor: View {
                     ),
                     systemImage: "checkmark.circle.fill"
                 )
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.goTeal)
                 .transition(.opacity)
                 .accessibilityIdentifier("task-center-human-profile-inline-saved-\(checkpoint.rawValue)")
@@ -393,7 +393,7 @@ struct TaskCenterHumanProfileInlineEditor: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     } else {
                         Text(l.save)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }

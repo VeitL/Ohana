@@ -31,6 +31,12 @@ enum WeightTrendDataBuilder {
             .sorted { $0.date < $1.date }
         guard !sorted.isEmpty else { return [] }
 
+        // One measurement is a point, not evidence of a stable trend over time.
+        if sorted.count == 1, let entry = sorted.first {
+            guard rangeStart.map({ entry.date >= $0 }) ?? true else { return [] }
+            return [WeightTrendPoint(date: entry.date, kilograms: entry.kilograms)]
+        }
+
         guard let rangeStart else {
             return sorted.map { WeightTrendPoint(date: $0.date, kilograms: $0.kilograms) }
         }
@@ -63,8 +69,6 @@ struct UnifiedWeightTrendChart: View {
     var xDomain: ClosedRange<Date>?
     var accent: Color = .goPrimary
 
-    @State private var chartProgress: Double = 0
-
     private var sortedPoints: [WeightTrendPoint] {
         points.sorted { $0.date < $1.date }
     }
@@ -89,27 +93,11 @@ struct UnifiedWeightTrendChart: View {
             xDomain: xDomain,
             yDomain: yDomain,
             tint: accent,
-            progress: chartProgress,
             showsLatestPoint: !actualPoints.isEmpty || !sortedPoints.isEmpty,
             yReferenceLineCount: 3,
             yReferenceFormatter: { OhanaChartStyle.weightReferenceLabel(kilograms: $0, domain: $1) }
         )
         .opacity(sortedPoints.isEmpty ? 0.35 : 1)
-        .onAppear { playEntrance() }
-        .onChange(of: chartSignature) { _, _ in playEntrance() }
-    }
-
-    private var chartSignature: String {
-        sortedPoints.map(\.id).joined(separator: "|")
-            + "|\(xDomain?.lowerBound.timeIntervalSinceReferenceDate ?? 0)"
-            + "|\(xDomain?.upperBound.timeIntervalSinceReferenceDate ?? 0)"
-    }
-
-    private func playEntrance() {
-        chartProgress = 0
-        withAnimation(GoMotion.page.delay(0.04)) {
-            chartProgress = 1
-        }
     }
 }
 
@@ -170,8 +158,6 @@ struct ExpenseBarDashboardChart: View {
     let buckets: [ExpenseTimeBucket]
     var accent: Color = .goPrimary
 
-    @State private var chartProgress: Double = 0
-
     var body: some View {
         OhanaMinimalBarChart(
             points: buckets.map {
@@ -183,19 +169,9 @@ struct ExpenseBarDashboardChart: View {
                 )
             },
             tint: accent,
-            progress: chartProgress,
             showsLabels: buckets.count <= 10,
             maxBarHeight: 124
         )
-        .onAppear { playEntrance() }
-        .onChange(of: buckets) { _, _ in playEntrance() }
-    }
-
-    private func playEntrance() {
-        chartProgress = 0
-        withAnimation(GoMotion.page.delay(0.04)) {
-            chartProgress = 1
-        }
     }
 }
 
@@ -206,39 +182,22 @@ struct DashboardRangePicker<Range: Hashable>: View {
     let title: (Range) -> String
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 7) {
-                ForEach(ranges, id: \.self) { range in
-                    let selected = range == selection
-                    Button {
-                        if isLocked(range) {
-                            selection = range
-                            return
-                        }
-                        withAnimation(GoMotion.feedback) {
-                            selection = range
-                        }
-                        UISelectionFeedbackGenerator().selectionChanged()
-                    } label: {
-                        HStack(spacing: 3) {
-                            Text(title(range))
-                            if isLocked(range) {
-                                Image(systemName: "lock.fill").accessibilityHidden(true)
-                                    .font(OhanaFont.adaptive(size: 8, weight: .black))
-                            }
-                        }
-                        .font(OhanaFont.caption(.black))
-                        .foregroundStyle(selected ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
-                        .padding(.horizontal, 12)
-                        .frame(height: 32)
-                        .background(selected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .accessibilityLabel(
-                        isLocked(range) ? "\(title(range)), Ohana Personal" : title(range)
-                    )
+        Menu {
+            ForEach(ranges, id: \.self) { range in
+                Button {
+                    guard selection != range else { return }
+                    selection = range
+                    if !isLocked(range) { OhanaFeedback.selection() }
+                } label: {
+                    Label(title(range), systemImage: isLocked(range) ? "lock.fill" : (range == selection ? "checkmark" : "calendar"))
                 }
+                .accessibilityLabel(isLocked(range) ? "\(title(range)), Ohana Personal" : title(range))
             }
+        } label: {
+            Label(title(selection), systemImage: "calendar")
+                .font(OhanaFont.subheadline())
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minHeight: 44)
         }
     }
 }

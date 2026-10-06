@@ -65,7 +65,7 @@ struct HumanWishlistContentView: View {
             }
         }
         .confettiOverlay(isShowing: $showConfetti)
-        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.visible, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) { addWishSheet }
         .onDisappear { commandQueue.cancelAll() }
     }

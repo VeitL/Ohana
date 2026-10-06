@@ -18,7 +18,7 @@ struct HouseholdInsightLockedCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: tab.icon)
-                    .font(OhanaFont.adaptive(size: 20, weight: .black))
+                    .font(OhanaFont.adaptive(size: 20, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary.opacity(0.14), in: Circle())
@@ -26,7 +26,7 @@ struct HouseholdInsightLockedCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tab.title(l: l))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
                         zh: "椰子树 Lv.\(requiredLevel) 解锁",
@@ -61,7 +61,7 @@ struct HouseholdInsightLockedCard: View {
             l.tr(zh: "当前 Lv.\(currentLevel)", en: "Current Lv.\(currentLevel)", de: "Aktuell Lv.\(currentLevel)"),
             systemImage: "tree.fill"
         )
-        .font(OhanaFont.callout(.black))
+        .font(OhanaFont.callout(.semibold))
         .foregroundStyle(Color.ohanaSecondaryText)
         .padding(.horizontal, 14)
         .frame(minHeight: 44)
@@ -72,7 +72,7 @@ struct HouseholdInsightLockedCard: View {
                 l.tr(zh: "用 Personal 立即解锁", en: "Unlock with Personal", de: "Mit Personal freischalten"),
                 systemImage: "sparkles"
             )
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 14)
             .frame(minHeight: 44)

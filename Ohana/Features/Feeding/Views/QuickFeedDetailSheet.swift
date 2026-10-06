@@ -131,6 +131,9 @@ struct QuickFeedDetailContent: View {
     @StateObject var presentationState = QuickFeedPresentationState()
     @StateObject var runtimeState = QuickFeedRuntimeState()
     @StateObject var feedHomeController: FeedHomeController
+    @State var isRecordingFeed = false
+    @StateObject var recordCommandQueue = DeferredDomainCommandQueue()
+    @State var savedRecord: PetRecordReference?
     @State var selectedActionHumanID: UUID?
     @State var personalUpgradePrompt: PersonalUpgradePrompt?
     @FocusState var focusedField: FeedInputField?
@@ -496,6 +499,7 @@ struct QuickFeedDetailContent: View {
 
     var configuredRoot: some View {
         rootNavigation
+            .petRecordFeedback($savedRecord)
             .modifier(rootEventHost)
             .modifier(systemSheetHost)
             .modifier(feedAlertHost)
@@ -507,7 +511,8 @@ struct QuickFeedDetailContent: View {
                     draftStore.overviewRange = .days30
                 }
             }
-            .interactiveDismissDisabled(inlineOverlayBlocksBackground)
+            .onDisappear { recordCommandQueue.cancelAll(); isRecordingFeed = false }
+            .interactiveDismissDisabled(inlineOverlayBlocksBackground || isRecordingFeed)
             .animation(GoMotion.page, value: activeSheet?.id)
             .animation(GoMotion.page, value: activeEmbeddedPanel)
     }
@@ -582,15 +587,18 @@ struct QuickFeedDetailContent: View {
     var rootNavigation: some View {
         NavigationStack {
             rootScene
-                .navigationTitle("")
-                .toolbar(.hidden, for: .navigationBar)
+                .navigationTitle(l.tr(zh: "粮食记录", en: "Food log", de: "Futter", es: "Alimentación", pt: "Alimentação", fr: "Repas", ja: "食事の記録", ko: "급식 기록", it: "Pasti"))
+                .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                    if showsCloseButton {
+                        OhanaModalToolbar(onClose: closeDetail, closeIdentifier: "quick-feed-detail-close-action")
+                    }
                     ToolbarItemGroup(placement: .keyboard) {
                         Spacer()
                         Button(l.tr(zh: "完成", en: "Done", de: "Fertig")) {
                             dismissFeedKeyboard()
                         }
-                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPrimary)
                     }
                 }
@@ -606,7 +614,6 @@ struct QuickFeedDetailContent: View {
 
             QuickFeedOverlayHost(route: activeOverlay)
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .petMemorialTone(isActive: pet.hasPassedAway)
     }
 
@@ -644,11 +651,13 @@ struct QuickFeedDetailContent: View {
     }
 
     func openRootFeedSheet(_ sheet: ActiveFeedSheet) {
+        draftStore.initialSheetEditorDraft = feedEditorDraft(sheet)
         sheetCoordinator.openRoot(sheet)
         scheduleDetailDataLoad(for: sheet)
     }
 
     func openFeedSheet(_ sheet: ActiveFeedSheet) {
+        draftStore.initialSheetEditorDraft = feedEditorDraft(sheet)
         sheetCoordinator.open(sheet)
         scheduleDetailDataLoad(for: sheet)
     }
@@ -824,34 +833,17 @@ struct QuickFeedDetailContent: View {
     // MARK: - Main
 
     var petHeader: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: OhanaSpacing.row) {
             avatarView(size: 46)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(zh: "粮食记录", en: "Food log", de: "Futter"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .accessibilityIdentifier("quick-feed-detail-screen")
-            }
-            Spacer()
-            if showsCloseButton {
-                Button {
-                    closeDetail()
-                } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                        .contentShape(Rectangle())
-                }
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                .accessibilityIdentifier("quick-feed-detail-close-action")
-                .frame(width: 44, height: 44)
-                .buttonStyle(ScaleButtonStyle())
-            }
+                .accessibilityHidden(true)
+            Text(pet.name)
+                .font(OhanaFont.headline())
+                .foregroundStyle(Color.ohanaPrimaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
         }
+        .accessibilityIdentifier("quick-feed-detail-screen")
     }
 
     private func closeDetail() {

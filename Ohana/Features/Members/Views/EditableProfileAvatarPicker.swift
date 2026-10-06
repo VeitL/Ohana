@@ -105,7 +105,7 @@ struct EditableProfileAvatarPicker: View {
                     avatarImageData = nil
                 } label: {
                     Text(l.tr(zh: "移除头像", en: "Remove avatar", de: "Avatar entfernen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -253,7 +253,7 @@ struct EditableProfileAvatarPicker: View {
                 .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .symbolRenderingMode(.monochrome)
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.ohanaPrimaryActionText)
         .frame(maxWidth: .infinity, minHeight: 44)

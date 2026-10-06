@@ -22,7 +22,7 @@ struct PetBasicInfoDangerZone: View {
                     .foregroundStyle(Color.goRed.opacity(0.7))
                     .font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(l.tr(zh: "危险区域", en: "Danger zone", de: "Gefahrenbereich"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goRed.opacity(0.7))
                     .tracking(2)
                 Spacer()
@@ -35,7 +35,7 @@ struct PetBasicInfoDangerZone: View {
                     Image(systemName: "eraser.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "仅清空所有记录", en: "Clear records only", de: "Nur Einträge löschen"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.goOrange)
                 .frame(maxWidth: .infinity)
@@ -53,7 +53,7 @@ struct PetBasicInfoDangerZone: View {
                     Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
                         .font(OhanaFont.adaptive(size: 14, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "彻底删除 \(petName)", en: "Delete \(petName)", de: "\(petName) löschen"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 }
                 .foregroundStyle(Color.goRed)
                 .frame(maxWidth: .infinity)
@@ -110,22 +110,22 @@ private struct PetDeleteConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(l.tr(zh: "彻底删除 \(petName)", en: "Delete \(petName)", de: "\(petName) löschen"))
-                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "输入名字后才能继续", en: "Type the name to continue", de: "Gib den Namen ein, um fortzufahren"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
                     Button(action: onCancel) {
                         Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(Color.primary.opacity(0.08), in: Circle())
@@ -140,15 +140,15 @@ private struct PetDeleteConfirmationSheet: View {
                         en: "This deletes the pet and all linked records. It cannot be undone.",
                         de: "Dies löscht das Tier und alle verknüpften Einträge. Es kann nicht rückgängig gemacht werden."
                     ))
-                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.68))
                     Text(l.tr(zh: "请输入：\(petName)", en: "Type: \(petName)", de: "Eingeben: \(petName)"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed.opacity(0.8))
                 }
 
                 TextField(l.tr(zh: "宠物名字", en: "Pet name", de: "Tiername"), text: $confirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 16, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .submitLabel(.done)
@@ -164,7 +164,7 @@ private struct PetDeleteConfirmationSheet: View {
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
                         Text(l.tr(zh: "取消", en: "Cancel", de: "Abbrechen"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -175,7 +175,7 @@ private struct PetDeleteConfirmationSheet: View {
 
                     Button(action: attemptDelete) {
                         Text(l.tr(zh: "删除", en: "Delete", de: "Löschen"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)

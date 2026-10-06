@@ -17,6 +17,7 @@ enum GoMotion {
     static let reduced: Animation = .easeOut(duration: 0.10)
     static let tap: Animation = .smooth(duration: 0.12, extraBounce: 0)
     static let selection: Animation = .smooth(duration: 0.18, extraBounce: 0)
+    static let chartLine: Animation = .easeOut(duration: 0.72)
     static let stateChange: Animation = .smooth(duration: 0.20, extraBounce: 0)
     static let zenCardGlassDissolve: Animation = .timingCurve(0.20, 0.76, 0.24, 1.00, duration: 0.76)
     static let zenCardColorReveal: Animation = zenCardGlassDissolve
@@ -29,6 +30,10 @@ enum GoMotion {
     static let zStackHero: Animation = .smooth(duration: 0.32, extraBounce: 0)
     static let zStackMenu: Animation = .smooth(duration: 0.20, extraBounce: 0)
     static let zStackPopup: Animation = .smooth(duration: 0.22, extraBounce: 0)
+    // Menu rows leave together, so submenu handoff does not wait for a cascade.
+    static let menuExitDuration: Double = 0.16
+    static let menuExit: Animation = .easeOut(duration: menuExitDuration)
+    static let menuHandoffMilliseconds: UInt64 = 160
 
     static func staggerDelay(_ index: Int, step: Double = 0.035, maxDelay: Double = 0.24) -> Double {
         min(Double(max(index, 0)) * step, maxDelay)

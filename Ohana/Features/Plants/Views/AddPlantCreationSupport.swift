@@ -39,13 +39,13 @@ enum AddPlantCreationStep: String, CaseIterable, Identifiable {
     func title(_ l: L10n) -> String {
         switch self {
         case .plant:
-            l.tr(zh: "植物与房间", en: "Plant and room", de: "Pflanze und Raum")
+            l.tr(zh: "选择植物", en: "Choose plant", de: "Pflanze wählen")
         case .avatar:
             l.tr(zh: "头像", en: "Avatar", de: "Avatar")
         case .care:
             l.tr(zh: "养护信息", en: "Care info", de: "Pflegeinfos")
         case .confirm:
-            l.tr(zh: "确认", en: "Confirm", de: "Bestätigen")
+            l.tr(zh: "名称与保存", en: "Name and save", de: "Name und Speichern")
         }
     }
 }
@@ -63,13 +63,13 @@ struct PlantCreationStepIndicator: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(currentStep.title(l))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Spacer()
                 Text("\(currentIndex + 1) / \(steps.count)")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .monospacedDigit()
             }
@@ -193,7 +193,7 @@ struct PlantCreationCardSurface<Content: View>: View {
                     .allowsHitTesting(false)
             } else {
                 Image(systemName: "leaf.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: min(width * 0.22, 86), weight: .black))
+                    .font(OhanaFont.adaptive(size: min(width * 0.22, 86), weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goTeal.opacity(0.22))
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
@@ -202,12 +202,12 @@ struct PlantCreationCardSurface<Content: View>: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                     .foregroundStyle(Color.arkInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
                 Text(subtitle)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.arkInk.opacity(0.66))
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
@@ -279,13 +279,13 @@ struct PlantCreationBufferedTextField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
 
             TextField(placeholder, text: $draftText) // ui-v4: allow buffered add-plant input; parent draft commits on submit/blur to avoid whole-sheet invalidation per keystroke.
                 .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(.horizontal, 14)
                 .frame(minHeight: 48)
@@ -352,7 +352,7 @@ struct PlantCreationSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.74)
@@ -370,11 +370,11 @@ struct PlantCreationMetricPill: View {
     var body: some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
                 .accessibilityHidden(true)
             Text(title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
         }
@@ -411,7 +411,7 @@ struct PlantCreationAvatarPreview: View {
                     .padding(size * 0.12)
             } else {
                 Image(systemName: "leaf.fill") // a11y: allow decorative fallback avatar glyph; the avatar preview is hidden from VoiceOver.
-                    .font(OhanaFont.adaptive(size: max(18, size * 0.36), weight: .black))
+                    .font(OhanaFont.adaptive(size: max(18, size * 0.36), weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .symbolRenderingMode(.monochrome)
             }
@@ -440,7 +440,7 @@ struct PlantCreationInfoRow<Control: View>: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 28, height: 28) // a11y: allow decorative row glyph; surrounding row text provides the accessible content.
@@ -448,7 +448,7 @@ struct PlantCreationInfoRow<Control: View>: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)

@@ -142,7 +142,7 @@ extension PetBasicInfoDetailView {
                                 Circle().fill(Color(hex: hex)).frame(width: 38, height: 38) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 if eThemeColorHex.uppercased() == hex.uppercased() {
                                     Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5)
-                                    Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 11, weight: .black)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    Image(systemName: "checkmark").font(OhanaFont.adaptive(size: 11, weight: .semibold)).foregroundStyle(Color.ohanaPrimaryText) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 }
                             }
                         }.buttonStyle(ScaleButtonStyle())
@@ -267,7 +267,7 @@ extension PetBasicInfoDetailView {
 
     func infoRowValue(_ value: String, alignment: Alignment, textAlignment: TextAlignment) -> some View {
         Text(value)
-            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.9))
             .multilineTextAlignment(textAlignment)
             .lineLimit(3)
@@ -311,7 +311,7 @@ extension PetBasicInfoDetailView {
 
     func editTextField(_ label: String, text: Binding<String>, identifier: String? = nil) -> some View {
         TextField(label, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaPrimaryText)
             .tint(profileEditAccent)
             .multilineTextAlignment(.trailing)
@@ -457,7 +457,7 @@ extension PetBasicInfoDetailView {
                                     .accessibilityHidden(true)
                             }
                         }
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(
                             isSelected
                                 ? profileEditAccent
@@ -516,7 +516,7 @@ extension PetBasicInfoDetailView {
                                 .frame(width: 14, height: 14) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .overlay(Circle().strokeBorder(Color.primary.opacity(0.14), lineWidth: 1))
                             Text(l.resourceName(item.name))
-                                .font(OhanaFont.adaptive(size: 12, weight: selection.wrappedValue == item.name ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 12, weight: selection.wrappedValue == item.name ? .semibold : .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.72)
                         }

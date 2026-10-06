@@ -136,7 +136,7 @@ struct HumanAllFeaturesActivitySummary: Equatable {
         let latestWorkout = workoutLogs.max(by: { $0.date < $1.date })
         let latestHealthMetric = healthMetricLogs.max(by: { $0.date < $1.date })
         let monthlyWorkoutCount = workoutLogs.count(where: { calendar.isDate($0.date, equalTo: now, toGranularity: .month) })
-        let visibleNotes = HumanProfileOptions.visibleNoteParts(from: human.notes)
+        let visibleNotes = HumanNoteTimelineBuilder.entries(notes: human.notes, humanID: human.id)
         let profileCompletion = MemberProfileCompletenessPolicy.human(
             human,
             explicitlyResolvedCategories: explicitlyResolvedProfileCategories
@@ -301,6 +301,7 @@ struct HumanAllFeaturesSheet: View {
                     subtitle: headerSubtitle,
                     eyebrow: l.tr(zh: "人类驾驶舱", en: "Human Hub", de: "Menschen-Hub"),
                     onClose: { dismiss() },
+                    showsCloseButton: false,
                     avatar: {
                         FeatureHubAvatar(
                             image: preparedAvatarImage,
@@ -331,7 +332,9 @@ struct HumanAllFeaturesSheet: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "全部功能", en: "All Features", de: "Alle Funktionen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "feature-hub-close-action") }
             .saturation(human.hasPassedAway ? 0.08 : 1)
             .grayscale(human.hasPassedAway ? 0.86 : 0)
             .animation(GoMotion.page, value: human.hasPassedAway)
@@ -1049,7 +1052,7 @@ private struct HumanOwnerPrivacyHint: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "lock.shield.fill") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 22, height: 22) // a11y: allow decorative non-interactive glyph; hint text is combined by parent
                 .accessibilityHidden(true)
@@ -1073,14 +1076,14 @@ private struct HumanMemorialBanner: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: "sparkles") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPurple)
                 .frame(width: 40, height: 40) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPurple.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "纪念模式", en: "Memorial mode", de: "Gedenkmodus"))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)

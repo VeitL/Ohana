@@ -27,7 +27,7 @@ enum HomeSheetRoute: Identifiable {
     case petWalkSummary(UUID)
     case petHealth(UUID, initialSection: PetHealthInitialSection?)
     case petMedication(UUID)
-    case petMomentHistory(UUID)
+    case petMomentHistory(UUID, initialRoute: PetMomentsRoute = .highlights)
     case petDocuments(UUID)
     case petAchievements(UUID)
     case petRetention(UUID)
@@ -40,6 +40,7 @@ enum HomeSheetRoute: Identifiable {
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
+    case humanObservationQuick(UUID)
     case humanConditions(UUID)
     case humanReport(UUID)
     case humanExpenseQuick(UUID)
@@ -69,7 +70,7 @@ enum HomeSheetRoute: Identifiable {
         case let .petWalkSummary(id): "pet-walk-\(id.uuidString)"
         case let .petHealth(id, section): "pet-health-\(id.uuidString)-\(section?.idValue ?? "default")"
         case let .petMedication(id): "pet-medication-\(id.uuidString)"
-        case let .petMomentHistory(id): "pet-moment-history-\(id.uuidString)"
+        case let .petMomentHistory(id, route): route == .highlights ? "pet-moment-history-\(id.uuidString)" : "pet-moment-history-\(id.uuidString)-\(route.routeID)"
         case let .petDocuments(id): "pet-documents-\(id.uuidString)"
         case let .petAchievements(id): "pet-achievements-\(id.uuidString)"
         case let .petRetention(id): "pet-retention-\(id.uuidString)"
@@ -82,6 +83,7 @@ enum HomeSheetRoute: Identifiable {
         case let .humanWorkout(id): "human-workout-\(id.uuidString)"
         case let .humanWorkoutDashboard(id): "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id): "human-metrics-\(id.uuidString)"
+        case let .humanObservationQuick(id): "human-observation-quick-\(id.uuidString)"
         case let .humanConditions(id): "human-conditions-\(id.uuidString)"
         case let .humanReport(id): "human-report-\(id.uuidString)"
         case let .humanExpenseQuick(id): "human-expense-quick-\(id.uuidString)"
@@ -646,6 +648,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanObservationQuick,
              .humanConditions,
              .humanReport,
              .humanExpense,
@@ -698,6 +701,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanObservationQuick,
              .humanConditions,
              .humanReport,
              .humanExpense,
@@ -743,6 +747,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanObservationQuick,
              .humanConditions,
              .humanReport,
              .humanExpenseQuick,
@@ -767,6 +772,7 @@ private extension HomeSheetRoute {
              .humanWorkout,
              .humanWorkoutDashboard,
              .humanMetrics,
+             .humanObservationQuick,
              .humanConditions,
              .humanReport,
              .humanExpenseQuick,
@@ -833,8 +839,8 @@ private extension HomeSheetRoute {
             .petHealth(id, initialSection: initialSection)
         case let .petMedication(id):
             .petMedication(id)
-        case let .petMomentHistory(id):
-            .petMomentHistory(id)
+        case let .petMomentHistory(id, route):
+            .petMomentHistory(id, initialRoute: route)
         case let .petDocuments(id):
             .petDocuments(id)
         case let .petAchievements(id):
@@ -861,6 +867,8 @@ private extension HomeSheetRoute {
             .humanWorkoutDashboard(id)
         case let .humanMetrics(id):
             .humanMetrics(id)
+        case let .humanObservationQuick(id):
+            .humanObservationQuick(id)
         case let .humanConditions(id):
             .humanConditions(id)
         case let .humanReport(id):

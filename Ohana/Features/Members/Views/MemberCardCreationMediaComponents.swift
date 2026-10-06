@@ -138,12 +138,12 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(snapshot.title)
-                            .font(OhanaFont.adaptive(size: 28, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 28, weight: .semibold, design: .default))
                             .foregroundStyle(readableText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.62)
                         Text(snapshot.subtitle.isEmpty ? snapshot.kind.typeLabel(L10n(AppLanguage.code)) : snapshot.subtitle)
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(readableText.opacity(0.72))
                             .lineLimit(1)
                             .minimumScaleFactor(0.62)
@@ -151,7 +151,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
                     Spacer()
                     if !snapshot.statusText.isEmpty {
                         Text(snapshot.statusText)
-                            .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                             .foregroundStyle(statusPillForeground)
                             .padding(.horizontal, 11)
                             .frame(height: 30)
@@ -214,7 +214,7 @@ struct MemberPortraitDraftCardSurface<Controls: View>: View {
     @ViewBuilder
     private func watermarkSymbol(width: CGFloat) -> some View {
         Image(systemName: snapshot.kind == .pet ? "pawprint.fill" : "person.crop.circle.fill")
-            .font(OhanaFont.adaptive(size: min(width * 0.30, 118), weight: .black))
+            .font(OhanaFont.adaptive(size: min(width * 0.30, 118), weight: .semibold))
             .foregroundStyle(Color.goCardWhite.opacity(0.20))
             .symbolRenderingMode(.monochrome)
             .shadow(color: Color.goCardWhite.opacity(0.16), radius: 12) // ui-v4: allow soft glass watermark glow inside member creation card
@@ -231,7 +231,7 @@ struct MemberCreationSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(foreground)
             content()
         }
@@ -270,7 +270,7 @@ struct MemberPortraitCropView: View {
                             onCancel()
                         } label: {
                             Text(l.cancel)
-                                .font(OhanaFont.callout(.black))
+                                .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.goCardWhite)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 50)
@@ -289,7 +289,7 @@ struct MemberPortraitCropView: View {
                                 }
                                 Text(primaryButtonTitle)
                             }
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(
                                 loadedImage == nil ? Color.ohanaSecondaryText : Color.ohanaPrimaryActionText
                             )
@@ -344,14 +344,14 @@ struct MemberPortraitCropView: View {
                         ProgressView()
                             .tint(Color.goPrimary)
                         Text(l.tr(zh: "正在准备照片", en: "Preparing photo", de: "Foto wird vorbereitet"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.goCardWhite)
                     } else {
                         Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 24, weight: .black))
+                            .font(OhanaFont.adaptive(size: 24, weight: .semibold))
                             .foregroundStyle(Color.goYellow)
                         Text(loadErrorText)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.goCardWhite)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)

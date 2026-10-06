@@ -59,7 +59,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let container = try makeContainer()
         let context = container.mainContext
         let human = Human(name: "Guan")
-        let item = try #require(ShopCatalog.item(id: "boost_streak"))
+        let item = try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId))
         let startingBalance = item.cost * 2
         human.coconutBalance = startingBalance
         context.insert(human)
@@ -82,7 +82,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let first = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Streak Shield",
+            itemName: "Avatar Pass",
             context: context,
             questManager: questManager,
             wallet: wallet,
@@ -91,7 +91,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let second = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: human,
-            itemName: "Streak Shield",
+            itemName: "Avatar Pass",
             context: context,
             questManager: questManager,
             wallet: wallet,
@@ -306,7 +306,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let inventory = UserDefaultsShopInventoryManager(defaults: defaults)
         let base = AppServices(modelContainer: container)
         let services = appServices(base: base, replacingInventoryWith: inventory)
-        let item = try #require(ShopCatalog.item(id: "boost_streak"))
+        let item = try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId))
         let buyer = Human(name: "Buyer")
         let contributor = Human(name: "Contributor")
         buyer.coconutBalance = 100
@@ -321,7 +321,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         let purchase = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: buyer,
-            itemName: "Streak Shield",
+            itemName: "Avatar Pass",
             context: context,
             questManager: services.questManager,
             wallet: services.coconutWallet,
@@ -350,7 +350,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         #expect(attempt.state == .fulfilled)
         #expect(buyer.coconutBalance == 0)
         #expect(contributor.coconutBalance == 0)
-        #expect(inventory.consumableSnapshot().streakShieldExpiry != nil)
+        #expect(inventory.consumableSnapshot().avatar2DExtraPassCount == 1)
         let firstWalletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         #expect(firstWalletEntries.count(where: { $0.source == .shop && $0.delta < 0 }) == 2)
         #expect(firstWalletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 0)
@@ -362,7 +362,7 @@ struct ShopPurchaseAttemptRecoveryTests {
         ).isEmpty)
         #expect(buyer.coconutBalance == 0)
         #expect(contributor.coconutBalance == 0)
-        #expect(inventory.consumableSnapshot().streakShieldExpiry != nil)
+        #expect(inventory.consumableSnapshot().avatar2DExtraPassCount == 1)
         let finalWalletEntries = try context.fetch(FetchDescriptor<CoconutLedgerEntry>())
         #expect(finalWalletEntries.count(where: { $0.source == .shop && $0.entryKind == .refund }) == 0)
     }

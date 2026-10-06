@@ -19,6 +19,8 @@ struct EditPetContentSheet: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
+    @State private var isSaving = false
+    @State private var initialDraft: [String]?
     @State private var showDuplicateNameAlert = false
     @State private var name = ""
     @State private var species = ""
@@ -50,8 +52,12 @@ struct EditPetContentSheet: View {
         return petNames.contains(candidate) || humanNames.contains(candidate)
     }
 
+    private var editorDraft: [String] {
+        [name, species, breed, avatarEmoji, String(birthday.timeIntervalSince1970), String(hasBirthday), gender, String(isNeutered), microchipID, vetContact, allergies, birthCountry, birthCity, foodBrand, String(dailyPortionGrams), notes, themeColorHex, primaryPersonalityTagID]
+    }
+
     var body: some View {
-        OhanaSheetWrapper(title: l.tr(zh: "编辑 \(pet.name)", en: "Edit \(pet.name)", de: "\(pet.name) bearbeiten"), onDismiss: { dismiss() }) {
+        OhanaEditorSheet(title: l.tr(zh: "编辑 \(pet.name)", en: "Edit \(pet.name)", de: "\(pet.name) bearbeiten"), hasChanges: initialDraft.map { $0 != editorDraft } ?? false, isSaving: isSaving, canSave: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && Pet.canonicalSex(gender) != nil, onCancel: { dismiss() }, onSave: save) {
             VStack(spacing: 24) {
                 UltimateGlassCard {
                     VStack(spacing: 16) {
@@ -147,7 +153,7 @@ struct EditPetContentSheet: View {
                                         if themeColorHex.uppercased() == tc.hexValue.uppercased() {
                                             Circle().strokeBorder(Color.ohanaCardSurface, lineWidth: 2.5).frame(width: 38, height: 38) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                                             Image(systemName: "checkmark").accessibilityHidden(true)
-                                                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                                                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                                                 .foregroundStyle(Color.ohanaPrimaryText)
                                         }
                                     }
@@ -170,25 +176,15 @@ struct EditPetContentSheet: View {
                     .padding(16)
                 }
 
-                Button {
-                    if isNameDuplicate { showDuplicateNameAlert = true
-                        return
-                    }
-                    save()
-                } label: {
-                    Text(l.tr(zh: "保存", en: "Save", de: "Speichern"))
-                        .font(OhanaFont.headline(.black))
-                        .foregroundStyle(Color.ohanaPrimaryActionText)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color.goPrimary, in: Capsule())
-                }
-                .padding(.top, 8)
-                .disabled(Pet.canonicalSex(gender) == nil)
+
             }
             .padding(.vertical, 16)
         }
-        .onAppear { loadData() }
+        .onAppear {
+            guard initialDraft == nil else { return }
+            loadData()
+            initialDraft = editorDraft
+        }
         .alert(l.tr(zh: "名字已被占用 🏠", en: "Name already used 🏠", de: "Name schon vergeben 🏠"), isPresented: $showDuplicateNameAlert) {
             Button(l.tr(zh: "好的，我换一个", en: "OK, I'll change it", de: "OK, ich ändere ihn"), role: .cancel) {}
         } message: {
@@ -277,6 +273,8 @@ struct EditPetContentSheet: View {
     }
 
     private func save() {
+        guard !isSaving else { return }
+        guard !isNameDuplicate else { showDuplicateNameAlert = true; return }
         let input = PetProfileCommandInput(
             name: name,
             avatarImageData: pet.avatarImageData,
@@ -303,7 +301,9 @@ struct EditPetContentSheet: View {
                     with: primaryPersonalityTagID
                 )
         )
+        isSaving = true
         commandQueue.enqueue(.memberProfile(entityID: pet.id, kind: EntityKind.pet.rawValue)) {
+            defer { isSaving = false }
             let result = MemberCommandExecutor(context: modelContext, services: appServices).updatePetProfile(
                 pet,
                 input: input,

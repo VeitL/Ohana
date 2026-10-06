@@ -385,7 +385,7 @@ struct HumanHealthObservationEditorSheet: View {
 
     private var severityValueLabel: some View {
         Text("\(severityValue)/10 · \(HumanHealthSeverityLabel.text(for: severityValue, l: l))")
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(condition.category.tint)
             .contentTransition(.numericText())
             .lineLimit(2)

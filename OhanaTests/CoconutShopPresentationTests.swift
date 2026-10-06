@@ -3,6 +3,19 @@ import Testing
 @testable import Ohana
 
 struct CoconutShopPresentationTests {
+    @Test func categoryRoutesMapToTheSinglePageSections() {
+        #expect(ShopShelfSection.destination(for: .plantDecor) == .oasis)
+        #expect(ShopShelfSection.destination(for: .appIcon) == .appIcons)
+        #expect(ShopShelfSection.destination(for: .effect) == .members)
+        #expect(ShopShelfSection.destination(for: .avatar2d) == .members)
+        for category in [ShopItem.ShopCategory.title_, .boost, .cashExchange] {
+            #expect(ShopShelfSection.destination(for: category) == .oasis)
+        }
+        #expect(ShopShelfSection.allCases.flatMap { section in
+            ShopCatalog.allItems().filter(section.contains)
+        }.map(\.id) == ShopCatalog.allItems().map(\.id))
+    }
+
     @Test func readinessNeverTreatsLoadingOrFailedDataAsZeroBalance() {
         #expect(
             ShopPurchaseReadiness.resolve(

@@ -66,6 +66,11 @@ enum HomeToolbarQuickRecordPolicy {
         "substrateChange"
     ]
 
+    static func contextualTargets(_ targets: [HomeToolbarQuickRecordTarget], expandedMemberID: UUID?) -> [HomeToolbarQuickRecordTarget] {
+        guard let expandedMemberID, let target = targets.first(where: { $0.entityID == expandedMemberID }) else { return targets }
+        return [target]
+    }
+
     static func isVisible(for tab: VerticalSolidHomeTab) -> Bool {
         tab == .home || tab == .plants
     }
@@ -160,6 +165,17 @@ enum HomeToolbarQuickRecordPolicy {
             let insertionIndex = actions.firstIndex { $0.actionType == "humanWeight" }
                 .map { actions.index(after: $0) } ?? actions.startIndex
             actions.insert(metrics, at: insertionIndex)
+        }
+        if card.isHuman, !actions.contains(where: { $0.actionType == "humanObservation" }) {
+            let observation = QuickActionItem(
+                id: "human-\(card.id.uuidString)-humanObservation",
+                label: HumanHealthPatternCopy.recordSymptoms(l),
+                icon: "heart.text.clipboard", colorHex: "14B8A6",
+                actionType: "humanObservation", entityId: card.id, entityKind: .human
+            )
+            let insertionIndex = actions.firstIndex { $0.actionType == "humanMetrics" }
+                .map { actions.index(after: $0) } ?? actions.startIndex
+            actions.insert(observation, at: insertionIndex)
         }
         return actions
     }

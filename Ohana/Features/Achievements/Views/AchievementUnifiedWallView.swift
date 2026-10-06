@@ -153,12 +153,12 @@ struct AchievementUnifiedWallView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "成长总览", en: "Growth overview", de: "Wachstumsübersicht"))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.brandTitle(.title3, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
                 Text("\(selectedItems.count(where: \.isUnlocked))/\(selectedItems.count)")
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.brandTitle(.title2, weight: .bold))
                     .foregroundStyle(Color.goPrimary)
                     .monospacedDigit()
             }
@@ -315,7 +315,7 @@ struct AchievementUnifiedWallView: View {
         } label: {
             HStack(spacing: 12) {
                 Text(item.emoji)
-                    .font(OhanaFont.title2(.bold))
+                    .font(OhanaFont.brandTitle(.title2, weight: .bold))
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "下一目标", en: "Next target", de: "Nächstes Ziel"))
@@ -361,7 +361,7 @@ struct AchievementUnifiedWallView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(alignment: .top) {
                         Text(item.emoji)
-                            .font(OhanaFont.title2(.bold))
+                            .font(OhanaFont.brandTitle(.title2, weight: .bold))
                             .accessibilityHidden(true)
                         Spacer()
                         achievementStateLabel(item)
@@ -810,11 +810,11 @@ private struct AchievementSnapshotDetailSheet: View {
                 VStack(alignment: .leading, spacing: 18) {
                     HStack(alignment: .top, spacing: 14) {
                         Text(item.emoji)
-                            .font(OhanaFont.largeTitle(.bold))
+                            .font(OhanaFont.brandTitle(.largeTitle, weight: .bold))
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 5) {
                             Text(item.title.value(languageCode: appLanguage))
-                                .font(OhanaFont.title2(.black))
+                                .font(OhanaFont.brandTitle(.title2, weight: .bold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text(scopeName)
                                 .font(OhanaFont.caption(.bold))

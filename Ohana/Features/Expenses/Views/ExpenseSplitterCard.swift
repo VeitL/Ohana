@@ -56,12 +56,12 @@ struct ExpenseSplitterCard: View {
                 Text("⚖️")
                     .font(OhanaFont.adaptive(size: 18))
                 Text(l.tr(zh: "财务结算室", en: "Settlement Room", de: "Abrechnung"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 if totalExpense > 0 {
                     Text(l.tr(zh: "人均 \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))", en: "Avg \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))", de: "Ø \(AppCurrency.format(totalExpense / max(1, Double(humans.count)), fractionDigits: 0))"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .padding(.horizontal, 10).padding(.vertical, 5)
                         .background(.white.opacity(0.08), in: Capsule()) // ui-v4: allow pre-existing visual token debt surfaced by accessibility font migration; tracked by full-scope ratchet.
@@ -77,7 +77,7 @@ struct ExpenseSplitterCard: View {
             } else {
                 // 结算文案（大字报）
                 Text(settlementText)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 16)
@@ -106,7 +106,7 @@ struct ExpenseSplitterCard: View {
             Text(r.emoji).font(OhanaFont.adaptive(size: 20))
             VStack(alignment: .leading, spacing: 2) {
                 Text(r.name)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "实付 \(AppCurrency.format(r.paid, fractionDigits: 0))", en: "Paid \(AppCurrency.format(r.paid, fractionDigits: 0))", de: "Bezahlt \(AppCurrency.format(r.paid, fractionDigits: 0))"))
                     .font(OhanaFont.adaptive(size: 10, weight: .medium))
@@ -115,7 +115,7 @@ struct ExpenseSplitterCard: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(isPositive ? l.tr(zh: "应收 \(AppCurrency.format(r.balance, fractionDigits: 0))", en: "Receives \(AppCurrency.format(r.balance, fractionDigits: 0))", de: "Erhält \(AppCurrency.format(r.balance, fractionDigits: 0))") : l.tr(zh: "应付 \(AppCurrency.format(abs(r.balance), fractionDigits: 0))", en: "Owes \(AppCurrency.format(abs(r.balance), fractionDigits: 0))", de: "Zahlt \(AppCurrency.format(abs(r.balance), fractionDigits: 0))"))
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                     .foregroundStyle(isPositive ? Color.goPrimary : Color.goRed)
             }
         }

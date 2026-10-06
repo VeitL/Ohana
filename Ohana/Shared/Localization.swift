@@ -924,7 +924,21 @@ nonisolated struct L10n {
     var sitterCard: String { tr(zh: "照护卡", en: "Sitter Card", de: "Betreuungskarte") }
     var immuneHealth: String { tr(zh: "免疫小盾牌", en: "Immune Shield", de: "Immunschild") }
     var vaccineBook: String { tr(zh: "疫苗小本本", en: "Vaccine Book", de: "Impfpass") }
-    var noRecords: String { tr(zh: "暂无记录", en: "No records yet", de: "Noch keine Einträge") }
+    var recordsLoadFailed: String {
+        tr(zh: "记录读取失败", en: "Couldn’t load records", de: "Einträge konnten nicht geladen werden", es: "No se pudieron cargar los registros", pt: "Não foi possível carregar os registros", fr: "Impossible de charger les données", ja: "記録を読み込めませんでした", ko: "기록을 불러오지 못했어요", it: "Impossibile caricare i dati")
+    }
+
+    var recordsRetryMessage: String {
+        tr(zh: "请重试，已保存的记录不会改变。", en: "Try again. Your saved records are unchanged.", de: "Versuche es erneut. Gespeicherte Einträge bleiben unverändert.", es: "Inténtalo de nuevo. Tus registros guardados no cambian.", pt: "Tente novamente. Seus registros salvos não mudam.", fr: "Réessayez. Vos données enregistrées restent inchangées.", ja: "もう一度お試しください。保存済みの記録は変わりません。", ko: "다시 시도해 주세요. 저장된 기록은 그대로예요.", it: "Riprova. I dati salvati restano invariati.")
+    }
+
+    var retryRecords: String {
+        tr(zh: "重试", en: "Try again", de: "Erneut versuchen", es: "Reintentar", pt: "Tentar novamente", fr: "Réessayer", ja: "再試行", ko: "다시 시도", it: "Riprova")
+    }
+
+    var noRecords: String {
+        tr(zh: "尚无记录", en: "No records yet", de: "Noch keine Einträge", es: "Aún no hay registros", pt: "Ainda sem registros", fr: "Aucun enregistrement", ja: "まだ記録がありません", ko: "아직 기록이 없어요", it: "Ancora nessun dato")
+    }
     var expired: String { tr(zh: "已过期", en: "Expired", de: "Abgelaufen") }
     func validUntil(_ date: String) -> String {
         tr(zh: "有效至 \(date)", en: "Valid until \(date)", de: "Gültig bis \(date)", es: "Válido hasta \(date)", pt: "Válido até \(date)", fr: "Valable jusqu'au \(date)")

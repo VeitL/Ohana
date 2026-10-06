@@ -153,9 +153,9 @@ struct HumanHealthReportContentView: View {
                 Button { sheetDestination = .create } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus").accessibilityHidden(true)
-                            .font(OhanaFont.headline(.black))
+                            .font(OhanaFont.headline(.semibold))
                         Text(l.tr(zh: "手动添加", en: "Add manually", de: "Manuell hinzufügen"))
-                            .font(OhanaFont.headline(.black))
+                            .font(OhanaFont.headline(.semibold))
                     }
                     .foregroundStyle(Color.arkInk)
                     .padding(.horizontal, 28).padding(.vertical, 14)
@@ -456,7 +456,7 @@ struct HumanHealthReportContentView: View {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
             .textCase(.uppercase)
             .tracking(1.0)
@@ -483,13 +483,13 @@ struct HumanHealthReportContentView: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "doc.viewfinder.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
                     .background(Color.goTeal, in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                 VStack(alignment: .leading, spacing: 3) {
                     Text(HumanLabScanCopy.text(.scanLabReport, l: l))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(HumanLabScanCopy.text(.reportEntryDetail, l: l))
                     .font(OhanaFont.caption(.semibold))
@@ -649,16 +649,16 @@ struct HumanHealthReportDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
                 Image(systemName: report.reportType.systemImage).accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 21, weight: .black))
+                    .font(OhanaFont.adaptive(size: 21, weight: .semibold))
                     .foregroundStyle(report.conclusion.color)
                     .frame(width: 52, height: 52)
                     .background(report.conclusion.color.opacity(0.15), in: Circle())
                 VStack(alignment: .leading, spacing: 4) {
                     Text(report.reportType.emoji + " " + report.reportType.localizedTitle(l))
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(report.conclusion.localizedTitle(l))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(report.conclusion.color)
                 }
                 Spacer(minLength: 0)
@@ -710,12 +710,12 @@ struct HumanHealthReportDetailView: View {
     private var followUpCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(l.tr(zh: "复查计划", en: "Follow-up", de: "Kontrolle"), systemImage: "calendar.badge.clock")
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             if let nextCheckDate = report.nextCheckDate {
                 Text(nextCheckDate, format: .dateTime.year().month().day())
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(followUpColor)
                 Text(followUpStatusText)
                     .font(OhanaFont.caption(.semibold))
@@ -736,7 +736,7 @@ struct HumanHealthReportDetailView: View {
                             : l.tr(zh: "调整复查日期", en: "Adjust Follow-up Date", de: "Kontrolldatum ändern"),
                         systemImage: "calendar.badge.plus"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.goYellow, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -795,7 +795,7 @@ struct HumanHealthReportDetailView: View {
     private func textCard(title: String, text: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(text)
                 .font(OhanaFont.body())

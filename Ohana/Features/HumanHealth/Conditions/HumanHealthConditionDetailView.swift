@@ -277,7 +277,7 @@ private extension HumanHealthConditionDetailView {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Image(systemName: "slider.horizontal.3").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
@@ -295,12 +295,12 @@ private extension HumanHealthConditionDetailView {
                 refreshFailureLabel
                 Spacer(minLength: 8)
                 Button(l.tr(zh: "重试", en: "Retry", de: "Erneut"), action: retryRecentRecords)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
             VStack(alignment: .leading, spacing: 9) {
                 refreshFailureLabel
                 Button(l.tr(zh: "重试", en: "Retry", de: "Erneut"), action: retryRecentRecords)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -410,11 +410,11 @@ private extension HumanHealthConditionDetailView {
 
                 HStack {
                     Text(l.tr(zh: "近 7 天记录频次", en: "Logging frequency in 7 days", de: "Eintragshäufigkeit in 7 Tagen"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     Text("\(snapshot.sevenDayCount)")
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(category.tint)
                 }
                 OhanaMinimalBarChart(
@@ -443,7 +443,7 @@ private extension HumanHealthConditionDetailView {
     private var severityTrendTitle: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(l.tr(zh: "自评严重度", en: "Self-reported severity", de: "Selbst eingeschätzte Stärke"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(zh: "0 表示无不适，10 表示影响很强", en: "0 is no impact; 10 is very high impact", de: "0 bedeutet keine, 10 eine sehr starke Belastung"))
                 .font(OhanaFont.caption(.semibold))
@@ -454,7 +454,7 @@ private extension HumanHealthConditionDetailView {
 
     private var severityTrendBadge: some View {
         Text(snapshot.severityTrend.displayName(l))
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(snapshot.severityTrend.tint)
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
@@ -543,7 +543,7 @@ private extension HumanHealthConditionDetailView {
                             en: "7-day analysis incomplete",
                             de: "7-Tage-Analyse unvollständig"
                         ))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.goOrange)
                     } else if let rate = medicationSnapshot.completionRate {
                         Text(l.tr(
@@ -551,7 +551,7 @@ private extension HumanHealthConditionDetailView {
                             en: "7-day due-to-now \(rate)%",
                             de: "7 Tage bis jetzt fällig \(rate)%"
                         ))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.goTeal)
                     }
                 }
@@ -564,7 +564,7 @@ private extension HumanHealthConditionDetailView {
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(medication.name)
-                                .font(OhanaFont.callout(.black))
+                                .font(OhanaFont.callout(.semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                             Text("\(medication.dosage) · \(medication.frequency.displayTitle(l: l))")
                                 .font(OhanaFont.caption(.semibold))
@@ -572,7 +572,7 @@ private extension HumanHealthConditionDetailView {
                         }
                         Spacer()
                         Text(medication.isActive ? l.tr(zh: "启用", en: "Active", de: "Aktiv") : l.tr(zh: "停用", en: "Stopped", de: "Beendet"))
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(medication.isActive ? Color.goTeal : Color.ohanaTertiaryText)
                     }
                     .padding(12)
@@ -632,13 +632,13 @@ private extension HumanHealthConditionDetailView {
 
         return HStack(spacing: 11) {
             Image(systemName: metric.category.systemImage).accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(metric.category.color)
                 .frame(width: 44, height: 44)
                 .background(metric.category.color.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(metric.displayName(l))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(latest?.date.formatted(Date.FormatStyle(
                     date: .abbreviated,
@@ -651,7 +651,7 @@ private extension HumanHealthConditionDetailView {
             Spacer()
             if let latest, let unit {
                 Text(formattedMetricValue(latest.value, unit: unit))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(metric.category.color)
             }
         }
@@ -767,7 +767,7 @@ private extension HumanHealthConditionDetailView {
                         .foregroundStyle(category.tint)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "查看全部历史", en: "View all history", de: "Gesamten Verlauf ansehen"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(
                             zh: "按页读取所有原始状态记录",
@@ -833,7 +833,7 @@ private extension HumanHealthConditionDetailView {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.headline(.black))
+            .font(OhanaFont.headline(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
     }
 
@@ -871,7 +871,7 @@ private extension HumanHealthConditionDetailView {
 
     private func summaryRowValue(_ value: String) -> some View {
         Text(value)
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .multilineTextAlignment(.trailing)
             .lineLimit(3)
@@ -881,7 +881,7 @@ private extension HumanHealthConditionDetailView {
     private func textBlock(title: String, text: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(category.tint)
             Text(text)
                 .font(OhanaFont.callout(.semibold))

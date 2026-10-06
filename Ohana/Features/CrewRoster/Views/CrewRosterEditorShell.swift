@@ -26,7 +26,7 @@ struct CrewRosterEditorShell<Content: View>: View {
                     onCancel()
                 } label: {
                     Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goCardWhite)
                         .frame(width: 44, height: 44)
                         .contentShape(Circle())
@@ -36,7 +36,7 @@ struct CrewRosterEditorShell<Content: View>: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.goCardWhite)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -52,7 +52,7 @@ struct CrewRosterEditorShell<Content: View>: View {
                     onSave()
                 } label: {
                     Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
                         .background(tint, in: Circle())

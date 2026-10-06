@@ -50,16 +50,7 @@ struct HumanHealthConditionsView: View {
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             if showsCloseButton {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(action: onClose) {
-                        Label(
-                            L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"),
-                            systemImage: "xmark"
-                        )
-                        .labelStyle(.iconOnly)
-                    }
-                    .accessibilityLabel(L10n(AppLanguage.code).tr(zh: "关闭", en: "Close", de: "Schließen"))
-                }
+                OhanaModalToolbar(onClose: onClose)
             }
         }
         .environment(\.locale, AppLanguage.effectiveLocale)
@@ -510,13 +501,13 @@ private struct HumanHealthConditionsContentView: View {
     private var analysisBoundaryCard: some View {
         HStack(alignment: .top, spacing: 11) {
             Image(systemName: "waveform.path.ecg.rectangle.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goBlue)
                 .frame(width: 34, height: 34) // a11y: allow decorative summary glyph; card text carries meaning.
                 .background(Color.goBlue.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "描述性记录", en: "Descriptive records", de: "Beschreibende Einträge"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
                     zh: "不作诊断或因果判断。",
@@ -574,7 +565,7 @@ private struct HumanHealthConditionsContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 Button(l.tr(zh: "重试", en: "Retry", de: "Erneut"), action: retry)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
 
             VStack(alignment: .leading, spacing: 9) {
@@ -583,7 +574,7 @@ private struct HumanHealthConditionsContentView: View {
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Button(l.tr(zh: "重试", en: "Retry", de: "Erneut"), action: retry)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -690,7 +681,7 @@ private struct HumanHealthConditionsContentView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             ForEach(conditions) { condition in
@@ -726,7 +717,7 @@ private struct HumanHealthConditionsContentView: View {
 
         return HStack(alignment: .center, spacing: 12) {
             Image(systemName: category.systemImage).accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                 .foregroundStyle(category.tint)
                 .frame(width: 44, height: 44)
                 .background(category.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -791,7 +782,7 @@ private struct HumanHealthConditionsContentView: View {
 
     private func conditionName(_ condition: HumanHealthCondition) -> some View {
         Text(condition.name)
-            .font(OhanaFont.callout(.black))
+            .font(OhanaFont.callout(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -799,7 +790,7 @@ private struct HumanHealthConditionsContentView: View {
 
     private func conditionStatus(_ condition: HumanHealthCondition) -> some View {
         Text(condition.trackingStatus.displayName(l))
-            .font(OhanaFont.caption2(.black))
+            .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(condition.trackingStatus.tint)
             .padding(.horizontal, 7)
             .padding(.vertical, 3)
@@ -850,14 +841,14 @@ private struct HumanHealthConditionsContentView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "cross.case.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 62, height: 62)
                 .background(Color.goTeal.opacity(0.14), in: Circle())
             Text(isReadOnly
                 ? l.tr(zh: "没有历史健康状况", en: "No health condition history", de: "Kein Verlauf zu Gesundheitszuständen")
                 : l.tr(zh: "建立第一份健康状况档案", en: "Create the first health condition", de: "Ersten Gesundheitszustand anlegen"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .frame(maxWidth: .infinity)

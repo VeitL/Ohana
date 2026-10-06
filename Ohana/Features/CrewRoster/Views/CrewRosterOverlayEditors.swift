@@ -257,7 +257,7 @@ extension CrewRosterProfilePanel {
                 }
             } label: {
                 Image(systemName: isEditing ? "checkmark" : "pencil")
-                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tintActionText)
                     .frame(width: 44, height: 44)
                     .background(tint, in: Circle())
@@ -267,7 +267,7 @@ extension CrewRosterProfilePanel {
             .accessibilityLabel(isEditing ? l.save : l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"))
 
             Text(displayName)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .lineLimit(1)
                 .minimumScaleFactor(0.70)
@@ -280,7 +280,7 @@ extension CrewRosterProfilePanel {
                     ),
                     systemImage: "checkmark.circle.fill"
                 )
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.goTeal)
                 .transition(.opacity)
                 .accessibilityIdentifier("crew-roster-profile-saved-feedback")
@@ -288,7 +288,7 @@ extension CrewRosterProfilePanel {
             Spacer(minLength: 8)
             Button(action: onClose) {
                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goCardWhite)
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
@@ -551,11 +551,11 @@ extension CrewRosterProfilePanel {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(tint)
                     .frame(width: 20)
                 Text(title)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goCardWhite.opacity(0.88))
                 Spacer(minLength: 0)
             }
@@ -591,7 +591,7 @@ extension CrewRosterProfilePanel {
     private func secondaryButton(_ title: String, icon: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(color)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 11)
@@ -1138,7 +1138,7 @@ private struct CrewRosterHumanGenderGrid: View {
                             Spacer(minLength: 0)
                             if isSelected {
                                 Image(systemName: "checkmark") // a11y: allow decorative selected-state glyph hidden below
-                                    .font(OhanaFont.caption(.black))
+                                    .font(OhanaFont.caption(.semibold))
                                     .accessibilityHidden(true)
                             }
                         }
@@ -1191,7 +1191,7 @@ private struct CrewRosterZodiacRow: View {
             .foregroundStyle(Color.goCardWhite.opacity(0.82))
             Spacer(minLength: 8)
             Text(Human.westernZodiacDisplay(for: date, l: l))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.goCardWhite)
         }
         .font(OhanaFont.caption(.bold))

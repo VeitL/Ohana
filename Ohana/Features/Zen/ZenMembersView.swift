@@ -28,25 +28,7 @@ struct ZenMembersRouteContainer: View {
                 onOpenProfile: { childRoute = .profile($0) }
             )
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark").accessibilityHidden(true)
-                    }
-                    .accessibilityLabel(L10n.current.tr(
-                        zh: "关闭",
-                        en: "Close",
-                        de: "Schließen",
-                        es: "Cerrar",
-                        pt: "Fechar",
-                        fr: "Fermer",
-                        ja: "閉じる",
-                        ko: "닫기",
-                        it: "Chiudi"
-                    ))
-                    .accessibilityIdentifier("zen-members-close-action")
-                }
+                OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "zen-members-close-action")
 
                 ToolbarItem(placement: .topBarTrailing) {
                     ZenMemberAddMenu { childRoute = .add($0) }

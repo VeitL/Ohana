@@ -16,7 +16,7 @@ extension PetBasicInfoDetailView {
                 HStack(spacing: 8) {
                     Text("🌈").font(OhanaFont.adaptive(size: 14)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "记录中心 · 彩虹桥彼端", en: "Record center · Rainbow Bridge", de: "Archiv · Regenbogenbrücke"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                         .tracking(1)
                     Spacer()
@@ -29,7 +29,7 @@ extension PetBasicInfoDetailView {
                                 en: "Date of passing: \(d.formatted(.dateTime.year().month().day()))",
                                 de: "Sterbedatum: \(d.formatted(.dateTime.year().month().day()))"
                             ))
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                                 .accessibilityIdentifier("pet-memorial-passed-date")
                         }
@@ -38,13 +38,13 @@ extension PetBasicInfoDetailView {
                             en: "Together for \(pet.daysTogetherAtPassing) days · \(localizedPetAgeAtPassing)",
                             de: "\(pet.daysTogetherAtPassing) Tage zusammen · \(localizedPetAgeAtPassing)"
                         ))
-                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
                     Button { showingUndoPassingAlert = true } label: {
                         Text(l.tr(zh: "撤销离世", en: "Undo passing", de: "Zurücknehmen"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goYellow)
                             .padding(.horizontal, 12).padding(.vertical, 6)
                             .background(Color.goYellow.opacity(0.1), in: Capsule())
@@ -75,7 +75,7 @@ extension PetBasicInfoDetailView {
                 HStack {
                     Image(systemName: "rainbow").foregroundStyle(Color.purple.opacity(0.6)).font(OhanaFont.adaptive(size: 12)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     Text(l.tr(zh: "生命终章", en: "End of life", de: "Lebensende"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.purple.opacity(0.6))
                         .tracking(2)
                     Spacer()
@@ -87,7 +87,7 @@ extension PetBasicInfoDetailView {
                     HStack(spacing: 8) {
                         Text("🌈")
                         Text(l.tr(zh: "标记 \(pet.name) 已离世", en: "Mark \(pet.name) as passed away", de: "\(pet.name) als verstorben markieren"))
-                            .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.purple.opacity(0.8))
                     .frame(maxWidth: .infinity)

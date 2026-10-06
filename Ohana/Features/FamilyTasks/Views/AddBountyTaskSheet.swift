@@ -158,7 +158,7 @@ struct AddBountyTaskSheet: View {
                                 Text("🥥")
                                     .font(OhanaFont.metric(size: 16, .medium))
                                 Text("\(val)")
-                                    .font(OhanaFont.callout(.black))
+                                    .font(OhanaFont.callout(.semibold))
                                     .foregroundStyle(
                                         reward == val ? Color.arkInk : Color.goYellow
                                     )
@@ -194,7 +194,7 @@ struct AddBountyTaskSheet: View {
                         .foregroundStyle(tertiaryText)
                     if assignedToId != nil {
                         Text("@")
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.goPrimary)
                     }
                 }

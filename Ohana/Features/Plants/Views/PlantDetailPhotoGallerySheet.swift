@@ -58,20 +58,20 @@ struct PlantPhotoGallerySheet: View {
     private var galleryHeader: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "photo.stack.fill") // a11y: allow decorative gallery glyph; heading and count name the content.
-                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 44, height: 44)
                 .background(Color.goTeal.opacity(0.16), in: Circle())
                 .accessibilityHidden(true)
 
             Text(l.tr(zh: "成长照片", en: "Growth photos", de: "Wachstumsfotos"))
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer(minLength: 8)
 
             Text("\(photos.count)")
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 11)
                 .frame(minHeight: 30)
@@ -84,7 +84,7 @@ struct PlantPhotoGallerySheet: View {
     private var emptyState: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "camera.metering.unknown") // a11y: allow decorative empty-state glyph; text explains the state.
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 44, height: 44)
                 .background(Color.goTeal.opacity(0.16), in: Circle())
@@ -92,14 +92,14 @@ struct PlantPhotoGallerySheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "还没有植物照片", en: "No plant photos yet", de: "Noch keine Pflanzenfotos"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
                     zh: "添加档案照或带照片的护理记录。",
                     en: "Add a profile photo or a care log with a photo.",
                     de: "Füge ein Profilfoto oder einen Pflegeeintrag mit Foto hinzu."
                 ))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -131,11 +131,11 @@ struct PlantPhotoGallerySheet: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(photo.title)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     Text(photo.subtitle)
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
@@ -187,13 +187,13 @@ private struct PlantPhotoDetailSheet: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(plantName)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(photo.subtitle)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(photo.detail)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -204,7 +204,7 @@ private struct PlantPhotoDetailSheet: View {
                     dismiss()
                 } label: {
                     Text(l.tr(zh: "完成", en: "Done", de: "Fertig"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(maxWidth: .infinity)
                         .frame(minHeight: 44)
@@ -252,7 +252,7 @@ struct PlantDetailDecodedImageTile: View {
                     .aspectRatio(contentMode: fillsContainer ? .fill : .fit)
             } else {
                 Image(systemName: "leaf.fill") // a11y: allow decorative image fallback; parent labels describe the photo item.
-                    .font(OhanaFont.adaptive(size: 28, weight: .black))
+                    .font(OhanaFont.adaptive(size: 28, weight: .semibold))
                     .foregroundStyle(tint)
                     .accessibilityHidden(true)
             }

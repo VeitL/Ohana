@@ -86,7 +86,7 @@ struct HygieneTodoSheet: View {
     private var header: some View {
         HStack(spacing: 12) {
             Image(systemName: type.systemIconName)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(accent)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; interactive hit target is provided by the surrounding control or container
@@ -94,14 +94,14 @@ struct HygieneTodoSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(type.localizedLabel(l))
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
                     zh: "为 \(pet.name) 添加护理计划",
                     en: "Add a care plan for \(pet.name)",
                     de: "Pflegeplan fuer \(pet.name) hinzufuegen"
                 ))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -129,7 +129,7 @@ struct HygieneTodoSheet: View {
                 DatePicker(l.tr(zh: "结束", en: "Ends", de: "Endet"), selection: $endDate, displayedComponents: .date)
             }
         }
-        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
         .padding(16)
         .background(Color.ohanaCardSurface, in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
     }
@@ -141,10 +141,10 @@ struct HygieneTodoSheet: View {
             Stepper(value: $repeatDays, in: 0 ... 365) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(recurrenceLabel)
-                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "0 表示只提醒一次", en: "0 means remind only once", de: "0 bedeutet nur einmal erinnern"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                 }
             }
@@ -160,7 +160,7 @@ struct HygieneTodoSheet: View {
             TextField(l.tr(zh: "可选", en: "Optional", de: "Optional"), text: $customNote, axis: .vertical) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .lineLimit(2 ... 4)
                 .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .padding(12)
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
         }
@@ -170,7 +170,7 @@ struct HygieneTodoSheet: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 

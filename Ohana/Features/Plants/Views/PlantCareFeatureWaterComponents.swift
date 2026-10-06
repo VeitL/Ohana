@@ -17,12 +17,12 @@ struct PlantWaterModeStrip: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 7) {
                 Label(l.tr(zh: "浇水模式", en: "Watering mode", de: "Gießmodus"), systemImage: "switch.2")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .labelStyle(.titleAndIcon)
                 Spacer(minLength: 8)
                 Text(selectedMode.title(l: l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goTeal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -50,10 +50,10 @@ struct PlantWaterModeStrip: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: mode.icon)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(mode.title(l: l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
@@ -86,7 +86,7 @@ struct PlantWaterPrimaryTaskCard: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 8) {
                 Label(l.tr(zh: "浇水", en: "Watering", de: "Gießen"), systemImage: "drop.fill")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.arkInk)
                     .labelStyle(.titleAndIcon)
                     .padding(.horizontal, 11)
@@ -97,7 +97,7 @@ struct PlantWaterPrimaryTaskCard: View {
 
                 Button(action: openPlan) {
                     Image(systemName: "gearshape.fill") // a11y: allow decorative plan glyph; accessibilityLabel names the button.
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                         .foregroundStyle(Color.goTeal)
                         .frame(width: 44, height: 44)
                         .background(Color.ohanaControlFill, in: Circle())
@@ -112,13 +112,13 @@ struct PlantWaterPrimaryTaskCard: View {
             HStack(alignment: .bottom, spacing: 14) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(model.title)
-                        .font(OhanaFont.adaptive(size: 23, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 23, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
 
                     Text(model.habitSummary)
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.82)
@@ -127,7 +127,7 @@ struct PlantWaterPrimaryTaskCard: View {
                 Spacer(minLength: 8)
 
                 Text(model.metricValue)
-                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 34, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goTeal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.52)
@@ -146,7 +146,7 @@ struct PlantWaterPrimaryTaskCard: View {
 
             Button(action: quickRecord) {
                 Label(l.tr(zh: "快速记录已浇水", en: "Log watered now", de: "Jetzt Gießen erfassen"), systemImage: "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.arkInk)
                     .labelStyle(.titleAndIcon)
                     .frame(maxWidth: .infinity)
@@ -179,12 +179,12 @@ private struct PlantWaterGuidedMetricPill: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(signal.title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
             Text(signal.value)
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(signal.tint)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -205,11 +205,11 @@ private struct PlantWaterGuidedNotice: View {
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: "checkmark.circle.fill") // a11y: allow decorative advice marker; text carries the content.
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(text)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
@@ -229,17 +229,17 @@ struct PlantWaterGuidedMiniChartCard: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "浇水趋势", en: "Watering trend", de: "Gießtrend"))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(zh: "只看节奏，详情在历史。", en: "A quiet rhythm. Details in history.", de: "Ruhiger Rhythmus. Details im Verlauf."))
-                        .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                 }
                 Spacer(minLength: 8)
                 Text(l.tr(zh: "目标 \(model.plannedIntervalDays) 天", en: "Target \(model.plannedIntervalDays)d", de: "Ziel \(model.plannedIntervalDays) T."))
-                    .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goTeal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.62)
@@ -275,12 +275,12 @@ struct PlantWaterGuidedMiniChartCard: View {
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(l.tr(zh: "还没有足够的浇水间隔", en: "Not enough watering intervals yet", de: "Noch nicht genug Gießintervalle"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(model.wateringLogCount == 0
                 ? l.tr(zh: "记录第一次浇水后会开始累积趋势。", en: "The trend starts after the first watering log.", de: "Der Trend beginnt nach dem ersten Gießprotokoll.")
                 : l.tr(zh: "再记录一次浇水后会显示实际间隔。", en: "Log one more watering to show the real interval.", de: "Noch einmal gießen erfassen, dann erscheint das echte Intervall."))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -293,10 +293,10 @@ struct PlantWaterGuidedMiniChartCard: View {
     private var loadingState: some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(l.tr(zh: "正在整理浇水节奏", en: "Preparing watering rhythm", de: "Gießrhythmus wird vorbereitet"))
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(zh: "先显示页面，历史趋势稍后补上。", en: "The page stays ready while history loads.", de: "Die Seite bleibt bereit, während der Verlauf lädt."))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -363,27 +363,27 @@ private struct PlantWaterCompactDiscoveryCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 8) {
                 Image(systemName: item.icon)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(item.tint)
                     .frame(width: 34, height: 34) // a11y: allow visual glyph frame; card text carries the accessible content.
                     .background(item.tint.opacity(0.13), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
                     .accessibilityHidden(true)
                 Text(item.title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 if isInteractive {
                     Image(systemName: "chevron.right") // a11y: allow decorative affordance; card label names the action.
-                        .font(OhanaFont.adaptive(size: 9, weight: .black))
+                        .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .accessibilityHidden(true)
                 }
             }
 
             Text(item.value)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(item.tint)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -401,11 +401,11 @@ private struct PlantWaterAdviceChip: View {
     var body: some View {
         HStack(spacing: 7) {
             Image(systemName: "checkmark.circle.fill") // a11y: allow decorative advice marker; chip text carries the content.
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .accessibilityHidden(true)
             Text(text)
-                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)

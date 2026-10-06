@@ -85,13 +85,13 @@ struct HumanAccountSwitcherSheet: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: "person.2.fill") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.16), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "切换记录成员", en: "Switch check-in member", de: "Eintragsmitglied wechseln"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "选择后续记录归属的成员", en: "Choose who future records belong to", de: "Wähle, wem künftige Einträge gehören"))
                     .font(OhanaFont.caption(.semibold))
@@ -103,7 +103,7 @@ struct HumanAccountSwitcherSheet: View {
                     dismiss()
                 } label: {
                     Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.ohanaControlFill, in: Capsule())
@@ -121,10 +121,10 @@ struct HumanAccountSwitcherSheet: View {
                 accountAvatar(activeHuman, size: 48)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "当前账户", en: "Current account", de: "Aktuelles Konto"))
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Text(displayName(activeHuman))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                 }
                 Spacer()
@@ -141,7 +141,7 @@ struct HumanAccountSwitcherSheet: View {
     private var accountList: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "成员", en: "Members", de: "Mitglieder"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 2)
 
@@ -160,7 +160,7 @@ struct HumanAccountSwitcherSheet: View {
                     accountAvatar(human, size: 44)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(displayName(human))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(localizedRoleText(for: human.role))
                             .font(OhanaFont.caption2(.bold))
@@ -189,7 +189,7 @@ struct HumanAccountSwitcherSheet: View {
     private func statusBadge(for human: Human) -> some View {
         if human.id.uuidString == activeHumanId {
             Text(l.tr(zh: "当前", en: "Current", de: "Aktuell"))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
@@ -197,14 +197,14 @@ struct HumanAccountSwitcherSheet: View {
         } else if HumanLocalPrivacyPolicy.isEnabled,
                   appServices.passcodes.hasPasscode(human) {
             Text(l.tr(zh: "需密码", en: "PIN needed", de: "PIN nötig"))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.goYellow)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(Color.goYellow.opacity(0.14), in: Capsule())
         } else {
             Text(l.tr(zh: "可切换", en: "Can switch", de: "Wechselbar"))
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
@@ -217,7 +217,7 @@ struct HumanAccountSwitcherSheet: View {
             openSecurity(for: human)
         } label: {
             Image(systemName: appServices.passcodes.hasPasscode(human) ? "lock.fill" : "lock.open.fill")
-                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(appServices.passcodes.hasPasscode(human) ? Color.goYellow : Color.ohanaTertiaryText)
                 .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.ohanaControlFill, in: RoundedRectangle(cornerRadius: OhanaRadius.chip, style: .continuous))
@@ -233,7 +233,7 @@ struct HumanAccountSwitcherSheet: View {
                 accountAvatar(human, size: 38)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.tr(zh: "输入 \(displayName(human)) 的 4 位密码", en: "Enter \(displayName(human))'s 4-digit PIN", de: "4-stellige PIN für \(displayName(human)) eingeben"))
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(statusMessage.isEmpty ? pendingPurpose.prompt(l) : statusMessage)
                         .font(OhanaFont.caption(.bold))

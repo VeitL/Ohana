@@ -120,7 +120,7 @@ extension HumanDetailView {
                 .font(OhanaFont.metric(size: 34))
                 .foregroundStyle(Color.goYellow)
             Text(l.tr(zh: "此成员资料仅本人可见", en: "This member profile is private", de: "Dieses Mitgliederprofil ist privat"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color(hex: "1E3A8A"))
             Text(l.tr(
                 zh: "当前家庭成员无法查看 TA 的体重、运动、吃药、备注、花费和椰子资产等相关数据。",

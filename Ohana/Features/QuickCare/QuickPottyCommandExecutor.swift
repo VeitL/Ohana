@@ -38,6 +38,7 @@ struct QuickPottyCommandResult: Equatable {
     let action: String
     let targetCount: Int
     let undoToken: SharedCareUndoToken?
+    var recordReference: PetRecordReference? = nil
 }
 
 @MainActor
@@ -213,7 +214,8 @@ struct QuickPottyCommandExecutor {
                 coconutDelta: recorded.result.coconutDelta,
                 action: action,
                 targetCount: 1,
-                undoToken: nil
+                undoToken: nil,
+                recordReference: PetRecordReference(petID: pet.id, recordID: recorded.result.logID)
             )
         }
 
@@ -251,7 +253,8 @@ struct QuickPottyCommandExecutor {
             coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
             action: action,
             targetCount: 1,
-            undoToken: nil
+            undoToken: nil,
+            recordReference: logID.map { PetRecordReference(petID: pet.id, recordID: $0) }
         )
     }
 
@@ -303,7 +306,8 @@ struct QuickPottyCommandExecutor {
             coconutDelta: 0,
             action: "unknownSharedPotty",
             targetCount: targets.count,
-            undoToken: nil
+            undoToken: nil,
+            recordReference: PetRecordReference(petID: sourcePet.id, recordID: log.id)
         )
     }
 
@@ -414,7 +418,9 @@ struct QuickPottyCommandExecutor {
                     receiptID: receiptID,
                     undoDeadline: undoDeadline
                 )
-            }
+            },
+            recordReference: result?.recordReference(for: sourcePet.id, ids: result?.careLogIDs ?? [])
+                ?? careLogID.map { PetRecordReference(petID: sourcePet.id, recordID: $0) }
         )
     }
 

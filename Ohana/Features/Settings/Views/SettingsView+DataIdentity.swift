@@ -138,7 +138,7 @@ extension SettingsView {
                                         if HumanLocalPrivacyPolicy.isEnabled,
                                            human.hasPasscode {
                                             Image(systemName: "lock.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                                .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                                .font(OhanaFont.adaptive(size: 8, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                                 .foregroundStyle(Color.arkInk)
                                                 .frame(width: 16, height: 16) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                                 .background(Color.goYellow, in: Circle())
@@ -146,7 +146,7 @@ extension SettingsView {
                                             }
                                     }
                                     Text(human.displayName(fallback: l.tr(zh: "成员", en: "Member", de: "Mitglied")))
-                                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(isSelected ? Color.goPrimary : tertiaryText)
                                         .lineLimit(1)
                                 }
@@ -169,7 +169,7 @@ extension SettingsView {
                             en: "Tasks and records will default to \(selectedName)",
                             de: "Aufgaben und Einträge verwenden standardmäßig \(selectedName)"
                         ))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tertiaryText)
                         .accessibilityIdentifier("settings-human-identity-selected-summary")
                     }

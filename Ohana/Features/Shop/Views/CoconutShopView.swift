@@ -122,6 +122,7 @@ nonisolated enum ShopManualRecoveryActionPolicy {
 }
 
 struct CoconutShopView: View {
+    let showsCloseButton: Bool
     let humans: [Human]
     let pets: [Pet]
     let purchaseRecords: [ShopPurchaseRecord]
@@ -154,7 +155,7 @@ struct CoconutShopView: View {
     @AppStorage(OasisPlantDecorStore.equippedPotSkinKey) var equippedPlantPotSkin = ""
     @AppStorage(AppIconCatalog.selectedIconKey) var selectedAppIcon = AppIconCatalog.defaultItemId
 
-    @State var selectedCategory: ShopItem.ShopCategory
+    let initialCategory: ShopItem.ShopCategory
     @State var pendingPurchaseItem: ShopItem?
     @State var activePicker: ShopPicker?
     @State var equipPopoutPet: Pet?
@@ -172,7 +173,8 @@ struct CoconutShopView: View {
     @State var exchangeNote = ""
 
     init(
-        initialCategory: ShopItem.ShopCategory = .effect,
+        initialCategory: ShopItem.ShopCategory = .plantDecor,
+        showsCloseButton: Bool = true,
         humans: [Human] = [],
         pets: [Pet] = [],
         purchaseRecords: [ShopPurchaseRecord] = [],
@@ -191,6 +193,7 @@ struct CoconutShopView: View {
             )
         }
     ) {
+        self.showsCloseButton = showsCloseButton
         self.humans = humans
         self.pets = pets
         self.purchaseRecords = purchaseRecords
@@ -202,7 +205,7 @@ struct CoconutShopView: View {
         self.retryDataLoad = retryDataLoad
         self.refreshData = refreshData
         self.retryPurchaseRecovery = retryPurchaseRecovery
-        _selectedCategory = State(initialValue: initialCategory.isVisibleInFirstRelease ? initialCategory : .effect)
+        self.initialCategory = initialCategory
     }
 
     enum ShopPicker: Identifiable {
@@ -243,14 +246,6 @@ struct CoconutShopView: View {
 
     var allItems: [ShopItem] {
         ShopCatalog.allItems(purchasedSet: purchasedSet)
-    }
-
-    var filteredItems: [ShopItem] {
-        allItems.filter { $0.category == effectiveSelectedCategory }
-    }
-
-    var effectiveSelectedCategory: ShopItem.ShopCategory {
-        selectedCategory.isVisibleInFirstRelease ? selectedCategory : .effect
     }
 
     var selectedActiveHuman: Human? {
@@ -347,7 +342,7 @@ struct CoconutShopView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack {
                 OhanaAppBackground()
                     .ignoresSafeArea()
@@ -364,32 +359,26 @@ struct CoconutShopView: View {
                             .padding(.top, 8)
                             .padding(.bottom, 14)
 
-                        categoryRail
-                            .padding(.bottom, 12)
-
-                        categoryIntro
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, effectiveSelectedCategory == .plantDecor ? 12 : 0)
-
                         if !purchaseSettlements.isEmpty || !blockedPurchaseItemIDs.isEmpty {
                             purchaseSettlementNotice
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 12)
                         }
 
-                        ScrollView {
-                            if effectiveSelectedCategory == .cashExchange {
-                                cashExchangeSection
-                                    .padding(.horizontal, 20)
-                                    .padding(.bottom, 36)
-                            } else {
-                                LazyVGrid(columns: shopGridColumns, spacing: 12) {
-                                    ForEach(filteredItems) { item in
-                                        shopItemCard(item)
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 24) {
+                                    ForEach(ShopShelfSection.allCases) { section in
+                                        shopShelfSection(section)
+                                            .id(section.id)
                                     }
                                 }
                                 .padding(.horizontal, 20)
                                 .padding(.bottom, 36)
+                            }
+                            .accessibilityIdentifier("coconut-shop-shelves")
+                            .onAppear {
+                                proxy.scrollTo(ShopShelfSection.destination(for: initialCategory).id, anchor: .top)
                             }
                         }
                     }
@@ -404,9 +393,7 @@ struct CoconutShopView: View {
             .navigationTitle(l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokosnuss-Shop"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.tr(zh: "关闭", en: "Close", de: "Schließen")) { dismiss() }
-                }
+                if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }) }
             }
         }
         .tint(Color.goPrimary)
@@ -424,6 +411,12 @@ struct CoconutShopView: View {
                     purchaseConfirmation(item: item)
                         .padding(20)
                 }
+                    .safeAreaInset(edge: .bottom) {
+                        purchaseConfirmationAction(item)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.ohanaCardSurfaceElevated)
+                    }
                     .navigationTitle(l.tr(zh: "确认兑换", en: "Confirm redemption", de: "Einlösen bestätigen"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
@@ -452,9 +445,6 @@ struct CoconutShopView: View {
             .presentationDetents([.medium, .large])
         }
         .onAppear {
-            if !selectedCategory.isVisibleInFirstRelease {
-                selectedCategory = .effect
-            }
             selectedAppIcon = appServices.appIcons.currentDescriptor.itemId
         }
         .onChange(of: pendingPurchaseItem?.id) { _, itemID in

@@ -29,7 +29,11 @@ struct CoconutLogView: View {
     }
 
     var body: some View {
-        content
+        if showsCloseButton {
+            NavigationStack { content }
+        } else {
+            content
+        }
     }
 
     private var content: some View {

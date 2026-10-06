@@ -29,13 +29,13 @@ struct CrewRosterDeleteConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 18) {
                 HStack(spacing: 12) {
                     Image(systemName: "trash.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goRed)
                         .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(Color.goRed.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous))
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
-                            .font(OhanaFont.title3(.black))
+                            .font(OhanaFont.title3(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
@@ -46,7 +46,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                     Spacer()
                     Button(action: onCancel) {
                         Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             .background(Color.primary.opacity(0.08), in: Circle())
@@ -74,7 +74,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
                 HStack(spacing: 10) {
                     Button(action: onCancel) {
                         Text(l.cancel)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)
@@ -84,7 +84,7 @@ struct CrewRosterDeleteConfirmationSheet: View {
 
                     Button(action: onDelete) {
                         Text(l.tr(zh: "删除", en: "Delete", de: "Loeschen"))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(canDelete ? Color.ohanaPrimaryActionText : Color.primary.opacity(0.32))
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 13)

@@ -11,6 +11,7 @@ import UIKit
 
 struct AchievementWallContentView: View {
     let pet: Pet
+    var showsCloseButton = true
     var allPets: [Pet] = []
     var onPresentCoconutLog: ((CoconutLogSubject?) -> Void)?
     let electronicPets: [OasisElectronicPet]
@@ -359,18 +360,13 @@ struct AchievementWallContentView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
             }
-            .blur(radius: selectedAchievement == nil && pendingClaimAchievement == nil ? 0 : 1.2)
-            .allowsHitTesting(selectedAchievement == nil && pendingClaimAchievement == nil)
-
-            if let selectedAchievement {
-                achievementPopup(selectedAchievement)
-                    .zIndex(4)
-            }
-
-            if let pendingClaimAchievement {
-                claimConfirmPopup(pendingClaimAchievement)
-                    .zIndex(5)
-            }
+        }
+        .navigationTitle(l.tr(zh: "成就解锁", en: "Badges", de: "Abzeichen"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: { dismiss() }) } }
+        .sheet(item: $selectedAchievement) { badge in
+            achievementPopup(badge)
+                .presentationDetents([.medium, .large])
         }
         .tint(Color.goPrimary)
         .onAppear {
@@ -390,12 +386,6 @@ struct AchievementWallContentView: View {
             amount: rewardAnimationAmount,
             label: rewardAnimationLabel
         )
-        .sheet(isPresented: $showingAchievementShareSheet) {
-            if let achievementShareImage {
-                ShareSheet(image: achievementShareImage)
-            }
-        }
-        .animation(GoMotion.sheet, value: selectedAchievement?.id)
-        .animation(GoMotion.sheet, value: pendingClaimAchievement?.id)
+
     }
 }

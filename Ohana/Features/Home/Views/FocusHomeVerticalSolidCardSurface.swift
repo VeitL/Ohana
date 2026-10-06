@@ -171,21 +171,20 @@ struct FocusHomeVerticalSolidCardSurface: View {
         HStack(alignment: .top, spacing: 10) {
             VStack(alignment: .leading, spacing: lerp(3, 4, p)) {
                 Text(card.name)
-                    .font(.system(size: lerp(17, 28, p), weight: .black, design: .rounded))
+                    .font(.system(size: lerp(17, 24, p), weight: .semibold, design: .rounded))
                     .foregroundStyle(primary)
-                    .lineLimit(1)
+                    .lineLimit(p > 0.72 ? 2 : 1)
                     .minimumScaleFactor(0.70)
                     .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.58, radius: 5, y: 2) // ui-v4: allow requested legibility shadow on card text
 
                 Text(card.kind)
-                    .font(.system(size: lerp(9, 12, p), weight: .black, design: .rounded))
+                    .font(.system(size: lerp(9, 12, p), weight: .regular))
                     .foregroundStyle(secondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
                     .homeCardTextShadow(usesFullVisualEffects: usesTextShadows(usesFullWidthPhoto: usesFullWidthPhoto), opacity: 0.46, radius: 4, y: 1) // ui-v4: allow requested legibility shadow on card text
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(compactHeaderOpacity)
 
             Spacer(minLength: 0)
 
@@ -202,7 +201,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
                     .opacity(compactHeaderOpacity)
             }
         }
-        .padding(.trailing, expandedContentStyle == .zenProfile ? 48 : 0)
+        .padding(.trailing, lerp(0, 48, p))
     }
 
     @ViewBuilder
@@ -312,7 +311,7 @@ struct FocusHomeVerticalSolidCardSurface: View {
             petAgeMetric(progress: p, usesFullWidthPhoto: usesFullWidthPhoto)
 
             Text(petTogetherHeadline)
-                .font(.system(size: lerp(15, 20, p), weight: .black, design: .rounded))
+                .font(.system(size: lerp(13, 16, p), weight: .semibold, design: .rounded))
                 .foregroundStyle(cardPrimaryText(usesFullWidthPhoto: usesFullWidthPhoto))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)

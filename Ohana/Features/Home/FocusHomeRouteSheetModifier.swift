@@ -32,7 +32,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .sheet(item: modalSheetRouteBinding, onDismiss: handleModalDismissed) { route in
                 AppDeferredRouteContent(
                     routeID: route.id,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { modalSheetRouteBinding.wrappedValue = nil }
                 ) {
                     homeModalDestination(for: route)
                 }
@@ -45,7 +46,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .sheet(item: systemSheetRouteBinding) { route in
                 AppDeferredRouteContent(
                     routeID: route.id,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { systemSheetRouteBinding.wrappedValue = nil }
                 ) {
                     homeSheetDestination(for: route)
                 }
@@ -64,7 +66,8 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             .sheet(item: overlayRouteBinding) { route in
                 AppDeferredRouteContent(
                     routeID: route.id.uuidString,
-                    policy: AppPresentationPolicyProvider.policy(for: route)
+                    policy: AppPresentationPolicyProvider.policy(for: route),
+                    onCloseWhileLoading: { overlayRouteBinding.wrappedValue = nil }
                 ) {
                     homeOverlayDestination(for: route)
                 }
@@ -201,45 +204,36 @@ struct FocusHomeRouteSheetModifier: ViewModifier {
             )
             .ohanaSheetPagePresentation() // ui-v4: allow coconut history as long sheet
         case let .crewRoster(mode):
-            NavigationStack {
-                CrewRosterOverlayRouteContainer(
-                    initialMode: mode,
-                    onSelectPet: { pet in
-                        routes.dismissModal()
-                        onCrewPetSelected(pet)
-                    },
-                    onSelectHuman: { human in
-                        routes.dismissModal()
-                        onCrewHumanSelected(human)
-                    },
-                    onInlinePetSaved: { pet in
-                        routes.dismissModal()
-                        onPetSavedFromAddEntity(pet)
-                    },
-                    onInlineHumanSaved: { human in
-                        routes.dismissModal()
-                        onHumanSavedFromAddEntity(human)
-                    },
-                    onClose: { routes.dismissModal() },
-                    onPresentCoconutLog: { subject in
-                        routes.openCoconutLog(subject)
-                    },
-                    onOpenTaskCenter: {
-                        routes.dismissModal()
-                        OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
-                            routes.openTaskCenter()
-                        }
-                    }
-                )
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button { routes.dismissModal() } label: {
-                            Image(systemName: "xmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                .foregroundStyle(Color.ohanaSecondaryText)
-                        }
+            CrewRosterOverlayRouteContainer(
+                initialMode: mode,
+                onSelectPet: { pet in
+                    routes.dismissModal()
+                    onCrewPetSelected(pet)
+                },
+                onSelectHuman: { human in
+                    routes.dismissModal()
+                    onCrewHumanSelected(human)
+                },
+                onInlinePetSaved: { pet in
+                    routes.dismissModal()
+                    onPetSavedFromAddEntity(pet)
+                },
+                onInlineHumanSaved: { human in
+                    routes.dismissModal()
+                    onHumanSavedFromAddEntity(human)
+                },
+                onClose: { routes.dismissModal() },
+                onPresentCoconutLog: { subject in
+                    routes.openCoconutLog(subject)
+                },
+                onOpenTaskCenter: {
+                    routes.dismissModal()
+                    OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
+                        routes.openTaskCenter()
                     }
                 }
-            }
+            )
+
             .ohanaSheetPagePresentation() // ui-v4: allow family collaboration/member hub
         case .accountSwitcher:
             AppAccountSwitcherRouteContainer(onSwitched: { routes.dismissModal() })
@@ -579,7 +573,7 @@ private extension FocusHomeRouteSheetModifier {
             petSheetDestination(for: route)
         case .humanAllFeatures, .humanBasicInfo, .humanMedicationQuick, .humanMedication,
              .humanWeightQuick, .humanWeight, .humanWorkoutQuick, .humanWorkout,
-             .humanWorkoutDashboard, .humanMetrics, .humanConditions, .humanReport, .humanExpenseQuick,
+             .humanWorkoutDashboard, .humanMetrics, .humanObservationQuick, .humanConditions, .humanReport, .humanExpenseQuick,
              .humanExpense, .humanWishlist, .humanNoteQuick, .humanNote:
             humanSheetDestination(for: route)
         case let .plantCareLog(id, initialCareType):
@@ -654,8 +648,8 @@ private extension FocusHomeRouteSheetModifier {
         case let .petMedication(id):
             petRouteContainer(id: id, destination: .medication)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
-        case let .petMomentHistory(id):
-            petRouteContainer(id: id, destination: .momentHistory)
+        case let .petMomentHistory(id, route):
+            petRouteContainer(id: id, destination: .momentHistory(route))
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
         case let .petDocuments(id):
             petRouteContainer(id: id, destination: .documents)
@@ -721,6 +715,9 @@ private extension FocusHomeRouteSheetModifier {
         case let .humanMetrics(id):
             humanRouteContainer(id: id, destination: .metrics)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
+        case let .humanObservationQuick(id):
+            humanRouteContainer(id: id, destination: .observationQuick)
+                .ohanaSheetPagePresentation() // ui-v4: allow local health record editor
         case let .humanConditions(id):
             humanRouteContainer(id: id, destination: .conditions)
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/detail sheet
@@ -794,8 +791,14 @@ private extension FocusHomeRouteSheetModifier {
             .petBasicInfo(petID)
         case .documents:
             .petDocuments(petID)
-        case .moments, .timeline:
+        case .moments:
             .petMomentHistory(petID)
+        case .timeline:
+            .petMomentHistory(petID, initialRoute: .timeline)
+        case .photos:
+            .petMomentHistory(petID, initialRoute: .photos)
+        case let .memory(reference):
+            .petMomentHistory(petID, initialRoute: reference.route)
         case .achievements:
             .petAchievements(petID)
         case .retention:
@@ -868,6 +871,8 @@ private extension FocusHomeRouteSheetModifier {
             .humanWorkoutDashboard(humanID)
         case .metrics:
             .humanMetrics(humanID)
+        case .observationQuick:
+            .humanObservationQuick(humanID)
         case .conditions:
             .humanConditions(humanID)
         case .report:

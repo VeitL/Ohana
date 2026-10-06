@@ -148,21 +148,25 @@ struct QuickWaterDetailRouteContainer: View {
     let id: UUID
     let onRemove: () -> Void
     let onClose: (() -> Void)?
+    let showsCloseButton: Bool
 
     init(
         id: UUID,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.id = id
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
         QuickWaterDetailSheetHost(
             id: id,
             onRemove: onRemove,
+            showsCloseButton: showsCloseButton,
             onClose: onClose
         )
     }
@@ -177,15 +181,18 @@ struct QuickPottyDetailRouteContainer: View {
     let id: UUID
     let onRemove: () -> Void
     let onClose: (() -> Void)?
+    let showsCloseButton: Bool
 
     init(
         id: UUID,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.id = id
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
@@ -194,6 +201,7 @@ struct QuickPottyDetailRouteContainer: View {
                 QuickPottyDetailSheet(
                     pet: pet,
                     onRemove: onRemove,
+                    showsCloseButton: showsCloseButton,
                     onClose: onClose,
                     onRecordChanged: {
                         scheduleRouteDataLoad(delayMilliseconds: 120, force: true)
@@ -543,7 +551,7 @@ struct QuickCareMissingRouteEntityView: View {
                 .font(OhanaFont.adaptive(size: 28, weight: .bold))
                 .foregroundStyle(Color.goOrange)
             Text(L10n.current.tr(zh: "找不到对应资料", en: "Missing \(kind)", de: "\(kind) nicht gefunden"))
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -559,7 +567,7 @@ private struct QuickCareLoadingRouteEntityView: View {
             ProgressView()
                 .controlSize(.regular)
             Text(kind)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

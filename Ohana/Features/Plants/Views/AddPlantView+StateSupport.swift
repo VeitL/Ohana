@@ -82,7 +82,7 @@ extension AddPlantView {
     }
 
     var profilePreviewName: String {
-        trimmedName.isEmpty ? l.tr(zh: "新植物", en: "New plant", de: "Neue Pflanze") : trimmedName
+        trimmedName.isEmpty ? (isUnknownSpeciesSelected ? l.tr(zh: "我的植物", en: "My plant", de: "Meine Pflanze") : l.tr(zh: "新植物", en: "New plant", de: "Neue Pflanze")) : trimmedName
     }
 
     var profilePreviewSpecies: String {

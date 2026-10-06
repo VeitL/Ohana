@@ -163,7 +163,7 @@ struct VerticalSolidHomeExpandedCardActions: View {
             )
         }
         let menuPolicy = state.isLocked ? .none : state.menuPolicy.expandedPolicy
-        let actionUsesQuickPath = menuPolicy.showsQuickButton
+        let actionUsesQuickPath = menuPolicy.showsQuickButton || (!card.isHuman && item.actionType == "feed")
         let title = item.displayLabel(localization: l)
         return VerticalHomeEmbeddedAction(
             id: item.id,
@@ -182,11 +182,27 @@ struct VerticalSolidHomeExpandedCardActions: View {
             showsMenu: menuPolicy.showsMenu,
             showsQuickButton: menuPolicy.showsQuickButton,
             quickAccessibilityLabel: title,
-            detailAccessibilityLabel: l.tr(zh: "查看详情", en: "Details", de: "Details"),
+            detailAccessibilityLabel: card.isHuman
+                ? l.tr(zh: "查看详情", en: "Details", de: "Details")
+                : PetCareExperienceCopy(l: l).viewHistory,
             detailAction: { onAction(item, false) },
+            usesLabeledMenu: !card.isHuman && !state.isLocked && item.actionType != "allFeatures",
+            quickActionTitle: petQuickActionSemantic(item, state: state)?.title(l),
+            primarySemantic: petQuickActionSemantic(item, state: state),
             optionAction: { optionId in onOptionAction(item, optionId) },
             action: { onAction(item, actionUsesQuickPath) }
         )
+    }
+
+    private func petQuickActionSemantic(_ item: QuickActionItem, state: HomeQuickActionRenderSnapshot) -> PetQuickActionSemantic? {
+        guard !card.isHuman else { return nil }
+        if item.actionType != "walk", !state.menuPolicy.showsQuickButton { return .fillRecord }
+        switch item.actionType {
+        case "walk": return .startWalk
+        case "weight", "expense", "moment", "health", "medication": return .fillRecord
+        case "feed" where state.status == HomeQuickStatusCopy(l).needsSetup: return .fillRecord
+        default: return .recordOnce
+        }
     }
 
     private func makeAddEmbeddedAction(

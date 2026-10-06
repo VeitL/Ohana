@@ -39,6 +39,12 @@ struct ProtectionDocumentContentPopup: View {
     @State private var attachmentIsImage = false
     @State private var hasNewAttachment = false
     @State private var isSaving = false
+    @State private var initialDraft: [String]?
+    private var editorDraft: [String] {
+        [title, category.rawValue, String(hasIssueDate), String(issueDate.timeIntervalSince1970),
+         String(hasExpiryDate), String(expiryDate.timeIntervalSince1970), issuingAuthority, notes,
+         costText, selectedPayerId ?? "", attachmentFilename, String(hasNewAttachment)]
+    }
     @State private var importErrorMessage: String?
     @State private var showImportErrorAlert = false
 
@@ -160,24 +166,22 @@ struct ProtectionDocumentContentPopup: View {
                 ? l.tr(zh: "编辑证件", en: "Edit Document", de: "Dokument bearbeiten")
                 : l.tr(zh: "添加证件", en: "Add Document", de: "Dokument hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel, action: close)
-                        .accessibilityIdentifier("protection-document-cancel-action")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Sichern"), action: save)
-                        .disabled(!canSave)
-                        .accessibilityIdentifier("protection-document-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: initialDraft.map { $0 != editorDraft } ?? false,
+                isSaving: isSaving, canSave: canSave,
+                closeIdentifier: "protection-document-cancel-action",
+                saveIdentifier: "protection-document-save-action",
+                onCancel: close, onSave: save
+            )
         }
         .accessibilityIdentifier("protection-document-editor")
         .onAppear {
+            guard initialDraft == nil else { return }
             selectedPayerId = currentPayerId
             if !isEdit {
                 applyCategoryDefaults(force: true)
             }
+            initialDraft = editorDraft
         }
         .onChange(of: category) { oldValue, newValue in
             let previousSpec = ProtectionDocumentFormSpec.spec(for: oldValue, petName: pet.name, l: l)

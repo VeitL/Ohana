@@ -68,7 +68,7 @@ extension AddPlantView {
                 subtitle: l.tr(zh: "添加后会根据这些信息生成本地护理计划。", en: "After adding, Ohana generates local care plans from this info.", de: "Nach dem Hinzufügen erzeugt Ohana lokale Pflegepläne aus diesen Infos.")
             ) {
                 Toggle(l.tr(zh: "开启提醒", en: "Enable reminders", de: "Erinnerungen aktivieren"), isOn: $remindersEnabled)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goPrimary)
             }
@@ -85,6 +85,9 @@ extension AddPlantView {
     }
 
     var toxicitySummary: String {
+        if selectedCatalog == nil {
+            return l.tr(zh: "品种未确定，安全资料待确认", en: "Species unknown · safety unconfirmed", de: "Art unbekannt · Sicherheit ungeklärt")
+        }
         var risks: [String] = []
         if isToxicToCats { risks.append(l.tr(zh: "猫", en: "cats", de: "Katzen")) }
         if isToxicToDogs { risks.append(l.tr(zh: "狗", en: "dogs", de: "Hunde")) }
@@ -113,7 +116,7 @@ extension AddPlantView {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 28, height: 28) // a11y: allow decorative row glyph; the full review row button owns the 44pt hit target.
@@ -122,18 +125,18 @@ extension AddPlantView {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                     Text(value)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(2)
                         .minimumScaleFactor(0.72)
                 }
                 Spacer(minLength: 8)
                 Image(systemName: "pencil") // a11y: allow decorative edit affordance; row text labels the edit target.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .accessibilityHidden(true)
             }

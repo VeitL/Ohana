@@ -14,6 +14,7 @@ enum IslandWealthDashboardPresentation: Equatable {
 }
 
 struct IslandWealthDashboardView: View {
+    let showsCloseButton: Bool
     let presentation: IslandWealthDashboardPresentation
 
     @Environment(\.modelContext) private var modelContext
@@ -21,8 +22,9 @@ struct IslandWealthDashboardView: View {
     @State private var routeData = IslandWealthDashboardRouteData()
     @State private var dataLoadTask: Task<Void, Never>?
 
-    init(presentation: IslandWealthDashboardPresentation = .standalone) {
+    init(presentation: IslandWealthDashboardPresentation = .standalone, showsCloseButton: Bool = true) {
         self.presentation = presentation
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
@@ -31,7 +33,8 @@ struct IslandWealthDashboardView: View {
             humans: routeData.humans,
             walletAccounts: routeData.walletAccounts,
             walletLedgerEntries: routeData.walletLedgerEntries,
-            presentation: presentation
+            presentation: presentation,
+            showsCloseButton: showsCloseButton
         )
         .onAppear {
             scheduleRouteDataLoad()

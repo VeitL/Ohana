@@ -145,6 +145,8 @@ scripts/cleanup-local-build-storage.sh --scope safe
 scripts/cleanup-local-build-storage.sh --scope results
 
 # Dead replacement copies of Ohana.app in the shutdown iPhone 17 Tests only.
+# With multiple runtimes, OHANA_TEST_SIMULATOR_UDID selects the exact Tests
+# device; Dogfood and every other device name remain forbidden.
 scripts/cleanup-local-build-storage.sh --scope test-app-cache
 
 # Explicit low-space relief for unfinished MobileAsset downloads in the
@@ -156,10 +158,16 @@ scripts/cleanup-local-build-storage.sh --scope test-transient-cache
 # executable products and xctestrun for xcode-test.sh --without-building.
 scripts/cleanup-local-build-storage.sh --scope test-intermediates
 
+# Only Build/Intermediates.noindex and Build/Products in system Ohana-* caches
+# whose info.plist identifies a registered worktree's Ohana project. Preserve
+# indexes, logs, localization output, other projects, and all shared lanes.
+scripts/cleanup-local-build-storage.sh --scope project-build-cache
+
 # Active shared DerivedData only; Simulator data is still excluded.
 scripts/cleanup-local-build-storage.sh --scope derived-data
 
-# Combine all scopes.
+# Combine safe, results, and shared derived-data scopes. The narrow cache
+# scopes above remain explicit.
 scripts/cleanup-local-build-storage.sh --scope all
 ```
 

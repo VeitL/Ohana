@@ -73,7 +73,13 @@ struct DocumentsListContentView: View {
             }
         }
         .accessibilityIdentifier("pet-documents-screen")
-        .toolbar(.hidden, for: .navigationBar)
+        .navigationTitle(l.tr(zh: "证件保障", en: "Documents and protection", de: "Dokumente und Schutz"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if showsCloseButton {
+                OhanaModalToolbar(onClose: { if let onClose { onClose() } else { dismiss() } }, closeIdentifier: "pet-documents-close-action")
+            }
+        }
         .sheet(item: $activePopup) { popup in
             switch popup {
             case .addDocument:
@@ -86,10 +92,10 @@ struct DocumentsListContentView: View {
                 ProtectionInsurancePopup(pet: pet, existing: insurance) { activePopup = nil }
             }
         }
-        .sheet(item: $detailDoc) { doc in
-            DocumentDetailSheet(doc: doc, pet: pet, onEdit: { activePopup = .editDocument(doc) })
+        .navigationDestination(item: $detailDoc) { doc in
+            DocumentDetailSheet(doc: doc, pet: pet)
         }
-        .sheet(item: $selectedInsurance) { insurance in
+        .navigationDestination(item: $selectedInsurance) { insurance in
             InsurancePolicyDetailSheet(insurance: insurance, pet: pet)
         }
         .alert(l.tr(zh: "删除证件？", en: "Delete document?", de: "Dokument löschen?"), isPresented: Binding(
@@ -149,31 +155,14 @@ struct DocumentsListContentView: View {
             ProtectionPetAvatar(pet: pet, size: 48)
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "证件保障", en: "Documents and protection", de: "Dokumente und Schutz"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(pet.name)
                     .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
             Spacer()
-            if showsCloseButton {
-                Button {
-                    if let onClose {
-                        onClose()
-                    } else {
-                        dismiss()
-                    }
-                } label: {
-                    Image(systemName: "xmark").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black))
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                .accessibilityIdentifier("pet-documents-close-action")
-            }
+
         }
     }
 
@@ -196,7 +185,7 @@ struct DocumentsListContentView: View {
     private func statusMetric(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(value)
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -235,7 +224,7 @@ struct DocumentsListContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Label(selectedSection.title(l), systemImage: selectedSection.icon)
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
             }

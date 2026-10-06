@@ -37,17 +37,12 @@ struct SwipeableEventRow: View {
     @State private var activeDragAxis: DragAxis? = nil
 
     // Overdue emphasis stays static in list geometry; rows must not drift while the user scans.
-    @State private var overdueBreath: Bool = false
 
     private let triggerThreshold: CGFloat = 100
     private let dampFactor: CGFloat = 0.4
     private enum DragAxis {
         case horizontal
         case vertical
-    }
-
-    private var shouldReduceWork: Bool {
-        powerSavingMode || reduceMotion || AppPerformanceMode.systemPrefersReducedWork
     }
 
     private var leftProgress: CGFloat { max(0, -offsetX) / triggerThreshold }
@@ -101,7 +96,7 @@ struct SwipeableEventRow: View {
                         Image(systemName: leftProgress >= 1 ? "checkmark.circle.fill" : "checkmark.circle")
                             .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text(l.tr(zh: "完成", en: "Done", de: "Erledigt")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        Text(l.tr(zh: "完成", en: "Done", de: "Erledigt")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, leftProgress * 1.5))
@@ -120,7 +115,7 @@ struct SwipeableEventRow: View {
                         Image(systemName: "trash.fill").accessibilityHidden(true)
                             .font(OhanaFont.adaptive(size: 20, weight: .bold))
                             .symbolRenderingMode(.monochrome)
-                        Text(l.tr(zh: "删除", en: "Delete", de: "Löschen")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        Text(l.tr(zh: "删除", en: "Delete", de: "Löschen")).font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     }
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .opacity(min(1, rightProgress * 1.5))
@@ -161,15 +156,6 @@ struct SwipeableEventRow: View {
                 ? l.tr(zh: "这是一个重复事件，请选择删除方式", en: "This event repeats. Choose how to delete it.", de: "Dieser Termin wiederholt sich. Wähle die Löschart.")
                 : l.tr(zh: "确定要删除「\(event.title)」吗？此操作不可撤回。", en: "Delete \"\(event.title)\"? This cannot be undone.", de: "\"\(event.title)\" löschen? Dies kann nicht rückgängig gemacht werden."))
         }
-        .onAppear {
-            guard rowState == .overdue, !shouldReduceWork else {
-                overdueBreath = false
-                return
-            }
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) { // ui-v4: allow overdue warning breath, gated by reduce-work policy. // smoothness: allow pre-existing or workload-gated path surfaced by accessibility font migration; tracked by full-scope ratchet.
-                overdueBreath = true
-            }
-        }
     }
 
     // MARK: - Event Card
@@ -196,10 +182,9 @@ struct SwipeableEventRow: View {
                     Circle()
                         .fill(Color(hex: "FF5A00"))
                         .frame(width: 40, height: 40) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                        .scaleEffect(overdueBreath ? 1.05 : 1.0)
                     if leftProgress > 0.3 {
                         Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 16, weight: .black))
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                             .foregroundStyle(Color.arkInk)
                             .opacity(Double((leftProgress - 0.3) / 0.7))
                             .scaleEffect(0.5 + leftProgress * 0.5)
@@ -229,7 +214,7 @@ struct SwipeableEventRow: View {
                     // Morph icon → checkmark as swipe deepens
                     if leftProgress > 0.4 {
                         Image(systemName: "checkmark").accessibilityHidden(true)
-                            .font(OhanaFont.adaptive(size: 16, weight: .black))
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                             .foregroundStyle(Color.arkInk)
                             .opacity(Double((leftProgress - 0.4) / 0.6))
                             .scaleEffect(0.5 + leftProgress * 0.5)
@@ -246,7 +231,7 @@ struct SwipeableEventRow: View {
             // 中间信息区
             VStack(alignment: .leading, spacing: 4) {
                 Text(event.title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                     .foregroundStyle(rowState == .completed ? titleMuted : titlePrimary)
                     .strikethrough(rowState == .completed, color: titleMuted.opacity(0.9))
                     .lineLimit(1)
@@ -254,7 +239,7 @@ struct SwipeableEventRow: View {
 
                 HStack(spacing: 6) {
                     Text(event.eventTypeEnum?.localizedLabel(l) ?? event.eventType)
-                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                         .foregroundStyle(eventNodeColor)
                         .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(eventNodeColor.opacity(0.15), in: Capsule())
@@ -267,7 +252,7 @@ struct SwipeableEventRow: View {
                     }
                     if rowState == .overdue {
                         Text(l.tr(zh: "逾期", en: "Overdue", de: "Überfällig"))
-                            .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                             .foregroundStyle(Color(hex: "FF5A00"))
                             .padding(.horizontal, 5).padding(.vertical, 1)
                             .background(Color(hex: "FF5A00").opacity(0.12), in: Capsule())
@@ -287,11 +272,11 @@ struct SwipeableEventRow: View {
                         .foregroundStyle(Color.goPrimary)
                 } else if event.isAllDay {
                     Text(l.tr(zh: "全天", en: "All day", de: "Ganztägig"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(timeSecondary)
                 } else {
                     Text(occurrenceDisplayStart, style: .time)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(rowState == .overdue ? Color(hex: "FF5A00") : timeSecondary)
                         .monospacedDigit()
                 }
@@ -601,7 +586,7 @@ struct CalendarEventDetailPage: View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "事项详情", en: "Event details", de: "Termindetails"))
-                    .font(OhanaFont.adaptive(size: 26, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 26, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .accessibilityIdentifier("calendar-event-detail-page")
@@ -617,7 +602,7 @@ struct CalendarEventDetailPage: View {
                 dismiss()
             } label: {
                 Image(systemName: "xmark").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -644,7 +629,7 @@ struct CalendarEventDetailPage: View {
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(event.title)
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -771,7 +756,7 @@ struct CalendarEventDetailPage: View {
     ) -> some View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
-                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .bold, design: .default))
                 .foregroundStyle(foreground)
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: 52)
@@ -893,11 +878,11 @@ struct CalendarEventDetailPage: View {
                 .foregroundStyle(nodeColor)
                 .frame(width: 22)
             Text(label)
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Spacer()
             Text(value)
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
         }
         .padding(.horizontal, 24)

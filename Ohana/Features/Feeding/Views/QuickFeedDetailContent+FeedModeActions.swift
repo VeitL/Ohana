@@ -25,11 +25,6 @@ extension QuickFeedDetailContent {
         draftStore.isSavingFeedPlan = true
         runtimeState.resetPendingFeedRefresh()
         feedPlanSaveTask?.cancel()
-        collapseEmbeddedPanel()
-        closeActiveFeedSheet()
-        performFeedModeUpdatesWithoutAnimation {
-            feedHomeController.setModeImmediately(targetMode, pet: pet)
-        }
         UISelectionFeedbackGenerator().selectionChanged()
 
         feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
@@ -56,6 +51,8 @@ extension QuickFeedDetailContent {
                 else {
                     throw FeedCommandPersistenceError.persistenceFailed(nil)
                 }
+                collapseEmbeddedPanel()
+                closeActiveFeedSheet()
                 runtimeState.installSuccessfulRuleWrite(
                     events: result.events,
                     affectedPetIDs: result.affectedPetIDs,
@@ -284,8 +281,6 @@ extension QuickFeedDetailContent {
         guard !draftStore.isSavingFeedPlan else { return }
         draftStore.isSavingFeedPlan = true
         feedPlanSaveTask?.cancel()
-        collapseEmbeddedPanel()
-        closeActiveFeedSheet()
         UISelectionFeedbackGenerator().selectionChanged()
 
         feedPlanSaveTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: feedPlanSaveDelayMilliseconds) {
@@ -298,6 +293,8 @@ extension QuickFeedDetailContent {
                         allEvents: latestAllEvents()
                     )
                 }
+                collapseEmbeddedPanel()
+                closeActiveFeedSheet()
                 let latestEvents = latestAllEvents()
                 let resolvedMode = result.shouldSwitchToManual ? FeedOperatingMode.manual : FeedOperatingMode.resolved(
                     pet: pet,

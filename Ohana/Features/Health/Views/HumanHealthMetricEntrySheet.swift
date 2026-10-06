@@ -205,7 +205,7 @@ struct HumanHealthMetricEntrySheet: View {
                         readOnlyNotice
                     }
                     valueBlock
-                    EmbeddedDecimalKeypad(
+                    OhanaDecimalInput(
                         text: $valueText,
                         countryCode: appCountry,
                         maxFractionDigits: inputFractionDigits,
@@ -235,18 +235,15 @@ struct HumanHealthMetricEntrySheet: View {
             .accessibilityIdentifier("human-health-metric-entry-sheet-\(metric.key)")
             .navigationTitle(l.tr(zh: "记录指标", en: "Record metric", de: "Wert erfassen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { close() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if !human.hasPassedAway {
-                        Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                            .disabled(!isValid || presentationState.isSaving || requiresRecorderSelection)
-                            .accessibilityIdentifier("human-health-metric-entry-save-action")
-                    }
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: !valueText.isEmpty || !notes.isEmpty,
+                isSaving: presentationState.isSaving,
+                canSave: isValid && !requiresRecorderSelection && !human.hasPassedAway,
+                closeIdentifier: "ohana-sheet-close-action",
+                saveIdentifier: "human-health-metric-entry-save-action",
+                onCancel: close,
+                onSave: save
+            )
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
@@ -338,14 +335,14 @@ struct HumanHealthMetricEntrySheet: View {
     private var header: some View {
         HStack(alignment: .center, spacing: 12) {
             Image(systemName: metric.category.systemImage)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(metric.category.colorToken.actionTextColor)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: Circle())
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.tr(zh: "记录指标", en: "Record metric", de: "Wert erfassen"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .accessibilityIdentifier("human-health-metric-entry-sheet-\(metric.key)")
                 Text(metric.displayName(l))
@@ -383,7 +380,7 @@ struct HumanHealthMetricEntrySheet: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(valueText.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: inputFractionDigits, countryCode: appCountry) : valueText)
-                    .font(OhanaFont.metric(size: 52, .black))
+                    .font(OhanaFont.metric(size: 52, .semibold))
                     .foregroundStyle(valueText.isEmpty ? Color.ohanaTertiaryText : Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .minimumScaleFactor(0.45)
@@ -391,7 +388,7 @@ struct HumanHealthMetricEntrySheet: View {
                     .accessibilityIdentifier("human-health-metric-entry-value")
 
                 Text(selectedUnit.label)
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
@@ -416,7 +413,7 @@ struct HumanHealthMetricEntrySheet: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(unit.label)
-                                .font(OhanaFont.subheadline(.black))
+                                .font(OhanaFont.subheadline(.semibold))
                             Text(unit.normalRangeLabel(includeUnit: false))
                                 .font(OhanaFont.caption2(.bold))
                                 .opacity(0.74)
@@ -454,7 +451,7 @@ struct HumanHealthMetricEntrySheet: View {
                             .environment(\.locale, AppLanguage.effectiveLocale)
                     } else {
                         Text(l.tr(zh: "可选", en: "Optional", de: "Optional"))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Toggle("", isOn: $includesRecordTime.animation(GoMotion.feedback))
@@ -490,16 +487,16 @@ struct HumanHealthMetricEntrySheet: View {
     private var referenceBlock: some View {
         HStack(spacing: 12) {
             Image(systemName: "target").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                 .background(tint.opacity(0.15), in: Circle())
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "参考范围", en: "Reference range", de: "Referenzbereich"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaTertiaryText)
                 Text(selectedUnit.normalRangeLabel())
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             Spacer(minLength: 0)
@@ -518,7 +515,7 @@ struct HumanHealthMetricEntrySheet: View {
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存指标", en: "Save metric", de: "Wert speichern")
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
             }
             .foregroundStyle(isValid && !presentationState.isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)

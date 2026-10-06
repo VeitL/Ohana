@@ -298,7 +298,7 @@ enum OasisEmbeddedLayoutPolicy {
 
         let topPadding: CGFloat = height >= 620 ? 4 : 2
         let sectionSpacing: CGFloat = height >= 620 ? 8 : 6
-        let bottomPadding: CGFloat = height >= 620 ? 8 : 6
+        let bottomPadding: CGFloat = height >= 620 ? 24 : 20
         let chromeHeight = topPadding + sectionSpacing + bottomPadding
         let contentHeight = max(0, height - chromeHeight)
         let idealBentoHeight = min(148, max(112, contentHeight * 0.23))
@@ -349,7 +349,6 @@ struct OasisRewardView: View {
     @State var activeBentoFeatureInfo: OasisBentoFeatureInfo?
     @State var confirmationRoute: OasisConfirmationRoute?
     @State var showCritterNest = false
-    @State var critterNestPopupProgress: CGFloat = 0
     @State var energyParticles: [EnergyParticle] = []
     // 模块六：打卡日历
     @State var checkedInDates: Set<String> = [] // "yyyy-MM-dd" 格式
@@ -394,8 +393,6 @@ struct OasisRewardView: View {
     @State var upgradeRewardTask: Task<Void, Never>?
     @State var critterCommandTask: Task<Void, Never>?
     @State var checkInCommandTask: Task<Void, Never>?
-    @State var critterNestOpenTask: Task<Void, Never>?
-    @State var critterNestCloseTask: Task<Void, Never>?
     @State var levelUpFeedbackTask: Task<Void, Never>?
     @State var particleCleanupTask: Task<Void, Never>?
     @State var critterPulseCleanupTask: Task<Void, Never>?
@@ -548,7 +545,7 @@ struct OasisRewardView: View {
     }
 
     var contentTopInset: CGFloat {
-        hideToolbar ? 32 : 64
+        hideToolbar ? 32 : 0
     }
 
     var treeSceneTopPadding: CGFloat {

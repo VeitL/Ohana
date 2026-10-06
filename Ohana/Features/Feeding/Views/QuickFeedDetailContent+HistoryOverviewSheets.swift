@@ -5,9 +5,10 @@ extension QuickFeedDetailContent {
     var manageSheet: some View {
         VStack(alignment: .leading, spacing: 16) {
             sheetHero(icon: "slider.horizontal.3", title: l.tr(zh: "管理", en: "Manage", de: "Verwalten"), tint: Color.goPrimary)
+            PetReminderNotificationStatus()
             VStack(alignment: .leading, spacing: 10) {
                 Text(l.tr(zh: "模式", en: "Mode", de: "Modus"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 feedModeSelector
             }
@@ -23,7 +24,7 @@ extension QuickFeedDetailContent {
             }
             manageRow(
                 icon: FeedRuleKind.manualReminder.iconName,
-                title: l.tr(zh: "喂食计划", en: "Feeding plan", de: "Fütterungsplan"),
+                title: feedScheduleEvents.isEmpty ? PetCareExperienceCopy(l: l).setReminder : PetCareExperienceCopy(l: l).editReminder,
                 value: feedScheduleEvents.isEmpty ? l.tr(zh: "未设置", en: "Not set", de: "Nicht gesetzt") : "\(feedScheduleEvents.count) \(l.tr(zh: "次/天", en: "x/day", de: "x/Tag"))",
                 tint: Color.goPurple
             ) {
@@ -159,7 +160,6 @@ extension QuickFeedDetailContent {
     var editFeedLogSheet: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                sheetHero(icon: "pencil", title: l.tr(zh: "编辑记录", en: "Edit log", de: "Eintrag bearbeiten"), tint: mainFoodTint)
                 gramInput(
                     title: l.tr(zh: "克数", en: "Grams", de: "Gramm"),
                     text: $draftStore.editFeedLogGrams,
@@ -168,26 +168,16 @@ extension QuickFeedDetailContent {
                     quickValues: quickMainGramOptions
                 )
                 DatePicker(l.tr(zh: "时间", en: "Time", de: "Zeit"), selection: $draftStore.editFeedLogDate)
-                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 14, weight: .bold, design: .default))
                     .padding(12)
                     .feedFlatBlockSurface(cornerRadius: OhanaRadius.control)
                 if let inputError = draftStore.inputError {
                     errorText(inputError)
                 }
-                FoodPrimaryButton(title: l.tr(zh: "保存修改", en: "Save changes", de: "Änderungen speichern"), icon: "checkmark", tint: mainFoodTint) {
-                    saveFeedLogEdit()
-                }
             }
             .padding(20)
-            .ohanaAdaptiveSheetContentHeight(
-                adaptiveSheetHeightBinding,
-                minHeight: 330,
-                maxHeight: 540,
-                chromePadding: 66
-            )
         }
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"))
     }
 
     var feedingOverviewSheet: some View {

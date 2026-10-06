@@ -34,13 +34,14 @@ extension VerticalSolidHomeView {
             guard result[card.id] == nil else { return }
             result[card.id] = interaction.expandedActions(for: card.id).candidateItems
         }
-        return HomeToolbarQuickRecordPolicy.targets(
+        let targets = HomeToolbarQuickRecordPolicy.targets(
             for: controller.selectedTab,
             cards: controller.snapshot.cards,
             plants: controller.snapshot.plants,
             quickActionsByCardID: quickActionsByCardID,
             localization: l
         )
+        return HomeToolbarQuickRecordPolicy.contextualTargets(targets, expandedMemberID: expandedBottomBarCard?.id)
     }
 
     func openHomeToolbarQuickRecord(
@@ -64,7 +65,7 @@ extension VerticalSolidHomeView {
                   }),
                   let action,
                   optionID == nil else { return }
-            if action.actionType == "humanMetrics" {
+            if action.actionType == "humanMetrics" || action.actionType == "humanObservation" {
                 guard let privacyProbe = interaction.expandedActions(for: target.entityID)
                     .candidateItems
                     .first(where: { $0.actionType == "humanWeight" }) else { return }
@@ -73,7 +74,7 @@ extension VerticalSolidHomeView {
                     return
                 }
                 OhanaFeedback.light()
-                routeCoordinator.openSheet(.humanMetrics(target.entityID))
+                routeCoordinator.openSheet(action.actionType == "humanObservation" ? .humanObservationQuick(target.entityID) : .humanMetrics(target.entityID))
                 return
             }
             openQuickActionItem(action, card: card, usesPrimaryAction: true)

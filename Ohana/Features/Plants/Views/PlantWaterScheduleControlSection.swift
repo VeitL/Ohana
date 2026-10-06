@@ -52,7 +52,7 @@ struct PlantWaterScheduleControlSection: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "calendar.badge.clock") // a11y: allow decorative header glyph; adjacent text carries the content.
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goYellow)
                 .frame(width: 36, height: 36) // a11y: allow non-interactive header glyph; this is not a hit target.
                 .background(Color.goYellow.opacity(0.14), in: Circle())
@@ -60,11 +60,11 @@ struct PlantWaterScheduleControlSection: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "浇水计划与提醒", en: "Watering plan and reminders", de: "Gießplan und Erinnerungen"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(summary)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.74)
@@ -217,11 +217,11 @@ struct PlantWaterScheduleControlSection: View {
         if let persistenceError {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill") // a11y: allow decorative error glyph; adjacent text announces the failure.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(Color.goRed)
                     .accessibilityHidden(true)
                 Text(persistenceError)
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     .foregroundStyle(Color.goRed)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -237,10 +237,10 @@ struct PlantWaterScheduleControlSection: View {
         Button(action: onResync) {
             HStack(spacing: 8) {
                 Image(systemName: "arrow.triangle.2.circlepath") // a11y: allow decorative sync glyph; button text names the action.
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .accessibilityHidden(true)
                 Text(l.tr(zh: "同步浇水日历计划", en: "Sync watering calendar plan", de: "Gießkalender synchronisieren"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
             }
@@ -263,20 +263,20 @@ struct PlantWaterScheduleControlSection: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
                 Spacer(minLength: 8)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.goTeal)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
             }
 
             Text(footnote)
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }

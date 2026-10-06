@@ -156,6 +156,7 @@ nonisolated struct PlantDetailLogSummary: Equatable, Sendable {
     let latestHealthReviewLog: PlantDetailLogSnapshot?
     let recentStressSignalCount: Int
     let recentObservationLogCount: Int
+    let recentCareCount: Int
 
     var hasLogs: Bool { logCount > 0 }
     var hasRecentStressSignals: Bool { recentStressSignalCount > 0 }
@@ -168,6 +169,7 @@ nonisolated struct PlantDetailRenderData: Sendable {
     let taskSummary: PlantDetailTaskSummary
     let logSummary: PlantDetailLogSummary
     let galleryPhotoItems: [PlantDetailPhotoItem]
+    let growthComparisonPhotos: [PlantDetailPhotoItem]
     let growthDiaryPhotoCount: Int
 }
 

@@ -636,7 +636,7 @@ struct GrowthUnlockStageExplorer: View {
                             .font(OhanaFont.caption2(.black))
                             .foregroundStyle(accent)
                         Text(step.title(language: appLanguage))
-                            .font(OhanaFont.title3(.black))
+                            .font(OhanaFont.brandTitle(.title3, weight: .bold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .fixedSize(horizontal: false, vertical: true)
                     }

@@ -45,9 +45,9 @@ struct WalkTrackingFullScreen: View {
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: "chevron.down").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 12, weight: .heavy))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 Text(l.tr(zh: "收起", en: "Minimize", de: "Minimieren"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
             }
             .foregroundStyle(Color.goCardWhite)
             .padding(.horizontal, 12)

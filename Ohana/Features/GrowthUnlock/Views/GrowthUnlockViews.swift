@@ -57,7 +57,7 @@ struct GrowthUnlockRulesSheet: View {
                 ko: "코코넛 나무 도감",
                 it: "Atlante dell’albero di cocco"
             ))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.brandTitle(.title3, weight: .bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             Spacer(minLength: 8)
@@ -151,7 +151,7 @@ struct GrowthUnlockProgressCard: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(localized(zh: "生命之树 Lv.\(currentLevel)", en: "Life Tree Lv.\(currentLevel)", de: "Lebensbaum Lv.\(currentLevel)"))
-                        .font(isCompact ? OhanaFont.callout(.black) : OhanaFont.title3(.black))
+                        .font(isCompact ? OhanaFont.callout(.black) : OhanaFont.brandTitle(.title3, weight: .bold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(currentStep.title(language: appLanguage))
                         .font(OhanaFont.caption(.black))
@@ -312,7 +312,7 @@ struct GrowthUnlockRoadmapView: View {
                 ko: "코코넛 나무 성장 경로",
                 it: "Percorso dell’albero di cocco"
             ))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.brandTitle(.title3, weight: .bold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)

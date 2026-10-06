@@ -8,10 +8,9 @@ struct FunctionMenuRootView: View {
     let humans: [Human]
 
     @Environment(AppServices.self) private var appServices
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(GrowthNewFeatureStore.revisionKey) private var newFeatureRevision = 0
 
-    private var activePets: [Pet] { pets.filter { !$0.hasPassedAway } }
-    private var visibleHumans: [Human] { humans.filter { !$0.hasPassedAway } }
     private var l: L10n { L10n(appLanguage) }
     private var currentTreeLevel: Int { appServices.oasisTree.treeLevel.rawValue }
 
@@ -31,9 +30,6 @@ struct FunctionMenuRootView: View {
 
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 18) {
-                    rootHeader
-                        .padding(.top, 10)
-
                     GrowthUnlockProgressCard(
                         currentLevel: currentTreeLevel,
                         progressToNextLevel: appServices.oasisTree.progressToNextLevel,
@@ -55,9 +51,8 @@ struct FunctionMenuRootView: View {
                             ForEach(functionMenuGroups, id: \.self) { group in
                                 menuTile(
                                     icon: group.icon,
-                                    iconColor: group.color,
                                     title: group.title(l: l),
-                                    status: compactSubtitle(for: subtitle(for: group)),
+                                    status: subtitle(for: group),
                                     showsNewFeature: showsPendingGroup(group),
                                     accessibilityIdentifier: "function-menu-group-\(group.rawValue)"
                                 ) {
@@ -82,9 +77,8 @@ struct FunctionMenuRootView: View {
                                 ForEach(toolEntries) { entry in
                                     menuTile(
                                         icon: entry.icon,
-                                        iconColor: entry.color,
                                         title: entry.title,
-                                        status: compactSubtitle(for: entry.subtitle),
+                                        status: entry.subtitle,
                                         showsNewFeature: showsPendingDestination(entry.destination),
                                         accessibilityIdentifier: "function-menu-tool-\(entry.id)"
                                     ) {
@@ -99,36 +93,12 @@ struct FunctionMenuRootView: View {
                 .padding(.bottom, 30)
             }
         }
-        .accessibilityIdentifier("function-menu-root")
-    }
-
-    private var rootHeader: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                .foregroundStyle(Color.goPrimary)
-                .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-
-            Text(l.tr(
-                zh: "更多功能", en: "More", de: "Mehr",
-                es: "Más", pt: "Mais", fr: "Plus",
-                ja: "その他", ko: "더보기", it: "Altro"
-            ))
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-
-            Spacer()
-
-            Button(action: onClose) {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
+        .navigationTitle(l.tr(zh: "更多功能", en: "More", de: "Mehr", es: "Más", pt: "Mais", fr: "Plus", ja: "その他", ko: "더보기", it: "Altro"))
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            OhanaModalToolbar(onClose: onClose, closeIdentifier: "function-menu-close")
         }
+        .accessibilityIdentifier("function-menu-root")
     }
 
     private var functionMenuGroups: [FeatureGroup] {
@@ -140,7 +110,7 @@ struct FunctionMenuRootView: View {
     }
 
     private var columns: [GridItem] {
-        [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+        Array(repeating: GridItem(.flexible(), spacing: 10), count: dynamicTypeSize.isAccessibilitySize ? 1 : 2)
     }
 
     private var toolEntries: [ToolEntry] {
@@ -150,7 +120,6 @@ struct FunctionMenuRootView: View {
                 title: l.tr(zh: "Oasis 收益", en: "Oasis Income", de: "Oasis-Erträge"),
                 subtitle: wealthSubtitle,
                 icon: "creditcard.fill",
-                color: Color(hex: "EAB308"),
                 destination: .wealthDashboard
             ),
             ToolEntry(
@@ -158,23 +127,32 @@ struct FunctionMenuRootView: View {
                 title: l.tr(zh: "成就", en: "Achievements", de: "Erfolge"),
                 subtitle: l.tr(zh: "本人 · 伙伴 · 全岛", en: "You · Pets · Island", de: "Du · Tiere · Insel"),
                 icon: "trophy.fill",
-                color: Color(hex: "EAB308"),
                 destination: .featureAggregate(.achievements)
             ),
             ToolEntry(
                 id: "shop",
                 title: l.tr(zh: "椰子商店", en: "Coconut Shop", de: "Kokos-Shop"),
-                subtitle: l.tr(zh: "装饰 · 周报 · 奖励", en: "Cosmetics · Reports · Rewards", de: "Deko · Berichte · Belohnungen"),
+                subtitle: l.tr(
+                    zh: "绿洲装饰、图标与成员外观", en: "Oasis decor, icons and member looks", de: "Oasis-Deko, Symbole und Mitglieder-Looks",
+                    es: "Decoración, iconos y aspecto de miembros", pt: "Decoração, ícones e visual dos membros", fr: "Décor, icônes et apparence des membres",
+                    ja: "オアシスの装飾、アイコン、メンバーの外観", ko: "오아시스 장식, 아이콘과 멤버 외관", it: "Decorazioni, icone e aspetto dei membri"
+                ),
                 icon: "bag.fill",
-                color: Color(hex: "EAB308"),
                 destination: .coconutShop
             ),
             ToolEntry(
                 id: "gacha",
-                title: l.tr(zh: "收藏玩法", en: "Collection Play", de: "Sammlungsspiel"),
-                subtitle: l.tr(zh: "扭蛋 · 收藏", en: "Draws · Collection", de: "Ziehungen · Sammlung"),
+                title: l.tr(
+                    zh: "盲盒收藏", en: "Blind Box", de: "Blindbox",
+                    es: "Caja sorpresa", pt: "Caixa surpresa", fr: "Boîte surprise",
+                    ja: "ブラインドボックス", ko: "블라인드 박스", it: "Scatola sorpresa"
+                ),
+                subtitle: l.tr(
+                    zh: "用椰子抽取收藏品", en: "Draw collectibles with coconuts", de: "Sammelfiguren mit Kokosnüssen ziehen",
+                    es: "Consigue coleccionables con cocos", pt: "Sorteie colecionáveis com cocos", fr: "Obtenez des objets avec des noix de coco",
+                    ja: "ココナッツでコレクションを引く", ko: "코코넛으로 수집품 뽑기", it: "Estrai oggetti da collezione con il cocco"
+                ),
                 icon: "circle.grid.cross.fill",
-                color: Color(hex: "F97316"),
                 destination: .gacha
             )
         ]
@@ -190,24 +168,42 @@ struct FunctionMenuRootView: View {
     private func subtitle(for group: FeatureGroup) -> String {
         switch group {
         case .dailyCare:
-            hasDogs
-                ? l.tr(zh: "饮食 · 清洁 · 遛狗 · 便便", en: "Food · Hygiene · Walks · Potty", de: "Futter · Pflege · Gassi · Toilette")
-                : l.tr(zh: "饮食 · 清洁 · 便便", en: "Food · Hygiene · Potty", de: "Futter · Pflege · Toilette")
+            l.tr(
+                zh: "记录饮食与日常照护", en: "Log food and daily care", de: "Futter und tägliche Pflege erfassen",
+                es: "Registra comida y cuidados diarios", pt: "Registre alimentação e cuidados diários", fr: "Notez les repas et les soins quotidiens",
+                ja: "食事と日々のお世話を記録", ko: "식사와 일상 돌봄 기록", it: "Registra cibo e cure quotidiane"
+            )
         case .healthBody:
-            l.tr(zh: "健康概览 · 用药趋势", en: "Health · Medication trends", de: "Gesundheit · Medikamententrends")
+            l.tr(
+                zh: "查看健康与用药记录", en: "Review health and medication", de: "Gesundheit und Medikamente ansehen",
+                es: "Revisa salud y medicación", pt: "Veja saúde e medicação", fr: "Consultez la santé et les médicaments",
+                ja: "健康と投薬の記録を確認", ko: "건강과 투약 기록 확인", it: "Consulta salute e farmaci"
+            )
         case .archiveMemory:
-            l.tr(zh: "成长 · 基本信息 · 证件 · 时刻", en: "Growth · Profile · Documents · Moments", de: "Wachstum · Profil · Dokumente · Momente")
+            l.tr(
+                zh: "资料、证件与成长时刻", en: "Profiles, documents and moments", de: "Profile, Dokumente und Momente",
+                es: "Perfiles, documentos y momentos", pt: "Perfis, documentos e momentos", fr: "Profils, documents et moments",
+                ja: "プロフィール、書類、成長の思い出", ko: "프로필, 문서와 성장 순간", it: "Profili, documenti e momenti"
+            )
         case .householdHub:
-            l.tr(zh: "体重 · 花费 · 周报 · 回顾", en: "Weight · Expenses · Reports · Review", de: "Gewicht · Ausgaben · Berichte · Rückblick")
+            l.tr(
+                zh: "体重、花费与照护回顾", en: "Weight, expenses and care review", de: "Gewicht, Ausgaben und Pflegerückblick",
+                es: "Peso, gastos y resumen de cuidados", pt: "Peso, gastos e resumo dos cuidados", fr: "Poids, dépenses et bilan des soins",
+                ja: "体重、支出、お世話の振り返り", ko: "체중, 지출과 돌봄 돌아보기", it: "Peso, spese e riepilogo delle cure"
+            )
         case .oasisRewards:
-            l.tr(zh: "\(wealthSubtitle) · 商店 · 扭蛋", en: "\(wealthSubtitle) · Shop · Gacha", de: "\(wealthSubtitle) · Shop · Gacha")
+            l.tr(
+                zh: "椰子、商店与收藏", en: "Coconuts, shop and collections", de: "Kokosnüsse, Shop und Sammlungen",
+                es: "Cocos, tienda y colecciones", pt: "Cocos, loja e coleções", fr: "Noix de coco, boutique et collections",
+                ja: "ココナッツ、ショップ、コレクション", ko: "코코넛, 상점과 컬렉션", it: "Cocco, negozio e collezioni"
+            )
         case .plants:
-            l.tr(zh: "浇水 · 施肥 · 状态", en: "Watering · Fertilizing · Status", de: "Gießen · Düngen · Status")
+            l.tr(
+                zh: "浇水、施肥与植物状态", en: "Watering, fertilizer and plant status", de: "Gießen, Düngen und Pflanzenzustand",
+                es: "Riego, abono y estado de las plantas", pt: "Rega, adubo e estado das plantas", fr: "Arrosage, engrais et état des plantes",
+                ja: "水やり、肥料、植物の状態", ko: "물주기, 비료와 식물 상태", it: "Acqua, concime e stato delle piante"
+            )
         }
-    }
-
-    private var hasDogs: Bool {
-        activePets.contains { Pet.isDogSpecies($0.species) }
     }
 
     private var wealthSubtitle: String {
@@ -216,10 +212,6 @@ struct FunctionMenuRootView: View {
             en: "Assets \(humans.reduce(0) { $0 + $1.coconutBalance } + pets.reduce(0) { $0 + $1.coconutBalance })🥥",
             de: "Vermoegen \(humans.reduce(0) { $0 + $1.coconutBalance } + pets.reduce(0) { $0 + $1.coconutBalance })🥥"
         )
-    }
-
-    private func compactSubtitle(for subtitle: String) -> String {
-        subtitle.components(separatedBy: " · ").first ?? subtitle
     }
 
     private func select(_ destination: FMDest) {
@@ -244,7 +236,6 @@ struct FunctionMenuRootView: View {
 
     private func menuTile(
         icon: String,
-        iconColor: Color,
         title: String,
         status: String,
         showsNewFeature: Bool = false,
@@ -256,25 +247,27 @@ struct FunctionMenuRootView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     HStack(spacing: 8) {
                         Image(systemName: icon)
-                            .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaFunctionalIcon)
                         Spacer()
                         Image(systemName: "chevron.right") // a11y: allow decorative/status glyph; surrounding text or control label carries meaning
-                            .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .accessibilityHidden(true)
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText.opacity(0.6))
                     }
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.75)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
                         Text(status)
-                            .font(OhanaFont.caption2(.black))
-                            .foregroundStyle(iconColor)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
+                            .font(OhanaFont.caption2(.semibold))
+                            .foregroundStyle(Color.ohanaSecondaryText)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .frame(maxWidth: .infinity, minHeight: 96, alignment: .topLeading)
@@ -297,7 +290,7 @@ struct FunctionMenuRootView: View {
                 .font(OhanaFont.adaptive(size: 10, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary.opacity(0.8))
             Text(title)
-                .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
         }
@@ -310,6 +303,5 @@ private struct ToolEntry: Identifiable {
     let title: String
     let subtitle: String
     let icon: String
-    let color: Color
     let destination: FMDest
 }

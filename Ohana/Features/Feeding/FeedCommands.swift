@@ -19,6 +19,7 @@ struct ManualFeedCommandResult {
     let coconutDelta: Int
     let didPersist: Bool
     let persistenceErrorDescription: String?
+    var recordReference: PetRecordReference? = nil
 }
 
 enum ManualFeedCommand {
@@ -41,6 +42,7 @@ enum ManualFeedCommand {
         pet.dailyPortionGrams = defaultEnabled ? grams : 0
         CloudSyncMutationRecorder.markModified(pet, context: context)
         let saveResult = context.safeSaveResult(publishFailureEvent: true)
+        if !saveResult.didSave { context.rollback() }
         return saveResult.didSave
     }
 
@@ -56,12 +58,23 @@ enum ManualFeedCommand {
         context: ModelContext,
         executorId: String?,
         careEvents: CareEventRecording? = nil,
-        date: Date = Date()
+        date: Date = Date(),
+        note: String = ""
     ) -> ManualFeedCommandResult {
         let careEvents = careEvents ?? CareEventService()
 
-        let quality = QuestManager.QualityBonus.compose(precise: true, hasNote: false, hasPhoto: false)
+        let quality = QuestManager.QualityBonus.compose(precise: true, hasNote: !note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, hasPhoto: false)
         let normalizedTargets = SharedPetTargetResolver.normalizedTargets(targets, fallback: pet)
+        let previousFoodKind = pet.mainFoodKind
+        let previousPortion = pet.dailyPortionGrams
+        let savesDefault = saveAsDefault && MemberWritePolicy.disposition(pet: pet, intent: .activeOnly).allowsDerivedEffects
+        if savesDefault {
+            pet.mainFoodKind = foodKind
+            pet.dailyPortionGrams = grams
+            CloudSyncMutationRecorder.markModified(pet, context: context)
+        }
+        // The fact's first commit also commits an explicitly chosen default.
+        // A failed/no-op fact restores the default and never asks for another record.
         let recorded = if normalizedTargets.count > 1 {
             careEvents.recordSharedManualFeedFact(
                 sourcePet: pet,
@@ -71,7 +84,8 @@ enum ManualFeedCommand {
                 context: context,
                 executorId: executorId,
                 quality: quality,
-                date: date
+                date: date,
+                note: note
             )
         } else {
             singleCareResult(careEvents.recordManualFeedFact(
@@ -82,11 +96,13 @@ enum ManualFeedCommand {
                 quality: quality,
                 date: date,
                 foodKind: foodKind,
-                source: .quickAction
+                source: .quickAction,
+                note: note
             ))
         }
 
         guard recorded.didPersist else {
+            if savesDefault { pet.mainFoodKind = previousFoodKind; pet.dailyPortionGrams = previousPortion }
             return ManualFeedCommandResult(
                 foodKind: foodKind,
                 grams: grams,
@@ -101,6 +117,7 @@ enum ManualFeedCommand {
             )
         }
         guard recorded.didWriteFact else {
+            if savesDefault { pet.mainFoodKind = previousFoodKind; pet.dailyPortionGrams = previousPortion }
             return ManualFeedCommandResult(
                 foodKind: foodKind,
                 grams: grams,
@@ -116,12 +133,6 @@ enum ManualFeedCommand {
         }
 
         let allowsDerivedEffects = recorded.allowsDerivedEffects
-        if allowsDerivedEffects {
-            pet.mainFoodKind = foodKind
-            if saveAsDefault {
-                pet.dailyPortionGrams = grams
-            }
-        }
         let stockReminders = allowsDerivedEffects
             ? FeedingPlanWriter.rebuildFoodStockReminders(
                 pet: pet,
@@ -142,7 +153,8 @@ enum ManualFeedCommand {
             allowsDerivedEffects: allowsDerivedEffects,
             coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
             didPersist: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
         )
     }
 
@@ -231,7 +243,8 @@ enum ManualFeedCommand {
             allowsDerivedEffects: completed.allowsDerivedEffects,
             coconutDelta: completed.coconutDelta,
             didPersist: true,
-            persistenceErrorDescription: nil
+            persistenceErrorDescription: nil,
+            recordReference: completed.logID.map { PetRecordReference(petID: pet.id, recordID: $0) }
         )
     }
 }

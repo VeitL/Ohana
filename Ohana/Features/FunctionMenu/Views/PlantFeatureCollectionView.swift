@@ -166,7 +166,7 @@ struct PlantFeatureCollectionView: View {
     private var pageHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: "square.grid.2x2.fill") // a11y: allow decorative header glyph; title text owns meaning.
-                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow decorative header glyph; surrounding title owns meaning.
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow decorative header glyph; surrounding title owns meaning.
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame.
                 .accessibilityHidden(true)
@@ -176,7 +176,7 @@ struct PlantFeatureCollectionView: View {
                 es: "Funciones de plantas", pt: "Funcionalidades de plantas", fr: "Fonctions des plantes",
                 ja: "植物の機能", ko: "식물 기능", it: "Funzioni delle piante"
             ))
-                .font(OhanaFont.title2(.black))
+                .font(OhanaFont.title2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)

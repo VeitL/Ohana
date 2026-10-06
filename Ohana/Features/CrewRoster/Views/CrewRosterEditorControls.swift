@@ -152,13 +152,13 @@ struct CrewRosterEditorStepperRow: View {
             Spacer(minLength: 8)
             Stepper(value: $value, in: range) {
                 Text("\(value) \(unit)")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goCardWhite)
                     .monospacedDigit()
             }
             .labelsHidden()
             Text("\(value) \(unit)")
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.goCardWhite)
                 .monospacedDigit()
                 .frame(width: 56, alignment: .trailing)
@@ -194,7 +194,7 @@ struct CrewRosterThemeSwatchRow: View {
                                 .frame(width: 28, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                             if selectedHex.uppercased() == hex.uppercased() {
                                 Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(WalletPetCardTheme.prefersDarkForeground(for: hex) ? Color.arkInk : Color.goCardWhite)
                             }
                         }
@@ -218,11 +218,11 @@ struct CrewRosterEditorLabel: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 18)
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.goCardWhite.opacity(0.82))
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)

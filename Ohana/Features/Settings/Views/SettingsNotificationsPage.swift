@@ -93,15 +93,7 @@ struct SettingsNotificationsPage: View {
     private var presenceSafetyRow: some View {
         NavigationLink {
             PresenceSafetySettingsView()
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button(role: .cancel, action: onClose) {
-                            Label(l.tr(zh: "关闭", en: "Close", de: "Schließen"), systemImage: "xmark")
-                        }
-                        .labelStyle(.iconOnly)
-                        .accessibilityIdentifier("settings-close-action")
-                    }
-                }
+
         } label: {
             SettingsNavigationLabel(
                 icon: "checkmark.shield.fill",
@@ -405,16 +397,7 @@ private extension View {
             .background(OhanaStaticAppBackground())
             .navigationTitle(title)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(role: .cancel, action: onClose) {
-                        Label(closeLabel, systemImage: "xmark")
-                    }
-                    .labelStyle(.iconOnly)
-                    .accessibilityLabel(closeLabel)
-                    .accessibilityIdentifier("settings-close-action")
-                }
-            }
+
             .accessibilityIdentifier(screenIdentifier)
     }
 }

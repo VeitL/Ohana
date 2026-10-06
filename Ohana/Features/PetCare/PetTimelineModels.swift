@@ -20,6 +20,8 @@ nonisolated struct UnifiedLogItem: Identifiable {
     var style: PetTimelineItemStyle = .rail
     var isHighlight: Bool = false
     var sharedSessionID: UUID?
+    var actionType: String? = nil
+    var recordIDs: [UUID] = []
 }
 
 nonisolated enum PetTimelineItemStyle: Sendable {
@@ -98,6 +100,12 @@ nonisolated struct PetTimelineRenderItem: Identifiable, Sendable {
     var style: PetTimelineItemStyle = .rail
     var isHighlight: Bool = false
     var sharedSessionID: UUID?
+    var actionType: String? = nil
+    var recordIDs: [UUID] = []
+
+    func containsRecord(_ recordID: UUID) -> Bool {
+        id == recordID || recordIDs.contains(recordID)
+    }
 }
 
 nonisolated struct PetTimelineRenderSection: Identifiable, Sendable {
@@ -217,7 +225,7 @@ nonisolated enum PetTimelineItemsBuilder {
         }
         for w in sourceRows.weightLogs {
             list.append(UnifiedLogItem(id: w.id, date: w.date, type: "weight",
-                                       title: String(format: "体重 %.1f kg", w.weight), subtitle: "",
+                                       title: "\(l.homeQAWeight) \(String(format: "%.1f", w.weight)) kg", subtitle: "",
                                        iconName: "scalemass.fill", colorToken: .goTeal))
         }
         for c in sourceRows.careLogs {
@@ -226,7 +234,7 @@ nonisolated enum PetTimelineItemsBuilder {
                                        title: careTitle(for: c, session: session, l: l),
                                        subtitle: careSubtitle(for: c, session: session, l: l),
                                        iconName: "sparkles", colorToken: .goPurple,
-                                       sharedSessionID: session?.id))
+                                       sharedSessionID: session?.id, actionType: c.careType.rawValue))
         }
 
         let sorted = list.sorted { $0.date > $1.date }
@@ -329,14 +337,43 @@ nonisolated enum PetTimelineItemsBuilder {
 
     private static func careTitle(for log: PetCareLog, session: SharedCareSession?, l: L10n) -> String {
         guard let session else {
-            return "护理 · \(log.careType.emoji)\(log.careType.rawValue)"
+            let title: String = switch log.careType {
+            case .feeding: l.homeQAFeed
+            case .watering: l.homeQAWater
+            case .litter: l.homeQALitter
+            case .waterChange: l.homeQAWaterChange
+            case .filterClean: l.homeQAFilterClean
+            case .cageCleaning: l.homeQACageClean
+            case .freeFlight: l.homeQAFreeFlight
+            case .play: l.homeQAPlay
+            case .misting: l.tr(zh: "喷水保湿", en: "Misting", de: "Besprühen")
+            case .substrateChange: l.tr(zh: "换垫材", en: "Change substrate", de: "Substrat wechseln")
+            }
+            return "\(log.careType.emoji) \(title)"
         }
         return sharedTitle(prefix: sharedCareActionTitle(for: session, fallback: log.careType, l: l), targetCount: targetCount(for: session, note: log.note), l: l)
     }
 
     private static func careSubtitle(for log: PetCareLog, session: SharedCareSession?, l: L10n) -> String {
-        let visibleNote = SharedCareMetadata.visibleNote(log.note)
-        guard let session else { return visibleNote }
+        var visibleNote = SharedCareMetadata.visibleNote(log.note)
+        if visibleNote.hasPrefix(PetCareLog.manualFeedNoteMarker) ||
+            visibleNote.hasPrefix(PetCareLog.plannedFeedNotePrefix) ||
+            visibleNote.hasPrefix(PetCareLog.plannedWaterNotePrefix) {
+            visibleNote = visibleNote.split(separator: "\n", omittingEmptySubsequences: false).dropFirst().joined(separator: "\n")
+        } else if log.isAutoFeedLogEntry || log.isTreatFeedLogEntry {
+            visibleNote = ""
+        }
+        guard let session else {
+            var parts: [String] = []
+            if log.amountGrams > 0 {
+                parts.append(formattedWholeAmount(log.amountGrams, unit: "g"))
+                parts.append(log.foodKind.title(l))
+            } else if log.amountMl > 0 {
+                parts.append(formattedWholeAmount(log.amountMl, unit: "ml"))
+            }
+            if !visibleNote.isEmpty { parts.append(visibleNote) }
+            return parts.joined(separator: " · ")
+        }
         var parts: [String] = []
         if session.totalAmountGrams > 0 {
             parts.append(formattedWholeAmount(session.totalAmountGrams, unit: "g"))
@@ -478,7 +515,8 @@ nonisolated enum PetTimelineItemsBuilder {
                 colorToken: .goPurple,
                 photos: imageLogs,
                 style: .story,
-                isHighlight: true
+                isHighlight: true,
+                recordIDs: group.map(\.id)
             )
         }
 
@@ -758,7 +796,9 @@ private extension UnifiedLogItem {
             photos: photos.map(\.timelinePhotoReference),
             style: style,
             isHighlight: isHighlight,
-            sharedSessionID: sharedSessionID
+            sharedSessionID: sharedSessionID,
+            actionType: actionType,
+            recordIDs: recordIDs
         )
     }
 }
@@ -779,7 +819,9 @@ private extension [UnifiedLogItem] {
         var seen = Set<String>()
         return filter { item in
             let day = Calendar.current.startOfDay(for: item.date).timeIntervalSince1970
-            let key = "\(Int(day))|\(item.title)"
+            // Only generated milestone stories may overlap a real milestone.
+            // Different care facts and moments must remain separately addressable.
+            let key = item.type == "milestone" ? "milestone|\(Int(day))|\(item.title)" : item.id.uuidString
             guard !seen.contains(key) else { return false }
             seen.insert(key)
             return true

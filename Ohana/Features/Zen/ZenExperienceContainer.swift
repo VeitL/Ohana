@@ -672,7 +672,7 @@ private extension ZenExperienceContainer {
                 onChanged: closeAndRefreshRoute
             )
         case let .shop(category):
-            NavigationStack { CoconutShopRouteContainer(initialCategory: category) }
+            CoconutShopRouteContainer(initialCategory: category)
         case .achievements:
             FunctionMenuSheet(initialDestination: .featureAggregate(.achievements))
         case .gacha:
@@ -682,9 +682,7 @@ private extension ZenExperienceContainer {
                 onPresentCoconutLog: nil
             )
         case .critters:
-            NavigationStack {
-                OasisCritterCodexRouteContainer(mode: .codex, onClose: closeRoute)
-            }
+            OasisCritterCodexRouteContainer(mode: .codex, onClose: closeRoute)
         case .growthRoadmap:
             FunctionMenuSheet(initialDestination: .growthRoadmap)
         case .oasisReward:

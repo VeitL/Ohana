@@ -399,11 +399,11 @@ extension PlantDashboardView {
                         .frame(width: 42, height: 5) // a11y: allow decorative drag handle inside a 44pt detail button
                         .accessibilityHidden(true)
                     Image(systemName: "chevron.down") // a11y: allow decorative disclosure glyph; button text labels the action.
-                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .accessibilityHidden(true)
                     Text(l.tr(zh: "查看详情", en: "View details", de: "Details ansehen"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                 }
@@ -462,7 +462,7 @@ extension PlantDashboardView {
             VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: icon)
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.arkInk)
                         .frame(width: 44, height: 44)
                         .background(tint, in: Circle())
@@ -477,7 +477,7 @@ extension PlantDashboardView {
                     }
                 }
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -591,17 +591,17 @@ extension PlantDashboardView {
     func plantListMetricPill(icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 7) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
                     .lineLimit(1)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.76)
@@ -651,11 +651,11 @@ extension PlantDashboardView {
     func plantListBadge(icon: String, text: String, tint: Color) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 9, weight: .black))
+                .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(text)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)

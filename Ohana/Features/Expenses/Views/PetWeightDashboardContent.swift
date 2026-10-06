@@ -207,7 +207,7 @@ struct PetWeightDashboardContent: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(l.tr(zh: "趋势", en: "Trend", de: "Trend"))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 DashboardRangePicker(
@@ -250,7 +250,7 @@ struct PetWeightDashboardContent: View {
     private var historyBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "最近", en: "Recent", de: "Zuletzt"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
             if entries.isEmpty {
@@ -271,7 +271,7 @@ struct PetWeightDashboardContent: View {
     private var addButton: some View {
         Button(action: onAdd) {
             Image(systemName: "plus").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: 56, height: 56)
                 .background(Color.goPrimary, in: Circle())
@@ -294,12 +294,12 @@ struct PetWeightDashboardContent: View {
     private func weightRow(_ entry: PetWeightLedgerEntry) -> some View {
         HStack(spacing: 12) {
             Image(systemName: "scalemass.fill").accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             VStack(alignment: .leading, spacing: 3) {
                 Text(entry.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(entry.date.formatted(date: .omitted, time: .shortened))
                     .font(OhanaFont.caption(.semibold))
@@ -307,7 +307,7 @@ struct PetWeightDashboardContent: View {
             }
             Spacer()
             Text(AppMeasurementSystem.formatWeightKilograms(entry.weightKilograms))
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             if let legacyLogId = entry.legacyLogId {
                 Button {
@@ -354,10 +354,10 @@ struct PetWeightDashboardContent: View {
     private func emptyState(icon: String, text: String) -> some View {
         VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 28, weight: .black))
+                .font(OhanaFont.adaptive(size: 28, weight: .semibold))
                 .foregroundStyle(Color.goPrimary)
             Text(text)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)

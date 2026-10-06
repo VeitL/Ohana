@@ -82,7 +82,6 @@ struct RequiredHumanProfileView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onDisappear {
             flipTask?.cancel()
         }
@@ -166,7 +165,7 @@ struct RequiredHumanProfileView: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.badge, style: .continuous)
                     .fill(Color(hex: "0C1640"))
                 Image(systemName: "heart.text.square.fill").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 44, height: 44)
@@ -177,7 +176,7 @@ struct RequiredHumanProfileView: View {
                 en: "Welcome to Ohana",
                 de: "Willkommen bei Ohana"
             ))
-            .font(OhanaFont.headline(.black))
+            .font(OhanaFont.headline(.semibold))
             .foregroundStyle(RequiredHumanIntroPalette.primaryText)
             .lineLimit(1)
             Spacer(minLength: 0)
@@ -209,10 +208,10 @@ struct RequiredHumanProfileView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
                     Image(systemName: introPageIndex < introPageCount - 1 ? "chevron.right" : "arrow.right")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .accessibilityHidden(true)
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryActionText)
                 .frame(width: width, height: 54)
                 .background(Color.goPrimary, in: Capsule())
@@ -339,7 +338,7 @@ struct RequiredHumanProfileView: View {
                 .frame(height: 218)
 
             Text(title)
-                .font(OhanaFont.largeTitle(.black))
+                .font(OhanaFont.largeTitle(.semibold))
                 .foregroundStyle(RequiredHumanIntroPalette.primaryText)
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
@@ -385,7 +384,7 @@ struct RequiredHumanProfileView: View {
                     .shadow(color: tint.opacity(0.34), radius: 18, y: 10) // ui-v4: allow required human hero glyph depth
 
                 Image(systemName: primaryIcon)
-                    .font(OhanaFont.adaptive(size: 54, weight: .black))
+                    .font(OhanaFont.adaptive(size: 54, weight: .semibold))
                     .foregroundStyle(tintForeground)
                     .symbolRenderingMode(.monochrome)
                     .accessibilityHidden(true)
@@ -401,7 +400,7 @@ struct RequiredHumanProfileView: View {
 
     private func floatingGlyph(icon: String, tint: Color) -> some View {
         Image(systemName: icon)
-            .font(OhanaFont.adaptive(size: 19, weight: .black))
+            .font(OhanaFont.adaptive(size: 19, weight: .semibold))
             .foregroundStyle(tint)
             .frame(width: 54, height: 54)
             .background(RequiredHumanIntroPalette.mutedFill, in: Circle())
@@ -423,11 +422,11 @@ struct RequiredHumanProfileView: View {
     private func badgePill(icon: String, title: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(RequiredHumanIntroPalette.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)

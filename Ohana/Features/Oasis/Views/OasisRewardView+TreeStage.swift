@@ -470,7 +470,7 @@ extension OasisRewardView {
                 HStack(spacing: 9) {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Lv.\(treeVisualLevel.rawValue)")
-                            .font(OhanaFont.title3(.black))
+                            .font(OhanaFont.brandTitle(.title3, weight: .bold))
                             .monospacedDigit()
                             .contentTransition(.numericText())
                         Text(treeVisualLevel.displayName)
@@ -591,63 +591,15 @@ extension OasisRewardView {
         "\(title), \(l.tr(zh: "Lv.\(level) 解锁", en: "unlocks at level \(level)", de: "ab Level \(level)"))"
     }
 
-    var critterNestPopupOverlay: some View {
-        GeometryReader { proxy in
-            let progress = min(max(critterNestPopupProgress, 0), 1)
-            ZStack {
-                Color.black.opacity(0.34 * Double(progress)) // ui-v4: allow modal scrim
-                    .ignoresSafeArea()
-                    .onTapGesture {
-                        closeCritterNest()
-                    }
 
-                OasisCritterCodexRouteContainer(
-                    mode: .nest,
-                    isPopup: true,
-                    onClose: {
-                        closeCritterNest()
-                    },
-                    onPresentCoconutLog: onPresentCoconutLog ?? { _ in }
-                )
-                .frame(
-                    width: min(proxy.size.width - 20, 430),
-                    height: min(proxy.size.height - 86, 760)
-                )
-                .padding(.horizontal, 10)
-                .scaleEffect(0.92 + 0.08 * progress, anchor: .center)
-                .offset(y: (1 - progress) * 24)
-                .opacity(Double(progress))
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .allowsHitTesting(progress > 0.04)
-        }
-    }
 
-    var critterNestPopupOpenAnimation: Animation {
-        shouldRunAmbientMotion ? GoMotion.heroExpand : GoMotion.reduced
-    }
 
-    var critterNestPopupCloseAnimation: Animation {
-        shouldRunAmbientMotion ? GoMotion.heroCollapse : GoMotion.reduced
-    }
 
-    var critterNestPopupCloseDelay: Double {
-        shouldRunAmbientMotion ? 0.54 : 0.12
-    }
 
-    func closeCritterNest() {
-        guard showCritterNest || critterNestPopupProgress > 0.001 else { return }
-        withAnimation(critterNestPopupCloseAnimation) {
-            critterNestPopupProgress = 0
-        }
-        critterNestCloseTask?.cancel()
-        critterNestCloseTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: UInt64(critterNestPopupCloseDelay * 1000)) {
-            if critterNestPopupProgress <= 0.001 {
-                showCritterNest = false
-            }
-            critterNestCloseTask = nil
-        }
-    }
+
+
+
+
 
     var stageUpgradeCoconutDock: some View {
         HStack(spacing: 10) {
@@ -690,7 +642,7 @@ extension OasisRewardView {
         } label: {
             ZStack(alignment: .bottomTrailing) {
                 Text("🥥")
-                    .font(OhanaFont.metric(size: 28))
+                    .font(OhanaFont.brandMetric(size: 28))
                     .rotationEffect(.degrees(isOpening ? -12 : 0))
                     .scaleEffect(isOpening ? 1.14 : 1)
                     .frame(width: 48, height: 48)
@@ -927,19 +879,8 @@ extension OasisRewardView {
     }
 
     func openCritterEntry() {
-        guard !showCritterNest, critterNestPopupProgress <= 0.001 else { return }
-        OhanaFeedback.light()
-        critterNestCloseTask?.cancel()
-        critterNestCloseTask = nil
-        critterNestOpenTask?.cancel()
-        critterNestOpenTask = OhanaFrameScheduler.runAfterNextFrame(milliseconds: 40) {
-            showCritterNest = true
-            critterNestPopupProgress = max(critterNestPopupProgress, 0.001)
-            withAnimation(critterNestPopupOpenAnimation) {
-                critterNestPopupProgress = 1
-            }
-            critterNestOpenTask = nil
-        }
+        guard !showCritterNest else { return }
+        showCritterNest = true
     }
 
     func injectTreeEnergy() {

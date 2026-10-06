@@ -23,6 +23,14 @@ struct DocumentsListView: View {
     }
 
     var body: some View {
+        if showsCloseButton {
+            NavigationStack { content }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         RouteFirstFrameDeferredLoad(
             initialData: DocumentsListRouteData(),
             refreshToken: routeRevision,

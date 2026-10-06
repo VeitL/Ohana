@@ -6,6 +6,14 @@ enum HumanHealthPatternCopy {
     case timeline, comparison, insufficient, incomplete, boundary, method, methodDetail, history, date, severity
     case taken, skipped, mixed, unknown
 
+    static func recordSymptoms(_ l: L10n) -> String {
+            l.tr(zh: "脱发／过敏", en: "Hair / allergy", de: "Haare / Allergie", es: "Cabello / alergia", pt: "Cabelo / alergia", fr: "Cheveux / allergie", ja: "抜け毛・アレルギー", ko: "탈모 / 알레르기", it: "Capelli / allergia")
+    }
+
+    static func symptomDetail(_ l: L10n) -> String {
+            l.tr(zh: "记录脱发、过敏等每日程度，再查看用药后的变化。", en: "Log daily hair shedding, allergies or other symptoms, then compare changes after medication.", de: "Haarausfall, Allergien oder andere Symptome täglich erfassen und Veränderungen nach Medikamenten vergleichen.", es: "Registra a diario la caída del cabello, alergias u otros síntomas y compara cambios tras la medicación.", pt: "Registre diariamente queda de cabelo, alergias ou outros sintomas e compare mudanças após a medicação.", fr: "Notez chaque jour la chute de cheveux, les allergies ou d’autres symptômes, puis comparez les évolutions après les prises.", ja: "抜け毛やアレルギーなどの日々の程度を記録し、服薬後の変化を確認します。", ko: "탈모, 알레르기 등 매일의 증상 정도를 기록하고 복약 이후 변화를 비교하세요.", it: "Registra ogni giorno caduta dei capelli, allergie o altri sintomi e confronta le variazioni dopo i farmaci.")
+    }
+
     func text(_ l: L10n) -> String {
         switch self {
         case .title:
@@ -54,6 +62,13 @@ enum HumanHealthPatternCopy {
             l.tr(zh: "每点是一天自评的平均值；空白不是 0。用药按记录对应的计划日期对齐，补录时间不会移动日期。已服、跳过都有记录的日子单独标示；漏记或待处理为未知。当天对照不判断先后顺序，跳过记录不证明当天完全没有服药。间隔由你选择，不代表医学上的起效时间；压力、疾病、其他药物等也可能影响结果。", en: "Each point averages one day's ratings; gaps are not zero. Doses use their scheduled dates, not the time of back-entry. Mixed taken/skipped days are separate; missing or pending logs are unknown. Same-day views do not establish sequence, and a skip does not prove no medication was taken that day. The interval is your viewing choice, not a medical onset time. Stress, illness and other medications may also matter.", de: "Jeder Punkt mittelt einen Tag; Lücken sind keine Null. Es zählt das geplante Dosendatum, nicht der Nachtrag. Gemischte Tage stehen separat; fehlende oder offene Einträge sind unbekannt. Gleicher Tag beweist keine Reihenfolge; Überspringen beweist keinen einnahmefreien Tag. Der Abstand ist eine Ansichtsoption, keine medizinische Wirkzeit. Stress, Krankheit und andere Medikamente können mitwirken.", es: "Cada punto promedia un día; los huecos no son cero. Se usa la fecha prevista de la dosis, no la del registro tardío. Los días mixtos van separados; faltantes o pendientes son desconocidos. Mismo día no establece orden; omitir no prueba un día sin medicación. El intervalo es visual, no un tiempo médico de efecto. Estrés, enfermedad y otros fármacos pueden influir.", pt: "Cada ponto é a média do dia; lacunas não são zero. Vale a data prevista da dose, não a do registro tardio. Dias mistos ficam separados; registros ausentes ou pendentes são desconhecidos. Mesmo dia não define ordem; pular não prova um dia sem medicação. O intervalo é visual, não um prazo médico de efeito. Estresse, doenças e outros remédios podem influir.", fr: "Chaque point est la moyenne d’un jour ; un vide n’est pas un zéro. La date prévue de prise est utilisée, pas celle de la saisie tardive. Les jours mixtes sont séparés ; les entrées absentes ou en attente sont inconnues. Un même jour n’établit pas l’ordre ; une prise sautée ne prouve pas une journée sans médicament. L’intervalle est un choix de lecture, pas un délai médical. Stress, maladies et autres médicaments peuvent intervenir.", ja: "各点は1日の評価平均で、空白は0ではありません。後日入力した時刻ではなく予定された服薬日で対応させます。服用とスキップの混在日は別表示、未記録や保留は不明です。同日比較は前後関係を示さず、スキップだけでその日まったく服薬しなかったとは判断できません。間隔は表示の選択で、医学的な作用時間ではありません。ストレス、病気、他の薬も影響し得ます。", ko: "각 점은 하루 평가의 평균이며 빈칸은 0이 아닙니다. 나중에 입력한 시각이 아닌 예정된 복약 날짜로 연결합니다. 복용과 건너뜀이 섞인 날은 별도 표시하고 누락이나 대기는 알 수 없음입니다. 같은 날 비교는 선후 관계를 뜻하지 않으며 건너뜀만으로 하루 종일 미복용했다고 볼 수 없습니다. 간격은 보기 설정이지 의학적 작용 시간이 아닙니다. 스트레스, 질병, 다른 약도 영향을 줄 수 있습니다.", it: "Ogni punto è la media giornaliera; i vuoti non sono zero. Si usa la data prevista della dose, non quella di inserimento tardivo. I giorni misti sono separati; dati mancanti o in attesa sono ignoti. Lo stesso giorno non stabilisce l’ordine; una dose saltata non prova un giorno senza farmaci. L’intervallo è una scelta visiva, non un tempo medico d’azione. Stress, malattie e altri farmaci possono influire.")
         case .history:
             l.tr(zh: "逐日查看", en: "Review each day", de: "Tage einzeln ansehen", es: "Ver cada día", pt: "Ver cada dia", fr: "Voir chaque jour", ja: "日ごとに確認", ko: "날짜별 보기", it: "Esamina ogni giorno")
+        case .taken, .skipped, .mixed, .unknown:
+            doseStateText(l)
+        }
+    }
+
+    private func doseStateText(_ l: L10n) -> String {
+        switch self {
         case .taken:
             l.tr(zh: "标记已服", en: "Marked taken", de: "Als genommen markiert", es: "Marcada tomada", pt: "Marcada como tomada", fr: "Noté pris", ja: "服用と記録", ko: "복용으로 기록", it: "Segnata assunta")
         case .skipped:
@@ -62,6 +77,7 @@ enum HumanHealthPatternCopy {
             l.tr(zh: "已服和跳过", en: "Taken and skipped", de: "Genommen und übersprungen", es: "Tomada y omitida", pt: "Tomada e pulada", fr: "Pris et sauté", ja: "服用とスキップ", ko: "복용 및 건너뜀", it: "Assunta e saltata")
         case .unknown:
             l.tr(zh: "用药未知", en: "Medication unknown", de: "Einnahme unbekannt", es: "Medicación desconocida", pt: "Medicação desconhecida", fr: "Prise inconnue", ja: "服薬不明", ko: "복약 여부 불명", it: "Assunzione ignota")
+        default: ""
         }
     }
 

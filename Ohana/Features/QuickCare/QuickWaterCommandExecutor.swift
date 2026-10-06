@@ -20,6 +20,7 @@ struct QuickWaterRewardResult {
     let allowsDerivedEffects: Bool
     let coconutDelta: Int
     let targetCount: Int
+    var recordReference: PetRecordReference? = nil
 }
 
 struct QuickWaterCareResult {
@@ -27,6 +28,7 @@ struct QuickWaterCareResult {
     let allowsDerivedEffects: Bool
     let reminders: [Reminder]
     let personalDenial: PersonalFreeLimitDenial?
+    var recordReference: PetRecordReference? = nil
 
     static let noOp = QuickWaterCareResult(
         didRecord: false,
@@ -438,7 +440,8 @@ struct QuickWaterCommandExecutor {
             didRecord: completed.didRecord,
             allowsDerivedEffects: completed.allowsDerivedEffects,
             coconutDelta: completed.coconutDelta,
-            targetCount: 1
+            targetCount: 1,
+            recordReference: completed.didRecord ? completed.logID.map { PetRecordReference(petID: pet.id, recordID: $0) } : nil
         )
     }
 
@@ -446,7 +449,9 @@ struct QuickWaterCommandExecutor {
         pet: Pet,
         targets: [Pet],
         amountMl: Double,
-        executorId: String?
+        executorId: String?,
+        date: Date = Date(),
+        note: String = ""
     ) -> QuickWaterRewardResult {
         guard EconomyWalletWritePolicy.canWrite(pet) else {
             deriveWaterMutation(
@@ -474,7 +479,8 @@ struct QuickWaterCommandExecutor {
                 totalMl: amountMl,
                 context: context,
                 executorId: executorId,
-                date: Date()
+                date: date,
+                note: note
             )
         } else {
             singleCareResult(careEvents.recordCareFact(
@@ -485,9 +491,10 @@ struct QuickWaterCommandExecutor {
                 executorId: executorId,
                 reward: .water,
                 quality: .none,
-                date: Date(),
+                date: date,
                 source: .quickAction,
-                createsLinkedPottyLog: false
+                createsLinkedPottyLog: false,
+                note: note
             ))
         }
         guard recorded.didWriteFact else {
@@ -509,7 +516,8 @@ struct QuickWaterCommandExecutor {
             didRecord: true,
             allowsDerivedEffects: recorded.allowsDerivedEffects,
             coconutDelta: recorded.reward.humanGot + recorded.reward.petGot,
-            targetCount: liveTargets.count
+            targetCount: liveTargets.count,
+            recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
         )
     }
 
@@ -592,7 +600,8 @@ struct QuickWaterCommandExecutor {
                 didRecord: true,
                 allowsDerivedEffects: true,
                 reminders: [],
-                personalDenial: denial
+                personalDenial: denial,
+                recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
             )
         } catch {
             OhanaLog.warning(
@@ -603,7 +612,8 @@ struct QuickWaterCommandExecutor {
                 didRecord: true,
                 allowsDerivedEffects: true,
                 reminders: [],
-                personalDenial: nil
+                personalDenial: nil,
+                recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
             )
         }
         let reminders = liveTargets.flatMap {
@@ -619,7 +629,8 @@ struct QuickWaterCommandExecutor {
             didRecord: true,
             allowsDerivedEffects: true,
             reminders: reminders,
-            personalDenial: nil
+            personalDenial: nil,
+                recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
         )
     }
 
@@ -708,7 +719,8 @@ struct QuickWaterCommandExecutor {
                 didRecord: true,
                 allowsDerivedEffects: true,
                 reminders: [],
-                personalDenial: denial
+                personalDenial: denial,
+                recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
             )
         } catch {
             OhanaLog.warning(
@@ -719,7 +731,8 @@ struct QuickWaterCommandExecutor {
                 didRecord: true,
                 allowsDerivedEffects: true,
                 reminders: [],
-                personalDenial: nil
+                personalDenial: nil,
+                recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
             )
         }
         let reminders = liveTargets.flatMap {
@@ -735,7 +748,8 @@ struct QuickWaterCommandExecutor {
             didRecord: true,
             allowsDerivedEffects: true,
             reminders: reminders,
-            personalDenial: nil
+            personalDenial: nil,
+                recordReference: recorded.recordReference(for: pet.id, ids: recorded.careLogIDs)
         )
     }
 

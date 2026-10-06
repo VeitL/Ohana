@@ -12,6 +12,7 @@ struct QuickPottyDetailSheet: View {
     let pet: Pet
     let onRemove: () -> Void
     var onClose: (() -> Void)?
+    let showsCloseButton: Bool
     var onRecordChanged: () -> Void
     let allEvents: [Event]
     let allPets: [Pet]
@@ -40,6 +41,7 @@ struct QuickPottyDetailSheet: View {
     @State var saveToastTask: Task<Void, Never>?
     @State var pottyPlanSaveTask: Task<Void, Never>?
     @State var isSavingPottyPlan = false
+    @State var planSaveFailed = false
     @State var showSingleUseNotice = false
     @State var singleUseNoticeMessage = ""
     @State var overviewRange: PoopOverviewRange = .days7
@@ -60,6 +62,7 @@ struct QuickPottyDetailSheet: View {
     init(
         pet: Pet,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil,
         onRecordChanged: @escaping () -> Void = {},
         allEvents: [Event] = [],
@@ -71,6 +74,7 @@ struct QuickPottyDetailSheet: View {
         self.pet = pet
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
         self.onRecordChanged = onRecordChanged
         self.allEvents = allEvents
         self.allPets = allPets
@@ -219,8 +223,9 @@ struct QuickPottyDetailSheet: View {
         return Double(abnormal) / Double(logs.count)
     }
 
+    @State var savedRecord: PetRecordReference?
     var body: some View {
-        NavigationStack {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack {
                 OhanaAppBackground()
                     .ignoresSafeArea()
@@ -232,6 +237,7 @@ struct QuickPottyDetailSheet: View {
                         }
                         pottyDashboard
                         coreCards
+                        PetReminderNotificationStatus()
                         recentStrip
                     }
                     .padding(.horizontal, 18)
@@ -246,7 +252,9 @@ struct QuickPottyDetailSheet: View {
                     toastView
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "排泄记录", en: "Potty log", de: "Ausscheidungen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { if showsCloseButton { OhanaModalToolbar(onClose: closeDetail) } }
             .sheet(item: systemSheetBinding) { sheet in
                 NavigationStack {
                     sheetContent(sheet)
@@ -255,16 +263,19 @@ struct QuickPottyDetailSheet: View {
                         .navigationTitle(pottySheetTitle(sheet))
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                Button(l.cancel) {
-                                    closeActivePottySheet()
-                                }
-                                .accessibilityIdentifier("quick-potty-sheet-cancel-action")
+                            if sheet != .scoopSettings && sheet != .litterSettings {
+                                OhanaModalToolbar(onClose: closeActivePottySheet, closeIdentifier: "quick-potty-sheet-cancel-action")
                             }
                         }
                 }
+                .alert(l.tr(zh: "保存失败", en: "Save failed", de: "Speichern fehlgeschlagen", es: "Error al guardar", pt: "Falha ao salvar", fr: "Échec de l’enregistrement", ja: "保存できませんでした", ko: "저장 실패", it: "Salvataggio non riuscito"), isPresented: $planSaveFailed) {
+                    Button(l.tr(zh: "好", en: "OK", de: "OK"), role: .cancel) {}
+                } message: {
+                    Text(l.tr(zh: "输入已保留，请重试。", en: "Your changes are kept. Please try again.", de: "Deine Änderungen bleiben erhalten. Bitte versuche es erneut."))
+                }
                 .ohanaSheetPagePresentation() // ui-v4: allow long overview/history uses system sheet
             }
+            .petRecordFeedback($savedRecord)
             .sheet(item: $personalUpgradePrompt) { prompt in
                 PersonalPlanView(prompt: prompt)
             }
@@ -279,12 +290,7 @@ struct QuickPottyDetailSheet: View {
         .accessibilityIdentifier("quick-potty-detail-sheet")
         .onAppear {
             loadSettings()
-            selectedSharedPottyPetIds = SharedPetSelectionMemory.restoredSelection(
-                sourcePet: pet,
-                scope: "quickCare.potty",
-                candidates: sameSpeciesPottyPets,
-                defaultToAll: true
-            )
+            selectedSharedPottyPetIds = Set([pet.id])
             guard !pet.hasPassedAway else { return }
             if !isCatPet {
                 selectedFocus = .potty
@@ -456,24 +462,16 @@ struct QuickPottyDetailSheet: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(pet.name)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
             Spacer()
 
-            Button { closeDetail() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 36, height: 36) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .contentShape(Rectangle())
-            }
-            .frame(width: 44, height: 44)
-            .buttonStyle(ScaleButtonStyle())
+
         }
     }
 
@@ -506,16 +504,16 @@ struct QuickPottyDetailSheet: View {
                         .fill(tint(for: selectedFocus).opacity(0.14))
                         .frame(width: 66, height: 66)
                     Image(systemName: selectedFocus.icon)
-                        .font(OhanaFont.adaptive(size: 27, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 27, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(tint(for: selectedFocus))
                 }
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(l.tr(zh: "噗噗电台", en: "Poop Radio", de: "Häufchen-Radio"))
-                        .font(OhanaFont.adaptive(size: 24, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 24, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(pottyDashboardSubtitle)
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                 }
@@ -572,9 +570,9 @@ struct QuickPottyDetailSheet: View {
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: focus.icon)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(focus.title(l))
-                    .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             }
             .foregroundStyle(selected ? actionForeground(for: focus) : tint)
             .frame(maxWidth: .infinity)
@@ -587,10 +585,10 @@ struct QuickPottyDetailSheet: View {
     func pottySummaryPill(title: String, value: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.ohanaSecondaryText)
             Text(value)
-                .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -757,7 +755,7 @@ struct QuickPottyDetailSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(l.tr(zh: "最近", en: "Latest", de: "Zuletzt"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .accessibilityIdentifier("quick-potty-recent-strip")
                 Spacer()
@@ -765,7 +763,7 @@ struct QuickPottyDetailSheet: View {
                     openPottySheet(.history)
                 } label: {
                     Text(l.tr(zh: "管理", en: "Manage", de: "Verwalten"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(chromeTint)
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -773,7 +771,7 @@ struct QuickPottyDetailSheet: View {
 
             if recentItems.isEmpty {
                 Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText.opacity(0.62))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -791,7 +789,7 @@ struct QuickPottyDetailSheet: View {
 
     var toastView: some View {
         Text(saveToastMessage)
-            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(chromeActionForeground)
             .padding(.horizontal, 14)
             .padding(.vertical, 9)

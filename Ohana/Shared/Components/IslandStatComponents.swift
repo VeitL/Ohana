@@ -68,7 +68,7 @@ struct OverlappingAvatarsView: View {
                         .overlay(Circle().strokeBorder(Color.ohanaCardStroke, lineWidth: 1.5))
                         .frame(width: 24, height: 24) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     Text("+\(emojis.count - maxCount)")
-                        .font(OhanaFont.adaptive(size: 8, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 8, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.7))
                 }
                 .offset(x: CGFloat(-maxCount) * 8)

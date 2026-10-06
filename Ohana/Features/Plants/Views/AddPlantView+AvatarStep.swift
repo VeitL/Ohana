@@ -15,7 +15,7 @@ extension AddPlantView {
                 icon: "camera.aperture"
             ) {
                 Text(plantAvatarStatusText)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 plantAvatarSourceActions
@@ -77,7 +77,7 @@ extension AddPlantView {
                         l.tr(zh: "改回自带头像", en: "Use built-in avatar", de: "Integrierten Avatar nutzen"),
                         systemImage: "arrow.uturn.backward"
                     )
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
@@ -102,7 +102,7 @@ extension AddPlantView {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                     .symbolRenderingMode(.monochrome)
                     .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.goTeal)
                     .frame(width: 34, height: 34) // a11y: allow decorative source glyph; parent button provides the 44pt target and label.
@@ -111,7 +111,7 @@ extension AddPlantView {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -124,7 +124,7 @@ extension AddPlantView {
                 Spacer(minLength: 0)
                 if isSelected {
                     Image(systemName: "checkmark.circle.fill") // a11y: allow decorative selected glyph; button selected trait carries state.
-                        .font(OhanaFont.adaptive(size: 16, weight: .black))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                         .foregroundStyle(Color.goPrimary)
                         .accessibilityHidden(true)
                 }

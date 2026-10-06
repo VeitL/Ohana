@@ -52,11 +52,11 @@ nonisolated enum ExpandedQuickActionStatusLogic {
         switch state.operatingMode {
         case .manual:
             let count = state.manualMainCount
-            if count > 0 { return "手动 \(count)餐" }
-            return context.pet.dailyPortionGrams > 0 ? "\(Int(context.pet.dailyPortionGrams.rounded()))g" : "待设置"
+            if count > 0 { return HomeQuickStatusCopy(context.localization).manualMeals(count) }
+            return context.pet.dailyPortionGrams > 0 ? "\(Int(context.pet.dailyPortionGrams.rounded()))g" : HomeQuickStatusCopy(context.localization).needsSetup
         case .manualReminder:
             if state.hasMissedManualPlan {
-                return "未打卡 \(state.todayManualPlanMissedCount)餐"
+                return HomeQuickStatusCopy(context.localization).missedMeals(state.todayManualPlanMissedCount)
             }
             if let lastExpired = state.lastExpiredManualPlanDate {
                 let time = quickPlanTimeText(lastExpired, now: context.now, calendar: context.calendar)
@@ -69,9 +69,9 @@ nonisolated enum ExpandedQuickActionStatusLogic {
             if let overdue = overdueQuickStatusText(for: "feed", context: context) {
                 return overdue
             }
-            return "计划 \(state.completedTodayPlanCount)/\(state.todayManualPlanTotalCount)"
+            return HomeQuickStatusCopy(context.localization).plan("\(state.completedTodayPlanCount)/\(state.todayManualPlanTotalCount)")
         case .autoFeeder:
-            return "自动 \(state.autoMainCount)次"
+            return HomeQuickStatusCopy(context.localization).automaticCount(state.autoMainCount)
         }
     }
 
@@ -100,14 +100,14 @@ nonisolated enum ExpandedQuickActionStatusLogic {
             }
             let waterState = ExpandedQuickActionLogic.waterRuleState(for: pet, allEvents: context.events)
             if waterState.operatingMode == .reminder {
-                return waterState.missedCount > 0 ? "待补 \(waterState.missedCount)次" : "计划 \(waterState.completionText)"
+                return waterState.missedCount > 0 ? HomeQuickStatusCopy(context.localization).pendingCount(waterState.missedCount) : HomeQuickStatusCopy(context.localization).plan(waterState.completionText)
             }
             let count = todayCareEntryCount(.watering, context: context)
-            if count > 0 { return "今日 \(count)次" }
+            if count > 0 { return HomeQuickStatusCopy(context.localization).todayCount(count) }
             if let amount = ExpandedQuickActionLogic.defaultWaterAmountMl(for: pet) {
                 return "\(Int(amount.rounded()))ml"
             }
-            return "只记录次数"
+            return HomeQuickStatusCopy(context.localization).countOnly
         case "waterChange":
             if let status = WaterCareCycleStatusCalculator.waterChangeStatus(
                 for: pet,
@@ -119,7 +119,7 @@ nonisolated enum ExpandedQuickActionStatusLogic {
                 if status.isDueToday { return context.localization.tr(zh: "今天应换", en: "Due today", de: "Heute fällig") }
             }
             if let overdue = overdueQuickStatusText(for: actionType, context: context) { return overdue }
-            return latestCareAgeText(.waterChange, context: context, todayDone: "今天已换")
+            return latestCareAgeText(.waterChange, context: context, todayDone: HomeQuickStatusCopy(context.localization).doneToday)
         case "filterClean":
             return filterStatusText(context, waterCycleSnapshot: waterCycleSnapshot)
         default:
@@ -159,40 +159,40 @@ nonisolated enum ExpandedQuickActionStatusLogic {
             if status.isDueToday { return context.localization.tr(zh: "今天应清", en: "Due today", de: "Heute fällig") }
         }
         if let overdue = overdueQuickStatusText(for: "filterClean", context: context) { return overdue }
-        return latestCareAgeText(.filterClean, context: context, todayDone: "今天已清")
+        return latestCareAgeText(.filterClean, context: context, todayDone: HomeQuickStatusCopy(context.localization).doneToday)
     }
 
     private static func routineText(actionType: String, context: ExpandedQuickActionStatusContext) -> String? {
         switch actionType {
         case "walk":
             let walks = todayWalkEntries(context: context)
-            guard !walks.isEmpty else { return "今日未遛" }
+            guard !walks.isEmpty else { return HomeQuickStatusCopy(context.localization).noWalkToday }
             let distance = walks.reduce(0.0) { $0 + $1.distanceMeters }
             let distanceText = distance >= 1000
                 ? String(format: "%.1fkm", distance / 1000)
                 : String(format: "%.0fm", distance)
-            return "今日 \(walks.count)次 · \(distanceText)"
+            return "\(HomeQuickStatusCopy(context.localization).todayCount(walks.count)) · \(distanceText)"
         case "potty":
             let count = todayPottyEntries(context: context).count
-            if count > 0 { return "今日 \(count)次" }
+            if count > 0 { return HomeQuickStatusCopy(context.localization).todayCount(count) }
             if let last = latestPottyEntry(context), last.pottyType == .softPoop || last.pottyType == .liquidPoop {
-                return "最近异常"
+                return HomeQuickStatusCopy(context.localization).recentConcern
             }
             return nil
         case "litter":
             if let overdue = overdueQuickStatusText(for: actionType, context: context) { return overdue }
-            if todayCareEntryCount(.litter, context: context) > 0 { return "今日已铲" }
+            if todayCareEntryCount(.litter, context: context) > 0 { return HomeQuickStatusCopy(context.localization).doneToday }
             return scoopQuickStatusText(context)
         case "play":
             if let overdue = overdueQuickStatusText(for: actionType, context: context) { return overdue }
             let count = todayCareEntryCount(.play, context: context)
-            if count > 0 { return "今日陪玩 \(count)次" }
+            if count > 0 { return HomeQuickStatusCopy(context.localization).playCount(count) }
             if let event = ExpandedQuickActionLogic.playPlanEvent(for: context.pet, allEvents: context.events) {
                 let eventDay = context.calendar.startOfDay(for: event.startDate)
                 let today = context.calendar.startOfDay(for: context.now)
-                return eventDay <= today ? "计划待陪" : "计划 \(relativeFutureDayText(for: event.startDate, calendar: context.calendar))"
+                return eventDay <= today ? HomeQuickStatusCopy(context.localization).playPlanned : HomeQuickStatusCopy(context.localization).plan(event.startDate.formatted(.dateTime.month().day().locale(Locale(identifier: context.localization.languageCode))))
             }
-            return "今日未陪"
+            return HomeQuickStatusCopy(context.localization).noPlayToday
         default:
             return nil
         }
@@ -204,13 +204,13 @@ nonisolated enum ExpandedQuickActionStatusLogic {
             return latestWeightEntry(context).map { String(format: "%.1fkg", $0.weightKg) }
         case "medication":
             let activeMedications = context.pet.medications.filter(\.isActiveToday)
-            guard !activeMedications.isEmpty else { return "待设置" }
+            guard !activeMedications.isEmpty else { return HomeQuickStatusCopy(context.localization).needsSetup }
             let planned = activeMedications.reduce(0) { $0 + PetMedicationDoseLogging.requiredDoses(on: context.now, for: $1) }
             let done = activeMedications.reduce(0) {
                 $0 + PetMedicationDoseLogging.todayDoseCount(events: context.events, medicationId: $1.id)
             }
             if let overdue = overdueQuickStatusText(for: actionType, context: context) { return overdue }
-            return planned > 0 ? "今日 \(min(done, planned))/\(planned)" : "\(activeMedications.count)种药"
+            return planned > 0 ? HomeQuickStatusCopy(context.localization).todayProgress("\(min(done, planned))/\(planned)") : HomeQuickStatusCopy(context.localization).medicationCount(activeMedications.count)
         case "expense":
             let total = context.expenseEntries
                 .filter {
@@ -218,7 +218,7 @@ nonisolated enum ExpandedQuickActionStatusLogic {
                         context.calendar.isDate($0.date, equalTo: context.now, toGranularity: .month)
                 }
                 .reduce(0.0) { $0 + $1.amount }
-            return total > 0 ? "本月 \(AppCurrency.format(total, fractionDigits: 0))" : nil
+            return total > 0 ? HomeQuickStatusCopy(context.localization).thisMonth(AppCurrency.format(total, fractionDigits: 0)) : nil
         case "moment":
             return momentText(context)
         default:
@@ -257,15 +257,15 @@ nonisolated enum ExpandedQuickActionStatusLogic {
         if let overdue = overdueQuickStatusText(for: actionType, context: context) { return overdue }
         switch actionType {
         case "cageCleaning":
-            return latestCareAgeText(.cageCleaning, context: context, todayDone: "今天已清")
+            return latestCareAgeText(.cageCleaning, context: context, todayDone: HomeQuickStatusCopy(context.localization).doneToday)
         case "freeFlight":
             let count = todayCareEntryCount(.freeFlight, context: context)
-            return count > 0 ? "今日 \(count)次" : nil
+            return count > 0 ? HomeQuickStatusCopy(context.localization).todayCount(count) : nil
         case "misting":
             let count = todayCareEntryCount(.misting, context: context)
-            return count > 0 ? "今日 \(count)次" : nil
+            return count > 0 ? HomeQuickStatusCopy(context.localization).todayCount(count) : nil
         case "substrateChange":
-            return latestCareAgeText(.substrateChange, context: context, todayDone: "今天已换")
+            return latestCareAgeText(.substrateChange, context: context, todayDone: HomeQuickStatusCopy(context.localization).doneToday)
         case "health":
             return nil
         default:
@@ -364,7 +364,7 @@ nonisolated enum ExpandedQuickActionStatusLogic {
     ) -> String? {
         guard let last = latestCareEntry(type, pet: context.pet, careLedgerEntries: context.careEntries) else { return nil }
         let days = context.calendar.dateComponents([.day], from: last.date, to: context.now).day ?? 0
-        return days == 0 ? todayDone : "\(days)天前"
+        return days == 0 ? todayDone : HomeQuickStatusCopy(context.localization).daysAgo(days)
     }
 
     private static func todayHygieneEntries(context: ExpandedQuickActionStatusContext) -> [HomeHygieneQuickActionEntry] {
@@ -465,11 +465,11 @@ nonisolated enum ExpandedQuickActionStatusLogic {
         ).max(by: { $0.date < $1.date }) {
             let days = context.calendar.dateComponents([.day], from: last.date, to: context.now).day ?? 0
             if last.actionType == CareType.filterClean.rawValue {
-                return days == 0 ? "今天清滤芯" : "\(days)天前滤芯"
+                return HomeQuickStatusCopy(context.localization).filterCare(daysAgo: days)
             }
-            return days == 0 ? "今天已换水" : "\(days)天前换水"
+            return HomeQuickStatusCopy(context.localization).waterCare(daysAgo: days)
         }
-        return "长按管理"
+        return HomeQuickStatusCopy(context.localization).holdToManage
     }
 
     private static func waterCycleOverdueText(title: String, days: Int, l: L10n) -> String {
@@ -502,13 +502,5 @@ nonisolated enum ExpandedQuickActionStatusLogic {
         if days <= 0 { return context.localization.tr(zh: "今天", en: "today", de: "heute") }
         if days == 1 { return context.localization.tr(zh: "昨天", en: "yesterday", de: "gestern") }
         return context.localization.tr(zh: "\(days)天前", en: "\(days)d ago", de: "vor \(days) T.")
-    }
-
-    private static func relativeFutureDayText(for date: Date, calendar: Calendar) -> String {
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: Date()), to: calendar.startOfDay(for: date)).day ?? 0
-        if days <= 0 { return "今天" }
-        if days == 1 { return "明天" }
-        if days == 2 { return "后天" }
-        return "\(days)天后"
     }
 }

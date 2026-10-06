@@ -161,7 +161,7 @@ extension MemberCardCreationContentView {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Text(label(option))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.54)
@@ -196,7 +196,7 @@ extension MemberCardCreationContentView {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Text(icon(option))
-                        .font(OhanaFont.adaptive(size: 20, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 20, weight: .semibold, design: .default))
                         .foregroundStyle(isSelected ? cardSelectedForeground : cardForeground)
                         .frame(maxWidth: .infinity)
                         .frame(height: 44)
@@ -234,7 +234,7 @@ extension MemberCardCreationContentView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(cardSecondaryForeground)
             InlineNumericInput(
                 text: text,
@@ -243,8 +243,8 @@ extension MemberCardCreationContentView {
                 countryCode: appCountry,
                 maxFractionDigits: maxFractionDigits,
                 accent: Color.goPrimary,
-                valueFont: OhanaFont.callout(.black),
-                unitFont: OhanaFont.caption2(.black),
+                valueFont: OhanaFont.callout(.semibold),
+                unitFont: OhanaFont.caption2(.semibold),
                 fill: cardControlFill,
                 cornerRadius: OhanaRadius.input,
                 horizontalPadding: 10,
@@ -279,7 +279,7 @@ extension MemberCardCreationContentView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(cardSecondaryForeground)
             InlineNumericInput(
                 text: text,
@@ -288,8 +288,8 @@ extension MemberCardCreationContentView {
                 countryCode: appCountry,
                 maxFractionDigits: maxFractionDigits,
                 accent: Color.goPrimary,
-                valueFont: OhanaFont.title3(.black),
-                unitFont: OhanaFont.caption(.black),
+                valueFont: OhanaFont.title3(.semibold),
+                unitFont: OhanaFont.caption(.semibold),
                 fill: cardControlFill,
                 cornerRadius: OhanaRadius.cardSoft,
                 horizontalPadding: 12,
@@ -310,7 +310,7 @@ extension MemberCardCreationContentView {
     func mediaButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(cardForeground)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
@@ -327,7 +327,7 @@ extension MemberCardCreationContentView {
     func compactTogglePill(title: String, icon: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Label(title, systemImage: icon)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.62)
                 .frame(maxWidth: .infinity, minHeight: 36)
@@ -339,7 +339,7 @@ extension MemberCardCreationContentView {
 
     func statusPill(text: String, icon: String, tint: Color) -> some View {
         Label(text, systemImage: icon)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaPrimaryText)
             .padding(.horizontal, 10)
             .frame(height: 32)
@@ -373,12 +373,12 @@ extension MemberCardCreationContentView {
                     .foregroundStyle(cardSecondaryForeground)
                 Spacer()
                 Text(value)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(cardForeground)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
                 Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                     .foregroundStyle(cardSecondaryForeground)
             }
             .frame(height: 44)
@@ -404,12 +404,12 @@ extension MemberCardCreationContentView {
                     .minimumScaleFactor(0.72)
                 Spacer(minLength: 4)
                 Text(value)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(cardForeground)
                     .lineLimit(1)
                     .minimumScaleFactor(0.58)
                 Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold))
                     .foregroundStyle(cardSecondaryForeground)
             }
             .frame(maxWidth: .infinity)
@@ -436,7 +436,7 @@ extension MemberCardCreationContentView {
                         }
                     } label: {
                         Text(label(option))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                             .padding(.horizontal, 12)
                             .frame(height: 34)

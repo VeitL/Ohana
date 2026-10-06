@@ -345,7 +345,7 @@ private extension HumanBasicInfoDetailContentView {
                         ),
                         systemImage: "checkmark.circle.fill"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityIdentifier("human-basic-info-editor-saved-feedback")
@@ -427,7 +427,7 @@ private extension HumanBasicInfoDetailContentView {
                                     Spacer(minLength: 0)
                                     if isSelected {
                                         Image(systemName: "checkmark") // a11y: allow decorative selected-state glyph hidden below
-                                            .font(OhanaFont.caption(.black))
+                                            .font(OhanaFont.caption(.semibold))
                                             .accessibilityHidden(true)
                                     }
                                 }
@@ -520,7 +520,7 @@ private extension HumanBasicInfoDetailContentView {
                         .foregroundStyle(Color.ohanaSecondaryText)
                         Spacer(minLength: 8)
                         Text(Human.westernZodiacDisplay(for: eBirthday, l: l))
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryText)
                     }
                     .font(OhanaFont.callout(.semibold))
@@ -628,7 +628,7 @@ private extension HumanBasicInfoDetailContentView {
                                 if isSelected {
                                     Circle().strokeBorder(Color.ohanaPrimaryText, lineWidth: 2.5)
                                     Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                         .foregroundStyle(Color.ohanaPrimaryText)
                                 }
                             }
@@ -702,7 +702,7 @@ private extension HumanBasicInfoDetailContentView {
 
     private func editLabel(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .foregroundStyle(Color.ohanaSecondaryText)
     }
 
@@ -748,7 +748,7 @@ private extension HumanBasicInfoDetailContentView {
 
     private func editTextField(_ title: String, text: Binding<String>) -> some View {
         TextField(title, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
-            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+            .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             .multilineTextAlignment(.trailing)
     }
 
@@ -860,7 +860,7 @@ private extension HumanBasicInfoDetailContentView {
                 editLabel(l.tr(zh: "身高", en: "Height", de: "Größe"))
                 Spacer()
                 Text(heightValue > 0 ? "\(Int(heightValue)) cm" : localizedEmptyValue)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             }
             HStack(spacing: 8) {
@@ -869,7 +869,7 @@ private extension HumanBasicInfoDetailContentView {
                         eHeightText = option
                     } label: {
                         Text(option.isEmpty ? localizedEmptyValue : "\(option)")
-                            .font(OhanaFont.adaptive(size: 12, weight: heightOptionSelected(option) ? .black : .semibold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: heightOptionSelected(option) ? .semibold : .semibold, design: .default))
                             .foregroundStyle(
                                 heightOptionSelected(option)
                                     ? profileEditAccentForeground
@@ -891,7 +891,7 @@ private extension HumanBasicInfoDetailContentView {
                 step: 1
             ) {
                 Text(l.tr(zh: "微调 80-230 cm", en: "Fine tune 80-230 cm", de: "Feinabstimmung 80-230 cm"))
-                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
         }
@@ -928,7 +928,7 @@ private extension HumanBasicInfoDetailContentView {
                         selection.wrappedValue = option
                     } label: {
                         Text(localizedOptionTitle(option))
-                            .font(OhanaFont.adaptive(size: 12, weight: selected ? .black : .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: selected ? .semibold : .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(
                                 selected
                                     ? profileEditAccentForeground

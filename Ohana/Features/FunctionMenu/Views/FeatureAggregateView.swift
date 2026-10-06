@@ -90,11 +90,11 @@ struct FeatureAggregateView: View {
     private var pageHeader: some View {
         HStack(spacing: 10) {
             Image(systemName: feature.icon)
-                .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
             Text(feature.title(l: l))
-                .font(OhanaFont.title2(.black))
+                .font(OhanaFont.title2(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
             Spacer(minLength: 54)
@@ -165,7 +165,7 @@ struct FeatureAggregateView: View {
                     .frame(width: 24, height: 24).clipShape(Circle()) // a11y: allow decorative non-interactive frame; hit area handled by parent
             } else {
                 Text(String(human.name.prefix(1)))
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(color)
             }
         }

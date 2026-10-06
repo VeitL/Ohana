@@ -11,7 +11,7 @@ import UIKit
 
 extension AddPlantView {
     var plantCreationSteps: [AddPlantCreationStep] {
-        AddPlantCreationStep.allCases
+        [.plant, .confirm]
     }
 
     var currentStepIndex: Int {
@@ -25,14 +25,15 @@ extension AddPlantView {
     var resolvedPlantName: String {
         if !trimmedName.isEmpty { return trimmedName }
         if let selectedCatalog { return selectedCatalog.localizedCommonName }
-        return trimmedSpecies
+        if !trimmedSpecies.isEmpty { return trimmedSpecies }
+        return isUnknownSpeciesSelected ? l.tr(zh: "我的植物", en: "My plant", de: "Meine Pflanze") : ""
     }
 
     var canAdvanceStep: Bool {
         guard !isSaving else { return false }
         switch currentStep {
         case .plant:
-            return !selectedCatalogID.isEmpty && !resolvedPlantName.isEmpty
+            return selectedCatalog != nil || isUnknownSpeciesSelected
         case .avatar, .care:
             return true
         case .confirm:
@@ -50,10 +51,6 @@ extension AddPlantView {
                 let cardHeight = plantCreationCardHeight(in: proxy.size.height)
                 VStack(spacing: MemberCreationCardLayout.stackSpacing) {
                     Spacer(minLength: 0)
-                    plantTopChrome
-                        .frame(maxWidth: MemberCreationCardLayout.maxCardWidth)
-                        .opacity(isSaving ? 0.42 : 1)
-                        .allowsHitTesting(!isSaving)
                     plantCreationCardArea
                         .frame(height: cardHeight)
                     plantBottomCTA
@@ -76,39 +73,9 @@ extension AddPlantView {
                 .zIndex(50)
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .overlay(alignment: .topLeading) {
             PlantCreationAccessibilityMarker(identifier: "add-plant-step-flow")
-        }
-        .onAppear {
-            OhanaFrameScheduler.runAfterNextFrame(milliseconds: 260) {
-                media.prepareCameraIfNeeded()
-            }
-        }
-    }
-
-    var plantTopChrome: some View {
-        HStack(spacing: 10) {
-            Button {
-                onComplete()
-            } label: {
-                Image(systemName: "xmark") // a11y: allow decorative close glyph; button has localized Cancel label.
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .accessibilityHidden(true)
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.cancel)
-            .accessibilityIdentifier("add-plant-cancel-action")
-
-            Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                .font(OhanaFont.title(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-            Spacer()
         }
     }
 
@@ -135,7 +102,7 @@ extension AddPlantView {
     func plantCreationCardHeight(in containerHeight: CGFloat) -> CGFloat {
         MemberCreationCardLayout.cardHeight(
             in: containerHeight,
-            includesTopChrome: true
+            includesTopChrome: false
         )
     }
 
@@ -166,7 +133,46 @@ extension AddPlantView {
         case .care:
             plantCareDetailsStep
         case .confirm:
-            plantConfirmationStep
+            plantQuickSetupStep
+        }
+    }
+
+    var plantQuickSetupStep: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            PlantCreationSection(
+                title: l.tr(zh: "名字", en: "Name", de: "Name"),
+                icon: "text.cursor"
+            ) {
+                plantNameSummarySection
+            }
+            PlantCreationSection(
+                title: l.tr(zh: "摆放位置（可选）", en: "Placement (optional)", de: "Standort (optional)"),
+                icon: "house.fill"
+            ) {
+                roomAndSpotControls
+            }
+            duplicateWarningSection
+            Button {
+                withAnimation(GoMotion.selection) {
+                    showingOptionalPlantDetails.toggle()
+                }
+            } label: {
+                Label(
+                    l.tr(zh: "照片与更多资料（可选）", en: "Photo and more details (optional)", de: "Foto und weitere Angaben (optional)"),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(OhanaFont.callout(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            }
+            .buttonStyle(ScaleButtonStyle())
+            .accessibilityIdentifier("add-plant-optional-details-toggle")
+            if showingOptionalPlantDetails {
+                plantAvatarStep
+                plantCareDetailsStep
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            PlantCreationAccessibilityMarker(identifier: "add-plant-step-confirm")
         }
     }
 
@@ -180,7 +186,7 @@ extension AddPlantView {
                     retreatPlantStep()
                 } label: {
                     Label(l.tr(zh: "上一步", en: "Back", de: "Zurück"), systemImage: "chevron.left")
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.72))
                         .frame(minWidth: 96, idealWidth: 112, maxWidth: 154, minHeight: 54)
                         .background(Color.ohanaControlFill.opacity(0.62), in: Capsule())
@@ -209,7 +215,7 @@ extension AddPlantView {
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(enabled ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
                 .frame(maxWidth: .infinity)
                 .frame(height: 54)

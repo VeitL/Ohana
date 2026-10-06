@@ -293,11 +293,6 @@ struct CoconutLogContentView: View {
             OhanaAppBackground()
 
             VStack(spacing: 0) {
-                header
-                    .padding(.horizontal, 20)
-                    .padding(.top, safeTopInset + 16)
-                    .padding(.bottom, 16)
-
                 if isContentReady {
                     balanceHeader
 
@@ -316,25 +311,38 @@ struct CoconutLogContentView: View {
                 }
             }
         }
-        .toolbar(showsCloseButton ? .hidden : .visible, for: .navigationBar)
+        .navigationTitle(selectedPage == .history
+            ? l.tr(zh: "椰子历史", en: "Coconut History", de: "Kokosnuss-Historie")
+            : l.tr(zh: "财富分析", en: "Wealth analysis", de: "Vermögensanalyse"))
+        .navigationBarTitleDisplayMode(.inline)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("coconut-log-screen")
+        .toolbar {
+            if showsCloseButton {
+                OhanaModalToolbar(onClose: closeLog, closeIdentifier: "coconut-log-close-action")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    selectedPage = selectedPage == .history ? .wealth : .history
+                } label: {
+                    Label(selectedPage == .history
+                        ? l.tr(zh: "打开财富分析", en: "Open wealth analysis", de: "Vermögensanalyse öffnen")
+                        : l.tr(zh: "返回椰子历史", en: "Return to coconut history", de: "Zurück zum Kokosnuss-Verlauf"),
+                        systemImage: selectedPage == .history ? "chart.pie" : "clock.arrow.circlepath")
+                }
+                .accessibilityIdentifier("coconut-log-wealth-action")
+            }
+        }
         .onAppear {
             scheduleMemberSnapshotRefresh()
             scheduleHistoryContentMount()
-            seedDefaultActorFilterIfNeeded()
         }
         .onDisappear {
             historyContentMountTask?.cancel()
             memberSnapshotTask?.cancel()
         }
-        .onChange(of: activeHumanIdStr) { oldValue, newValue in
-            guard subject == nil else { return }
+        .onChange(of: activeHumanIdStr) { _, _ in
             scheduleMemberSnapshotRefresh()
-            let next = newValue.isEmpty ? nil : newValue
-            if selectedActorId == nil || selectedActorId == oldValue || selectedActorId?.isEmpty == true {
-                withAnimation(GoMotion.selection) {
-                    selectedActorId = next
-                }
-            }
         }
     }
 
@@ -365,6 +373,7 @@ struct CoconutLogContentView: View {
             Text("🥥").font(OhanaFont.adaptive(size: 44)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(visibleCoconutTotal)")
+                    .accessibilityIdentifier("coconut-log-balance-value")
                     .font(OhanaFont.adaptive(size: 52, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
                     .contentTransition(.numericText())
@@ -444,65 +453,11 @@ struct CoconutLogContentView: View {
                 viewedBy: activeHumanId,
                 privacy: appServices.privacy
             )
-            seedDefaultActorFilterIfNeeded()
             memberSnapshotTask = nil
         }
     }
 
-    private func seedDefaultActorFilterIfNeeded() {
-        guard subject == nil, selectedActorId == nil, let activeHumanActorId else { return }
-        selectedActorId = activeHumanActorId
-    }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(spacing: 8) {
-                    Image(systemName: "circle.hexagongrid.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.goPrimary)
-                    Text(l.tr(zh: "椰子历史", en: "Coconut History", de: "Kokosnuss-Historie"))
-                        .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .accessibilityIdentifier("coconut-log-screen")
-                }
-                Text((isContentReady ? subjectName : nil) ?? l.tr(zh: "每一笔收支", en: "Every coconut change", de: "Jede Bewegung"))
-                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaSecondaryText)
-            }
-            Spacer()
-            Button {
-                withAnimation(GoMotion.page) {
-                    selectedPage = selectedPage == .history ? .wealth : .history
-                }
-            } label: {
-                Image(systemName: selectedPage == .history ? "chart.pie.fill" : "clock.arrow.circlepath") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-                    .contentTransition(.symbolEffect(.replace))
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(selectedPage == .history
-                ? l.tr(zh: "打开财富分析", en: "Open wealth analysis", de: "Vermögensanalyse öffnen")
-                : l.tr(zh: "返回椰子历史", en: "Return to coconut history", de: "Zurück zum Kokosnuss-Verlauf"))
-            .accessibilityIdentifier("coconut-log-wealth-action")
-
-            if showsCloseButton {
-            Button { closeLog() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-            .accessibilityIdentifier("coconut-log-close-action")
-            }
-        }
-    }
 
     private func closeLog() {
         if let onClose {
@@ -528,6 +483,8 @@ struct CoconutLogContentView: View {
             .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
         }
         .buttonStyle(ScaleButtonStyle())
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("coconut-log-filter-\(id ?? "all")")
         .animation(GoMotion.selection, value: selectedActorId)
     }
 

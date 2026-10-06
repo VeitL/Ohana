@@ -113,12 +113,12 @@ struct PetMedicationActionHumanConfirmationSheet: View {
             VStack(alignment: .leading, spacing: 16) {
                 Label {
                     Text(draft.actionTitle)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: "pills.fill").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 17, weight: .black))
+                        .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                         .foregroundStyle(Color.goBlue)
                 }
 
@@ -139,7 +139,7 @@ struct PetMedicationActionHumanConfirmationSheet: View {
                         l.tr(zh: "确认已完成", en: "Confirm completed", de: "Als erledigt bestätigen"),
                         systemImage: "checkmark.circle.fill"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .background(Color.goPrimary, in: Capsule())

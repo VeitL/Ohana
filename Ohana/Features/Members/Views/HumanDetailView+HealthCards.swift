@@ -219,7 +219,7 @@ extension HumanDetailView {
                             .foregroundStyle(Color.goTeal)
                         if abnormalHealthMetricLogCount > 0 {
                             Text("+\(abnormalHealthMetricLogCount)")
-                                .font(OhanaFont.caption2(.black))
+                                .font(OhanaFont.caption2(.semibold))
                                 .foregroundStyle(Color.goOrange)
                         }
                     }

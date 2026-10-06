@@ -93,17 +93,15 @@ struct QuickHumanNoteSheet: View {
             .accessibilityIdentifier("quick-human-note-sheet")
             .navigationTitle(l.tr(zh: "添加记录", en: "Add Record", de: "Eintrag hinzufügen"))
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel, role: .cancel) { close() }
-                        .accessibilityIdentifier("ohana-sheet-close-action")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(l.tr(zh: "保存", en: "Save", de: "Speichern")) { save() }
-                        .disabled(!canSave || isSaving)
-                        .accessibilityIdentifier("quick-human-note-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: !noteText.isEmpty || hasAttachment || reminderEnabled || !selectedItems.isEmpty,
+                isSaving: isSaving,
+                canSave: canSave,
+                closeIdentifier: "ohana-sheet-close-action",
+                saveIdentifier: "quick-human-note-save-action",
+                onCancel: close,
+                onSave: save
+            )
         }
         .presentationDetents([.medium, .large])
         .presentationContentInteraction(.scrolls)
@@ -200,14 +198,14 @@ struct QuickHumanNoteSheet: View {
                 RoundedRectangle(cornerRadius: OhanaRadius.controlLarge, style: .continuous)
                     .fill(Color.goPrimary.opacity(0.18))
                 Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
             }
             .frame(width: 58, height: 58)
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "添加记录", en: "Add Record", de: "Eintrag hinzufügen"))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(human.name)
                     .font(OhanaFont.caption(.semibold))
@@ -224,7 +222,7 @@ struct QuickHumanNoteSheet: View {
     private var noteBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "内容", en: "Note", de: "Notiz"))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
             TextEditor(text: $noteText)
                 .font(OhanaFont.body(.semibold))
@@ -294,9 +292,9 @@ struct QuickHumanNoteSheet: View {
     private func attachmentButton(icon: String, title: String, color: Color, foreground: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(title)
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
         }
@@ -322,7 +320,7 @@ struct QuickHumanNoteSheet: View {
                                         selectedImages.remove(at: index)
                                     } label: {
                                         Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                                            .font(OhanaFont.adaptive(size: 8, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                            .font(OhanaFont.adaptive(size: 8, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                             .foregroundStyle(Color.arkInk)
                                             .frame(width: 18, height: 18) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                             .background(Color.goRed, in: Circle())
@@ -338,7 +336,7 @@ struct QuickHumanNoteSheet: View {
             ForEach(attachedFiles) { file in
                 HStack(spacing: 8) {
                     Image(systemName: file.isImage ? "photo.fill" : "doc.fill")
-                        .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.goPurple)
                     Text(file.fileName)
                         .font(OhanaFont.caption(.semibold))
@@ -349,7 +347,7 @@ struct QuickHumanNoteSheet: View {
                         attachedFiles.removeAll { $0.id == file.id }
                     } label: {
                         Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 10, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 10, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -365,7 +363,7 @@ struct QuickHumanNoteSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Toggle(isOn: $reminderEnabled.animation(GoMotion.feedback)) {
                 Label(l.tr(zh: "添加提醒", en: "Add Reminder", de: "Erinnerung hinzufügen"), systemImage: "bell.badge.fill")
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
             }
             .tint(Color.goPrimary)
@@ -373,7 +371,7 @@ struct QuickHumanNoteSheet: View {
             if reminderEnabled {
                 HStack {
                     Text(l.tr(zh: "提醒时间", en: "Reminder time", de: "Erinnerungszeit"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     DatePicker("", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
@@ -392,10 +390,10 @@ struct QuickHumanNoteSheet: View {
     private var dateBlock: some View {
         HStack(spacing: 12) {
             Image(systemName: "calendar") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(l.tr(zh: "记录日期", en: "Record date", de: "Eintragsdatum"))
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Spacer()
             DatePicker("", selection: $date, displayedComponents: .date)
@@ -411,12 +409,12 @@ struct QuickHumanNoteSheet: View {
         Button { save() } label: {
             HStack(spacing: 8) {
                 Image(systemName: isSaving ? "hourglass" : "checkmark.circle.fill")
-                    .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 Text(isSaving
                     ? l.tr(zh: "保存中", en: "Saving", de: "Speichert")
                     : l.tr(zh: "保存记录", en: "Save Record", de: "Eintrag speichern")
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
             }
             .foregroundStyle(canSave && !isSaving ? Color.ohanaPrimaryActionText : Color.ohanaSecondaryText)
             .frame(maxWidth: .infinity)
@@ -476,7 +474,6 @@ struct QuickHumanNoteSheet: View {
         let savedRecorderID = selectedRecorderID?.uuidString
         let command = DomainCommand.humanNote(humanID: human.id)
 
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
         commandQueue.enqueue(command) {
             do {
                 guard try HumanCareCommandExecutor(
@@ -507,6 +504,7 @@ struct QuickHumanNoteSheet: View {
                 appServices.domainRevisions.publishFailure(command: command, error: error)
                 return
             }
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
             onSaved?()
             isSaving = false
             close()

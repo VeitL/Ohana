@@ -100,7 +100,8 @@ enum DesignSpecOptionCatalogV4 {
     ]
 
     static let types = [
-        DesignSpecOptionV4("rounded", "圆体", "Rounded", "Ohana 默认。", "Ohana default.", "textformat", Color.goPrimary, recommended: true),
+        DesignSpecOptionV4("system", "系统语义字体", "System Semantic", "正文清楚，品牌保留圆润。", "Clear content with rounded brand accents.", "textformat", Color.goPrimary, recommended: true),
+        DesignSpecOptionV4("rounded", "圆体", "Rounded", "用于成员、绿洲和奖励。", "For members, Oasis, and rewards.", "textformat", Color.goPrimary),
         DesignSpecOptionV4("compact", "紧凑粗体", "Compact", "适合密集信息。", "For dense information.", "bold", Color.goBlue),
         DesignSpecOptionV4("editorial", "柔和展示", "Editorial", "更有温度。", "Warmer display style.", "textformat.size", Color.goPurple),
         DesignSpecOptionV4("mono", "数字强调", "Metric Mono", "适合金额/克数。", "For money and metrics.", "number", Color.goTeal)

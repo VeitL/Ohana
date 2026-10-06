@@ -174,11 +174,13 @@ nonisolated struct ShopItem: Identifiable, Equatable {
     var appIcon: AppIconShopDescriptor?
     var isPurchased: Bool = false
 
-    var name: String { nameText.resolve() }
-    var description: String { descriptionText.resolve() }
+    var displayNameText: AppLocalizedText { ShopShelfCopy.name(for: id) ?? nameText }
+    var displayDescriptionText: AppLocalizedText { ShopShelfCopy.description(for: id) ?? descriptionText }
+    var name: String { displayNameText.resolve() }
+    var description: String { displayDescriptionText.resolve() }
 
-    func name(_ l: L10n) -> String { l.text(nameText) }
-    func description(_ l: L10n) -> String { l.text(descriptionText) }
+    func name(_ l: L10n) -> String { l.text(displayNameText) }
+    func description(_ l: L10n) -> String { l.text(displayDescriptionText) }
     var application: ShopProductApplication { ShopProductApplicationCatalog.application(for: id) }
     var applicationRequirement: ShopApplicationRequirement {
         ShopProductApplicationCatalog.requirement(for: id)
@@ -248,6 +250,12 @@ nonisolated enum ShopCatalog {
         sellableItems.map { decorated($0, purchasedSet: purchasedSet) }
     }
 
+    /// Ownership and recovery outlive the visible shelf, including the free
+    /// default icon and independently granted Supporter icon.
+    static func inventoryItems(purchasedSet: Set<String> = []) -> [ShopItem] {
+        allCatalogItems.map { decorated($0, purchasedSet: purchasedSet) }
+    }
+
     static func item(id: String, purchasedSet: Set<String> = []) -> ShopItem? {
         allCatalogItems
             .first { $0.id == id }
@@ -272,8 +280,21 @@ nonisolated enum ShopCatalog {
         return copy
     }
 
-    private static let sellableItems: [ShopItem] =
-        appIconItems + avatarItems + effectItems + plantDecorItems + titleItems + boostItems
+    private static let sellableIDs = [
+        OasisPlantDecorID.ceramicPotSkin,
+        OasisPlantDecorID.mossPath,
+        OasisPlantDecorID.greenhouseCorner,
+        "appicon_coconut",
+        "appicon_clean_blue",
+        "appicon_lime_night",
+        "fx_lime_glow",
+        "fx_popout_card",
+        Avatar2DAccess.shopItemId
+    ]
+
+    private static let sellableItems: [ShopItem] = sellableIDs.compactMap { id in
+        allCatalogItems.first { $0.id == id }
+    }
 
     /// Retained only so historical in-flight purchases can finish after an app
     /// update. Tree energy remains available from Oasis itself, not as a
@@ -343,7 +364,9 @@ nonisolated enum ShopCatalog {
         )
     ]
 
-    private static let allCatalogItems = sellableItems + legacyFulfillmentItems
+    // Keep historical definitions stable for outstanding purchases and backups.
+    private static let allCatalogItems =
+        appIconItems + avatarItems + effectItems + plantDecorItems + titleItems + boostItems + legacyFulfillmentItems
 
     private static let appIconItems: [ShopItem] = [
         ShopItem(

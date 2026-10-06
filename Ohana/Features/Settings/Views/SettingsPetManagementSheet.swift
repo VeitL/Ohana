@@ -28,7 +28,6 @@ struct SettingsPetManagementSheet: View {
 
                 ScrollView(showsIndicators: false) {
                     LazyVStack(alignment: .leading, spacing: 14) {
-                        header
                         petList
                     }
                     .padding(.horizontal, 18)
@@ -36,7 +35,9 @@ struct SettingsPetManagementSheet: View {
                     .padding(.bottom, 26)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "宠物管理", en: "Manage pets", de: "Haustiere verwalten"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { OhanaModalToolbar(onClose: { dismiss() }) }
         }
         .alert(l.tr(zh: "删除 \(petToDelete?.name ?? "")", en: "Delete \(petToDelete?.name ?? "")", de: "\(petToDelete?.name ?? "") löschen"), isPresented: $showingDeletePetAlert) {
             TextField(l.tr(zh: "输入宠物名字确认", en: "Enter pet name to confirm", de: "Tiernamen zur Bestätigung eingeben"), text: $deleteConfirmName) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
@@ -72,22 +73,7 @@ struct SettingsPetManagementSheet: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text(l.tr(zh: "宠物管理", en: "Pet Management", de: "Tierverwaltung"))
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(primaryText)
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(primaryText)
-                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.ohanaControlFill, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-    }
+
 
     private var petList: some View {
         VStack(alignment: .leading, spacing: 8) {

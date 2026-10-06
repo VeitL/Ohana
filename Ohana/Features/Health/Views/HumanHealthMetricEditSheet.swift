@@ -36,6 +36,11 @@ struct HumanHealthMetricEditSheet: View {
     private var parsedValue: Double? {
         CountryDecimalInput.parse(valueText, countryCode: appCountry)
     }
+    private var hasChanges: Bool {
+        parsedValue != log.value || selectedUnitCode != log.unitCode
+            || selectedDate != log.date || notes != log.notes
+    }
+
     private var isValid: Bool {
         guard metric.unit(for: selectedUnitCode) != nil,
               let parsedValue else { return false }
@@ -75,21 +80,16 @@ struct HumanHealthMetricEditSheet: View {
             .background(OhanaAppBackground())
             .navigationTitle(copy.editTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(L10n(appLanguage).cancel, role: .cancel) { dismiss() }
-                        .disabled(isSaving)
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(copy.saveTitle, action: save)
-                        .disabled(!isValid || isSaving || human.hasPassedAway)
-                        .accessibilityIdentifier("human-health-metric-edit-save-action")
-                }
-            }
+            .ohanaEditorChrome(
+                hasChanges: hasChanges, isSaving: isSaving,
+                canSave: isValid && !human.hasPassedAway,
+                saveTitle: copy.saveTitle,
+                saveIdentifier: "human-health-metric-edit-save-action",
+                onCancel: { dismiss() }, onSave: save
+            )
         }
         .tint(tint)
         .environment(\.locale, AppLanguage.effectiveLocale)
-        .interactiveDismissDisabled(isSaving)
         .accessibilityIdentifier("human-health-metric-edit-sheet-\(metric.key)")
         .onChange(of: valueText) { _, newValue in
             let sanitized = CountryDecimalInput.sanitize(

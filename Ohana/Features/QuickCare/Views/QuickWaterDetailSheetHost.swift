@@ -14,15 +14,18 @@ struct QuickWaterDetailSheetHost: View {
     let id: UUID
     let onRemove: () -> Void
     let onClose: (() -> Void)?
+    let showsCloseButton: Bool
 
     init(
         id: UUID,
         onRemove: @escaping () -> Void,
+        showsCloseButton: Bool = true,
         onClose: (() -> Void)? = nil
     ) {
         self.id = id
         self.onRemove = onRemove
         self.onClose = onClose
+        self.showsCloseButton = showsCloseButton
     }
 
     var body: some View {
@@ -38,6 +41,7 @@ struct QuickWaterDetailSheetHost: View {
                 QuickWaterDetailSheet(
                     pet: pet,
                     onRemove: onRemove,
+                    showsCloseButton: showsCloseButton,
                     onClose: onClose,
                     allEvents: routeData.allEvents,
                     allPets: routeData.allPets,

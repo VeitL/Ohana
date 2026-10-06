@@ -20,7 +20,7 @@ extension AddPlantView {
                     value: $wateringInterval,
                     in: 1 ... 90
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             }
@@ -52,7 +52,7 @@ extension AddPlantView {
                     )
                 }
                 .pickerStyle(.menu)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             }
@@ -77,7 +77,7 @@ extension AddPlantView {
                         .tint(Color.goPrimary)
                 }
                 .pickerStyle(.menu)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             }
 
@@ -91,7 +91,7 @@ extension AddPlantView {
                     value: $fertilizingInterval,
                     in: 1 ... 365
                 )
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             }
@@ -120,7 +120,7 @@ extension AddPlantView {
                         submitLabel: .done
                     )
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             }
 
@@ -130,7 +130,7 @@ extension AddPlantView {
                 subtitle: l.tr(zh: "靠近空调/暖气会让叶片清洁提醒更频繁。", en: "AC/heater exposure makes leaf-cleaning checks more frequent.", de: "Klimaquellen machen Blattreinigung häufiger.")
             ) {
                 Toggle(l.tr(zh: "需要更频繁清洁叶片", en: "Needs more frequent leaf cleaning", de: "Häufigere Blattreinigung"), isOn: $isNearClimateSource)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .tint(Color.goPrimary)
             }
@@ -145,7 +145,7 @@ extension AddPlantView {
                     Toggle(l.tr(zh: "对狗有误食风险", en: "Risk for dogs", de: "Risiko für Hunde"), isOn: $isToxicToDogs)
                     Toggle(l.tr(zh: "对儿童有误食风险", en: "Risk for children", de: "Risiko für Kinder"), isOn: $isToxicToChildren)
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             }
@@ -163,7 +163,7 @@ extension AddPlantView {
                     Toggle(l.tr(zh: "多肉/仙人掌类", en: "Succulent/cactus", de: "Sukkulente/Kaktus"), isOn: $isSucculent)
                         .tint(Color.goPrimary)
                 }
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             }
         }

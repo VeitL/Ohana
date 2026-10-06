@@ -2,7 +2,7 @@
 //  InlineNumericInput.swift
 //  Ohana
 //
-//  Reusable in-page numeric input. Keeps simple number entry out of the system keyboard.
+//  Reusable native numeric entry and optional step controls.
 //
 
 import SwiftUI
@@ -17,8 +17,8 @@ struct InlineNumericInput: View {
     var accentForeground: Color = .ohanaPrimaryActionText
     var step: Double?
     var minValue: Double = 0
-    var valueFont: Font = OhanaFont.title3(.black)
-    var unitFont: Font = OhanaFont.callout(.black)
+    var valueFont: Font = OhanaFont.title3(.semibold)
+    var unitFont: Font = OhanaFont.callout(.semibold)
     var valueAlignment: Alignment = .center
     var fill: Color = .ohanaCardSurface
     var cornerRadius: CGFloat = 18
@@ -29,114 +29,51 @@ struct InlineNumericInput: View {
     var decrementAccessibilityIdentifier: String?
     var incrementAccessibilityIdentifier: String?
 
-    @State private var showsKeypad = false
-
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                if step != nil {
-                    stepButton(
-                        systemName: "minus",
-                        deltaMultiplier: -1,
-                        accessibilityIdentifier: decrementAccessibilityIdentifier
-                    )
-                }
-
-                numericEntryButton
-
-                if step != nil {
-                    stepButton(
-                        systemName: "plus",
-                        deltaMultiplier: 1,
-                        accessibilityIdentifier: incrementAccessibilityIdentifier
-                    )
-                }
+        HStack(spacing: 10) {
+            if step != nil {
+                stepButton(systemName: "minus", deltaMultiplier: -1, accessibilityIdentifier: decrementAccessibilityIdentifier)
             }
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, verticalPadding)
-            .background(fill, in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-
-            if showsKeypad {
-                EmbeddedDecimalKeypad(
-                    text: $text,
-                    countryCode: countryCode,
-                    maxFractionDigits: maxFractionDigits,
-                    accent: accent,
-                    isMini: usesMiniKeypad
-                ) {
-                    withAnimation(GoMotion.feedback) {
-                        showsKeypad = false
-                    }
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
-            }
-        }
-        .transaction { transaction in
-            transaction.animation = nil
-        }
-    }
-
-    @ViewBuilder
-    private var numericEntryButton: some View {
-        let button = Button {
-            withAnimation(GoMotion.feedback) {
-                showsKeypad.toggle()
-            }
-            UISelectionFeedbackGenerator().selectionChanged()
-        } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(text.isEmpty ? placeholder : text)
+                TextField(placeholder, text: $text)
+                    .keyboardType(maxFractionDigits == 0 ? .numberPad : .decimalPad)
                     .font(valueFont)
-                    .foregroundStyle(text.isEmpty ? Color.ohanaSecondaryText : Color.ohanaPrimaryText)
                     .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.55)
+                    .multilineTextAlignment(valueAlignment == .leading ? .leading : .center)
+                    .ohanaRoundedTextFieldStyle()
+                    .accessibilityLabel(unit.map { "\(placeholder) \($0)" } ?? placeholder)
+                    .accessibilityIdentifier(inputAccessibilityIdentifier ?? "ohana-decimal-input")
                 if let unit {
-                    Text(unit)
-                        .font(unitFont)
-                        .foregroundStyle(accent)
-                        .lineLimit(1)
+                    Text(unit).font(unitFont).foregroundStyle(accent)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: valueAlignment)
+            if step != nil {
+                stepButton(systemName: "plus", deltaMultiplier: 1, accessibilityIdentifier: incrementAccessibilityIdentifier)
+            }
         }
-        .buttonStyle(ScaleButtonStyle())
-
-        if let inputAccessibilityIdentifier {
-            button.accessibilityIdentifier(inputAccessibilityIdentifier)
-        } else {
-            button
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        .tint(accent)
+        .onChange(of: text) { _, value in
+            let sanitized = CountryDecimalInput.sanitize(value, countryCode: countryCode, maxFractionDigits: maxFractionDigits)
+            if sanitized != value { text = sanitized }
         }
     }
 
-    @ViewBuilder
-    private func stepButton(
-        systemName: String,
-        deltaMultiplier: Double,
-        accessibilityIdentifier: String?
-    ) -> some View {
-        let button = Button {
+    private func stepButton(systemName: String, deltaMultiplier: Double, accessibilityIdentifier: String?) -> some View {
+        Button {
             guard let step else { return }
             let current = CountryDecimalInput.parse(text, countryCode: countryCode) ?? 0
             let next = max(minValue, current + step * deltaMultiplier)
             text = next > minValue
                 ? CountryDecimalInput.format(next, countryCode: countryCode, maxFractionDigits: maxFractionDigits)
                 : ""
-            showsKeypad = false
-            UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Image(systemName: systemName)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
-                .foregroundStyle(accentForeground)
-                .frame(width: 36, height: 36) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
-                .background(accent, in: Circle())
+                .frame(minWidth: 44, minHeight: 44)
         }
-        .buttonStyle(ScaleButtonStyle())
-
-        if let accessibilityIdentifier {
-            button.accessibilityIdentifier(accessibilityIdentifier)
-        } else {
-            button
-        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.circle)
+        .accessibilityIdentifier(accessibilityIdentifier ?? "ohana-number-\(systemName)")
     }
 }

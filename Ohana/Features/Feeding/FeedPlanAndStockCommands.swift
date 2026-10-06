@@ -59,6 +59,7 @@ struct TreatFeedCommandResult {
     let grams: Double
     let didRecord: Bool
     let allowsDerivedEffects: Bool
+    var recordReference: PetRecordReference? = nil
 }
 
 enum TreatFeedCommand {
@@ -83,7 +84,8 @@ enum TreatFeedCommand {
         return TreatFeedCommandResult(
             grams: grams,
             didRecord: recorded.result.didWriteFact,
-            allowsDerivedEffects: recorded.result.allowsDerivedEffects
+            allowsDerivedEffects: recorded.result.allowsDerivedEffects,
+            recordReference: recorded.result.didWriteFact ? PetRecordReference(petID: pet.id, recordID: recorded.result.logID) : nil
         )
     }
 }

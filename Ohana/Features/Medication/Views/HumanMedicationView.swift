@@ -183,7 +183,7 @@ struct HumanMedicationContentView: View {
                 medicationContent
             }
         }
-        .toolbar(showsDoneButton ? .hidden : .visible, for: .navigationBar)
+        .toolbar(.visible, for: .navigationBar)
         .sheet(isPresented: $showAddSheet) {
             AddMedicationSheet(human: human)
                 .ohanaSheetPagePresentation() // ui-v4: allow complex medication editor uses full-height system sheet
@@ -381,7 +381,7 @@ private extension HumanMedicationContentView {
                 if showToast {
                     HStack(spacing: 8) {
                         Image(systemName: toastKind.icon)
-                            .font(OhanaFont.subheadline(.black))
+                            .font(OhanaFont.subheadline(.semibold))
                             .foregroundStyle(toastKind.tint)
                             .accessibilityHidden(true)
                         Text(toastMessage)
@@ -403,9 +403,9 @@ private extension HumanMedicationContentView {
                 Button { showAddSheet = true } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 16, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         Text(l.tr(zh: "添加药物", en: "Add medication", de: "Medikament hinzufügen"))
-                            .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     }
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 28).padding(.vertical, 14)
@@ -510,7 +510,7 @@ private extension HumanMedicationContentView {
                     .font(OhanaFont.callout(.bold))
                     .foregroundStyle(isResolved ? tertiaryText : primaryText)
                 Text(doseStatusText(item, status: status))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(tint)
             }
             .frame(width: 62, alignment: .trailing)
@@ -520,7 +520,7 @@ private extension HumanMedicationContentView {
                     .fill(tint.opacity(0.14))
                     .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 Image(systemName: doseStatusIcon(item, status: status))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(tint)
             }
 
@@ -1071,7 +1071,7 @@ private extension HumanMedicationContentView {
 
     private func sectionLabel(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(tertiaryText)
             .textCase(.uppercase)
             .tracking(1.0)

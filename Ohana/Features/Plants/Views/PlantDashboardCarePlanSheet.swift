@@ -75,7 +75,7 @@ struct PlantDashboardCarePlanSheet: View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "calendar.badge.clock") // a11y: allow decorative care-plan glyph; heading and metrics name this sheet.
-                    .font(OhanaFont.adaptive(size: 18, weight: .black))
+                    .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                     .foregroundStyle(Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background(Color.goPrimary.opacity(0.16), in: Circle())
@@ -83,7 +83,7 @@ struct PlantDashboardCarePlanSheet: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "未来 7 天", en: "Next 7 days", de: "Nächste 7 Tage"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaTertiaryText)
                         .textCase(.uppercase)
                     Text(l.tr(
@@ -91,7 +91,7 @@ struct PlantDashboardCarePlanSheet: View {
                         en: "Review watering, fertilizing, and recheck tasks together.",
                         de: "Gießen, Düngen und Checks gemeinsam prüfen."
                     ))
-                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 }
@@ -127,7 +127,7 @@ struct PlantDashboardCarePlanSheet: View {
                         dismiss()
                     } label: {
                         Text(l.tr(zh: "全部完成", en: "Complete all", de: "Alle erledigen"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
@@ -141,7 +141,7 @@ struct PlantDashboardCarePlanSheet: View {
                         dismiss()
                     } label: {
                         Text(l.tr(zh: "延后一天", en: "Defer one day", de: "Um einen Tag"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: 44)
@@ -178,7 +178,7 @@ struct PlantDashboardCarePlanSheet: View {
     private var emptyState: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "checkmark.seal.fill") // a11y: allow decorative empty plan glyph; text explains state.
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 44, height: 44)
                 .background(Color.goTeal.opacity(0.16), in: Circle())
@@ -186,14 +186,14 @@ struct PlantDashboardCarePlanSheet: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(l.tr(zh: "本周没有植物任务", en: "No plant tasks this week", de: "Diese Woche keine Pflanzenaufgaben"))
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
                     zh: "可以补照片、完善摆放位置或记录一次观察。",
                     en: "Add photos, refine locations, or log an observation.",
                     de: "Fotos ergänzen, Standorte verbessern oder Beobachtung erfassen."
                 ))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -213,11 +213,11 @@ struct PlantDashboardCarePlanSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer(minLength: 8)
                 Text(detail)
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
             }
@@ -242,7 +242,7 @@ struct PlantDashboardCarePlanSheet: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Image(systemName: careSymbol(for: task.careType)) // a11y: allow decorative task glyph; row text and buttons name actions.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(careTint(for: task.careType))
                     .frame(width: 34, height: 34) // a11y: allow non-interactive task glyph; buttons provide 44pt hit targets.
                     .background(careTint(for: task.careType).opacity(0.16), in: Circle())
@@ -250,12 +250,12 @@ struct PlantDashboardCarePlanSheet: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(plant.name) · \(careTypeName)")
-                        .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
                     Text("\(task.subtitle) · \(dueText(for: task))")
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
@@ -268,7 +268,7 @@ struct PlantDashboardCarePlanSheet: View {
                     dismiss()
                 } label: {
                     Image(systemName: "arrow.right") // a11y: allow decorative open glyph; accessibility label names destination.
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .frame(width: 44, height: 44)
                         .accessibilityHidden(true)
@@ -280,7 +280,7 @@ struct PlantDashboardCarePlanSheet: View {
                     onOpenCareLog(plant, task.careType)
                 } label: {
                     Image(systemName: "checkmark") // a11y: allow decorative log glyph; accessibility label names the care log.
-                        .font(OhanaFont.adaptive(size: 12, weight: .black))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .frame(width: 44, height: 44)
                         .background(Color.goPrimary, in: Circle())
@@ -322,7 +322,7 @@ struct PlantDashboardCarePlanSheet: View {
     ) -> some View {
         Button(action: action) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -338,14 +338,14 @@ struct PlantDashboardCarePlanSheet: View {
     private func metricPill(icon: String, value: String, label: String, tint: Color) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Image(systemName: icon) // a11y: allow decorative metric glyph; adjacent text gives value.
-                .font(OhanaFont.adaptive(size: 11, weight: .black))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             Text(value)
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(label)
-                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)

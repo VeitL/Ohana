@@ -183,7 +183,7 @@ extension WalkTrackingCard {
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.82))
             Spacer(minLength: 8)
             Text(status.detail)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(status.tint)
                 .lineLimit(1)
         }
@@ -259,7 +259,7 @@ extension WalkTrackingCard {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
             } label: {
                 Text(l.tr(zh: "继续", en: "Resume", de: "Fortsetzen"))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(minHeight: 36)
                     .padding(.horizontal, 12)

@@ -199,6 +199,8 @@ struct IslandExpenseDashboard: View {
     @State private var requestedRange: ExpenseDashboardRange = .month
     @State private var requestedSubjectKey: String?
     @State private var loadTask: Task<Void, Never>?
+    @State private var isLoading = false
+    @State private var loadFailed = false
 
     init(standalone: Bool = true) {
         self.standalone = standalone
@@ -223,9 +225,12 @@ struct IslandExpenseDashboard: View {
             pets: pets,
             humans: humans,
             snapshot: snapshot,
-            onFilterChange: requestSnapshot
+            onFilterChange: requestSnapshot,
+            onRefresh: { scheduleLoad(force: true) },
+            isLoading: isLoading,
+            loadFailed: loadFailed
         )
-        .onAppear { scheduleLoad() }
+        .onAppear { scheduleLoad(force: isLoading || loadFailed) }
         .onReceive(appServices.domainRevisions.homeRevisionUpdates) { _ in
             scheduleLoad(force: true)
         }
@@ -245,6 +250,8 @@ struct IslandExpenseDashboard: View {
     private func scheduleLoad(force: Bool = false) {
         guard force || !snapshot.hasLoaded else { return }
         loadTask?.cancel()
+        isLoading = true
+        loadFailed = false
         let container = modelContext.container
         let range = requestedRange
         let subjectKey = requestedSubjectKey
@@ -263,11 +270,15 @@ struct IslandExpenseDashboard: View {
             } catch is CancellationError {
                 return
             } catch {
+                guard !Task.isCancelled else { return }
+                loadFailed = true
                 OhanaLog.warning(
                     "Expense insight snapshot load failed: \(error.localizedDescription)",
                     category: "Expenses"
                 )
             }
+            guard !Task.isCancelled else { return }
+            isLoading = false
             loadTask = nil
         }
     }

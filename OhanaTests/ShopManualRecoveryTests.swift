@@ -108,7 +108,7 @@ struct ShopManualRecoveryTests {
         let context = container.mainContext
         let (name, defaults) = try isolatedDefaults()
         defer { defaults.removePersistentDomain(forName: name) }
-        let item = try #require(ShopCatalog.item(id: "boost_streak"))
+        let item = try #require(ShopCatalog.item(id: Avatar2DAccess.shopItemId))
         let buyer = Human(name: "Buyer")
         buyer.coconutBalance = item.cost
         context.insert(buyer)
@@ -120,7 +120,7 @@ struct ShopManualRecoveryTests {
         let purchase = ShopPurchaseCommandService.purchase(
             item: item,
             buyer: buyer,
-            itemName: "Streak Shield",
+            itemName: "Avatar Pass",
             context: context,
             questManager: services.questManager,
             wallet: services.coconutWallet,
@@ -148,7 +148,7 @@ struct ShopManualRecoveryTests {
         #expect(result.disposition == .fulfilled)
         #expect(attempt.state == .fulfilled)
         #expect(buyer.coconutBalance == 0)
-        #expect(inventory.consumableSnapshot().streakShieldExpiry != nil)
+        #expect(inventory.consumableSnapshot().avatar2DExtraPassCount == 1)
         let retainedSnapshot = try JSONDecoder().decode(
             [ShopPurchaseFundingContribution].self,
             from: Data(attempt.fundingContributionsJSON.utf8)

@@ -257,7 +257,7 @@ struct OnboardingView: View {
                     ko: "어떻게 불러 드릴까요?",
                     it: "Come vuoi che ti chiamiamo?"
                 ))
-                .font(OhanaFont.title(.black))
+                .font(OhanaFont.brandTitle(.title, weight: .bold))
                 .foregroundStyle(OnboardingPalette.primaryText)
                 .multilineTextAlignment(.center)
 
@@ -338,7 +338,7 @@ struct OnboardingView: View {
                     ko: "지금 반려동물을 추가할까요?",
                     it: "Aggiungere un animale ora?"
                 ))
-                .font(OhanaFont.title(.black))
+                .font(OhanaFont.brandTitle(.title, weight: .bold))
                 .foregroundStyle(OnboardingPalette.primaryText)
                 .multilineTextAlignment(.center)
 
@@ -438,7 +438,7 @@ struct OnboardingView: View {
                     ko: "초기 설정이 완료되었어요",
                     it: "La configurazione è già completata"
                 ))
-                .font(OhanaFont.title(.black))
+                .font(OhanaFont.brandTitle(.title, weight: .bold))
                 .foregroundStyle(OnboardingPalette.primaryText)
                 .multilineTextAlignment(.center)
 

@@ -12,7 +12,7 @@ extension PlantDetailContentView {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "waveform.path.ecg") // a11y: allow decorative health-review glyph; heading names the card.
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 34, height: 34) // a11y: allow non-interactive health-review glyph; text carries the content.
                     .background(Color.goTeal.opacity(0.16), in: Circle())
@@ -20,10 +20,10 @@ extension PlantDetailContentView {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(l.tr(zh: "健康观察", en: "Health review", de: "Gesundheitscheck"))
-                        .font(OhanaFont.adaptive(size: 16, weight: .heavy, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(healthReviewSummaryText)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -63,7 +63,7 @@ extension PlantDetailContentView {
                     openCareLogSheet(.pestCheck)
                 } label: {
                     Text(PlantCareType.pestCheck.displayName(l: l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -79,7 +79,7 @@ extension PlantDetailContentView {
                     openCareLogSheet(.yellowLeaf)
                 } label: {
                     Text(PlantCareType.yellowLeaf.displayName(l: l))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -104,17 +104,17 @@ extension PlantDetailContentView {
     func healthReviewMetric(icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon) // a11y: allow decorative health metric glyph; metric text carries value.
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
                     .lineLimit(2)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -140,7 +140,7 @@ extension PlantDetailContentView {
     func healthReviewSignalRow(_ signal: PlantHealthReviewSignal) -> some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: signal.icon) // a11y: allow decorative health signal glyph; row text carries signal details.
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(signal.tint)
                 .frame(width: 34, height: 34) // a11y: allow non-interactive signal glyph; row label carries the content.
                 .background(signal.tint.opacity(0.16), in: Circle())
@@ -148,11 +148,11 @@ extension PlantDetailContentView {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(signal.title)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(signal.detail)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -171,18 +171,18 @@ extension PlantDetailContentView {
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "doc.text.magnifyingglass") // a11y: allow decorative diary glyph; heading names the card.
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 34, height: 34) // a11y: allow non-interactive diary glyph; text carries the content.
                     .background(Color.goTeal.opacity(0.16), in: Circle())
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(l.tr(zh: "成长档案", en: "Growth diary", de: "Wachstumstagebuch"))
-                        .font(OhanaFont.adaptive(size: 16, weight: .heavy, design: .rounded))
+                    Text(l.tr(zh: "成长回顾", en: "Growth recap", de: "Wachstumsrückblick"))
+                        .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(growthDiarySummaryText)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -191,6 +191,12 @@ extension PlantDetailContentView {
             }
 
             plantDetailMetricGrid {
+                diaryStatPill(
+                    icon: "checkmark.circle.fill",
+                    title: l.tr(zh: "近 30 天护理", en: "Care in 30 days", de: "Pflege in 30 Tagen"),
+                    value: "\(logSummary?.recentCareCount ?? 0)",
+                    tint: Color.goPrimary
+                )
                 diaryStatPill(
                     icon: "tray.full.fill",
                     title: l.tr(zh: "记录", en: "Logs", de: "Protokolle"),
@@ -209,6 +215,36 @@ extension PlantDetailContentView {
                     value: growthDiaryDateRangeText,
                     tint: Color.goYellow
                 )
+            }
+
+            if growthComparisonPhotos.count >= 2,
+               growthComparisonPhotos[0].id != growthComparisonPhotos[1].id {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(l.tr(zh: "早期与近期", en: "Then and now", de: "Früher und heute"))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.ohanaPrimaryText)
+                    HStack(alignment: .top, spacing: 10) {
+                        ForEach(growthComparisonPhotos.prefix(2)) { photo in
+                            VStack(alignment: .leading, spacing: 6) {
+                                PlantDetailDecodedImageTile(
+                                    imageID: photo.id,
+                                    imageSignature: photo.mediaSignature,
+                                    imageDataProvider: { await photoImageData(for: photo) },
+                                    tint: photo.tint,
+                                    fillsContainer: true,
+                                    maxPixel: 520
+                                )
+                                .frame(height: 110)
+                                .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row))
+                                Text(photo.subtitle)
+                                    .font(OhanaFont.adaptive(size: 11, weight: .semibold))
+                                    .foregroundStyle(Color.ohanaSecondaryText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("plant-detail-growth-photo-comparison")
             }
 
             if photos.isEmpty {
@@ -243,7 +279,7 @@ extension PlantDetailContentView {
                         showingPhotoGallery = true
                     } label: {
                         Text(l.tr(zh: "查看照片", en: "View photos", de: "Fotos ansehen"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.78)
@@ -260,7 +296,7 @@ extension PlantDetailContentView {
                     openCareLogSheet(.newLeaf)
                 } label: {
                     Text(l.tr(zh: "记录观察", en: "Log observation", de: "Beobachtung erfassen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -276,7 +312,7 @@ extension PlantDetailContentView {
                     openCareLogSheet(.photo)
                 } label: {
                     Text(l.tr(zh: "添加照片", en: "Add photo", de: "Foto hinzufügen"))
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -301,10 +337,10 @@ extension PlantDetailContentView {
     var growthDiaryExportButtonLabel: some View {
         HStack(spacing: 6) {
             Image(systemName: "square.and.arrow.up") // a11y: allow decorative share glyph; button label names export action.
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .accessibilityHidden(true)
             Text(l.tr(zh: "导出 Markdown", en: "Export Markdown", de: "Markdown exportieren"))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
         }
@@ -345,7 +381,7 @@ extension PlantDetailContentView {
     var emptyPhotoGalleryHint: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "photo.on.rectangle.angled") // a11y: allow decorative photo hint glyph; text explains the empty gallery.
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(Color.goTeal)
                 .frame(width: 44, height: 44)
                 .background(Color.goTeal.opacity(0.16), in: Circle())
@@ -353,14 +389,14 @@ extension PlantDetailContentView {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(l.tr(zh: "还没有照片线索", en: "No photo notes yet", de: "Noch keine Foto-Hinweise"))
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(l.tr(
                     zh: "带照片的档案图或护理记录会自动进入这里，方便回看叶片变化。",
                     en: "Profile photos and care logs with images appear here for leaf-change review.",
                     de: "Profilfotos und Pflegeprotokolle mit Bildern erscheinen hier zur Blattkontrolle."
                 ))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -391,12 +427,12 @@ extension PlantDetailContentView {
                             .clipShape(RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
                             Text(photo.title)
-                                .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                             Text(photo.subtitle)
-                                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
@@ -420,17 +456,17 @@ extension PlantDetailContentView {
     func diaryStatPill(icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon) // a11y: allow decorative stat glyph; pill text carries value.
-                .font(OhanaFont.adaptive(size: 10, weight: .black))
+                .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                 .foregroundStyle(tint)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 9, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 9, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .textCase(.uppercase)
                     .lineLimit(2)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)

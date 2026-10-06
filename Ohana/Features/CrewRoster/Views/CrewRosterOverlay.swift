@@ -126,7 +126,16 @@ struct CrewRosterOverlay: View {
                     }
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "家庭成员", en: "Family Members", de: "Familienmitglieder", es: "Familia", pt: "Família", fr: "Famille", ja: "家族メンバー", ko: "가족 구성원", it: "Famiglia"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(hideToolbar ? .hidden : .visible, for: .navigationBar)
+            .toolbar {
+                if !hideToolbar {
+                    OhanaModalToolbar(onClose: closeRoster, closeIdentifier: "crew-roster-close-action")
+                    ToolbarItem(placement: .primaryAction) { rosterPrimaryAction }
+                }
+            }
+            .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
             .crewRosterPresentations(
                 fullScreenRoute: $activeFullScreenRoute,
                 onAddEntityDismissed: resetPendingInlineAddEntity,
@@ -152,14 +161,14 @@ struct CrewRosterOverlay: View {
 
     private var rosterTopChrome: some View {
         VStack(spacing: 10) {
-            rosterHeader
+            if hideToolbar { rosterHeader }
             rosterTaskCenterAction
             if !isEmpty {
                 rosterMemberTools
             }
         }
         .padding(.horizontal, 18)
-        .padding(.top, safeTopInset + 12)
+        .padding(.top, hideToolbar ? safeTopInset + 12 : 12)
         .padding(.bottom, 10)
         .background {
             LinearGradient(
@@ -189,7 +198,7 @@ struct CrewRosterOverlay: View {
                     .font(OhanaFont.callout(.bold))
                     Spacer()
                     Image(systemName: "chevron.right") // a11y: allow decorative disclosure glyph hidden below
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .accessibilityHidden(true)
                 }
                 .foregroundStyle(Color.ohanaPrimaryText)
@@ -268,7 +277,7 @@ struct CrewRosterOverlay: View {
     private var rosterHeader: some View {
         HStack(spacing: 12) {
             Image(systemName: "person.2.crop.square.stack.fill") // a11y: allow decorative section icon hidden below
-                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 .background(Color.goPrimary.opacity(0.14), in: RoundedRectangle(cornerRadius: OhanaRadius.control, style: .continuous))
@@ -279,7 +288,7 @@ struct CrewRosterOverlay: View {
                 es: "Familia", pt: "Família", fr: "Famille",
                 ja: "家族メンバー", ko: "가족 구성원", it: "Famiglia"
             ))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .accessibilityIdentifier("crew-roster-\(resolvedInitialMode.rawValue)")
 
@@ -287,18 +296,7 @@ struct CrewRosterOverlay: View {
 
             rosterPrimaryAction
 
-            if !hideToolbar {
-                Button { closeRoster() } label: {
-                    Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                        .foregroundStyle(Color.ohanaPrimaryText)
-                        .frame(width: 44, height: 44)
-                        .background(Color.ohanaControlFill, in: Circle())
-                }
-                .buttonStyle(ScaleButtonStyle())
-                .accessibilityLabel(l.tr(zh: "关闭", en: "Close", de: "Schließen"))
-                .accessibilityIdentifier("crew-roster-close-action")
-            }
+
         }
     }
 
@@ -489,12 +487,12 @@ struct CrewRosterOverlay: View {
     private var emptyState: some View {
         VStack(spacing: 14) {
             Image(systemName: "person.2.slash") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 34, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 34, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
                 .frame(width: 72, height: 72)
                 .background(Color.goPrimary.opacity(0.14), in: Circle())
             Text(l.tr(zh: "还没有成员", en: "No members yet", de: "Noch keine Mitglieder"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(
                 zh: "用右上角 + 添加人类或宠物",

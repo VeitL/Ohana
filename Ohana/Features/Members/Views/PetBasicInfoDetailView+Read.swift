@@ -232,10 +232,10 @@ extension PetBasicInfoDetailView {
                         .background(Color.goYellow.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.icon, style: .continuous))
                     VStack(alignment: .leading, spacing: 1) {
                         Text(l.tr(zh: "\(breed) · 护理贴士", en: "\(breed) · Care tips", de: "\(breed) · Pflegetipps"))
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "基于品种特点的个性化建议", en: "Personalized suggestions based on breed traits", de: "Personalisierte Tipps nach Rasseeigenschaften"))
-                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.ohanaSecondaryText)
                     }
                     Spacer()
@@ -255,7 +255,7 @@ extension PetBasicInfoDetailView {
                                 .frame(width: 5, height: 5) // a11y: allow decorative non-interactive frame; hit area handled by parent
                                 .padding(.top, 5)
                             Text(tip)
-                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.75))
                         }
                     }

@@ -29,7 +29,7 @@ struct AppIconArtwork: View {
                 endPoint: .bottomTrailing
             )
             Image(systemName: descriptor.previewSymbol)
-                .font(OhanaFont.adaptive(size: 34, weight: .black))
+                .font(OhanaFont.adaptive(size: 34, weight: .semibold))
                 .foregroundStyle(descriptor.itemId == "appicon_minimal_o" ? Color.arkInk : Color.ohanaPrimaryActionText)
         }
     }

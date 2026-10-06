@@ -121,10 +121,10 @@ struct HumanHealthMetricDetailView: View {
                             metricLoadFailureNotice
                         }
                         heroMetric(snapshot)
-                        chartSection(snapshot)
                         unitSelector(snapshot)
-                        referenceSection(snapshot)
                         historySection(snapshot)
+                        DisclosureGroup(l.tr(zh: "详细图表", en: "Detailed charts", de: "Detaillierte Diagramme")) { chartSection(snapshot) }
+                        referenceSection(snapshot)
                     }
                     .padding(.horizontal, 18)
                     .padding(.top, 12)
@@ -319,14 +319,14 @@ struct HumanHealthMetricDetailView: View {
     private var pageHeader: some View {
         HStack(spacing: 12) {
             Image(systemName: metric.category.systemImage)
-                .font(OhanaFont.adaptive(size: 18, weight: .black))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold))
                 .foregroundStyle(metric.category.colorToken.actionTextColor)
                 .frame(width: 42, height: 42) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
                 .background(tint, in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(metric.displayName(l))
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -345,17 +345,17 @@ struct HumanHealthMetricDetailView: View {
             HStack(alignment: .top, spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(l.tr(zh: "最新记录", en: "Latest", de: "Aktuell"))
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                     if let latest = snapshot.selectedUnitLogs.first {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Text(snapshot.selectedUnit.formattedValue(latest.value, includeUnit: false))
-                                .font(OhanaFont.metric(size: 42, .black))
+                                .font(OhanaFont.metric(size: 42, .semibold))
                                 .foregroundStyle(Color.ohanaPrimaryText)
                                 .minimumScaleFactor(0.58)
                                 .contentTransition(.numericText())
                             Text(snapshot.selectedUnit.label)
-                                .font(OhanaFont.title3(.black))
+                                .font(OhanaFont.title3(.semibold))
                                 .foregroundStyle(tint)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
@@ -365,7 +365,7 @@ struct HumanHealthMetricDetailView: View {
                             .foregroundStyle(Color.ohanaSecondaryText)
                     } else {
                         Text("—")
-                            .font(OhanaFont.metric(size: 42, .black))
+                            .font(OhanaFont.metric(size: 42, .semibold))
                             .foregroundStyle(Color.ohanaTertiaryText)
                         Text(l.tr(zh: "此单位暂无记录", en: "No logs in this unit", de: "Keine Einträge in dieser Einheit"))
                             .font(OhanaFont.caption(.semibold))
@@ -422,13 +422,13 @@ struct HumanHealthMetricDetailView: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(unit.label)
-                                    .font(OhanaFont.callout(.black))
+                                    .font(OhanaFont.callout(.semibold))
                                 Text(unit.normalRangeLabel(includeUnit: false))
                                     .font(OhanaFont.caption2(.bold))
                                     .opacity(0.78)
                                 if isCountryDefault {
                                     Text(l.tr(zh: "国家默认", en: "Country default", de: "Länderstandard"))
-                                        .font(OhanaFont.caption2(.black))
+                                        .font(OhanaFont.caption2(.semibold))
                                         .opacity(0.62)
                                 }
                             }
@@ -462,7 +462,7 @@ struct HumanHealthMetricDetailView: View {
                     en: "\(snapshot.selectedUnitLogs.count)\(snapshot.didReachFetchLimit ? "+" : "") logs",
                     de: "\(snapshot.selectedUnitLogs.count)\(snapshot.didReachFetchLimit ? "+" : "") Einträge"
                 ))
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
             }
 
@@ -514,14 +514,14 @@ struct HumanHealthMetricDetailView: View {
 
             HStack(spacing: 12) {
                 Image(systemName: "target").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(tint)
                     .frame(width: 36, height: 36) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
                     .background(tint.opacity(0.15), in: Circle())
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(referenceLabel)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     if let latest,
                        latest.sourceReportID != nil,
@@ -554,7 +554,7 @@ struct HumanHealthMetricDetailView: View {
                 sectionTitle(l.tr(zh: "历史", en: "History", de: "Historie"))
                 Spacer()
                 Text(snapshot.selectedUnit.label)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(tint)
             }
 
@@ -623,9 +623,9 @@ struct HumanHealthMetricDetailView: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "plus").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 16, weight: .black))
+                    .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                 Text(l.tr(zh: "记录", en: "Record", de: "Erfassen"))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
             }
             .foregroundStyle(Color.ohanaPrimaryActionText)
             .padding(.horizontal, 26)
@@ -644,7 +644,7 @@ struct HumanHealthMetricDetailView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
             .textCase(.uppercase)
             .tracking(0.8)
@@ -653,11 +653,11 @@ struct HumanHealthMetricDetailView: View {
     private func miniStat(icon: String, value: String, label: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 1) {
                 Text(value)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.68)
@@ -686,7 +686,7 @@ struct HumanHealthMetricDetailView: View {
                 .fill(status.color)
                 .frame(width: 7, height: 7) // a11y: allow decorative/non-interactive frame; parent content or surrounding label owns accessibility.
             Text(status.label(l))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(status.color)
         }
         .padding(.horizontal, 10)
@@ -709,7 +709,7 @@ struct HumanHealthMetricDetailView: View {
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(log.date, format: .dateTime.year().month().day())
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 HStack(spacing: 6) {
                     Text(status.label(l))
@@ -739,10 +739,10 @@ struct HumanHealthMetricDetailView: View {
 
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(snapshot.selectedUnit.formattedValue(log.value, includeUnit: false))
-                    .font(OhanaFont.metric(size: 21, .black))
+                    .font(OhanaFont.metric(size: 21, .semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text(snapshot.selectedUnit.label)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(tint)
             }
 

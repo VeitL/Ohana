@@ -15,7 +15,15 @@ extension AddPlantView {
                 title: l.tr(zh: "选择植物", en: "Choose plant", de: "Pflanze wählen"),
                 icon: "leaf.fill"
             ) {
-                if let selectedCatalog {
+                if isUnknownSpeciesSelected {
+                    Button {
+                        isUnknownSpeciesSelected = false
+                    } label: {
+                        Label(l.tr(zh: "暂不确定品种 · 更换", en: "Species unknown · Change", de: "Art unbekannt · Ändern"), systemImage: "leaf")
+                            .frame(minHeight: 44)
+                    }
+                    .accessibilityIdentifier("add-plant-change-unknown-species")
+                } else if let selectedCatalog {
                     selectedPlantSummaryCard(selectedCatalog)
                 } else {
                     plantCatalogSearchField
@@ -27,22 +35,20 @@ extension AddPlantView {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     plantSelectionCatalogList
-                }
-            }
-
-            if selectedCatalog != nil {
-                PlantCreationSection(
-                    title: l.tr(zh: "名字", en: "Name", de: "Name"),
-                    icon: "text.cursor"
-                ) {
-                    plantNameSummarySection
-                }
-
-                PlantCreationSection(
-                    title: l.tr(zh: "摆放位置", en: "Placement", de: "Standort"),
-                    icon: "house.fill"
-                ) {
-                    roomAndSpotControls
+                    Button {
+                        selectedCatalogID = ""
+                        species = ""
+                        name = l.tr(zh: "我的植物", en: "My plant", de: "Meine Pflanze")
+                        isUnknownSpeciesSelected = true
+                        isCustomizingName = true
+                        focusedField = nil
+                        UISelectionFeedbackGenerator().selectionChanged()
+                    } label: {
+                        Label(l.tr(zh: "暂不确定品种", en: "I am not sure of the species", de: "Art noch nicht bekannt"), systemImage: "questionmark.circle")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                    .accessibilityIdentifier("add-plant-unknown-species-action")
                 }
             }
 
@@ -111,7 +117,7 @@ extension AddPlantView {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.localizedCommonName)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -133,7 +139,7 @@ extension AddPlantView {
                 clearSelectedPlantCatalog()
             } label: {
                 Image(systemName: "arrow.triangle.2.circlepath").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black))
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                     .foregroundStyle(Color.goTeal)
                     .frame(width: 44, height: 44)
                     .background(Color.goCardWhite.opacity(0.52), in: Circle())
@@ -177,7 +183,7 @@ extension AddPlantView {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Text(group.title(l))
-                .font(OhanaFont.caption(.black))
+                .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(isSelected ? Color.goTeal : Color.ohanaSecondaryText)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 34)
@@ -235,7 +241,7 @@ extension AddPlantView {
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(entry.localizedCommonName)
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -255,7 +261,7 @@ extension AddPlantView {
 
                 Spacer(minLength: 4)
                 Image(systemName: isSelected ? "checkmark" : "chevron.right")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaTertiaryText)
                     .frame(width: 30, height: 30) // a11y: allow glyph sits inside the full-width row button
                     .background(isSelected ? Color.goTeal : Color.goCardWhite.opacity(0.48), in: Circle())
@@ -286,12 +292,12 @@ extension AddPlantView {
     var plantSelectionEmptySearchState: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(l.tr(zh: "没有找到匹配", en: "No match found", de: "Kein Treffer"))
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(
-                zh: "可先选择最相近的植物。", en: "Choose the closest plant.", de: "Wähle die ähnlichste Pflanze.",
-                es: "Elige la planta más parecida.", pt: "Escolha a planta mais parecida.", fr: "Choisissez la plante la plus proche.",
-                ja: "最も近い植物を選べます。", ko: "가장 비슷한 식물을 선택하세요.", it: "Scegli la pianta più simile."
+                zh: "可以先用“暂不确定品种”建档。", en: "You can add it with an unknown species for now.", de: "Du kannst sie vorerst mit unbekannter Art anlegen.",
+                es: "Puedes añadirla con la especie sin identificar.", pt: "Você pode adicioná-la sem identificar a espécie.", fr: "Vous pouvez l’ajouter sans identifier l’espèce.",
+                ja: "品種未確定のまま追加できます。", ko: "품종을 몰라도 추가할 수 있어요.", it: "Puoi aggiungerla senza identificare la specie."
             ))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(Color.ohanaSecondaryText)
@@ -358,10 +364,10 @@ extension AddPlantView {
 
     var plantSelectionRequirementHint: some View {
         Label(
-            l.tr(zh: "请选择植物后继续，房间可以现在补上。", en: "Choose a plant to continue; room can be added now.", de: "Wähle eine Pflanze, um fortzufahren; der Raum kann jetzt ergänzt werden."),
+            l.tr(zh: "选择品种，或先以未知品种建档。", en: "Choose a species, or add it without one for now.", de: "Wähle eine Art oder lege die Pflanze zunächst ohne Art an."),
             systemImage: "info.circle.fill"
         )
-        .font(OhanaFont.caption(.black))
+        .font(OhanaFont.caption(.semibold))
         .foregroundStyle(Color.ohanaSecondaryText)
         .padding(.horizontal, 12)
         .frame(minHeight: 38)

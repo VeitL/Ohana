@@ -30,7 +30,6 @@ struct AppBackgroundPickerSheet: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 16) {
-                        header
                         supporterBackgrounds
                         officialBackgrounds
                         customBackgroundSection
@@ -40,7 +39,9 @@ struct AppBackgroundPickerSheet: View {
                     .padding(.bottom, 30)
                 }
             }
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "背景", en: "Background", de: "Hintergrund", es: "Fondo", pt: "Plano de fundo", fr: "Arrière-plan", ja: "背景", ko: "배경", it: "Sfondo"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { OhanaModalToolbar(onClose: { dismiss() }) }
         }
         .onChange(of: photoItem) { _, item in
             handlePhotoItem(item)
@@ -59,26 +60,7 @@ struct AppBackgroundPickerSheet: View {
         }
     }
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            Text(l.tr(
-                zh: "背景", en: "Background", de: "Hintergrund",
-                es: "Fondo", pt: "Plano de fundo", fr: "Arrière-plan",
-                ja: "背景", ko: "배경", it: "Sfondo"
-            ))
-                .font(OhanaFont.title2(.black))
-                .foregroundStyle(Color.ohanaPrimaryText)
-            Spacer()
-            Button { dismiss() } label: {
-                Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                    .frame(width: 38, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
-                    .background(Color.ohanaControlFill, in: Capsule())
-            }
-            .buttonStyle(ScaleButtonStyle())
-        }
-    }
+
 
     private var officialBackgrounds: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -100,7 +82,7 @@ struct AppBackgroundPickerSheet: View {
                         l.tr(zh: "已解锁", en: "Unlocked", de: "Freigeschaltet"),
                         systemImage: "checkmark.seal.fill"
                     )
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(Color.goPrimary)
                 }
             }
@@ -131,7 +113,7 @@ struct AppBackgroundPickerSheet: View {
                             ? l.tr(zh: "更换图片", en: "Change photo", de: "Bild ändern")
                             : l.tr(zh: "上传图片", en: "Upload photo", de: "Bild hochladen"))
                     }
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .frame(maxWidth: .infinity, minHeight: 46)
                     .background(Color.goPrimary, in: Capsule())
@@ -151,7 +133,7 @@ struct AppBackgroundPickerSheet: View {
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
                     } label: {
                         Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(Color.goRed)
                             .frame(width: 48, height: 46)
                             .background(Color.goRed.opacity(0.12), in: Capsule())
@@ -164,7 +146,7 @@ struct AppBackgroundPickerSheet: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(OhanaFont.caption2(.black))
+            .font(OhanaFont.caption2(.semibold))
             .foregroundStyle(Color.ohanaTertiaryText)
             .tracking(1.1)
     }
@@ -194,12 +176,12 @@ struct AppBackgroundPickerSheet: View {
                     .overlay(alignment: .topTrailing) {
                         if selected {
                             Image(systemName: "checkmark.circle.fill") // a11y: allow decorative icon covered by surrounding text or control
-                                .font(OhanaFont.adaptive(size: 18, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 18, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(Color.goPrimary)
                                 .padding(8)
                         } else if isLocked {
                             Image(systemName: "lock.fill").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                                 .foregroundStyle(Color.ohanaPrimaryActionText)
                                 .padding(8)
                                 .background(Color.goPrimary, in: Circle())
@@ -208,7 +190,7 @@ struct AppBackgroundPickerSheet: View {
                     }
 
                 Text(style.localizedName(appLanguage))
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -261,7 +243,7 @@ struct AppBackgroundPickerSheet: View {
             .clipped()
             .overlay(alignment: .bottomLeading) {
                 Text(label)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(scheme == .dark ? Color(hex: "F8FAFC").opacity(0.82) : Color(hex: "26364D").opacity(0.72))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -278,7 +260,7 @@ struct AppBackgroundPickerSheet: View {
         )
         .overlay(alignment: .bottomLeading) {
             Text(label)
-                .font(OhanaFont.caption2(.black))
+                .font(OhanaFont.caption2(.semibold))
                 .foregroundStyle(scheme == .dark ? Color(hex: "F8FAFC").opacity(0.82) : Color(hex: "26364D").opacity(0.72))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -302,7 +284,7 @@ struct AppBackgroundPickerSheet: View {
             }
             .overlay(alignment: .bottomLeading) {
                 Text(isDarkPreview ? l.tr(zh: "深", en: "Dark", de: "Dunkel") : l.tr(zh: "浅", en: "Light", de: "Hell"))
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(isDarkPreview ? Color(hex: "F8FAFC").opacity(0.82) : Color(hex: "26364D").opacity(0.72))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)

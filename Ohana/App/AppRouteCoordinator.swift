@@ -73,7 +73,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case petHealth(UUID, initialSection: PetHealthInitialSection?)
     case petMedication(UUID)
     case petMomentQuick(UUID)
-    case petMomentHistory(UUID)
+    case petMomentHistory(UUID, initialRoute: PetMomentsRoute = .highlights)
     case petDocuments(UUID)
     case petAchievements(UUID)
     case petRetention(UUID)
@@ -88,6 +88,7 @@ enum AppSheetRoute: Hashable, Identifiable {
     case humanWorkout(UUID)
     case humanWorkoutDashboard(UUID)
     case humanMetrics(UUID)
+    case humanObservationQuick(UUID)
     case humanConditions(UUID)
     case humanReport(UUID)
     case humanExpenseQuick(UUID)
@@ -152,8 +153,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "pet-medication-\(id.uuidString)"
         case let .petMomentQuick(id):
             "pet-moment-quick-\(id.uuidString)"
-        case let .petMomentHistory(id):
-            "pet-moment-history-\(id.uuidString)"
+        case let .petMomentHistory(id, route):
+            route == .highlights ? "pet-moment-history-\(id.uuidString)" : "pet-moment-history-\(id.uuidString)-\(route.routeID)"
         case let .petDocuments(id):
             "pet-documents-\(id.uuidString)"
         case let .petAchievements(id):
@@ -182,6 +183,8 @@ enum AppSheetRoute: Hashable, Identifiable {
             "human-workout-dashboard-\(id.uuidString)"
         case let .humanMetrics(id):
             "human-metrics-\(id.uuidString)"
+        case let .humanObservationQuick(id):
+            "human-observation-quick-\(id.uuidString)"
         case let .humanConditions(id):
             "human-conditions-\(id.uuidString)"
         case let .humanReport(id):
@@ -402,7 +405,7 @@ final class AppRouteCoordinator: ObservableObject {
         presentSheet(.taskCenter(context))
     }
 
-    func presentCoconutShop(category: ShopItem.ShopCategory = .appIcon) {
+    func presentCoconutShop(category: ShopItem.ShopCategory = .plantDecor) {
         applySheetDecision(sheetPresentationDecision(for: .coconutShop(category)))
     }
 

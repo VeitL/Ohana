@@ -139,14 +139,15 @@ struct PlantCareFeatureDetailView: View {
                     plant: plant,
                     initialCareType: draft.careType,
                     currentHealthStatus: plant.healthStatus,
-                    onSave: { careType, careNote, healthStatus, photoData, executorID in
+                    onSave: { careType, careNote, healthStatus, photoData, executorID, completion in
                         saveCareLog(
                             careType,
                             plant: plant,
                             careNote: careNote,
                             healthStatus: healthStatus,
                             photoData: photoData,
-                            executorID: executorID
+                            executorID: executorID,
+                            completion: completion
                         )
                     }
                 )
@@ -387,26 +388,26 @@ struct PlantCareFeatureDetailView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image(systemName: insight.icon)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(insight.tint)
                     .frame(width: 32, height: 32) // a11y: allow non-interactive metric glyph; tile text carries the accessible content.
                     .background(insight.tint.opacity(0.14), in: Circle())
                     .accessibilityHidden(true)
                 Text(insight.title)
-                    .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
             Text(insight.value)
-                .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(insight.detail)
-                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
@@ -421,7 +422,7 @@ struct PlantCareFeatureDetailView: View {
     private func metricTile(id: String, icon: String, title: String, value: String, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 12, weight: .black))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold))
                 .foregroundStyle(tint)
                 .frame(width: 44, height: 44)
                 .background(tint.opacity(0.14), in: Circle())
@@ -429,12 +430,12 @@ struct PlantCareFeatureDetailView: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 10, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(value)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -690,20 +691,20 @@ struct PlantCareFeatureDetailView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(plant.name)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(plantStatusText(plant))
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if showsFertilizingCadence {
                     Text(fertilizingCadenceText(for: plant))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -718,7 +719,7 @@ struct PlantCareFeatureDetailView: View {
                 openLog(for: plant)
             } label: {
                 Image(systemName: "plus") // a11y: allow decorative add glyph; button label is provided by accessibilityLabel.
-                    .font(OhanaFont.adaptive(size: 13, weight: .black))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                     .foregroundStyle(Color.arkInk)
                     .frame(width: 44, height: 44)
                     .background(feature.tint, in: Circle())
@@ -760,7 +761,7 @@ struct PlantCareFeatureDetailView: View {
                                 l.tr(zh: "加载更多", en: "Load more", de: "Mehr laden"),
                                 systemImage: "chevron.down.circle"
                             )
-                            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                             .frame(maxWidth: .infinity, minHeight: 44)
                         }
                         .buttonStyle(.plain)
@@ -783,7 +784,7 @@ struct PlantCareFeatureDetailView: View {
     private func recordRow(_ record: PlantCareFeatureRecord) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: careSymbol(for: record.careType))
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(careTint(for: record.careType))
                 .frame(width: 44, height: 44)
                 .background(careTint(for: record.careType).opacity(0.14), in: Circle())
@@ -792,14 +793,14 @@ struct PlantCareFeatureDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(record.careType.displayName(l: l))
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.76)
 
                     if isAggregate {
                         Text(record.plantName)
-                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.72)
@@ -807,21 +808,21 @@ struct PlantCareFeatureDetailView: View {
                 }
 
                 Text(fullDateText(record.date))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
 
                 if !record.note.isEmpty {
                     Text(record.note)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if let healthStatus = record.healthStatus {
                     Text(healthStatusText(healthStatus))
-                        .font(OhanaFont.adaptive(size: 11, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(healthTint(for: healthStatus))
                         .lineLimit(1)
                 }
@@ -849,7 +850,7 @@ struct PlantCareFeatureDetailView: View {
                 }
             } label: {
                 Image(systemName: "ellipsis").accessibilityHidden(true)
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
@@ -870,14 +871,14 @@ struct PlantCareFeatureDetailView: View {
     private var emptyPlantsState: some View {
         VStack(spacing: 10) {
             Image(systemName: "leaf") // a11y: allow decorative empty-state glyph; text names the state.
-                .font(OhanaFont.adaptive(size: 24, weight: .black))
+                .font(OhanaFont.adaptive(size: 24, weight: .semibold))
                 .foregroundStyle(feature.tint)
                 .accessibilityHidden(true)
             Text(l.tr(zh: "还没有植物", en: "No plants yet", de: "Noch keine Pflanzen"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(zh: "添加植物后，这里会汇总对应的护理记录。", en: "After adding plants, this page will collect the matching care logs.", de: "Nach dem Hinzufügen sammelt diese Seite passende Pflegeeinträge."))
-                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -892,10 +893,10 @@ struct PlantCareFeatureDetailView: View {
     private var emptyRecordState: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(l.tr(zh: "暂无记录", en: "No logs yet", de: "Noch keine Einträge"))
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(emptyRecordHint)
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -908,10 +909,10 @@ struct PlantCareFeatureDetailView: View {
     private var loadingRecordState: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(l.tr(zh: "正在整理历史", en: "Preparing history", de: "Verlauf wird vorbereitet"))
-                .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(zh: "首帧先展示操作区，记录会以快照补上。", en: "Actions render first; logs arrive as a snapshot.", de: "Aktionen erscheinen zuerst; Einträge folgen als Snapshot."))
-                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -957,7 +958,7 @@ struct PlantCareFeatureDetailView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+            .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .textCase(.uppercase)
     }

@@ -182,6 +182,7 @@ struct PlantDashboardView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @Environment(\.colorScheme) var colorScheme
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @ObservedObject var workloadPolicy = AppWorkloadPolicy.shared
 
     @StateObject var commandQueue = DeferredDomainCommandQueue()
@@ -1025,7 +1026,7 @@ struct PlantDashboardPhotoTile: View {
 
             if imageSignature.isEmpty {
                 Text(fallbackEmoji.isEmpty ? "🌱" : fallbackEmoji)
-                    .font(OhanaFont.adaptive(size: 30, weight: .black))
+                    .font(OhanaFont.adaptive(size: 30, weight: .semibold))
                     .minimumScaleFactor(0.72)
             }
         }

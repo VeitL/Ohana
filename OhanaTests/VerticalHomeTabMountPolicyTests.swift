@@ -610,39 +610,7 @@ struct VerticalHomeTabMountPolicyTests {
         ))
     }
 
-    @Test func bottomNavigationRemainsIconOnlyForFourTabs() {
-        let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 4)
-
-        #expect(!metrics.showsSelectedLabel)
-        #expect(metrics.barHeight == 58)
-        #expect(metrics.tabSpacing <= 2)
-        #expect(metrics.actionGap >= 8)
-    }
-
-    @Test func bottomNavigationRemainsIconOnlyForFiveTabs() {
-        let metrics = HomeBottomNavigationLayoutPolicy.metrics(tabCount: 5)
-
-        #expect(!metrics.showsSelectedLabel)
-        #expect(metrics.barHeight == 58)
-        #expect(metrics.tabSpacing == 0)
-    }
-
-    @Test func bottomNavigationUsesEqualFullWidthSlots() {
-        let threeTabWidth = HomeBottomNavigationLayoutPolicy.estimatedTabSlotWidth(
-            containerWidth: 390,
-            tabCount: 3
-        )
-        let fiveTabWidth = HomeBottomNavigationLayoutPolicy.estimatedTabSlotWidth(
-            containerWidth: 390,
-            tabCount: 5
-        )
-
-        #expect(threeTabWidth > 70)
-        #expect(fiveTabWidth >= 44)
-        #expect(threeTabWidth > fiveTabWidth)
-    }
-
-    @Test func splitIslandOwnsPageContextActionsWithoutRemovingModuleMenus() throws {
+    @Test func nativeNavigationOwnsPageContextActionsWithoutRemovingModuleMenus() throws {
         let routingSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeView+Routing.swift")
         let toolbarSource = try source("Ohana/Features/Home/Views/FocusHomeHeaderView.swift")
         let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
@@ -659,7 +627,6 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(toolbarSource.contains("if selectedTab == .home, showsHomePrimaryAction"))
         #expect(toolbarSource.contains("} else if selectedTab == .plants {"))
         #expect(!toolbarSource.contains("} else if selectedTab != .home, selectedTab != .oasis {"))
-        #expect(bottomBarSource.contains("if contextAction == .injectEnergy"))
         #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-primary-action\")"))
         #expect(oasisHostSource.contains("onInjectEnergy: onInjectEnergy"))
         #expect(oasisHostSource.contains("showsInjectEnergyButton: false"))
@@ -667,7 +634,7 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!componentsSource.contains(".accessibilityIdentifier(\"oasis-screen\")"))
     }
 
-    @Test func splitIslandPagesReserveBottomChrome() {
+    @Test func pagesRespectAvailableContentHeight() {
         let containerHeight: CGFloat = 844
         let topChromeHeight: CGFloat = 46
         let bottomChromeHeight: CGFloat = 104
@@ -778,14 +745,8 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(homeSource.contains(".toolbarBackground(.hidden, for: .navigationBar)"))
         #expect(!homeSource.contains("VerticalSolidHomeQuickActionMenu("))
         #expect(homeSource.contains("VerticalSolidHomeBottomBar("))
-        #expect(homeSource.contains("let safeBottom = proxy.safeAreaInsets.bottom"))
         #expect(!homeSource.contains("safeAreaController.resolvedBottom(in: proxy)"))
-        #expect(bottomBarSource.contains("GlassEffectContainer(spacing: 10)"))
-        #expect(bottomBarSource.contains("HomeBottomNavigationTabButton("))
-        #expect(bottomBarSource.contains("properties: .position"))
         #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
-        #expect(bottomBarSource.contains("attentionCount: tab == .calendar ? taskCenterBadge.attentionCount : 0"))
-        #expect(bottomBarSource.contains(".accessibilityValue(accessibilityPosition)"))
         #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-bottom-navigation\")"))
         #expect(!homeSource.contains("calendarBottomChromeHidden"))
         #expect(!routingSource.contains("VerticalSolidHomeBottomChromeScrollPolicy"))
@@ -1527,17 +1488,14 @@ struct VerticalHomeTabMountPolicyTests {
         #expect(!functionRootSource.contains(".householdHub, .plants"))
     }
 
-    @Test func splitIslandTabsUseLocalizedTitlesAndAccessibilityLabels() throws {
+    @Test func homePagesUseLocalizedAccessibilityLabels() throws {
         let componentsSource = try source("Ohana/Features/Home/Views/VerticalSolidHomePageDeck.swift")
         let bottomBarSource = try source("Ohana/Features/Home/Views/VerticalSolidHomeBottomBar.swift")
 
         #expect(componentsSource.contains("Label(tab.title(localization), systemImage: tab.icon)"))
         #expect(componentsSource.contains(".accessibilityLabel(tabAccessibilityLabel(for: tab))"))
         #expect(componentsSource.contains(".accessibilityIdentifier(\"home-content-tab-\\(tab.rawValue)\")"))
-        #expect(bottomBarSource.contains("return tab.title(localization)"))
-        #expect(bottomBarSource.contains(".accessibilityLabel(accessibilityLabel)"))
         #expect(bottomBarSource.contains(".accessibilityIdentifier(\"home-tab-\\(tab.rawValue)\")"))
-        #expect(bottomBarSource.contains(".accessibilityAddTraits(isSelected ? .isSelected : [])"))
     }
 
     @Test func oasisTabUnlocksWhenStarterGiftTransactionCommits() {

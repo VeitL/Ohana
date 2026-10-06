@@ -49,11 +49,11 @@ struct ReminderObservabilityContentView: View {
         return VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(score.message)
-                    .font(OhanaFont.adaptive(size: 17, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Spacer()
                 Text("\(score.value)")
-                    .font(OhanaFont.adaptive(size: 34, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 34, weight: .semibold, design: .default))
                     .foregroundStyle(score.color)
             }
             ProgressView(value: Double(score.value), total: 100)
@@ -64,7 +64,7 @@ struct ReminderObservabilityContentView: View {
                         l.tr(zh: "导出提醒诊断", en: "Export reminder diagnostics", de: "Erinnerungsdiagnose exportieren"),
                         systemImage: "square.and.arrow.up"
                     )
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.ohanaControlFill, in: Capsule())
@@ -91,7 +91,7 @@ struct ReminderObservabilityContentView: View {
                     en: "Notifications are off; system reminders may not arrive.",
                     de: "Mitteilungen sind aus; Systemerinnerungen kommen möglicherweise nicht an."
                 ))
-                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                     .foregroundStyle(Color.goOrange)
             }
         }
@@ -125,10 +125,10 @@ struct ReminderObservabilityContentView: View {
                 ForEach(snapshot.actionCounts) { stat in
                     HStack {
                         Text(Self.actionDisplayName(stat.action, l))
-                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                         Spacer()
                         Text("\(stat.count)")
-                            .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                             .foregroundStyle(actionColor(stat.action))
                     }
                     .padding(.vertical, 4)
@@ -153,10 +153,10 @@ struct ReminderObservabilityContentView: View {
                             .background((reminder.status == .failed ? Color.goRed : Color.goOrange).opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 2) {
                             Text(reminder.title.isEmpty ? l.tr(zh: "未命名提醒", en: "Unnamed reminder", de: "Unbenannter Reminder") : reminder.title)
-                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                                 .lineLimit(1)
                             Text("\(reminder.status.localizedLabel(l)) · \(reminder.scheduledAt.formatted(.dateTime.month().day().hour().minute()))")
-                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                                 .foregroundStyle(Color.ohanaSecondaryText)
                         }
                         Spacer()
@@ -234,11 +234,11 @@ struct ReminderObservabilityContentView: View {
     private func metric(_ label: String, _ value: String, _ color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                 .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-            Text(label).font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded)).foregroundStyle(Color.ohanaSecondaryText)
+            Text(label).font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default)).foregroundStyle(Color.ohanaSecondaryText)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 10)
@@ -248,14 +248,14 @@ struct ReminderObservabilityContentView: View {
     private func sectionHeader(_ title: String, icon: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon).foregroundStyle(Color.goPrimary)
-            Text(title).font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+            Text(title).font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
             Spacer()
         }
     }
 
     private func emptyText(_ text: String) -> some View {
         Text(text)
-            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
             .foregroundStyle(Color.ohanaSecondaryText)
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)

@@ -29,7 +29,7 @@ extension CalendarView {
                 Spacer()
 
                 Text(selectedDate, format: .dateTime.year().month(.wide))
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.title2(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 Spacer()

@@ -133,12 +133,12 @@ struct ProtectionCoreCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: section.icon)
-                    .font(OhanaFont.adaptive(size: 14, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 14, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(section.tint)
                 Spacer()
                 Button(action: onAdd) {
                     Image(systemName: "plus") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 11, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                         .frame(width: 30, height: 28) // a11y: allow decorative non-interactive frame; hit area handled by parent
                         .background(isSelected ? Color.goPrimary : Color.ohanaControlFill, in: Capsule())
@@ -148,12 +148,12 @@ struct ProtectionCoreCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(section.title(l))
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Text("\(count)")
-                    .font(OhanaFont.title3(.black))
+                    .font(OhanaFont.title3(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .ohanaNumericMotion(count)
             }
@@ -202,14 +202,14 @@ struct ProtectionEmptyState: View {
     var body: some View {
         VStack(spacing: 12) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 30, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 30, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(tint)
             Text(title)
-                .font(OhanaFont.subheadline(.black))
+                .font(OhanaFont.subheadline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Button(action: action) {
                 Text(actionTitle)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryActionText)
                     .padding(.horizontal, 18)
                     .frame(height: 38)
@@ -271,7 +271,7 @@ struct DocumentDetailRow: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(doc.title.isEmpty ? doc.documentCategory.localizedLabel(l) : doc.title)
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     HStack(spacing: 8) {
@@ -300,7 +300,7 @@ struct DocumentDetailRow: View {
                             .scaledToFill()
                     } placeholder: {
                         Image(systemName: "photo.fill") // a11y: allow decorative thumbnail placeholder; row title names the document.
-                            .font(OhanaFont.adaptive(size: 17, weight: .black))
+                            .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                             .foregroundStyle(Color.ohanaSecondaryText)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -310,7 +310,7 @@ struct DocumentDetailRow: View {
                 }
 
                 Text(statusText)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(expiryColor)
                     .padding(.horizontal, 9)
                     .frame(height: 26)
@@ -357,7 +357,7 @@ struct DocumentDetailRow: View {
                             Spacer()
                             Button { showingPreview = false } label: {
                                 Image(systemName: "xmark") // a11y: allow decorative icon covered by surrounding text or control
-                                    .font(OhanaFont.adaptive(size: 15, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                    .font(OhanaFont.adaptive(size: 15, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                     .foregroundStyle(Color.ohanaPrimaryText)
                                     .frame(width: 44, height: 44)
                             }
@@ -416,12 +416,12 @@ struct ProtectionInsuranceRow: View {
         Button(action: onDetail) {
             HStack(spacing: 12) {
                 Image(systemName: "shield.lefthalf.filled") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 17, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPurple)
                     .frame(width: 42, height: 42) // a11y: allow decorative non-interactive frame; hit area handled by parent
                 VStack(alignment: .leading, spacing: 5) {
                     Text(insurance.productName.isEmpty ? l.tr(zh: "宠物保险", en: "Pet insurance", de: "Tierversicherung") : insurance.productName)
-                        .font(OhanaFont.subheadline(.black))
+                        .font(OhanaFont.subheadline(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                     HStack(spacing: 8) {
@@ -435,7 +435,7 @@ struct ProtectionInsuranceRow: View {
                 }
                 Spacer()
                 Text(renewalStatusLabel)
-                    .font(OhanaFont.caption2(.black))
+                    .font(OhanaFont.caption2(.semibold))
                     .foregroundStyle(statusColor)
                     .padding(.horizontal, 9)
                     .frame(height: 26)

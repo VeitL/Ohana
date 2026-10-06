@@ -122,7 +122,7 @@ struct MemberCreationStepIndicator: View {
             HStack {
                 Spacer(minLength: 0)
                 Text("\(currentIndex + 1) / \(steps.count)")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(secondaryForeground)
                     .monospacedDigit()
             }
@@ -170,12 +170,12 @@ struct MemberCompactDateRow: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .font(OhanaFont.adaptive(size: 14, weight: .black))
+                .font(OhanaFont.adaptive(size: 14, weight: .semibold))
                 .foregroundStyle(foreground)
                 .frame(width: 28, height: 28) // a11y: allow visual glyph frame; parent row/control owns the 44pt hit target or the element is non-interactive.
 
             Text(title)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .foregroundStyle(foreground)
                 .lineLimit(1)
                 .minimumScaleFactor(0.72)
@@ -210,7 +210,7 @@ struct MemberCompactDateRow: View {
             .labelsHidden()
             .environment(\.locale, AppLanguage.effectiveLocale)
             .tint(accent)
-            .font(OhanaFont.caption(.black))
+            .font(OhanaFont.caption(.semibold))
             .foregroundStyle(foreground)
             .frame(minWidth: 118, maxWidth: 136, minHeight: 38, alignment: .trailing)
             .background(Color.goCardWhite.opacity(0.12), in: Capsule())
@@ -281,11 +281,11 @@ struct MemberCompactMBTIBar: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Text("MBTI")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(foreground.opacity(0.70))
                 Spacer()
                 Text(result)
-                    .font(OhanaFont.callout(.black))
+                    .font(OhanaFont.callout(.semibold))
                     .monospaced()
                     .foregroundStyle(result.contains("-") ? foreground.opacity(0.58) : foreground)
                 if hasSelection {
@@ -348,7 +348,7 @@ struct MemberCompactMBTIBar: View {
             select(value, selection: selection)
         } label: {
             Text(value)
-                .font(OhanaFont.callout(.black))
+                .font(OhanaFont.callout(.semibold))
                 .monospaced()
                 .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : foreground.opacity(0.82))
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -431,12 +431,12 @@ struct MemberCompactCityPicker: View {
                         .foregroundStyle(Color.ohanaSecondaryText)
                     Spacer()
                     Text(cityValueText)
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.62)
                     Image(systemName: "chevron.up.chevron.down").accessibilityHidden(true)
-                        .font(OhanaFont.adaptive(size: 10, weight: .black))
+                        .font(OhanaFont.adaptive(size: 10, weight: .semibold))
                         .foregroundStyle(Color.ohanaTertiaryText)
                 }
                 .frame(height: 42)
@@ -562,7 +562,7 @@ struct MemberCreationJoinHandoffCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
                     }
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goCardWhite)
                     .padding(.horizontal, 12)
                     .frame(height: 34)

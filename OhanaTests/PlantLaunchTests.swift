@@ -174,6 +174,24 @@ struct PlantLaunchTests {
         #expect(!task.isOverdue)
     }
 
+    @Test func realWateringClearsAnEarlierDeferral() throws {
+        let now = makeDate(year: 2026, month: 6, day: 8)
+        let calendar = Calendar.current
+        let plant = Plant(name: "Fern", wateringIntervalDays: 3)
+        plant.createdAt = calendar.date(byAdding: .day, value: -10, to: now) ?? now
+        let deferredUntil = calendar.date(byAdding: .day, value: 7, to: now) ?? now
+        plant.careLogs.append(PlantCareLog(
+            date: calendar.date(byAdding: .day, value: -1, to: now) ?? now,
+            careType: .customNote,
+            note: "defer:watering:\(ISO8601DateFormatter().string(from: deferredUntil))"
+        ))
+        plant.careLogs.append(PlantCareLog(date: now, careType: .watering))
+        plant.lastWateredDate = now
+
+        let task = try #require(PlantCarePlanService.tasks(for: plant, now: now).first { $0.careType == .watering })
+        #expect(task.daysUntilDue < 7)
+    }
+
     @Test func carePlanReadsWetSoilDeferralReasonAndExtendsWateringCadence() throws {
         let now = makeDate(year: 2026, month: 6, day: 8)
         let calendar = Calendar.current
@@ -1708,6 +1726,77 @@ struct PlantLaunchTests {
         #expect(result.affectedPlantCount == 1)
         #expect(wateringTask.daysUntilDue == 1)
         #expect(reminders.isEmpty)
+    }
+
+    @Test func wateringOptInPreservesOtherGlobalReminderSettings() throws {
+        let (defaults, suiteName) = try makePlantReminderDefaults()
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let plant = Plant(name: "Mint", wateringIntervalDays: 7)
+        plant.remindersEnabled = false
+        context.insert(plant)
+        try context.save()
+        PlantReminderPreferenceStore.setTimeWindow(.evening, defaults: defaults)
+        PlantReminderPreferenceStore.setTravelModeEnabled(true, defaults: defaults)
+
+        let result = PlantReminderControlService.enableWateringCheck(
+            plant: plant,
+            intervalDays: 5,
+            context: context,
+            notifications: NoopReminderNotificationScheduler(),
+            defaults: defaults
+        )
+
+        #expect(result.didPersist && result.didChange)
+        #expect(plant.remindersEnabled)
+        #expect(plant.wateringIntervalDays == 5)
+        #expect(PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .watering, defaults: defaults))
+        #expect(!PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .fertilizing, defaults: defaults))
+        #expect(PlantReminderPreferenceStore.timeWindow(defaults: defaults) == .evening)
+        #expect(PlantReminderPreferenceStore.isTravelModeEnabled(defaults: defaults))
+
+        let disabled = PlantReminderControlService.setPlantRemindersEnabled(
+            false,
+            plant: plant,
+            context: context,
+            scheduleNotifications: false,
+            notifications: NoopReminderNotificationScheduler(),
+            defaults: defaults
+        )
+        #expect(disabled.didPersist && disabled.didChange)
+        #expect(!plant.remindersEnabled)
+        #expect(try context.fetch(FetchDescriptor<Reminder>()).isEmpty)
+        #expect(PlantReminderPreferenceStore.isSystemReminderEnabled(forPlantID: plant.id, careType: .watering, defaults: defaults))
+    }
+
+    @Test func deferringOneCareTaskDoesNotCompleteCareOrHealthReview() throws {
+        let container = try makeInMemoryContainer()
+        let context = container.mainContext
+        let now = makeDate(year: 2026, month: 6, day: 19, hour: 9)
+        let plant = Plant(name: "Mint", wateringIntervalDays: 1)
+        plant.createdAt = Calendar.current.date(byAdding: .day, value: -10, to: now) ?? now
+        plant.lastWateredDate = Calendar.current.date(byAdding: .day, value: -2, to: now)
+        context.insert(plant)
+        try context.save()
+        let oldWateredDate = plant.lastWateredDate
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now
+
+        let result = PlantReminderControlService.deferTask(
+            plant: plant,
+            careType: .watering,
+            until: tomorrow,
+            context: context,
+            executorId: nil,
+            now: now,
+            notifications: NoopReminderNotificationScheduler()
+        )
+
+        #expect(result.didPersist && result.didChange)
+        #expect(plant.lastWateredDate == oldWateredDate)
+        #expect(plant.lastHealthCheckDate == nil)
+        #expect(plant.careLogs.filter { $0.careType == .watering }.isEmpty)
+        #expect(plant.careLogs.contains { $0.note.hasPrefix("defer:watering:") })
     }
 
     @Test func explicitPlantReminderPayloadDeepLinksToPlantCareFeature() {

@@ -215,7 +215,7 @@ struct BountyBoardContentView: View {
     private func statCell(value: String, label: String, accent: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(accent)
             Text(label)
                 .font(OhanaFont.caption2(.semibold))
@@ -293,7 +293,7 @@ struct BountyBoardContentView: View {
                     Text("🥥")
                         .font(OhanaFont.metric(size: 16, .medium))
                     Text("\(task.reward)")
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(Color.goYellow)
                 }
             }
@@ -308,7 +308,7 @@ struct BountyBoardContentView: View {
 
                 if let toName = task.assignedToName, !toName.isEmpty {
                     Image(systemName: "arrow.right").accessibilityHidden(true)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .foregroundStyle(tertiaryText)
                     HStack(spacing: 3) {
                         if let emoji = task.assignedToEmoji, !emoji.isEmpty {
@@ -585,7 +585,7 @@ struct BountyBoardContentView: View {
                     .font(OhanaFont.subheadline(.bold))
                     .foregroundStyle(Color.goPrimary)
                 Text(l.tr(zh: "本周家庭照护周报", en: "Family care this week", de: "Familienpflege diese Woche"))
-                    .font(OhanaFont.headline(.black))
+                    .font(OhanaFont.headline(.semibold))
                     .foregroundStyle(primaryText)
                 Spacer()
                 Text(weekRangeLabel)
@@ -644,14 +644,14 @@ struct BountyBoardContentView: View {
                         .foregroundStyle(primaryText)
                     if isTop {
                         Text(l.tr(zh: "👑 最勤快", en: "👑 Top helper", de: "👑 Top"))
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.goYellow)
                             .padding(.horizontal, 6).padding(.vertical, 2)
                             .background(Color.goYellow.opacity(0.15), in: Capsule())
                     }
                     Spacer()
                     Text("\(stat.count)")
-                        .font(OhanaFont.headline(.black))
+                        .font(OhanaFont.headline(.semibold))
                         .foregroundStyle(isTop ? Color.goYellow : Color.goPrimary)
                 }
 

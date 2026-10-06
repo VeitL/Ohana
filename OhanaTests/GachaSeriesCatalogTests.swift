@@ -35,7 +35,8 @@ struct GachaSeriesCatalogTests {
         #expect(!ShopCatalog.allItems().contains { $0.id == "boost_backdate_pack" })
         #expect(!ShopCatalog.isSellable(itemID: "boost_tree"))
         #expect(!ShopCatalog.isSellable(itemID: "boost_backdate_pack"))
-        #expect(ShopCatalog.isSellable(itemID: "boost_double"))
+        #expect(!ShopCatalog.isSellable(itemID: "boost_double"))
+        #expect(!ShopCatalog.isSellable(itemID: "boost_streak"))
         #expect(
             try #require(ShopCatalog.item(id: "boost_tree")).application ==
                 .treeEnergy(OasisTreeEnergyInjectionPolicy.starterPackageXP)
@@ -46,6 +47,38 @@ struct GachaSeriesCatalogTests {
         )
         #expect(try #require(ShopCatalog.item(id: "boost_backdate_single")).application == .backdatePasses(1))
         #expect(try #require(ShopCatalog.item(id: "boost_backdate_pack")).application == .backdatePasses(3))
+    }
+
+    @Test func launchShelfHasNineProductsAtTheirExistingPrices() {
+        let items = ShopCatalog.allItems()
+        #expect(items.map(\.id) == [
+            OasisPlantDecorID.ceramicPotSkin, OasisPlantDecorID.mossPath, OasisPlantDecorID.greenhouseCorner,
+            "appicon_coconut", "appicon_clean_blue", "appicon_lime_night",
+            "fx_lime_glow", "fx_popout_card", Avatar2DAccess.shopItemId
+        ])
+        #expect(items.map(\.cost) == [260, 360, 520, 600, 600, 700, 300, 800, 1200])
+        #expect(items.allSatisfy { ShopCatalog.isSellable(itemID: $0.id) })
+        #expect(!ShopCatalog.isSellable(itemID: AppIconCatalog.defaultItemId))
+        #expect(!ShopCatalog.isSellable(itemID: SupporterPackCatalog.supporterIconItemID))
+    }
+
+    @Test func inventoryRetainsRetiredOwnershipAndTheSupporterIcon() throws {
+        let ownedIDs: Set<String> = ["title_guardian", "fx_rainbow", "appicon_paw_duo", SupporterPackCatalog.supporterIconItemID]
+        let inventory = ShopCatalog.inventoryItems(purchasedSet: ownedIDs)
+        #expect(ownedIDs.isSubset(of: Set(inventory.filter(\.isPurchased).map(\.id))))
+        #expect(try #require(inventory.first { $0.id == AppIconCatalog.defaultItemId }).isPurchased)
+        for item in inventory where !ShopCatalog.isSellable(itemID: item.id) {
+            #expect(ShopCatalog.item(id: item.id)?.application == item.application)
+            #expect(!ShopCatalog.allItems().contains { $0.id == item.id })
+        }
+        #expect(try #require(inventory.first { $0.id == "boost_streak" }).isConsumable)
+    }
+
+    @Test func launchShelfCopyCoversEveryRegisteredLanguage() {
+        for item in ShopCatalog.allItems() {
+            #expect(item.displayNameText.missingSupportedLanguageCodes.isEmpty)
+            #expect(item.displayDescriptionText.missingSupportedLanguageCodes.isEmpty)
+        }
     }
 
     @Test func petSpecificEffectsDeclareTheirApplicationRequirements() throws {

@@ -11,7 +11,7 @@ ohana_assert_storage_fixture_configuration "${REPO_ROOT}"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/cleanup-local-build-storage.sh [--scope safe|results|test-app-cache|test-transient-cache|test-intermediates|derived-data|all]
+  scripts/cleanup-local-build-storage.sh [--scope safe|results|test-app-cache|test-transient-cache|test-intermediates|project-build-cache|derived-data|all]
   scripts/cleanup-local-build-storage.sh [--scope ...] --apply <plan-token>
 
 The default scope is `safe` and the default mode is report-only. Safe cleanup
@@ -25,6 +25,8 @@ Simulator devices and Xcode DeviceSupport are never deleted.
 `test-app-cache` is one narrow Simulator-cache exception: it accepts only dead
 replacement copies whose container metadata and app bundle identifier both
 prove that they are Ohana builds inside the shutdown `iPhone 17 Tests` device.
+Set OHANA_TEST_SIMULATOR_UDID to select a specific Tests runtime; the pinned
+Dogfood device and every other device name are always rejected.
 Direct Ohana `ohana-*` temporary artifacts are eligible only after their newest
 content exceeds the configured TTL and no open files are detected.
 
@@ -39,6 +41,11 @@ and index caches, SDK stat caches, and standalone dSYMs from the fixed Tests
 lane. It preserves executable products, the xctestrun file, and the provenance
 stamp so a previously built test can still run with
 `scripts/xcode-test.sh --without-building`.
+
+`project-build-cache` accepts only Build/Intermediates.noindex and Build/Products
+inside an Ohana-* cache in ~/Library/Developer/Xcode/DerivedData whose info.plist
+identifies a registered worktree's Ohana project. Indexes, logs, archives,
+unverified caches, and the shared build/test lanes remain untouched.
 
 `derived-data` may remove the Dogfood build cache, but never the pinned Dogfood
 Simulator, its app container, SwiftData store, identity seal, or evidence.
@@ -78,7 +85,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 case "${scope}" in
-  safe|results|test-app-cache|test-transient-cache|test-intermediates|derived-data|all) ;;
+  safe|results|test-app-cache|test-transient-cache|test-intermediates|project-build-cache|derived-data|all) ;;
   *)
     echo "Unknown cleanup scope: ${scope}" >&2
     exit 2
@@ -94,9 +101,14 @@ prepare_test_simulator_cache_scope() {
   local state
 
   [[ "${scope}" == "test-app-cache" || "${scope}" == "test-transient-cache" ]] || return 0
-  test_simulator_udid="$(
-    ohana_resolve_simulator_by_name "${OHANA_TEST_SIMULATOR_NAME_FIXED}" || true
-  )"
+  if [[ -n "${OHANA_TEST_SIMULATOR_UDID:-}" ]]; then
+    test_simulator_udid="${OHANA_TEST_SIMULATOR_UDID}"
+  else
+    test_simulator_udid="$(
+      ohana_resolve_simulator_by_name \
+        "${OHANA_TEST_SIMULATOR_NAME_FIXED}" "${OHANA_TEST_RUNTIME_VERSION:-}" || true
+    )"
+  fi
   if [[ -z "${test_simulator_udid}" ]]; then
     echo "Cannot inspect test app cache: '${OHANA_TEST_SIMULATOR_NAME_FIXED}' is unavailable." >&2
     return 70
@@ -250,6 +262,62 @@ worktree_rows="$(git -C "${OHANA_LOCAL_BUILD_REPO_ROOT}" worktree list --porcela
   awk '/^worktree / { sub(/^worktree /, ""); print }' || true)"
 [[ -n "${worktree_rows}" ]] || worktree_rows="${OHANA_LOCAL_BUILD_REPO_ROOT}"
 
+assert_safe_project_build_cache_candidate() {
+  local path="$1"
+  local mount_boundary_status
+
+  # Deliberately use the fixed system location, not the audit-only root override.
+  python3 - "${path}" "${HOME}" "${worktree_rows}" <<'PY'
+import os
+import plistlib
+import sys
+from pathlib import Path
+
+try:
+    candidate = Path(os.path.abspath(sys.argv[1]))
+    home = Path(os.path.abspath(sys.argv[2]))
+    root = home / "Library/Developer/Xcode/DerivedData"
+    cache = candidate.parent.parent
+    if (candidate.name not in {"Intermediates.noindex", "Products"}
+            or candidate.parent.name != "Build"
+            or cache.parent != root
+            or not cache.name.startswith("Ohana-")):
+        raise SystemExit(2)
+    for path in (root, cache, candidate.parent, candidate):
+        if (not path.is_dir() or path.is_symlink()
+                or path.resolve() != home.resolve() / path.relative_to(home)
+                or path.stat().st_uid != os.getuid()):
+            raise SystemExit(2)
+    info = cache / "info.plist"
+    if info.is_symlink() or info.stat().st_uid != os.getuid():
+        raise SystemExit(2)
+    metadata = plistlib.loads(info.read_bytes())
+    projects = {
+        str(Path(row) / name)
+        for row in sys.argv[3].splitlines() if row
+        for name in ("Ohana.xcodeproj", "Ohana.xcworkspace")
+        if (Path(row) / name).is_dir()
+    }
+    if metadata.get("WorkspacePath") not in projects:
+        raise SystemExit(2)
+    for directory, directories, files in os.walk(candidate, followlinks=False):
+        for name in directories + files:
+            child = Path(directory) / name
+            if child.is_symlink() or child.stat().st_uid != os.getuid():
+                raise SystemExit(2)
+except (OSError, ValueError, TypeError, AttributeError, plistlib.InvalidFileException):
+    raise SystemExit(2)
+PY
+  [[ $? == 0 ]] || return 2
+  ohana_path_is_mount_point "${path}" && return 2
+  if ohana_tree_has_mount_boundary "${path}"; then
+    return 2
+  else
+    mount_boundary_status=$?
+  fi
+  [[ "${mount_boundary_status}" == "1" ]]
+}
+
 cleanup_candidate_kind() {
   local path="$1"
   local path_absolute
@@ -262,6 +330,12 @@ cleanup_candidate_kind() {
   path_absolute="$(ohana_absolute_path "${path}")"
   parent_absolute="$(dirname "${path_absolute}")"
   basename_value="$(basename "${path_absolute}")"
+
+  if [[ "${scope}" == "project-build-cache" ]] && \
+    assert_safe_project_build_cache_candidate "${path}"; then
+    printf 'verified-project-build-cache\n'
+    return
+  fi
 
   if [[ "${scope}" == "test-app-cache" ]] && \
     assert_safe_test_app_cache_candidate "${path}"; then
@@ -385,6 +459,15 @@ cleanup_candidate_kind() {
 candidate_stream() {
   local path
   local worktree_root
+
+  if [[ "${scope}" == "project-build-cache" ]]; then
+    for path in \
+      "${HOME}"/Library/Developer/Xcode/DerivedData/Ohana-*/Build/Intermediates.noindex \
+      "${HOME}"/Library/Developer/Xcode/DerivedData/Ohana-*/Build/Products; do
+      [[ -e "${path}" ]] || continue
+      assert_safe_project_build_cache_candidate "${path}" && printf '%s\n' "${path}"
+    done
+  fi
 
   if [[ "${scope}" == "safe" || "${scope}" == "all" ]]; then
     while IFS= read -r worktree_root; do
@@ -558,6 +641,10 @@ reclaim_kib=0
 echo "Conservative cleanup plan"
 echo "Scope: ${scope}"
 echo "Preserve:"
+if [[ "${scope}" == "project-build-cache" ]]; then
+  echo "  system DerivedData indexes, logs, localization output, and project metadata"
+  echo "  unverified system DerivedData and all other projects' caches"
+fi
 if [[ "${scope}" == "test-app-cache" ]]; then
   echo "  active app and data containers in ${OHANA_TEST_SIMULATOR_NAME_FIXED}"
   echo "  all non-Ohana and unverified Simulator caches"

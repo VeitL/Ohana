@@ -57,7 +57,7 @@ extension AddExpenseSheetContent {
                 petAvatar(size: 38)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(l.quickExpenseTitle)
-                        .font(OhanaFont.title3(.black))
+                        .font(OhanaFont.title3(.semibold))
                         .foregroundStyle(primaryText)
                     Text(pet.name)
                         .font(OhanaFont.caption(.semibold))
@@ -84,10 +84,10 @@ extension AddExpenseSheetContent {
             } label: {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(AppCurrency.symbol)
-                        .font(OhanaFont.metric(size: 28, .black))
+                        .font(OhanaFont.metric(size: 28, .semibold))
                         .foregroundStyle(sheetTint)
                     Text(amountInput.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : amountInput)
-                        .font(OhanaFont.metric(size: 52, .black))
+                        .font(OhanaFont.metric(size: 52, .semibold))
                         .foregroundStyle(amountInput.isEmpty ? tertiaryText : primaryText)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .minimumScaleFactor(0.45)
@@ -102,7 +102,7 @@ extension AddExpenseSheetContent {
             .accessibilityValue(amountInput.isEmpty ? CountryDecimalInput.placeholder(fractionDigits: 2, countryCode: appCountry) : amountInput)
 
             if !hasSavedMedicalExpense, activePayerAmountID == nil {
-                EmbeddedDecimalKeypad(
+                OhanaDecimalInput(
                     text: $amountInput,
                     countryCode: appCountry,
                     maxFractionDigits: 2,
@@ -131,7 +131,7 @@ extension AddExpenseSheetContent {
                             applyQuickAmount(amount)
                         } label: {
                             Text("\(AppCurrency.symbol)\(displayAmount(amount))")
-                                .font(OhanaFont.subheadline(.black))
+                                .font(OhanaFont.subheadline(.semibold))
                                 .foregroundStyle(isQuickAmountSelected(amount) ? Color.ohanaPrimaryActionText : primaryText)
                                 .padding(.horizontal, 15)
                                 .padding(.vertical, 10)
@@ -197,7 +197,7 @@ extension AddExpenseSheetContent {
         HStack(alignment: .top, spacing: 9) {
             Image(systemName: "paperclip") // a11y: allow decorative icon; notice text carries the message.
                 .accessibilityHidden(true)
-                .font(OhanaFont.adaptive(size: 13, weight: .black))
+                .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                 .foregroundStyle(sheetTint)
                 .frame(width: 18)
             Text(l.tr(
@@ -205,7 +205,7 @@ extension AddExpenseSheetContent {
                 en: "Expenses with receipts are saved to one pet for now. Deselect the others or remove the receipt.",
                 de: "Ausgaben mit Beleg werden vorerst nur einem Tier zugeordnet. Wähle die anderen ab oder entferne den Beleg."
             ))
-            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
             .foregroundStyle(secondaryText)
             .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -236,7 +236,7 @@ extension AddExpenseSheetContent {
                                 ko: "균등 분할",
                                 it: "Dividi in parti uguali"
                             ))
-                            .font(OhanaFont.caption(.black))
+                            .font(OhanaFont.caption(.semibold))
                             .foregroundStyle(sheetTint)
                             .frame(minWidth: 44, minHeight: 44)
                             .contentShape(Rectangle())
@@ -251,7 +251,7 @@ extension AddExpenseSheetContent {
                     HStack(spacing: 8) {
                         payerChip(id: nil, name: l.quickExpenseUnspecified, color: sheetTint) {
                             Image(systemName: "questionmark") // a11y: allow decorative icon covered by surrounding text or control
-                                .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                                .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                                 .foregroundStyle(selectedPayerId == nil ? Color.ohanaPrimaryActionText : secondaryText)
                         }
                         ForEach(activeExpenseHumans) { human in
@@ -275,7 +275,7 @@ extension AddExpenseSheetContent {
 
                         if let activePayerAmountID,
                            selectedPayerIDs.contains(activePayerAmountID) {
-                            EmbeddedDecimalKeypad(
+                            OhanaDecimalInput(
                                 text: payerAmountBinding(for: activePayerAmountID),
                                 countryCode: appCountry,
                                 maxFractionDigits: 2,
@@ -388,6 +388,15 @@ extension AddExpenseSheetContent {
     var moreSection: some View {
         DisclosureGroup(isExpanded: $showMore) {
             VStack(spacing: 10) {
+                sharedExpenseTargetSection
+                payerSection
+                QuickCareActionHumanPickerContainer(
+                    selectedHumanID: $selectedRecorderID,
+                    requiresSelection: $requiresRecorderSelection,
+                    role: .recorder,
+                    tint: sheetTint
+                )
+                receiptSection
                 infoRow(icon: "calendar", label: l.quickExpenseDate) {
                     DatePicker("", selection: $date, in: ...Date(), displayedComponents: [.date])
                         .datePickerStyle(.compact)
@@ -409,7 +418,7 @@ extension AddExpenseSheetContent {
                 }
             }
         } label: {
-            Label(l.quickExpenseMore, systemImage: "ellipsis.circle.fill")
+            Label(PetCareExperienceCopy(l: l).moreOptions, systemImage: "ellipsis.circle.fill")
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(primaryText)
                 .badge(moreSummary)
@@ -427,7 +436,7 @@ extension AddExpenseSheetContent {
                 .background(Color.goTeal.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
                 Text(l.quickExpenseMedicalRecorded)
-                    .font(OhanaFont.subheadline(.black))
+                    .font(OhanaFont.subheadline(.semibold))
                     .foregroundStyle(primaryText)
                 Text(l.quickExpenseSubmitToInsurer(activeInsurances.first?.productName ?? l.quickExpenseInsuranceCompany))
                     .font(OhanaFont.caption(.semibold))

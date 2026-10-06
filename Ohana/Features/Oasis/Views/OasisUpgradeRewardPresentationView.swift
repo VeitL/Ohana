@@ -203,7 +203,7 @@ private struct OasisCritterUnlockRewardCard: View {
 
             VStack(spacing: 5) {
                 Text(title)
-                    .font(OhanaFont.title2(.black))
+                    .font(OhanaFont.brandTitle(.title2, weight: .bold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)

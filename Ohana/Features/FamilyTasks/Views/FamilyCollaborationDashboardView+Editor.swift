@@ -72,11 +72,7 @@ extension FamilyCollaborationDashboardView {
             .navigationTitle(editorTitle(for: route))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(l.cancel) {
-                        dismissEditor()
-                    }
-                }
+                if editorContext == nil { OhanaModalToolbar(onClose: dismissEditor, isEditor: true) }
             }
         }
         .presentationDetents([.medium, .large])
@@ -84,7 +80,7 @@ extension FamilyCollaborationDashboardView {
     }
 
     private func taskEditorPanel(_ editorContext: FamilyCollaborationEditorContext) -> some View {
-        FamilyTaskPlanEditorDataContainer(planID: editorContext.task?.planId) { planConfiguration in
+        FamilyTaskPlanEditorDataContainer(planID: editorContext.task?.planId, onClose: dismissEditor) { planConfiguration in
             FamilyTaskEditorPanel(
                 context: editorContext,
                 humans: humans,

@@ -8,19 +8,11 @@ import SwiftUI
 struct AppExperienceIntroductionBanner: View {
     let appLanguage: String
     let onDismiss: () -> Void
-
+    @State private var showsDetails = false
     private var l: L10n { L10n(appLanguage) }
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "leaf.fill") // a11y: allow decorative mode glyph is hidden below
-                .font(OhanaFont.adaptive(size: 17, weight: .black))
-                .foregroundStyle(Color.ohanaPrimaryActionText)
-                .frame(width: 38, height: 38) // a11y: allow non-interactive decorative glyph
-                .background(Color.goPrimary, in: Circle())
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(l.tr(
+    private var title: String {
+        l.tr(
                     zh: "认识佛系模式",
                     en: "Meet Zen mode",
                     de: "Zen-Modus kennenlernen",
@@ -30,10 +22,11 @@ struct AppExperienceIntroductionBanner: View {
                     ja: "佛系モードについて",
                     ko: "마음 편한 모드 알아보기",
                     it: "Scopri la modalità Zen"
-                ))
-                    .font(OhanaFont.callout(.black))
-                    .foregroundStyle(Color.ohanaPrimaryText)
-                Text(l.tr(
+        )
+    }
+
+    private var detail: String {
+        l.tr(
                     zh: "只保留首页打卡、连续日历与 Oasis；可随时在设置中切换。",
                     en: "Keep only Home check-ins, the streak calendar, and Oasis. Switch anytime in Settings.",
                     de: "Nur Home-Check-ins, Serienkalender und Oasis. Jederzeit in den Einstellungen wechselbar.",
@@ -43,21 +36,11 @@ struct AppExperienceIntroductionBanner: View {
                     ja: "ホームのチェックイン、連続カレンダー、Oasisだけのシンプルなモードです。設定からいつでも切り替えられます。",
                     ko: "홈 체크인, 연속 기록 캘린더와 Oasis만 남겨요. 설정에서 언제든지 바꿀 수 있어요.",
                     it: "Mantiene solo i check-in della Home, il calendario delle serie e Oasi. Puoi cambiare in qualsiasi momento dalle Impostazioni."
-                ))
-                .font(OhanaFont.caption(.semibold))
-                .foregroundStyle(Color.ohanaSecondaryText)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 4)
-            Button(action: onDismiss) {
-                Image(systemName: "xmark") // a11y: allow parent Button supplies the localized dismiss label
-                    .font(OhanaFont.adaptive(size: 12, weight: .black))
-                    .foregroundStyle(Color.ohanaSecondaryText)
-                    .frame(width: 36, height: 36) // a11y: allow parent Button owns the padded hit target
-                    .background(Color.ohanaControlFill, in: Circle())
-            }
-            .buttonStyle(ScaleButtonStyle())
-            .accessibilityLabel(l.tr(
+        )
+    }
+
+    private var closeTitle: String {
+        l.tr(
                 zh: "关闭介绍",
                 en: "Dismiss introduction",
                 de: "Einführung schließen",
@@ -67,11 +50,38 @@ struct AppExperienceIntroductionBanner: View {
                 ja: "紹介を閉じる",
                 ko: "소개 닫기",
                 it: "Chiudi introduzione"
-            ))
+        )
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(role: .close, action: onDismiss) {
+                Label(closeTitle, systemImage: "xmark")
+            }
+            .labelStyle(.iconOnly)
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
             .accessibilityIdentifier("zen-introduction-banner")
+
+            Button { showsDetails = true } label: {
+                Label(title, systemImage: "leaf")
+                    .font(.callout)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.bordered)
         }
-        .padding(14)
-        .goGlassBackground(RoundedRectangle(cornerRadius: OhanaRadius.card, style: .continuous))
+        .controlSize(.large)
+        .padding(.horizontal, OhanaSpacing.pageMargin)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("zen-introduction-container")
+        .alert(title, isPresented: $showsDetails) {
+            Button(l.done, role: .cancel, action: onDismiss)
+        } message: {
+            Text(detail)
+        }
     }
 }
 

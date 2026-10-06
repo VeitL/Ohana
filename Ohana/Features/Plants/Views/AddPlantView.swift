@@ -33,6 +33,7 @@ struct AddPlantView: View {
     @State var selectedAvatarSource: PlantCreationAvatarSource = .builtIn
     @State var catalogQuery = ""
     @State var selectedCatalogID = ""
+    @State var isUnknownSpeciesSelected = false
     @State var selectedCatalogGroup: PlantCatalogBrowsingGroup = .recommended
     @State var wateringInterval = 7
     @State var fertilizingInterval = 30
@@ -58,7 +59,7 @@ struct AddPlantView: View {
     @State var isToxicToCats = false
     @State var isToxicToDogs = false
     @State var isToxicToChildren = false
-    @State var remindersEnabled = true
+    @State var remindersEnabled = false
     @State var isSaving = false
     @State var showDuplicateAlert = false
     @State var showingOptionalPlantDetails = false
@@ -75,6 +76,20 @@ struct AddPlantView: View {
     @FocusState var focusedField: AddPlantFocusField?
 
     var body: some View {
+        NavigationStack {
+            creationContent
+                .navigationTitle(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
+                .navigationBarTitleDisplayMode(.inline)
+                .ohanaEditorChrome(
+                    hasChanges: !name.isEmpty || !selectedCatalogID.isEmpty || isUnknownSpeciesSelected || avatarImageData != nil,
+                    isSaving: isSaving, isComplete: didShowSuccess,
+                    closeIdentifier: "add-plant-cancel-action",
+                    onCancel: onComplete, onSave: nil
+                )
+        }
+    }
+
+    private var creationContent: some View {
         plantCreationFlow
         .toolbar {
             ToolbarItemGroup(placement: .keyboard) {
@@ -211,16 +226,16 @@ struct AddPlantView: View {
 
             VStack(alignment: .leading, spacing: 5) {
                 Text(l.tr(zh: "添加植物", en: "Add plant", de: "Pflanze hinzufügen"))
-                    .font(OhanaFont.adaptive(size: 19, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 19, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText)
                 Text("\(profilePreviewName) · \(profilePreviewSpecies)")
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
                     .accessibilityIdentifier("add-plant-name-summary-value")
                 Text(carePlanPreviewSummary)
-                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                     .foregroundStyle(Color.ohanaTertiaryText)
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -238,7 +253,7 @@ struct AddPlantView: View {
     private var plantSpeciesPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "选择品种", en: "Choose species", de: "Art wählen"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -255,7 +270,7 @@ struct AddPlantView: View {
             .accessibilityElement(children: .contain)
 
             Text(selectedCatalogGroup.subtitle(l))
-                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaTertiaryText)
                 .fixedSize(horizontal: false, vertical: true)
 
@@ -287,7 +302,7 @@ struct AddPlantView: View {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Text(group.title(l))
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(isSelected ? Color.ohanaPrimaryActionText : Color.ohanaPrimaryText)
                 .padding(.horizontal, 12)
                 .frame(minHeight: 34)
@@ -306,7 +321,7 @@ struct AddPlantView: View {
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 Text(entry.localizedCommonName)
-                    .font(OhanaFont.adaptive(size: 13, weight: .black, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold, design: .default))
                     .foregroundStyle(isSelected ? Color.arkInk : Color.ohanaPrimaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -315,7 +330,7 @@ struct AddPlantView: View {
                     en: "Water \(entry.defaultWateringDays)d",
                     de: "\(entry.defaultWateringDays) T. gießen"
                 ))
-                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
                     .foregroundStyle(isSelected ? Color.arkInk.opacity(0.74) : Color.ohanaSecondaryText)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
@@ -339,7 +354,7 @@ struct AddPlantView: View {
     private var nameAndPlaceSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(l.tr(zh: "名称和位置", en: "Name and place", de: "Name und Ort"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -408,12 +423,12 @@ struct AddPlantView: View {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(l.tr(zh: "植物名字", en: "Plant name", de: "Pflanzenname"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
 
                     Text(trimmedName.isEmpty ? (selectedCatalog?.localizedCommonName ?? "") : trimmedName)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
@@ -428,7 +443,7 @@ struct AddPlantView: View {
                     UISelectionFeedbackGenerator().selectionChanged()
                 } label: {
                     Label(l.tr(zh: "编辑", en: "Edit", de: "Bearbeiten"), systemImage: "pencil")
-                        .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .labelStyle(.iconOnly)
                         .frame(width: 44, height: 44)
                         .background(Color.ohanaControlFill.opacity(0.66), in: Circle())
@@ -447,7 +462,7 @@ struct AddPlantView: View {
                 inlineFormField(
                     l.tr(zh: "植物名字", en: "Plant name", de: "Pflanzenname"),
                     text: $name,
-                    placeholder: selectedCatalog?.localizedCommonName ?? l.tr(zh: "我的绿萝", en: "My pothos", de: "Meine Efeutute"),
+                    placeholder: selectedCatalog?.localizedCommonName ?? l.tr(zh: "我的植物", en: "My plant", de: "Meine Pflanze"),
                     identifier: "add-plant-name-input",
                     focusField: .name,
                     submitLabel: .next
@@ -464,7 +479,7 @@ struct AddPlantView: View {
                             l.tr(zh: "使用品种名称", en: "Use species name", de: "Artnamen verwenden"),
                             systemImage: "leaf"
                         )
-                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .foregroundStyle(Color.goTeal)
@@ -477,14 +492,14 @@ struct AddPlantView: View {
     private var essentialCareSection: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(l.tr(zh: "自动护理计划", en: "Automatic care plan", de: "Automatischer Pflegeplan"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
 
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: selectedCatalog == nil ? "sparkles" : "checkmark.seal.fill") // a11y: allow decorative care-plan glyph; adjacent text describes the generated plan.
-                    .font(OhanaFont.adaptive(size: 15, weight: .black))
+                    .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                     .foregroundStyle(selectedCatalog == nil ? Color.goTeal : Color.goPrimary)
                     .frame(width: 44, height: 44)
                     .background((selectedCatalog == nil ? Color.goTeal : Color.goPrimary).opacity(0.14), in: Circle())
@@ -492,18 +507,18 @@ struct AddPlantView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(carePlanPreviewSummary)
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(carePlanPreviewDetail)
-                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
             Toggle(l.tr(zh: "植物提醒", en: "Plant reminders", de: "Pflanzenerinnerungen"), isOn: $remindersEnabled)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
         }
@@ -523,7 +538,7 @@ struct AddPlantView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "slider.horizontal.3") // a11y: allow decorative optional-details glyph; button text labels the action.
-                        .font(OhanaFont.adaptive(size: 15, weight: .black))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold))
                         .foregroundStyle(Color.goTeal)
                         .frame(width: 44, height: 44)
                         .background(Color.goTeal.opacity(0.14), in: Circle())
@@ -534,13 +549,13 @@ struct AddPlantView: View {
                         es: "Detalles opcionales", pt: "Detalhes opcionais", fr: "Détails facultatifs",
                         ja: "任意の詳細", ko: "선택 세부 정보", it: "Dettagli facoltativi"
                     ))
-                        .font(OhanaFont.adaptive(size: 15, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
 
                     Spacer(minLength: 8)
 
                     Image(systemName: "chevron.down") // a11y: allow decorative disclosure glyph; button value exposes expanded state.
-                        .font(OhanaFont.adaptive(size: 13, weight: .black))
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .rotationEffect(.degrees(showingOptionalPlantDetails ? 180 : 0))
                         .accessibilityHidden(true)
@@ -574,7 +589,7 @@ struct AddPlantView: View {
     private var speciesOverrideSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "品种备注", en: "Species note", de: "Artnotiz"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -597,7 +612,7 @@ struct AddPlantView: View {
     private var careAdjustmentSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "调整护理周期", en: "Adjust care cadence", de: "Pflegezyklus anpassen"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -619,7 +634,7 @@ struct AddPlantView: View {
     private var avatarPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "植物图标", en: "Plant icon", de: "Pflanzensymbol"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -663,14 +678,14 @@ struct AddPlantView: View {
             if catalogMatches.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(l.tr(zh: "没有找到匹配", en: "No match found", de: "Kein Treffer"))
-                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(l.tr(
                         zh: "可以直接填写名称保存；以后在详情里再补品种。",
                         en: "You can save with a custom name and add the species later from details.",
                         de: "Du kannst mit eigenem Namen speichern und die Art später ergänzen."
                     ))
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -693,15 +708,15 @@ struct AddPlantView: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: selectedCatalogID == entry.id ? "checkmark.circle.fill" : "leaf.circle")
-                    .font(OhanaFont.adaptive(size: 17, weight: .black))
+                    .font(OhanaFont.adaptive(size: 17, weight: .semibold))
                     .foregroundStyle(selectedCatalogID == entry.id ? Color.goPrimary : Color.ohanaSecondaryText)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(entry.localizedCommonName)
-                        .font(OhanaFont.adaptive(size: 14, weight: .black, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 14, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText)
                     Text(entry.latinName)
-                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .semibold, design: .default))
                         .foregroundStyle(Color.ohanaSecondaryText)
                         .lineLimit(1)
                     Text(l.tr(
@@ -709,7 +724,7 @@ struct AddPlantView: View {
                         en: "Water \(entry.defaultWateringDays)d · fertilize \(entry.defaultFertilizingDays)d",
                         de: "Gießen \(entry.defaultWateringDays) T. · düngen \(entry.defaultFertilizingDays) T."
                     ))
-                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .bold, design: .default))
                     .foregroundStyle(Color.ohanaSecondaryText)
                 }
                 Spacer(minLength: 8)
@@ -731,7 +746,7 @@ struct AddPlantView: View {
 
     func catalogChip(_ title: String, foreground: Color, background: Color) -> some View {
         Text(title)
-            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .rounded))
+            .font(OhanaFont.adaptive(size: 10, weight: .bold, design: .default))
             .foregroundStyle(foreground)
             .lineLimit(1)
             .minimumScaleFactor(0.78)
@@ -743,7 +758,7 @@ struct AddPlantView: View {
     private var potSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "盆土", en: "Pot and soil", de: "Topf und Erde"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
@@ -751,7 +766,7 @@ struct AddPlantView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             Toggle(l.tr(zh: "花盆有排水孔", en: "Pot has drainage hole", de: "Topf hat Abzugsloch"), isOn: $potHasDrainage)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             OhanaChoiceChipRow(
@@ -762,7 +777,7 @@ struct AddPlantView: View {
             )
             TextField(l.tr(zh: "盆材质，如陶盆、塑料盆", en: "Pot material, e.g. terracotta or plastic", de: "Topfmaterial, z. B. Ton oder Kunststoff"), text: $potMaterial) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 .focused($focusedField, equals: .potMaterial)
@@ -777,7 +792,7 @@ struct AddPlantView: View {
             )
             TextField(l.tr(zh: "土壤类型，如疏松排水型通用土", en: "Soil type, e.g. loose well-draining mix", de: "Erdtyp, z. B. lockere gut drainierende Erde"), text: $soilType) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 .focused($focusedField, equals: .soil)
@@ -793,11 +808,11 @@ struct AddPlantView: View {
     private var sourceSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(l.tr(zh: "来源与类型", en: "Source and type", de: "Quelle und Typ"))
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
             Toggle(l.tr(zh: "记录购入日期", en: "Record acquired date", de: "Kaufdatum erfassen"), isOn: $hasAcquiredDate)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             if hasAcquiredDate {
@@ -813,7 +828,7 @@ struct AddPlantView: View {
             )
             TextField(l.tr(zh: "来源，如花市、朋友分株", en: "Source, e.g. market or friend's cutting", de: "Quelle, z. B. Markt oder Ableger von Freunden"), text: $acquisitionSource) // ui-v4: allow existing plant launch form input while OhanaTextField migration remains tracked.
                 .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
                 .focused($focusedField, equals: .source)
@@ -827,11 +842,11 @@ struct AddPlantView: View {
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             Toggle(l.tr(zh: "水培", en: "Hydroponic", de: "Hydrokultur"), isOn: $isHydroponic)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
             Toggle(l.tr(zh: "多肉/仙人掌类", en: "Succulent/cactus", de: "Sukkulente/Kaktus"), isOn: $isSucculent)
-                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 15, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .tint(Color.goPrimary)
         }
@@ -870,7 +885,7 @@ struct AddPlantView: View {
             UISelectionFeedbackGenerator().selectionChanged()
         } label: {
             Label(title, systemImage: "plus")
-                .font(OhanaFont.adaptive(size: 12, weight: .black, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .semibold, design: .default))
                 .foregroundStyle(Color.goTeal)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(minHeight: 44)
@@ -891,13 +906,13 @@ struct AddPlantView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 12, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaSecondaryText)
                 .textCase(.uppercase)
                 .tracking(0.6)
             TextField(placeholder, text: text) // ui-v4: allow existing form input; P1 baseline keeps layout stable while feature forms migrate to OhanaTextField
                 .textFieldStyle(.plain)
-                .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText)
                 .padding(14)
                 .background(Color.ohanaControlFill.opacity(0.68), in: RoundedRectangle(cornerRadius: OhanaRadius.row, style: .continuous))
@@ -1001,9 +1016,11 @@ struct AddPlantView: View {
 
     func applyCatalog(_ entry: PlantCatalogEntry) {
         let previousCatalogName = selectedCatalog?.localizedCommonName ?? ""
-        let shouldUseCatalogName = trimmedName.isEmpty || (!previousCatalogName.isEmpty && trimmedName == previousCatalogName)
+        let unknownDefaultName = l.tr(zh: "我的植物", en: "My plant", de: "Meine Pflanze")
+        let shouldUseCatalogName = trimmedName.isEmpty || trimmedName == unknownDefaultName || (!previousCatalogName.isEmpty && trimmedName == previousCatalogName)
         let defaults = PlantProfileUXPolicy.catalogDefaults(for: entry)
         selectedCatalogID = entry.id
+        isUnknownSpeciesSelected = false
         catalogQuery = ""
         if shouldUseCatalogName {
             name = defaults.name
@@ -1029,6 +1046,7 @@ struct AddPlantView: View {
 
     func clearSelectedPlantCatalog() {
         selectedCatalogID = ""
+        isUnknownSpeciesSelected = false
         catalogQuery = ""
         name = ""
         species = ""

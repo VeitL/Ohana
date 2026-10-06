@@ -40,20 +40,22 @@ extension CoconutShopView {
                 .font(OhanaFont.callout(.black))
                 .foregroundStyle(Color.goYellow)
 
-                Text(l.tr(
-                    zh: "执行前会重新校验余额；以下是按当前余额计算的预计出资。",
-                    en: "Balances are revalidated before purchase. This is the contribution preview using current balances.",
-                    de: "Die Guthaben werden vor dem Kauf erneut geprüft. Dies ist die Vorschau mit den aktuellen Guthaben.",
-                    es: "Los saldos se vuelven a comprobar antes de comprar. Esta es la aportación prevista con los saldos actuales.",
-                    pt: "Os saldos são verificados novamente antes da compra. Esta é a previsão com os saldos atuais.",
-                    fr: "Les soldes sont revérifiés avant l’achat. Voici la répartition prévue avec les soldes actuels.",
-                    ja: "購入直前に残高を再確認します。以下は現在の残高による支払い予定です。",
-                    ko: "구매 직전에 잔액을 다시 확인합니다. 아래는 현재 잔액 기준 예상 분담액입니다.",
-                    it: "I saldi vengono ricontrollati prima dell’acquisto. Questa è la ripartizione prevista con i saldi attuali."
-                ))
+                Text(l.text(ShopShelfCopy.fundingPreview))
                 .font(OhanaFont.caption(.semibold))
                 .foregroundStyle(secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+
+                Text(currentHumanSummary)
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                personalBalanceMetric
+                if funding.count > 1 {
+                    Text(l.text(ShopShelfCopy.cofunding))
+                        .font(OhanaFont.caption(.semibold))
+                        .foregroundStyle(secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 ForEach(funding) { contribution in
                     HStack(spacing: 8) {
@@ -86,8 +88,13 @@ extension CoconutShopView {
                     .background(Color.goOrange.opacity(0.12), in: RoundedRectangle(cornerRadius: OhanaRadius.input, style: .continuous))
                     .accessibilityIdentifier("coconut-shop-purchase-error")
             }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("coconut-shop-purchase-popup-\(item.id)")
+    }
 
-            Button {
+    func purchaseConfirmationAction(_ item: ShopItem) -> some View {
+        Button {
                 confirmPurchase(item)
             } label: {
                 HStack(spacing: 8) {
@@ -116,24 +123,11 @@ extension CoconutShopView {
             .buttonStyle(ScaleButtonStyle())
             .disabled(purchaseInFlightItemID != nil || purchaseRetryBlocked)
             .accessibilityIdentifier("coconut-shop-confirm-purchase-\(item.id)")
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("coconut-shop-purchase-popup-\(item.id)")
     }
 
     private var finalSaleNotice: some View {
         Label {
-            Text(l.tr(
-                zh: "确认后即为最终成交，不可撤销或退款。若应用暂时失败，商品或权益会保留并继续恢复，不会再次扣款。",
-                en: "Confirmation is final and cannot be cancelled or refunded. If application is delayed, the item or entitlement remains and recovery continues without another charge.",
-                de: "Die Bestätigung ist endgültig und kann weder storniert noch erstattet werden. Bei verzögerter Anwendung bleibt der Artikel erhalten und die Wiederherstellung läuft ohne erneute Belastung weiter.",
-                es: "La confirmación es definitiva y no se puede cancelar ni reembolsar. Si la aplicación se retrasa, el artículo se conserva y la recuperación continúa sin otro cargo.",
-                pt: "A confirmação é definitiva e não pode ser cancelada nem reembolsada. Se a aplicação atrasar, o item permanece e a recuperação continua sem nova cobrança.",
-                fr: "La confirmation est définitive, sans annulation ni remboursement. Si l’application est retardée, l’article reste acquis et la récupération continue sans nouveau débit.",
-                ja: "確定後の購入は取り消し・返金できません。適用が遅れた場合も商品や権利は保持され、再課金なしで復旧を続けます。",
-                ko: "확정된 구매는 취소하거나 환불할 수 없습니다. 적용이 지연되어도 상품이나 권리는 유지되며 추가 결제 없이 복구가 계속됩니다.",
-                it: "La conferma è definitiva e non può essere annullata o rimborsata. Se l’applicazione tarda, l’articolo resta acquisito e il recupero continua senza nuovi addebiti."
-            ))
+            Text(l.text(ShopShelfCopy.finalSale))
         } icon: {
             Image(systemName: "checkmark.shield.fill") // a11y: allow decorative icon; Label text carries the complete final-sale notice
         }
@@ -158,6 +152,29 @@ extension CoconutShopView {
                 .font(OhanaFont.callout(.bold))
                 .foregroundStyle(secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+            Text(l.text(item.isConsumable ? ShopShelfCopy.singleUse : ShopShelfCopy.permanent))
+                .font(OhanaFont.caption(.semibold))
+                .foregroundStyle(secondaryText)
+            if let detail = purchaseApplicationDetail(item) {
+                Text(l.text(detail))
+                    .font(OhanaFont.caption(.semibold))
+                    .foregroundStyle(secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    func purchaseApplicationDetail(_ item: ShopItem) -> AppLocalizedText? {
+        switch item.application {
+        case .plantDecor:
+            OasisPlantDecorID.slot(for: item.id) == .scene
+                ? ShopShelfCopy.sceneReplacement : ShopShelfCopy.potCompanion
+        case .avatarPass:
+            ShopShelfCopy.avatarRules
+        case .effect(.popoutCard):
+            ShopShelfCopy.popoutSetup
+        default:
+            nil
         }
     }
 

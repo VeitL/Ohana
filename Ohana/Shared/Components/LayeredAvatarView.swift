@@ -218,7 +218,7 @@ struct LayeredAvatarView: View {
             Image(systemName: "hand.tap.fill") // a11y: allow decorative icon covered by surrounding text or control
                 .font(OhanaFont.adaptive(size: 9, weight: .bold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
             Text(l.tr(zh: "点击捏脸", en: "Tap to customize", de: "Zum Anpassen tippen"))
-                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 9, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
         }
         .foregroundStyle(Color.goCardWhite)
         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -271,7 +271,7 @@ struct ColorPickerPopup: View {
                     .padding(.top, 12)
 
                 Text(title)
-                    .font(OhanaFont.adaptive(size: 18, weight: .bold, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 18, weight: .bold, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.ohanaPrimaryText)
 
                 // Color grid
@@ -307,7 +307,7 @@ struct ColorPickerPopup: View {
                             .strokeBorder(accent, lineWidth: 3)
                             .frame(width: 44, height: 44)
                         Image(systemName: "checkmark") // a11y: allow decorative icon covered by surrounding text or control
-                            .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                            .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                             .foregroundStyle(
                                 OhanaResolvedPrimaryAccent(customHex: preset.hex)?.actionTextColor ?? Color.ohanaPrimaryText
                             )
@@ -318,7 +318,7 @@ struct ColorPickerPopup: View {
                 .animation(GoMotion.feedback, value: isSelected)
 
                 Text(preset.localizedName(l))
-                    .font(OhanaFont.adaptive(size: 10, weight: isSelected ? .bold : .medium, design: .rounded)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 10, weight: isSelected ? .bold : .medium, design: .default)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(isSelected ? accent : textSec)
             }
         }

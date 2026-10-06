@@ -153,7 +153,7 @@ struct HumanWorkoutCard: View {
                         .foregroundStyle(Color.ohanaPrimaryText)
                     if isHealthKit {
                         Text(l.tr(zh: "健康", en: "Health", de: "Health"))
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -161,7 +161,7 @@ struct HumanWorkoutCard: View {
                     }
                     if isPetWalk {
                         Text(l.tr(zh: "遛狗", en: "Dog Walk", de: "Hundegang"))
-                            .font(OhanaFont.caption2(.black))
+                            .font(OhanaFont.caption2(.semibold))
                             .foregroundStyle(Color.arkInk)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -194,7 +194,7 @@ struct HumanWorkoutCard: View {
     private func workoutStatCell(value: String, label: String, color: Color) -> some View {
         VStack(spacing: 3) {
             Text(value)
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(color)
             Text(label)
                 .font(OhanaFont.caption2())
@@ -567,9 +567,9 @@ struct HumanWorkoutHistoryView: View {
                     Button { showAddSheet = true } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "plus").accessibilityHidden(true)
-                                .font(OhanaFont.adaptive(size: 16, weight: .black))
+                                .font(OhanaFont.adaptive(size: 16, weight: .semibold))
                             Text(l.tr(zh: "添加运动", en: "Add Workout", de: "Training hinzufügen"))
-                                .font(OhanaFont.adaptive(size: 16, weight: .black, design: .rounded))
+                                .font(OhanaFont.adaptive(size: 16, weight: .semibold, design: .default))
                         }
                         .foregroundStyle(Color.ohanaPrimaryActionText)
                         .padding(.horizontal, 28).padding(.vertical, 14)
@@ -655,7 +655,7 @@ struct HumanWorkoutHistoryView: View {
     private func summaryCell(value: String, label: String, color: Color) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(OhanaFont.title2(.black))
+                .font(OhanaFont.title2(.semibold))
                 .foregroundStyle(color)
             Text(label)
                 .font(OhanaFont.caption())

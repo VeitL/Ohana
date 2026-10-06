@@ -38,10 +38,10 @@ struct ImageCutoutPreviewSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(l.tr(zh: "选择头像样式", en: "Choose avatar style", de: "Avatar-Stil wählen"))
-                            .font(OhanaFont.adaptive(size: 18, weight: .black, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 18, weight: .semibold, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText)
                         Text(l.tr(zh: "点击任意一张完成选择", en: "Tap either image to choose", de: "Tippe auf ein Bild zum Auswählen"))
-                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                            .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                             .foregroundStyle(Color.ohanaPrimaryText.opacity(0.45))
                     }
                     Spacer()
@@ -94,14 +94,14 @@ struct ImageCutoutPreviewSheet: View {
                 // ── 底部提示
                 if !isProcessing, cutoutImage == nil {
                     Label(l.tr(zh: "无法识别主体，仅提供原图", en: "Could not detect the subject. Original only.", de: "Motiv nicht erkannt. Nur Original verfügbar."), systemImage: "exclamationmark.triangle")
-                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 12, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                         .padding(.bottom, 8)
                 }
 
                 // ── 说明文字
                 Text(l.tr(zh: "选择「去除背景」后，卡片正面将显示带白色描边的贴纸效果。", en: "Choose Remove background to show a sticker-style avatar with a white outline.", de: "Wähle Hintergrund entfernen, um einen Sticker-Avatar mit weißer Kontur zu zeigen."))
-                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                     .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -155,11 +155,11 @@ struct ImageCutoutPreviewSheet: View {
                     .font(OhanaFont.adaptive(size: 11, weight: .semibold))
                     .foregroundStyle(isSelected ? Color.goPrimary : .white.opacity(0.6))
                 Text(label)
-                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                    .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                     .foregroundStyle(isSelected ? Color.goPrimary : .white)
             }
             Text(sublabel)
-                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
         }
     }
@@ -176,7 +176,7 @@ struct ImageCutoutPreviewSheet: View {
                         .tint(Color.goPrimary)
                         .scaleEffect(1.2)
                     Text(l.tr(zh: "AI 智能抠图中…", en: "AI cutout in progress...", de: "AI-Freistellung läuft ..."))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
                 }
             }
@@ -189,10 +189,10 @@ struct ImageCutoutPreviewSheet: View {
             )
 
             Text(l.tr(zh: "去除背景", en: "Remove background", de: "Hintergrund entfernen"))
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.5))
             Text(l.tr(zh: "处理中…", en: "Processing...", de: "Wird verarbeitet ..."))
-                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
         }
     }
@@ -207,7 +207,7 @@ struct ImageCutoutPreviewSheet: View {
                         .font(OhanaFont.adaptive(size: 28))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
                     Text(l.tr(zh: "无法抠图", en: "Cutout failed", de: "Freistellen fehlgeschlagen"))
-                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .rounded))
+                        .font(OhanaFont.adaptive(size: 11, weight: .medium, design: .default))
                         .foregroundStyle(Color.ohanaPrimaryText.opacity(0.4))
                 }
             }
@@ -220,10 +220,10 @@ struct ImageCutoutPreviewSheet: View {
             )
 
             Text(l.tr(zh: "去除背景", en: "Remove background", de: "Hintergrund entfernen"))
-                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .rounded))
+                .font(OhanaFont.adaptive(size: 13, weight: .bold, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.3))
             Text(l.tr(zh: "识别失败", en: "Detection failed", de: "Erkennung fehlgeschlagen"))
-                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .rounded))
+                .font(OhanaFont.adaptive(size: 10, weight: .medium, design: .default))
                 .foregroundStyle(Color.ohanaPrimaryText.opacity(0.25))
         }
     }

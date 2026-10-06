@@ -384,7 +384,7 @@ struct TaskCenterPetProfileInlineEditor: View {
                 Spacer(minLength: 0)
                 if isSelected {
                     Image(systemName: "checkmark") // a11y: allow decorative selection glyph; the Button has a text label
-                        .font(OhanaFont.caption(.black))
+                        .font(OhanaFont.caption(.semibold))
                         .accessibilityHidden(true)
                 }
             }
@@ -430,7 +430,7 @@ struct TaskCenterPetProfileInlineEditor: View {
                         Spacer(minLength: 0)
                         if isSelected {
                             Image(systemName: "checkmark") // a11y: allow decorative selection glyph; the Button has a text label
-                                .font(OhanaFont.caption(.black))
+                                .font(OhanaFont.caption(.semibold))
                                 .accessibilityHidden(true)
                         }
                     }
@@ -505,7 +505,7 @@ struct TaskCenterPetProfileInlineEditor: View {
         VStack(alignment: .leading, spacing: 8) {
             if didSaveSuccessfully {
                 Label(TaskCenterPetProfileInlineCopy.saved(l), systemImage: "checkmark.circle.fill")
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goTeal)
                     .transition(.opacity)
                     .accessibilityIdentifier("task-center-pet-profile-inline-saved-\(checkpoint.rawValue)")
@@ -535,7 +535,7 @@ struct TaskCenterPetProfileInlineEditor: View {
                             .frame(maxWidth: .infinity, minHeight: 44)
                     } else {
                         Text(l.save)
-                            .font(OhanaFont.callout(.black))
+                            .font(OhanaFont.callout(.semibold))
                             .foregroundStyle(Color.ohanaPrimaryActionText)
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }

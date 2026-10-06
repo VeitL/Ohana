@@ -19,6 +19,7 @@ nonisolated struct PlantBatchCareSheetTask: Identifiable, Equatable, Sendable {
     let dueText: String
     let avatarSignature: String
     let tintHex: String
+    var lastCareDate: Date? = nil
 
     var selection: PlantBatchCareSelection {
         PlantBatchCareSelection(plantID: plantID, careType: careType, taskID: id)
@@ -167,7 +168,6 @@ actor PlantBatchCareRouteSnapshotActor {
                 calendar: calendar
             )
             .filter { $0.dueDate <= end }
-        }
             .filter { $0.daysUntilDue <= 0 }
             .filter { input.careType == nil || $0.careType == input.careType }
             .compactMap { task -> PlantBatchCareSheetTask? in
@@ -178,6 +178,11 @@ actor PlantBatchCareRouteSnapshotActor {
                     unassignedOutdoorTitle: input.unassignedOutdoorTitle
                 )
                 guard input.roomID == nil || roomName == input.roomID else { return nil }
+                let lastCareDate: Date? = switch task.careType {
+                case .watering: plant.lastWateredDate
+                case .fertilizing: plant.lastFertilizedDate
+                default: planningHistory.latestCareDates[task.careType]
+                }
                 return PlantBatchCareSheetTask(
                     id: task.id,
                     plantID: plant.id,
@@ -188,9 +193,11 @@ actor PlantBatchCareRouteSnapshotActor {
                     subtitle: task.subtitle,
                     dueText: Self.dueText(for: task),
                     avatarSignature: plant.avatarThumbnailSignature,
-                    tintHex: plant.themeColorHex
+                    tintHex: plant.themeColorHex,
+                    lastCareDate: lastCareDate
                 )
             }
+        }
         try Task.checkCancellation()
         return PlantBatchCareSheetSnapshot(tasks: tasks)
     }

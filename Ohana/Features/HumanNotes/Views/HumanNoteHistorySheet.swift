@@ -2,27 +2,20 @@
 //  HumanNoteHistorySheet.swift
 //  Ohana
 //
-//  V4 human note history.
+//  V4 human note history. Native searchable navigation + existing Human metric/record rows.
+//  Search/filter are local view state; timeline parsing happens once in the route container.
+//  Empty, loading, private and no-match states preserve access to normal note commands.
 //
 
 import SwiftData
 import SwiftUI
 import UIKit
 
-struct HumanNoteEntry: Identifiable {
-    let id: UUID
-    let date: Date
-    let dateString: String
-    let text: String
-    let attachments: [HumanNoteAttachmentReference]
-    let rawString: String
-    let recordedByHumanId: String?
-}
-
 struct HumanNoteHistoryContent: View {
     let human: Human
     let humans: [Human]
-    let noteRecords: [HumanNoteRecord]
+    let noteEntries: [HumanNoteEntry]
+    let isLoading: Bool
     let showsCloseButton: Bool
     let onRecordsChanged: () -> Void
 
@@ -33,38 +26,34 @@ struct HumanNoteHistoryContent: View {
     @Environment(\.ohanaAppLanguageCode) private var appLanguage
 
     @State private var showAddSheet = false
-    @State private var noteRevision = 0
+    @State private var searchText = ""
+    @State private var timeRange: HumanNoteTimeRange = .all
+    @State private var attachmentsOnly = false
+    @State private var pendingDeletion: HumanNoteEntry?
     @StateObject private var commandQueue = DeferredDomainCommandQueue()
 
     private var l: L10n { L10n(appLanguage) }
     private var activeHumanId: UUID? { UUID(uuidString: activeHumanIdStr) }
     private var isViewingOwnProfile: Bool { activeHumanId == human.id }
     private var isPrivacyLocked: Bool { human.isPrivate(.note, viewedBy: activeHumanId) }
-    private var noteEntries: [HumanNoteEntry] {
-        _ = noteRevision
-        return parseNotes()
-    }
-
     init(
         human: Human,
         humans: [Human],
-        noteRecords: [HumanNoteRecord],
+        noteEntries: [HumanNoteEntry],
+        isLoading: Bool = false,
         showsCloseButton: Bool = true,
         onRecordsChanged: @escaping () -> Void
     ) {
         self.human = human
         self.humans = humans
-        self.noteRecords = noteRecords
+        self.noteEntries = noteEntries
+        self.isLoading = isLoading
         self.showsCloseButton = showsCloseButton
         self.onRecordsChanged = onRecordsChanged
     }
 
     var body: some View {
-        if showsCloseButton { NavigationStack { content } } else { content }
-    }
-
-    private var content: some View {
-        Group {
+        OhanaNavigationContainer(ownsNavigationStack: showsCloseButton) {
             ZStack(alignment: .bottomTrailing) {
                 OhanaAppBackground().ignoresSafeArea()
 
@@ -73,27 +62,68 @@ struct HumanNoteHistoryContent: View {
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(alignment: .leading, spacing: 18) {
-                            header
+                            Text(human.name)
+                                .font(OhanaFont.title3(.bold))
+                                .foregroundStyle(Color.ohanaPrimaryText)
                             HumanPrivateDataNotice(human: human, field: .note)
-                            metricStrip
+                            if !isLoading {
+                                metricStrip
+                                HumanNoteTimelineFilters(timeRange: $timeRange, attachmentsOnly: $attachmentsOnly)
+                            }
                             notesSection
                         }
                         .padding(.horizontal, 16)
                         .padding(.top, 18)
                         .padding(.bottom, 110)
                     }
+                    .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: L10n(appLanguage).tr(
+                        zh: "搜索备注、附件或记录人", en: "Search notes, files or recorder",
+                        de: "Notizen, Dateien oder Person suchen",
+                        es: "Buscar notas, archivos o autor", pt: "Buscar notas, arquivos ou autor",
+                        fr: "Rechercher notes, fichiers ou auteur", ja: "メモ・添付・記録者を検索",
+                        ko: "메모, 첨부 파일 또는 기록자 검색", it: "Cerca note, file o autore"
+                    ))
 
                     addButton
                         .padding(.trailing, 18)
                         .padding(.bottom, 24)
                 }
             }
-            .toolbar(showsCloseButton ? .hidden : .visible, for: .navigationBar)
+            .navigationTitle(l.tr(zh: "备注记录", en: "Notes", de: "Notizen"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if showsCloseButton {
+                    OhanaModalToolbar(onClose: { dismiss() }, closeIdentifier: "human-module-close-action")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    if isViewingOwnProfile {
+                        HumanPrivacyToggleButton(human: human, field: .note)
+                    }
+                }
+            }
+            .confirmationDialog(
+                l.tr(
+                    zh: "删除这条备注？", en: "Delete this note?", de: "Diese Notiz löschen?",
+                    es: "¿Eliminar esta nota?", pt: "Excluir esta nota?", fr: "Supprimer cette note ?",
+                    ja: "このメモを削除しますか？", ko: "이 메모를 삭제할까요?", it: "Eliminare questa nota?"
+                ),
+                isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
+                titleVisibility: .visible,
+                presenting: pendingDeletion
+            ) { entry in
+                Button(l.tr(
+                    zh: "删除", en: "Delete", de: "Löschen", es: "Eliminar", pt: "Excluir",
+                    fr: "Supprimer", ja: "削除", ko: "삭제", it: "Elimina"
+                ), role: .destructive) {
+                    deleteNote(entry)
+                    pendingDeletion = nil
+                }
+                Button(l.cancel, role: .cancel) { pendingDeletion = nil }
+            }
             .sheet(isPresented: $showAddSheet) {
                 QuickHumanNoteSheet(
                     human: human,
                     onSaved: {
-                        noteRevision += 1
                         onRecordsChanged()
                     }
                 )
@@ -102,20 +132,7 @@ struct HumanNoteHistoryContent: View {
                 commandQueue.cancelAll()
             }
         }
-    }
-
-    private var header: some View {
-        HumanModulePageHeader(
-            human: human,
-            title: l.tr(zh: "备注记录", en: "Notes", de: "Notizen"),
-            subtitle: human.name,
-            showsCloseButton: showsCloseButton,
-            onClose: { dismiss() }
-        ) {
-            if isViewingOwnProfile {
-                HumanPrivacyToggleButton(human: human, field: .note)
-            }
-        }
+        .environment(\.locale, AppLanguage.effectiveLocale)
     }
 
     private var metricStrip: some View {
@@ -134,16 +151,30 @@ struct HumanNoteHistoryContent: View {
     }
 
     private var notesSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let visibleEntries = HumanNoteTimelineBuilder.filtered(
+            noteEntries, query: searchText, timeRange: timeRange,
+            attachmentsOnly: attachmentsOnly,
+            recorderNames: Dictionary(uniqueKeysWithValues: humans.map { ($0.id, $0.name) })
+        )
+        return VStack(alignment: .leading, spacing: 10) {
             Text(l.tr(zh: "时间线", en: "Timeline", de: "Zeitlinie"))
-                .font(OhanaFont.headline(.black))
+                .font(OhanaFont.headline(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
 
-            if noteEntries.isEmpty {
+            if isLoading {
+                ProgressView()
+                    .frame(maxWidth: .infinity, minHeight: 80)
+            } else if noteEntries.isEmpty {
                 emptyState
+            } else if visibleEntries.isEmpty {
+                HumanNoteTimelineNoResults {
+                    searchText = ""
+                    timeRange = .all
+                    attachmentsOnly = false
+                }
             } else {
                 LazyVStack(spacing: 10) {
-                    ForEach(noteEntries) { entry in
+                    ForEach(visibleEntries) { entry in
                         noteRow(entry)
                     }
                 }
@@ -155,10 +186,10 @@ struct HumanNoteHistoryContent: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
-                    .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPrimary)
-                Text(entry.date, format: .dateTime.year().month().day())
-                    .font(OhanaFont.caption(.black))
+                Text(noteDateText(entry.date))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.goPrimary)
                 if humans.count > 1, let recorderName = recorderName(for: entry) {
                     Text("· \(recorderName)")
@@ -168,24 +199,24 @@ struct HumanNoteHistoryContent: View {
                 }
                 Spacer()
                 Button {
-                    withAnimation(GoMotion.feedback) {
-                        deleteNote(entry)
-                    }
+                    pendingDeletion = entry
                 } label: {
                     Image(systemName: "trash") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.adaptive(size: 13, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                        .font(OhanaFont.adaptive(size: 13, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                         .foregroundStyle(Color.ohanaTertiaryText)
-                        .frame(width: 34, height: 34) // a11y: allow decorative non-interactive frame; hit area handled by parent
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .accessibilityLabel(l.tr(zh: "删除备注", en: "Delete note", de: "Notiz löschen"))
                 .accessibilityIdentifier("human-note-delete-action")
             }
 
-            Text(entry.text)
-                .font(OhanaFont.body(.semibold))
-                .foregroundStyle(Color.ohanaPrimaryText)
-                .fixedSize(horizontal: false, vertical: true)
+            if !entry.text.isEmpty {
+                Text(entry.text)
+                    .font(OhanaFont.body(.semibold))
+                    .foregroundStyle(Color.ohanaPrimaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if !entry.attachments.isEmpty {
                 attachmentStrip(entry.attachments)
@@ -216,10 +247,10 @@ struct HumanNoteHistoryContent: View {
         } else {
             HStack(spacing: 7) {
                 Image(systemName: attachment.isImage ? "photo.fill" : "doc.fill")
-                    .font(OhanaFont.adaptive(size: 12, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                    .font(OhanaFont.adaptive(size: 12, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                     .foregroundStyle(Color.goPurple)
                 Text(attachment.fileName)
-                    .font(OhanaFont.caption(.black))
+                    .font(OhanaFont.caption(.semibold))
                     .foregroundStyle(Color.ohanaPrimaryText)
                     .lineLimit(1)
             }
@@ -232,10 +263,10 @@ struct HumanNoteHistoryContent: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "note.text") // a11y: allow decorative icon covered by surrounding text or control
-                .font(OhanaFont.adaptive(size: 38, weight: .black)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
+                .font(OhanaFont.adaptive(size: 38, weight: .semibold)) // a11y: allow legacy fixed-size visual token; tracked for dynamic type cleanup
                 .foregroundStyle(Color.goPrimary)
             Text(l.tr(zh: "还没有备注", en: "No notes yet", de: "Noch keine Notizen"))
-                .font(OhanaFont.title3(.black))
+                .font(OhanaFont.title3(.semibold))
                 .foregroundStyle(Color.ohanaPrimaryText)
             Text(l.tr(
                 zh: "记录一句想法、身体感受或重要提醒。",
@@ -279,61 +310,26 @@ struct HumanNoteHistoryContent: View {
 
     private var latestNoteText: String {
         guard let latest = noteEntries.first else { return l.tr(zh: "无", en: "None", de: "Keine") }
-        let cal = Calendar.current
-        if cal.isDateInToday(latest.date) { return l.tr(zh: "今天", en: "Today", de: "Heute") }
-        if cal.isDateInYesterday(latest.date) { return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern") }
-        return latest.date.formatted(date: .abbreviated, time: .omitted)
+        return noteDateText(latest.date)
     }
 
-    private static let noteDateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "yyyy-MM-dd"
-        return f
-    }()
-
-    private func parseNotes() -> [HumanNoteEntry] {
-        guard !human.notes.isEmpty else { return [] }
-        let parts = human.notes.components(separatedBy: "\n\n")
-        let recordsBySequence = Dictionary(uniqueKeysWithValues: noteRecords.map { ($0.sequence, $0) })
-        return parts.enumerated().compactMap { sequence, part in
-            let trimmed = part.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { return nil }
-            let record = recordsBySequence[sequence]
-            if trimmed.hasPrefix("["),
-               let bracketEnd = trimmed.firstIndex(of: "]") {
-                let dateStr = String(trimmed[trimmed.index(after: trimmed.startIndex) ..< bracketEnd])
-                let rest = String(trimmed[trimmed.index(after: bracketEnd)...])
-                    .trimmingCharacters(in: .whitespaces)
-                if let date = Self.noteDateFormatter.date(from: dateStr) {
-                    let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: rest)
-                    return HumanNoteEntry(
-                        id: record?.id ?? UUID(),
-                        date: date,
-                        dateString: dateStr,
-                        text: parsed.text,
-                        attachments: parsed.attachments,
-                        rawString: trimmed,
-                        recordedByHumanId: record?.recordedByHumanId
-                    )
-                }
-            }
-            let parsed = HumanNoteAttachmentStore.visibleTextAndAttachments(from: trimmed)
-            return HumanNoteEntry(
-                id: record?.id ?? UUID(),
-                date: .distantPast,
-                dateString: "",
-                text: parsed.text,
-                attachments: parsed.attachments,
-                rawString: trimmed,
-                recordedByHumanId: record?.recordedByHumanId
+    private func noteDateText(_ date: Date?) -> String {
+        guard let date else {
+            return l.tr(
+                zh: "未注明日期", en: "Undated", de: "Ohne Datum",
+                es: "Sin fecha", pt: "Sem data", fr: "Sans date",
+                ja: "日付なし", ko: "날짜 없음", it: "Senza data"
             )
         }
-        .sorted { $0.date > $1.date }
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return l.tr(zh: "今天", en: "Today", de: "Heute") }
+        if cal.isDateInYesterday(date) { return l.tr(zh: "昨天", en: "Yesterday", de: "Gestern") }
+        return date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(AppLanguage.effectiveLocale))
     }
 
     private func recorderName(for entry: HumanNoteEntry) -> String? {
         guard let id = entry.recordedByHumanId else { return nil }
-        return humans.first { $0.id.uuidString == id }?.name
+        return humans.first { $0.id == UUID(uuidString: id) }?.name
     }
 
     private func deleteNote(_ entry: HumanNoteEntry) {
@@ -343,8 +339,18 @@ struct HumanNoteHistoryContent: View {
             let result = HumanCareCommandExecutor(context: modelContext, services: appServices).deleteNote(
                 human: human,
                 rawString: entry.rawString,
-                recordID: entry.id
+                recordID: entry.recordID
             )
+            guard result.didDelete, result.didPersist else {
+                appServices.islandToasts.show(l.tr(
+                    zh: "备注未能删除，请重试。", en: "The note could not be deleted. Try again.",
+                    de: "Die Notiz konnte nicht gelöscht werden. Bitte erneut versuchen.",
+                    es: "No se pudo eliminar la nota. Inténtalo de nuevo.", pt: "Não foi possível excluir a nota. Tente novamente.",
+                    fr: "La note n’a pas pu être supprimée. Réessayez.", ja: "メモを削除できませんでした。再試行してください。",
+                    ko: "메모를 삭제할 수 없습니다. 다시 시도해 주세요.", it: "Impossibile eliminare la nota. Riprova."
+                ))
+                return
+            }
             if case .pending = result.attachmentCleanup {
                 appServices.islandToasts.show(l.tr(
                     zh: "备注已删除，但本地附件未能完全清理。请联系支持。",
@@ -352,7 +358,6 @@ struct HumanNoteHistoryContent: View {
                     de: "Die Notiz wurde gelöscht, aber der lokale Anhang konnte nicht vollständig entfernt werden. Kontaktiere den Support."
                 ))
             }
-            noteRevision += 1
             onRecordsChanged()
         }
     }
@@ -379,10 +384,10 @@ private struct HumanNoteAttachmentImagePreview: View {
             } else {
                 VStack(spacing: 5) {
                     Image(systemName: "photo.fill") // a11y: allow decorative icon covered by surrounding text or control
-                        .font(OhanaFont.callout(.black))
+                        .font(OhanaFont.callout(.semibold))
                         .accessibilityHidden(true)
                     Text(fileName)
-                        .font(OhanaFont.caption2(.black))
+                        .font(OhanaFont.caption2(.semibold))
                         .lineLimit(1)
                 }
                 .foregroundStyle(Color.goPurple)
