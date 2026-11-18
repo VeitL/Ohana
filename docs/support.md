@@ -1,32 +1,53 @@
 # Ohana Support / Ohana 支持
 
-Last updated / 最后更新：2026-07-16
+Last updated / 最后更新：2026-11-07
 
-Ohana is a local-first iPhone app for household care. For help, email
+Ohana is a local-first iPhone care app. Version 1.0 offers the Free experience
+without an Ohana account. For help, email
 [guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support).
 
-Ohana 是一款本地优先的 iPhone 家庭照护 App。如需帮助，请发送邮件至
+Ohana 是一款本地优先的 iPhone 照护 App。1.0 提供免费体验，无需 Ohana 账号。
+如需帮助，请发送邮件至
 [guanchen.li.119@gmail.com](mailto:guanchen.li.119@gmail.com?subject=Ohana%20Support)。
 
-## Purchases and subscriptions / 购买与订阅
+## Free limits and existing records / 免费额度与已有记录
 
-- Restore an eligible purchase in **Settings > Ohana Personal > Restore
-  Purchases**.
-- Manage or cancel a monthly or yearly subscription from your Apple Account's
-  subscription settings. Buying Personal Lifetime does not automatically cancel
-  an existing subscription.
-- Apple processes payments. To review a charge or request a refund, use
-  [reportaproblem.apple.com](https://reportaproblem.apple.com/).
-- If products or prices do not load, check the network connection, reopen Ohana,
-  and try again later. Ohana's Free features remain available.
+Free allows two active pets, two active people, and five active plants.
+Everyday plans, reminders, and basic care records have no count limit. Your
+saved profiles, records, history, and media remain available. Creating or
+reactivating a profile that would exceed its active limit is restricted.
 
-- 可在 **设置 > Ohana Personal > 恢复购买** 中恢复符合条件的购买。
-- 月付或年付订阅需在 Apple 账号的订阅设置中管理或取消。购买 Personal 永久版不会自动
-  取消现有订阅。
-- 付款由 Apple 处理。如需核对扣款或申请退款，请访问
-  [reportaproblem.apple.com](https://reportaproblem.apple.com/)。
-- 若商品或价格暂时无法加载，请检查网络、重新打开 Ohana 后稍后重试；Ohana Free
-  功能仍可继续使用。
+Free 支持 2 只活跃宠物、2 位活跃家人和 5 株活跃植物。普通计划、提醒和基础照护记录
+不限数量。已有档案、记录、历史和媒体继续可用。新增或重新激活档案时，系统会检查
+对应的活跃档案额度。
+
+## Personal preview / Personal 预告
+
+Settings > Ohana Free includes a shaded Ohana Personal card marked
+**Coming soon**. Advanced scheduling is planned for a later release. Personal is not offered for purchase in 1.0. There are no
+purchase, Restore Purchases, or subscription-management controls in this
+preview. The app continues to reconcile verified existing Apple entitlements
+without changing ownership of your saved data or Coconut Shop items.
+
+设置中的 Ohana Free 介绍页包含阴影遮罩的 Personal **Coming soon** 预告，高级排程将在后续版本提供。
+1.0 不开放 Personal 购买，预告页没有购买、恢复购买或订阅管理操作。应用继续核对
+已经验证的 Apple 权益，同时保留已有数据和椰子商店物品所有权。
+
+## Backups and exports / 备份与导出
+
+Optional automatic backup keeps the latest restricted package in
+your own iCloud Drive. Ohana does not add password encryption to automatic
+backup packages. Manual external backup and export use a restricted
+scope as well. Human health and HealthKit-derived records, free-text household
+tasks, and derived economy/ledger sidecars are excluded. A restricted package
+is not a complete copy of all app data. Check the scope shown in the app before
+using it for recovery. Copies you deliberately share or save outside Ohana
+remain under your control.
+
+可选自动备份在你自己的 iCloud Drive 中保留最新一份受限备份。Ohana 不为自动备份包添加密码加密。手动外部备份和
+导出也采用受限范围，排除人类健康及 HealthKit 衍生记录、自由文本家庭任务，以及
+派生经济和账本侧车数据。受限包不是全部 App 数据的完整副本；恢复前请查看应用内
+说明。你主动分享或保存到 Ohana 以外的副本由你管理。
 
 ## When contacting support / 联系支持时
 
